@@ -1479,7 +1479,7 @@ void GuiMainWindow::cb_display_io_node_i()
 		if (exists(fn_job+"job.star"))
 		{
 			excludetiltseriesjob.read(fn_job.c_str(), iscont, true); // true means do initialise
-            command += " --cash-size " + excludetiltseriesjob.joboptions["cache_size"].getString();
+            command += " --cache-size " + excludetiltseriesjob.joboptions["cache_size"].getString();
         }
 
         // Run in the background
@@ -1498,7 +1498,7 @@ void GuiMainWindow::cb_display_io_node_i()
         if (exists(fn_job+"job.star"))
         {
             excludetiltseriesjob.read(fn_job.c_str(), iscont, true); // true means do initialise
-            command += " --cash-size " + excludetiltseriesjob.joboptions["cache_size"].getString();
+            command += " --cache-size " + excludetiltseriesjob.joboptions["cache_size"].getString();
         }
 
         // Run in the background

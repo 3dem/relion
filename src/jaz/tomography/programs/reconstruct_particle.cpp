@@ -556,14 +556,6 @@ void ReconstructParticleProgram::finalise(
 		dataImgDivRS[0], dataImgRS[0], ctfImgFS[0],
 			"merged", binnedOutPixelSize);
 
-	if (particleSet.hasHalfSets())
-    {
-        optimisationSet.refMap1 = outDir + "half1.mrc";
-        optimisationSet.refMap2 = outDir + "half2.mrc";
-        optimisationSet.refFSC = "";
-        optimisationSet.write(outDir + "optimisation_set.star");
-    }
-
     Log::endSection();
 }
 
