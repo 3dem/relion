@@ -745,10 +745,6 @@ void TomogramSet::generateSingleMetaDataTable(MetaDataTable &MDout, ObservationM
 
 void TomogramSet::convertBackFromSingleMetaDataTable(MetaDataTable &MDin)
 {
-    if (!MDin.containsLabel(EMDL_MICROGRAPH_PRE_EXPOSURE))
-    {
-        REPORT_ERROR("BUG: MDin should contain a rlnMicrographPreExposure label");
-    }
 
     for (long int t = 0; t < tomogramTables.size(); t++)
     {

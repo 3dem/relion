@@ -189,13 +189,6 @@ void CtffindRunner::initialise(bool is_leader)
 			MDin.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group);
 			optics_group_micrographs_all.push_back(optics_group);
 
-            if (is_tomo)
-            {
-                RFLOAT exposure;
-                MDin.getValue(EMDL_MICROGRAPH_PRE_EXPOSURE, exposure);
-                pre_exposure_micrographs.push_back(exposure);
-            }
-
 		}
 	}
 	else
@@ -494,12 +487,6 @@ void CtffindRunner::joinCtffindResults()
 				MDctf.setValue(EMDL_CTF_PHASESHIFT, phaseshift);
 			if (fabs(valscore + 999.) > 0.)
 				MDctf.setValue(EMDL_CTF_VALIDATIONSCORE, valscore);
-
-            if (is_tomo)
-            {
-                // Store pre-exposure to sort images on, just in case this program messed up the order...
-                MDctf.setValue(EMDL_MICROGRAPH_PRE_EXPOSURE, pre_exposure_micrographs[imic]);
-            }
 
 		}
 
