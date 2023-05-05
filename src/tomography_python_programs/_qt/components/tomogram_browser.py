@@ -1,26 +1,29 @@
-import mrcfile
 import napari
+import mrcfile
 import numpy as np
 from psygnal import Signal
 from qtpy.QtWidgets import QWidget, QVBoxLayout, QLabel, QSizePolicy
 from lru import LRU
 
-from ..._metadata_models.gui.tilt_series_set import GuiTiltSeriesSet as GuiTiltSeriesSet
+from ..._metadata_models.gui.tilt_series_set import GuiTiltSeriesSet
 from ..._metadata_models.gui.tilt_series import GuiTiltSeries
 from .tilt_series_list import TiltSeriesListWidget
+
+IMAGE_LAYER_NAME = 'tomogram'
 
 
 class TomogramBrowserWidget(QWidget):
     changing_tomogram: Signal = Signal()
     tomogram_changed: Signal = Signal()
+    image_layer: napari.layers.Image
 
     def __init__(
-            self,
-            viewer: napari.Viewer,
-            tilt_series: GuiTiltSeriesSet,
-            cache_size: int,
-            *args,
-            **kwargs
+        self,
+        viewer: napari.Viewer,
+        tilt_series: GuiTiltSeriesSet,
+        cache_size: int,
+        *args,
+        **kwargs
     ):
         super().__init__(*args, **kwargs)
         self.viewer = viewer
@@ -49,6 +52,10 @@ class TomogramBrowserWidget(QWidget):
         self._on_tomogram_selection_change()
 
     @property
+    def image_layer(self) -> napari.layers.Image:
+        return self.viewer.layers[IMAGE_LAYER_NAME]
+
+    @property
     def selected_tilt_series(self) -> GuiTiltSeries:
         return self._selected_tilt_series
 
@@ -64,11 +71,11 @@ class TomogramBrowserWidget(QWidget):
 
     def _update_tomogram_in_viewer(self, tomogram: np.ndarray):
         if 'tomogram' in self.viewer.layers:
-            self.viewer.layers['tomogram'].data = tomogram
+            self.viewer.layers[IMAGE_LAYER_NAME].data = tomogram
         else:
             self.viewer.add_image(
                 data=tomogram,
-                name='tomogram',
+                name=IMAGE_LAYER_NAME,
                 depiction='plane',
                 plane={'thickness': 1},
                 rendering='minip',
@@ -87,15 +94,13 @@ class TomogramBrowserWidget(QWidget):
         self._cache[tilt_series_id] = tomogram
         if add_to_viewer:
             self._update_tomogram_in_viewer(tomogram)
-            self.tomogram_changed.emit()
 
     def _load_tomogram_from_cache(self, tilt_series_id: str, add_to_viewer: bool):
         if add_to_viewer is True:
             self._update_tomogram_in_viewer(self._cache[tilt_series_id])
-            self._on_tomogram_loaded()
 
     def _on_tomogram_loaded(self):
-        layer = self.viewer.layers['tomogram']
+        layer = self.viewer.layers[IMAGE_LAYER_NAME]
         layer.depiction = 'plane'
         layer.plane.position = np.array(layer.data.shape) / 2
         layer.plane.normal = (1, 0, 0)
@@ -118,4 +123,3 @@ class TomogramBrowserWidget(QWidget):
 
     def next_tilt_series(self, event=None):
         self.tilt_series_list_widget.next()
-

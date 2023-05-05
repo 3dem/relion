@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Tuple, Dict, Optional, Iterable
+from typing import List, Dict, Iterable
 
 import mrcfile
 import napari
@@ -30,12 +30,12 @@ class TiltSeriesBrowserWidget(QWidget):
     tilt_series_changed: Signal = Signal()
 
     def __init__(
-            self,
-            viewer: napari.Viewer,
-            tilt_series: GuiTiltSeriesSet,
-            cache_size: int,
-            *args,
-            **kwargs
+        self,
+        viewer: napari.Viewer,
+        tilt_series: GuiTiltSeriesSet,
+        cache_size: int,
+        *args,
+        **kwargs
     ):
         super().__init__(*args, **kwargs)
         self.viewer = viewer
@@ -103,7 +103,8 @@ class TiltSeriesBrowserWidget(QWidget):
             self._disconnect_worker_safe(worker)
 
         if self.selected_tilt_series.name not in self._cache:
-            self.load_tilt_series_async(self.selected_tilt_series.name, update_viewer=True)
+            self.load_tilt_series_async(self.selected_tilt_series.name,
+                                        update_viewer=True)
         else:
             self.load_tilt_series_from_cache(self.selected_tilt_series.name)
         self._remove_workers_for_uncached_tilt_series()
@@ -165,11 +166,13 @@ class TiltSeriesBrowserWidget(QWidget):
         worker = _read_tilt_series(tilt_series_id, list(tilt_images))
         return worker
 
-    def _connect_events_for_background_loading(self, worker: GeneratorWorker) -> GeneratorWorker:
+    def _connect_events_for_background_loading(self,
+                                               worker: GeneratorWorker) -> GeneratorWorker:
         worker.yielded.connect(self._cache_tilt_series)
         return worker
 
-    def _connect_events_for_gui_updates(self, worker: GeneratorWorker) -> GeneratorWorker:
+    def _connect_events_for_gui_updates(self,
+                                        worker: GeneratorWorker) -> GeneratorWorker:
         worker.yielded.connect(self._update_tilt_series_in_viewer)
         worker.finished.connect(self.tilt_series_changed.emit)
         worker.finished.connect(self.preload_next_tilt_series)
@@ -214,7 +217,8 @@ class TiltSeriesBrowserWidget(QWidget):
     @property
     def background_workers(self) -> Iterable[GeneratorWorker]:
         background_worker_keys = self._workers.keys() - {self.selected_tilt_series.name}
-        return (self._workers[tilt_series_id] for tilt_series_id in background_worker_keys)
+        return (self._workers[tilt_series_id] for tilt_series_id in
+                background_worker_keys)
 
     def _update_list_from_combobox(self):
         idx = self.tilt_series_combo_box.currentIndex()
@@ -227,14 +231,16 @@ class TiltSeriesBrowserWidget(QWidget):
         self.tilt_series_combo_box.blockSignals(False)
 
 
-def _create_empty_tilt_series_data(tilt_image_files: List[Path], dtype=np.float32) -> np.ndarray:
+def _create_empty_tilt_series_data(tilt_image_files: List[Path],
+                                   dtype=np.float32) -> np.ndarray:
     with mrcfile.open(tilt_image_files[0], header_only=True) as mrc:
         tilt_series_shape = (len(tilt_image_files), mrc.header.ny, mrc.header.nx)
     return np.zeros(shape=tilt_series_shape, dtype=dtype)
 
 
 @thread_worker(progress={'total': 40}, start_thread=False)
-def _read_tilt_series(tilt_series_id: str, tilt_image_files: List[Path]) -> LazyTiltSeriesData:
+def _read_tilt_series(tilt_series_id: str,
+                      tilt_image_files: List[Path]) -> LazyTiltSeriesData:
     tilt_series = _create_empty_tilt_series_data(tilt_image_files, dtype=np.float16)
     lazy_tilt_series_data = LazyTiltSeriesData(
         name=tilt_series_id, data=tilt_series, last_loaded_index=None, n_images_loaded=0

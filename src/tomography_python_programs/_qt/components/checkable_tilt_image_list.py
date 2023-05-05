@@ -16,6 +16,7 @@ class QTiltImageItem(QListWidgetItem):
 
 class TiltImageListWidget(QListWidget):
     """QListWidget of QTiltImageItem"""
+
     def __init__(self):
         super().__init__()
         self.images = []
@@ -64,5 +65,3 @@ class TiltImageListWidget(QListWidget):
     def deselect_all(self):
         for i in range(self.count()):
             self.item(i).setCheckState(Qt.CheckState.Unchecked)
-
-
