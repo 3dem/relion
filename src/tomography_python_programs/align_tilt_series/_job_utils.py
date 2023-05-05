@@ -6,7 +6,7 @@ import pandas as pd
 import starfile
 import typer
 
-from .._metadata_models.relion.tilt_series_set import TiltSeriesSet
+from .._metadata_models.relion.tilt_series_set import RlnTiltSeriesSet
 from .._utils.transformations import S, Rx, Ry, Rz
 from ._cli import cli
 
@@ -67,7 +67,7 @@ def tilt_series_alignment_parameters_to_relion_projection_matrices(
 
 
 def write_global_output(
-        input_tilt_series_set: TiltSeriesSet,
+        input_tilt_series_set: RlnTiltSeriesSet,
         job_directory: Path
 ):
     """Write output from a batch of tilt-series alignment experiments."""

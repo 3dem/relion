@@ -1,4 +1,5 @@
-from .particles import pick_isolated_particles_cli
-from .spheres import pick_spheres_cli
+from .particles import pick_particles
+from .spheres import pick_spheres
+from .filaments import pick_filaments
 
 from ._cli import cli

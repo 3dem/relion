@@ -1,1 +1,1 @@
-from .tilt_series import TiltSeries
+from .tilt_series import RlnTiltSeries

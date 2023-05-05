@@ -9,11 +9,11 @@ from .._job_utils import (
     create_alignment_job_directories,
 )
 from ._utils import get_xyz_extrinsic_euler_angles, get_specimen_shifts
-from ..._metadata_models.relion.tilt_series import TiltSeries
+from ..._metadata_models.relion.tilt_series import RlnTiltSeries
 
 
 def align_single_tilt_series(
-        tilt_series: TiltSeries,
+        tilt_series: RlnTiltSeries,
         pixel_spacing_angstroms: float,
         alignment_function: Callable,
         alignment_function_kwargs: Dict[str, Any],
@@ -59,7 +59,7 @@ def align_single_tilt_series(
             etomo_output)
         df[['rlnTomoXShiftAngst', 'rlnTomoYShiftAngst']] = get_specimen_shifts(
             etomo_output) * pixel_spacing_angstroms
-        TiltSeries(name=tilt_series.name, data=df).write_star_file(
+        RlnTiltSeries(name=tilt_series.name, data=df).write_star_file(
             metadata_directory / f'{tilt_series.name}.star')
     except RuntimeError:
         error_console.log(f'ERROR: alignment for {tilt_series.name} failed')

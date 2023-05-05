@@ -1,17 +1,17 @@
-from tomography_python_programs._metadata_models.relion.tilt_series import TiltSeries
-from tomography_python_programs._metadata_models.relion.tilt_series_set import TiltSeriesSet
+from tomography_python_programs._metadata_models.relion.tilt_series import RlnTiltSeries
+from tomography_python_programs._metadata_models.relion.tilt_series_set import RlnTiltSeriesSet
 
 
 def test_read_single_tilt_series_metadata(tilt_series_star_file):
     """Simple parsing test."""
-    tilt_series = TiltSeries.from_star_file(tilt_series_star_file)
+    tilt_series = RlnTiltSeries.from_star_file(tilt_series_star_file)
     assert tilt_series.data.shape == (41, 29)
 
 
 def test_read_global_metadata(global_relion_metadata_file, run_in_project_directory):
     """Simple parsing test."""
-    relion_metadata = TiltSeriesSet.from_star_file(global_relion_metadata_file)
-    assert isinstance(relion_metadata, TiltSeriesSet)
+    relion_metadata = RlnTiltSeriesSet.from_star_file(global_relion_metadata_file)
+    assert isinstance(relion_metadata, RlnTiltSeriesSet)
     assert len(relion_metadata.tilt_series) == 5
     assert len(relion_metadata.global_data) == 5
     assert relion_metadata.global_data.shape == (5, 13)
@@ -38,7 +38,7 @@ def test_gui_data_model_from_relion_metadata(relion_metadata, run_in_project_dir
 
 
 def test_gui_data_model_includes_tomogram_file(relion_metadata, run_in_project_directory):
-    """Test that _gui model generated from relion metadata references tomograms."""
+    """Test that _qt model generated from relion metadata references tomograms."""
     gui_model = relion_metadata.as_gui_model()
     tilt_series = gui_model[list(gui_model.keys())[0]]
     assert tilt_series.tomogram_file is not None

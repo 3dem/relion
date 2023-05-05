@@ -6,7 +6,7 @@ from napari.settings import get_settings
 from napari.utils.notifications import NotificationSeverity
 
 from .relion_tilt_image_excluder import RelionTiltImageExcluderWidget
-from .._metadata_models.relion.tilt_series_set import TiltSeriesSet
+from .._metadata_models.relion.tilt_series_set import RlnTiltSeriesSet
 from .._utils.relion import relion_pipeline_job
 
 cli = typer.Typer(add_completion=False)
@@ -22,7 +22,7 @@ def exclude_tilt_images_cli(
     viewer = napari.Viewer()
     settings = get_settings()
     settings.application.gui_notification_level = NotificationSeverity.ERROR
-    relion_metadata = TiltSeriesSet.from_star_file(tilt_series_star_file)
+    relion_metadata = RlnTiltSeriesSet.from_star_file(tilt_series_star_file)
     dock_widget = RelionTiltImageExcluderWidget(
         viewer=viewer,
         relion_metadata=relion_metadata,

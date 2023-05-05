@@ -4,7 +4,7 @@ import napari
 import numpy as np
 from qtpy.QtWidgets import QWidget, QVBoxLayout, QPushButton, QSizePolicy
 
-from .._metadata_models.gui.tilt_series_set import TiltSeriesSet
+from .._metadata_models.gui.tilt_series_set import GuiTiltSeriesSet
 from .components.tilt_image_selection_widget import TiltImageSelectionWidget
 from .components.tilt_series_browser import TiltSeriesBrowserWidget
 
@@ -13,7 +13,7 @@ class TiltImageExcluderWidget(QWidget):
     def __init__(
             self,
             viewer: napari.Viewer,
-            tilt_series: TiltSeriesSet,
+            tilt_series: GuiTiltSeriesSet,
             cache_size: int,
             save_button_label: str,
             *args,

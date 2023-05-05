@@ -7,7 +7,7 @@ from rich.console import Console
 from .align_tilt_series import align_single_tilt_series
 from .._cli import cli
 from .._job_utils import write_global_output
-from ..._metadata_models.relion.tilt_series_set import TiltSeriesSet
+from ..._metadata_models.relion.tilt_series_set import RlnTiltSeriesSet
 from ..._utils.relion import relion_pipeline_job
 
 console = Console(record=True)
@@ -28,7 +28,7 @@ def aretomo_cli(
         raise RuntimeError('Could not find tilt series star file')
     console.log('Extracting metadata from STAR file')
 
-    tilt_series_set = TiltSeriesSet.from_star_file(
+    tilt_series_set = RlnTiltSeriesSet.from_star_file(
         filename=tilt_series_star_file, tilt_series_id=tomogram_name
     )
     for global_data, tilt_series in tilt_series_set:

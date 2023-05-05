@@ -12,8 +12,8 @@ from superqt.combobox import QSearchableComboBox
 from lru import LRU
 
 from ..._metadata_models.gui.lazy_tilt_series_data import LazyTiltSeriesData
-from ..._metadata_models.gui.tilt_series_set import TiltSeriesSet
-from ..._metadata_models.gui.tilt_series import TiltSeries
+from ..._metadata_models.gui.tilt_series_set import GuiTiltSeriesSet
+from ..._metadata_models.gui.tilt_series import GuiTiltSeries
 from .tilt_series_list import TiltSeriesListWidget
 
 
@@ -32,7 +32,7 @@ class TiltSeriesBrowserWidget(QWidget):
     def __init__(
             self,
             viewer: napari.Viewer,
-            tilt_series: TiltSeriesSet,
+            tilt_series: GuiTiltSeriesSet,
             cache_size: int,
             *args,
             **kwargs
@@ -80,11 +80,11 @@ class TiltSeriesBrowserWidget(QWidget):
         self.on_tilt_series_change()
 
     @property
-    def selected_tilt_series(self) -> TiltSeries:
+    def selected_tilt_series(self) -> GuiTiltSeries:
         return self._selected_tilt_series
 
     @selected_tilt_series.setter
-    def selected_tilt_series(self, value: TiltSeries):
+    def selected_tilt_series(self, value: GuiTiltSeries):
         self._selected_tilt_series = value
 
     def on_tilt_series_change(self):

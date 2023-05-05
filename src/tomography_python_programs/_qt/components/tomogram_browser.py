@@ -5,8 +5,8 @@ from psygnal import Signal
 from qtpy.QtWidgets import QWidget, QVBoxLayout, QLabel, QSizePolicy
 from lru import LRU
 
-from ..._metadata_models.gui.tilt_series_set import TiltSeriesSet as GuiTiltSeriesSet
-from ..._metadata_models.gui.tilt_series import TiltSeries
+from ..._metadata_models.gui.tilt_series_set import GuiTiltSeriesSet as GuiTiltSeriesSet
+from ..._metadata_models.gui.tilt_series import GuiTiltSeries
 from .tilt_series_list import TiltSeriesListWidget
 
 
@@ -49,11 +49,11 @@ class TomogramBrowserWidget(QWidget):
         self._on_tomogram_selection_change()
 
     @property
-    def selected_tilt_series(self) -> TiltSeries:
+    def selected_tilt_series(self) -> GuiTiltSeries:
         return self._selected_tilt_series
 
     @selected_tilt_series.setter
-    def selected_tilt_series(self, value: TiltSeries):
+    def selected_tilt_series(self, value: GuiTiltSeries):
         self._selected_tilt_series = value
 
     def _on_tomogram_selection_change(self):

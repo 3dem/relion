@@ -6,14 +6,14 @@ import pandas as pd
 import starfile
 from pydantic import BaseModel, validator
 
-from .tilt_series import TiltSeries
-from ..gui.tilt_series_set import TiltSeriesSet as GuiTiltSeriesSet
-from ..gui.tilt_series import TiltSeries as GuiTiltSeries
+from .tilt_series import RlnTiltSeries
+from ..gui.tilt_series_set import GuiTiltSeriesSet as GuiTiltSeriesSet
+from ..gui.tilt_series import GuiTiltSeries as GuiTiltSeries
 
 
-class TiltSeriesSet(BaseModel):
+class RlnTiltSeriesSet(BaseModel):
     global_data: pd.DataFrame
-    tilt_series: List[TiltSeries]
+    tilt_series: List[RlnTiltSeries]
 
     class Config:
         arbitrary_types_allowed = True
@@ -41,10 +41,10 @@ class TiltSeriesSet(BaseModel):
         if tilt_series_id is not None:  # get single tilt-series
             global_df = global_df.loc[tilt_series_id]
             tilt_series_star_file = global_df['rlnTomoTiltSeriesStarFile']
-            tilt_series = [TiltSeries.from_star_file(tilt_series_star_file)]
+            tilt_series = [RlnTiltSeries.from_star_file(tilt_series_star_file)]
         else:  # get all tilt-series
             tilt_series = [
-                TiltSeries.from_star_file(tilt_series_star_file)
+                RlnTiltSeries.from_star_file(tilt_series_star_file)
                 for tilt_series_star_file
                 in global_df['rlnTomoTiltSeriesStarFile']
             ]
@@ -88,9 +88,9 @@ class TiltSeriesSet(BaseModel):
                 tilt_series_set[gui_tilt_series.name].denoised_tomogram_file = tomogram_file
         return tilt_series_set
 
-    def __getitem__(self, tilt_series_id: str) -> TiltSeries:
+    def __getitem__(self, tilt_series_id: str) -> RlnTiltSeries:
         return self.tilt_series[self._tilt_series_names.index(tilt_series_id)]
 
-    def __iter__(self) -> Iterable[Tuple[pd.Series, TiltSeries]]:
+    def __iter__(self) -> Iterable[Tuple[pd.Series, RlnTiltSeries]]:
         return ((self.global_data.loc[tilt_series.name], tilt_series) for
                 tilt_series in self.tilt_series)

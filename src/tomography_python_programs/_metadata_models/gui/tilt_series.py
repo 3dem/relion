@@ -4,7 +4,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 
-class TiltSeries(BaseModel):
+class GuiTiltSeries(BaseModel):
     name: str
     tilt_image_files: List[Path]
     tomogram_file: Optional[Path] = None

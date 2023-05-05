@@ -1,19 +1,18 @@
 from pathlib import Path
 
 import napari
-import numpy as np
 import pandas as pd
 import starfile
 from napari_threedee.annotators import SphereAnnotator
+from napari_threedee.data_models import N3dSpheres
 from qtpy.QtWidgets import QWidget, QVBoxLayout, QPushButton, QSizePolicy
 from typer import Option
 
 from ._cli import cli
-from .._metadata_models.relion.tilt_series_set import TiltSeriesSet
-from .._metadata_models.gui.tilt_series_set import TiltSeriesSet as GuiTiltSeriesSet
-from .._gui.components.tomogram_browser import TomogramBrowserWidget
-from .._gui.components.save_dialog import SaveDialog
-from .._utils.relion import relion_pipeline_job
+from .._metadata_models.relion.tilt_series_set import RlnTiltSeriesSet
+from .._metadata_models.gui.tilt_series_set import GuiTiltSeriesSet
+from .._qt.components.tomogram_browser import TomogramBrowserWidget
+from .._qt.components.save_dialog import SaveDialog
 
 COMMAND_NAME = 'spheres'
 
@@ -44,6 +43,7 @@ class PickSpheresWidget(QWidget):
         self.annotator = SphereAnnotator(
             viewer=viewer, enabled=True
         )
+        self.points_layer = None
 
         self.tomogram_browser_widget.changing_tomogram.connect(
             self._open_save_dialog
@@ -61,56 +61,53 @@ class PickSpheresWidget(QWidget):
         self.synchronise_annotator()
 
     def synchronise_annotator(self):
-        if self.annotator.points_layer is not None:
-            self.viewer.layers.remove(self.annotator.points_layer)
+        self.annotator.enabled = False
+        if self.points_layer is not None:
+            self.viewer.layers.remove(self.points_layer)
             self.viewer.layers.remove(self.annotator.surface_layer)
-        self.annotator.points_layer = None
-        self.annotator.set_layers(image_layer=self.viewer.layers['tomogram'])
-        self.annotator.enabled = True
-        self.viewer.layers.selection = [self.viewer.layers['tomogram']]
         try:
-            self.load_particles()
+            n3d_spheres = self.load_particles()
+            self.points_layer = n3d_spheres.as_layer()
         except FileNotFoundError:
-            pass
+            self.points_layer = N3dSpheres(centers=[], radii=[]).as_layer()
+        self.viewer.add_layer(self.points_layer)
+        self.annotator = SphereAnnotator(
+            viewer=self.viewer,
+            image_layer=self.tomogram_browser_widget.image_layer,
+            points_layer=self.points_layer,
+            enabled=True,
+        )
+        self.viewer.layers.selection = [self.tomogram_browser_widget.image_layer]
 
     @property
     def current_particle_star_file(self) -> Path:
         tilt_series_id = self.tomogram_browser_widget.selected_tilt_series.name
-        return self.output_directory / tilt_series_id / 'spheres.star'
+        return self.output_directory / f'{tilt_series_id}_spheres.star'
 
     def save_particles(self):
-        centers_zyx = self.annotator.points_layer.data
-        if len(centers_zyx) == 0:
+        spheres = N3dSpheres.from_layer(self.points_layer)
+        if len(spheres.centers) == 0:
             raise ValueError('no spheres to save')
-        radii = self.annotator.points_layer.features[self.annotator.SPHERE_RADIUS_FEATURES_KEY]
         output_directory = self.current_particle_star_file.parent
         output_directory.mkdir(parents=True, exist_ok=True)
+        ts_id = self.tomogram_browser_widget.selected_tilt_series.name
         sphere_data = {
-            'rlnCoordinateX': centers_zyx[:, -1],
-            'rlnCoordinateY': centers_zyx[:, -2],
-            'rlnCoordinateZ': centers_zyx[:, -3],
-            'rlnSphereRadius': radii.to_numpy(),
+            'rlnTomoName': [ts_id] * len(spheres.centers),
+            'rlnCoordinateX': spheres.centers[:, -1],
+            'rlnCoordinateY': spheres.centers[:, -2],
+            'rlnCoordinateZ': spheres.centers[:, -3],
+            'rlnSphereRadius': spheres.radii,
         }
         df = pd.DataFrame(sphere_data)
         starfile.write(df, self.current_particle_star_file, overwrite=True)
 
-    def load_particles(self):
+    def load_particles(self) -> N3dSpheres:
         if not self.current_particle_star_file.exists():
             raise FileNotFoundError
         df = starfile.read(self.current_particle_star_file)
         zyx = df[['rlnCoordinateZ', 'rlnCoordinateY', 'rlnCoordinateX']].to_numpy()
         radii = df['rlnSphereRadius'].to_numpy()
-        if self.annotator.points_layer is None:
-            self.annotator.points_layer = self.annotator._create_points_layer()
-            self.viewer.layers.append(self.annotator.points_layer)
-        self.annotator.points_layer.data = zyx
-        self.annotator.points_layer.features[
-            self.annotator.SPHERE_ID_FEATURES_KEY
-        ] = np.arange(len(zyx))
-        self.annotator.points_layer.features[
-            self.annotator.SPHERE_RADIUS_FEATURES_KEY
-        ] = radii
-        self.annotator._update_spheres()
+        return N3dSpheres(centers=zyx, radii=radii)
 
     def _open_save_dialog(self):
         if self.annotator.points_layer is None:
@@ -124,14 +121,13 @@ class PickSpheresWidget(QWidget):
 
 
 @cli.command(name=COMMAND_NAME, no_args_is_help=True)
-@relion_pipeline_job
-def pick_spheres_cli(
+def pick_spheres(
     tilt_series_star_file: Path = Option(...),
     output_directory: Path = Option(...),
     cache_size: int = 3
 ):
     viewer = napari.Viewer(ndisplay=3)
-    relion_tilt_series_set = TiltSeriesSet.from_star_file(tilt_series_star_file)
+    relion_tilt_series_set = RlnTiltSeriesSet.from_star_file(tilt_series_star_file)
     gui_tilt_series_set = relion_tilt_series_set.as_gui_model()
     dock_widget = PickSpheresWidget(
         viewer=viewer,
@@ -140,7 +136,7 @@ def pick_spheres_cli(
         cache_size=cache_size
     )
     viewer.window.add_dock_widget(
-        dock_widget, name='RELION sphere picker', area='left'
+        dock_widget, name='RELION: 3D sphere picker', area='left'
     )
     viewer.axes.visible = True
     viewer.axes.labels = False

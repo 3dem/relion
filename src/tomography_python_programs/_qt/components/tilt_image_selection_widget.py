@@ -4,7 +4,7 @@ from psygnal import Signal
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import QWidget, QLabel, QVBoxLayout
 
-from ..._metadata_models.gui.tilt_series import TiltSeries
+from ..._metadata_models.gui.tilt_series import GuiTiltSeries
 from .selection_buttons import SelectionButtons
 from .checkable_tilt_image_list import TiltImageListWidget
 
@@ -15,7 +15,7 @@ class TiltImageSelectionWidget(QWidget):
     def __init__(
             self,
             viewer: napari.Viewer,
-            tilt_series: TiltSeries,
+            tilt_series: GuiTiltSeries,
             *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.viewer = viewer
@@ -55,11 +55,11 @@ class TiltImageSelectionWidget(QWidget):
             self.viewer.dims.current_step = tuple(dims)
 
     @property
-    def tilt_series(self) -> TiltSeries:
+    def tilt_series(self) -> GuiTiltSeries:
         return self._tilt_series
 
     @tilt_series.setter
-    def tilt_series(self, value: TiltSeries):
+    def tilt_series(self, value: GuiTiltSeries):
         self._tilt_series = value
         self.tilt_image_list_widget.images = self.tilt_series.tilt_image_files
 

@@ -5,7 +5,7 @@ import starfile
 from pydantic import BaseModel
 
 
-class TiltSeries(BaseModel):
+class RlnTiltSeries(BaseModel):
     name: str
     data: pd.DataFrame
 

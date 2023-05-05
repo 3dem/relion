@@ -1,11 +1,11 @@
 from PyQt5.QtWidgets import QListWidget, QListWidgetItem
 
-from ..._metadata_models.gui.tilt_series_set import TiltSeriesSet
-from ..._metadata_models.gui.tilt_series import TiltSeries
+from ..._metadata_models.gui.tilt_series_set import GuiTiltSeriesSet
+from ..._metadata_models.gui.tilt_series import GuiTiltSeries
 
 
 class QTiltSeriesItem(QListWidgetItem):
-    def __init__(self, tilt_series: TiltSeries, *args, **kwargs):
+    def __init__(self, tilt_series: GuiTiltSeries, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.tilt_series = tilt_series
         self.setText(self.tilt_series.name)
@@ -13,7 +13,7 @@ class QTiltSeriesItem(QListWidgetItem):
 
 class TiltSeriesListWidget(QListWidget):
     """QListWidget of QTiltSeriesItem."""
-    def __init__(self, tilt_series: TiltSeriesSet):
+    def __init__(self, tilt_series: GuiTiltSeriesSet):
         super().__init__()
         self.setSortingEnabled(False)
         self.setMaximumHeight(200)
@@ -23,7 +23,7 @@ class TiltSeriesListWidget(QListWidget):
             self.addItem(QTiltSeriesItem(tilt_series))
         self.setCurrentItem(self.item(0))
 
-    def selected_tilt_series_in_view(self) -> TiltSeries:
+    def selected_tilt_series_in_view(self) -> GuiTiltSeries:
         return self.currentItem().tilt_series
 
     def _go_to_index(self, idx: int):

@@ -1,5 +1,5 @@
 from typing import Dict
 
-from .tilt_series import TiltSeries
+from .tilt_series import GuiTiltSeries
 
-TiltSeriesSet = Dict[str, TiltSeries]
+GuiTiltSeriesSet = Dict[str, GuiTiltSeries]
