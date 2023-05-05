@@ -83,7 +83,7 @@ class PickFilamentsWidget(QWidget):
     @property
     def current_particle_star_file(self) -> Path:
         tilt_series_id = self.tomogram_browser_widget.selected_tilt_series.name
-        return self.output_directory / f'{tilt_series_id}_filaments.star'
+        return self.output_directory / 'annotations' / f'{tilt_series_id}_filaments.star'
 
     def save_particles(self):
         paths = N3dPaths.from_layer(self.points_layer)

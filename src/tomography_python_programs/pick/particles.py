@@ -85,7 +85,7 @@ class PickIsolatedParticlesWidget(QWidget):
     @property
     def current_particle_star_file(self) -> Path:
         tilt_series_id = self.tomogram_browser_widget.selected_tilt_series.name
-        return self.output_directory / f'{tilt_series_id}_particles.star'
+        return self.output_directory / 'annotations' / f'{tilt_series_id}_particles.star'
 
     def save_particles(self):
         zyx = self.points_layer.data

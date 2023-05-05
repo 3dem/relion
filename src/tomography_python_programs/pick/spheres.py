@@ -82,7 +82,7 @@ class PickSpheresWidget(QWidget):
     @property
     def current_particle_star_file(self) -> Path:
         tilt_series_id = self.tomogram_browser_widget.selected_tilt_series.name
-        return self.output_directory / f'{tilt_series_id}_spheres.star'
+        return self.output_directory / 'annotations' / f'{tilt_series_id}_spheres.star'
 
     def save_particles(self):
         spheres = N3dSpheres.from_layer(self.points_layer)
