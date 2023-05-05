@@ -1470,7 +1470,7 @@ void GuiMainWindow::cb_display_io_node_i()
     else if (pipeline.nodeList[mynode].type.find(LABEL_TOMO_TILTSERIES) != std::string::npos )
     {
 
-        command = "relion_tomo_view_tilt_series --tilt-series-star-file " + pipeline.nodeList[mynode].name;
+        command = "relion_tomo_view tilt-series --tilt-series-star-file " + pipeline.nodeList[mynode].name;
 
         // Read cache-size from gui_tomo_exclude_tilt_imagesjob.star if that file exists
 		RelionJob excludetiltseriesjob;
@@ -1489,7 +1489,7 @@ void GuiMainWindow::cb_display_io_node_i()
     else if (pipeline.nodeList[mynode].type.find(LABEL_TOMO_TOMOGRAMS) != std::string::npos )
     {
 
-        command = "relion_tomo_view_tomograms --tilt-series-star-file " + pipeline.nodeList[mynode].name;
+        command = "relion_tomo_view tomograms --tilt-series-star-file " + pipeline.nodeList[mynode].name;
 
         // Read cache-size from gui_tomo_exclude_tilt_imagesjob.star if that file exists
         RelionJob excludetiltseriesjob;
