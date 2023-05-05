@@ -83,6 +83,7 @@ relion_tomo_exclude_tilt_images = "tomography_python_programs.exclude_tilt_image
 relion_tomo_align_tilt_series = "tomography_python_programs.align_tilt_series:cli"
 relion_tomo_view = "tomography_python_programs.view:cli"
 relion_tomo_pick = "tomography_python_programs.pick:cli"
+relion_tomo_derive_particle_poses = "tomography_python_programs.derive_particle_poses:cli"
 relion_tomo_denoise = "tomography_python_programs.denoise:cli"
 
 
