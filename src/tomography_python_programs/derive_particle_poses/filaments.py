@@ -98,7 +98,7 @@ def derive_poses_along_filament_backbones(
     df = pd.concat(dfs)
 
     if add_helical_priors is True:
-        rot_prior, tilt_prior, psi_prior = R.from_matrix(rotated_basis).as_euler(
+        rot_prior, tilt_prior, psi_prior = R.from_matrix(rotated_basis).inv().as_euler(
             seq='ZYZ', degrees=True
         )
         df['rlnAngleTiltPrior'] = [tilt_prior] * len(df)
