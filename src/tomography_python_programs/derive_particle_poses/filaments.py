@@ -30,6 +30,13 @@ def derive_poses_along_filament_backbones(
     ),
     twist_degrees: float = typer.Option(
         ..., help="twist between particles in degrees."
+    ),
+    add_helical_priors: bool = typer.Option(
+        False, help="Whether to extract rotated particles and add helical priors."
+    ),
+    filament_polarity_known: bool = typer.Option(
+        True, help="Whether filament polarity from annotations should be fixed "
+                   "during helical reconstruction"
     )
 ):
     global_df = starfile.read(tilt_series_star_file)
@@ -44,7 +51,16 @@ def derive_poses_along_filament_backbones(
         for filament_id, df in filament_df.groupby('rlnTomoManifoldIndex'):
             xyz = df[['rlnCoordinateX', 'rlnCoordinateY', 'rlnCoordinateZ']]
             xyz = xyz.to_numpy() * scale_factor
+
+            # derive equidistant poses along length of filament
             path = Path(control_points=xyz)
+            pose_sampler = path_samplers.HelicalPoseSampler(
+                spacing=spacing_angstroms / pixel_size, twist=twist_degrees
+            )
+            poses = pose_sampler.sample(path)
+            eulers = R.from_matrix(poses.orientations).inv().as_euler(
+                seq='ZYZ', degrees=True,
+            )
 
             # calculate total length of filament in pixels at tilt series pixel size
             point_sampler = path_samplers.PointSampler(spacing=0.1)
@@ -53,14 +69,15 @@ def derive_poses_along_filament_backbones(
             distances = np.linalg.norm(differences, axis=1)
             total_length = np.sum(distances)
 
-            # derive equidistant poses along length
-            pose_sampler = path_samplers.HelicalPoseSampler(
-                spacing=spacing_angstroms / pixel_size, twist=twist_degrees
-            )
-            poses = pose_sampler.sample(path)
-            eulers = R.from_matrix(poses.orientations).inv().as_euler(
-                seq='ZYZ', degrees=True,
-            )
+            # rot/psi are coupled when tilt==0,
+            # pre-rotate particles such that they have tilt=90 relative to a reference
+            # filament aligned along the z-axis
+            if add_helical_priors is True:
+                rotated_basis = R.from_euler('x', angles=90, degrees=True).as_matrix()
+                rotated_orientations = poses.orientations @ rotated_basis
+                eulers = R.from_matrix(rotated_orientations).inv().as_euler(
+                    seq='ZYZ', degrees=True,
+                )
 
             # how far along the helix is each particle? in angstroms
             total_length = total_length / pixel_size
@@ -79,5 +96,17 @@ def derive_poses_along_filament_backbones(
             }
             dfs.append(pd.DataFrame(data))
     df = pd.concat(dfs)
+
+    if add_helical_priors is True:
+        rot_prior, tilt_prior, psi_prior = R.from_matrix(rotated_basis).as_euler(
+            seq='ZYZ', degrees=True
+        )
+        df['rlnAngleTiltPrior'] = [tilt_prior] * len(df)
+        df['rlnAnglePsiPrior'] = [psi_prior] * len(df)
+
+        if filament_polarity_known is False:
+            df['rlnAnglePsiFlipRatio'] = [0.5] * len(df)
+
+    # write output
     output_file = output_directory / 'particles.star'
     starfile.write({'particles': df}, output_file, overwrite=True)
