@@ -13,6 +13,7 @@ from .._metadata_models.relion.tilt_series_set import RlnTiltSeriesSet
 from .._metadata_models.gui.tilt_series_set import GuiTiltSeriesSet
 from .._qt.components.tomogram_browser import TomogramBrowserWidget
 from .._qt.components.save_dialog import SaveDialog
+from .._utils.relion import relion_pipeline_job
 
 COMMAND_NAME = 'spheres'
 
@@ -56,7 +57,8 @@ class PickSpheresWidget(QWidget):
         self.setLayout(QVBoxLayout())
         self.layout().addWidget(self.tomogram_browser_widget)
         self.layout().addWidget(self.save_button)
-        self.tomogram_browser_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.tomogram_browser_widget.setSizePolicy(QSizePolicy.Expanding,
+                                                   QSizePolicy.Expanding)
         self.tomogram_browser_widget.layout().setContentsMargins(0, 0, 0, 0)
         self.synchronise_annotator()
 
@@ -121,6 +123,7 @@ class PickSpheresWidget(QWidget):
 
 
 @cli.command(name=COMMAND_NAME, no_args_is_help=True)
+@relion_pipeline_job
 def pick_spheres(
     tilt_series_star_file: Path = Option(...),
     output_directory: Path = Option(...),

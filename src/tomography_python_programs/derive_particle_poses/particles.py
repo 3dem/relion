@@ -5,11 +5,13 @@ import starfile
 import typer
 
 from ._cli import cli
+from .._utils.relion import relion_pipeline_job
 
 COMMAND_NAME = 'particles'
 
 
 @cli.command(name=COMMAND_NAME, no_args_is_help=True)
+@relion_pipeline_job
 def combine_particle_annotations(
     tilt_series_star_file: Path = typer.Option(
         ..., help='tilt-series STAR file containing tomogram'

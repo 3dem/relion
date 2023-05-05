@@ -7,11 +7,13 @@ from morphosamplers import Sphere, sphere_samplers
 from scipy.spatial.transform.rotation import Rotation as R
 
 from ._cli import cli
+from .._utils.relion import relion_pipeline_job
 
 COMMAND_NAME = 'spheres'
 
 
 @cli.command(name=COMMAND_NAME, no_args_is_help=True)
+@relion_pipeline_job
 def derive_poses_on_spheres(
     tilt_series_star_file: Path = typer.Option(
         ..., help='tilt-series STAR file containing tomogram'
@@ -40,7 +42,8 @@ def derive_poses_on_spheres(
         radii = sphere_df['rlnSphereRadius'].to_numpy() * scale_factor
         for center, radius in zip(centers, radii):
             sphere = Sphere(center=center, radius=radius)
-            sampler = sphere_samplers.PoseSampler(spacing=spacing_angstroms / pixel_size)
+            sampler = sphere_samplers.PoseSampler(
+                spacing=spacing_angstroms / pixel_size)
             poses = sampler.sample(sphere)
             eulers = R.from_matrix(poses.orientations).inv().as_euler(
                 seq='ZYZ', degrees=True,

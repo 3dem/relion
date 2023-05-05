@@ -14,6 +14,7 @@ from .._metadata_models.relion.tilt_series_set import RlnTiltSeriesSet
 from .._metadata_models.gui.tilt_series_set import GuiTiltSeriesSet
 from .._qt.components.tomogram_browser import TomogramBrowserWidget
 from .._qt.components.save_dialog import SaveDialog
+from .._utils.relion import relion_pipeline_job
 
 COMMAND_NAME = 'filaments'
 
@@ -126,6 +127,7 @@ class PickFilamentsWidget(QWidget):
 
 
 @cli.command(name=COMMAND_NAME, no_args_is_help=True)
+@relion_pipeline_job
 def pick_filaments(
     tilt_series_star_file: Path = Option(...),
     output_directory: Path = Option(...),
