@@ -36,7 +36,7 @@ dependencies = [
     "makefun",
     "lru-dict",
     "superqt",
-    "napari-threedee",
+    "morphosamplers",
 ]
 
 # extras
@@ -66,6 +66,7 @@ dev = [
 ]
 vis = [
     "napari",
+    "napari-threedee",
     "qtpy",
     "psygnal",
     "pyqt5",
