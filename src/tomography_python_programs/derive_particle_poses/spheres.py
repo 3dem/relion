@@ -34,7 +34,7 @@ def derive_poses_on_spheres(
     dfs = []
     for file in annotation_files:
         sphere_df = starfile.read(file)
-        tilt_series_id = ''.join(file.name.split('_')[:-1])
+        tilt_series_id = '_'.join(file.name.split('_')[:-1])
         pixel_size = float(global_table[tilt_series_id]['rlnTomoTiltSeriesPixelSize'])
         scale_factor = float(global_table[tilt_series_id]['rlnTomoTomogramBinning'])
         centers = sphere_df[['rlnCoordinateX', 'rlnCoordinateY', 'rlnCoordinateZ']]

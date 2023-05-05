@@ -29,7 +29,7 @@ def combine_particle_annotations(
     dfs = []
     for file in annotation_files:
         df = starfile.read(file)
-        tilt_series_id = ''.join(file.name.split('_')[:-1])
+        tilt_series_id = '_'.join(file.name.split('_')[:-1])
         scale_factor = float(global_table[tilt_series_id]['rlnTomoTomogramBinning'])
         xyz = df[['rlnCoordinateX', 'rlnCoordinateY', 'rlnCoordinateZ']].to_numpy()
         df[['rlnCoordinateX', 'rlnCoordinateY', 'rlnCoordinateZ']] = xyz * scale_factor

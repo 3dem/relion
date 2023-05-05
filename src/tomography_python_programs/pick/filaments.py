@@ -97,7 +97,7 @@ class PickFilamentsWidget(QWidget):
         ts_id = self.tomogram_browser_widget.selected_tilt_series.name
         filament_data = {
             'rlnTomoName': [ts_id] * len(zyx),
-            'rlnManifoldID': paths.spline_ids,
+            'rlnTomoManifoldIndex': paths.spline_ids,
             'rlnCoordinateX': zyx[:, -1],
             'rlnCoordinateY': zyx[:, -2],
             'rlnCoordinateZ': zyx[:, -3],
@@ -110,7 +110,7 @@ class PickFilamentsWidget(QWidget):
             raise FileNotFoundError
         df = starfile.read(self.current_particle_star_file)
         paths = []
-        for _, _df in df.groupby('rlnManifoldID'):
+        for _, _df in df.groupby('rlnTomoManifoldIndex'):
             zyx = _df[['rlnCoordinateZ', 'rlnCoordinateY', 'rlnCoordinateX']].to_numpy()
             paths.append(N3dPath(data=zyx))
         return N3dPaths(data=paths)
