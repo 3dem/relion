@@ -28,15 +28,15 @@ def derive_poses_on_spheres(
         ..., help="target spacing between particle poses on spheres in angstroms."
     ),
 ):
-    star = starfile.read(tilt_series_star_file)
-    global_table = star['global'].set_index('rlnTomoName')
+    global_df = starfile.read(tilt_series_star_file)
+    global_df = global_df.set_index('rlnTomoName')
     annotation_files = annotations_directory.glob('*_spheres.star')
     dfs = []
     for file in annotation_files:
         sphere_df = starfile.read(file)
         tilt_series_id = '_'.join(file.name.split('_')[:-1])
-        pixel_size = float(global_table[tilt_series_id]['rlnTomoTiltSeriesPixelSize'])
-        scale_factor = float(global_table[tilt_series_id]['rlnTomoTomogramBinning'])
+        pixel_size = float(global_df.loc[tilt_series_id, 'rlnTomoTiltSeriesPixelSize'])
+        scale_factor = float(global_df.loc[tilt_series_id, 'rlnTomoTomogramBinning'])
         centers = sphere_df[['rlnCoordinateX', 'rlnCoordinateY', 'rlnCoordinateZ']]
         centers = centers.to_numpy() * scale_factor
         radii = sphere_df['rlnSphereRadius'].to_numpy() * scale_factor
