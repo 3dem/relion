@@ -11,24 +11,31 @@ from .file import basename
 
 
 def calculate_pre_exposure_dose(
-        df: pd.DataFrame,
-        dose_per_tilt_image: Optional[float] = None,
-        dose_per_movie_frame: Optional[float] = None,
+    df: pd.DataFrame,
+    dose_per_tilt_image: Optional[float] = None,
+    dose_per_movie_frame: Optional[float] = None,
 ) -> np.ndarray:
     """Assumes that mdoc dataframe is already sorted by datetime."""
     if dose_per_tilt_image is not None and dose_per_movie_frame is not None:
-        raise ValueError('only one of dose_per_tilt_image and dose_per_movie_frame can be set.')
-    dose_override_provided = dose_per_tilt_image is not None or dose_per_movie_frame is not None
-    if "exposure_dose" in df.columns and dose_override_provided is False:
-        pre_exposure_dose = np.cumsum(df["exposure_dose"].to_numpy())
+        raise ValueError(
+            'only one of dose_per_tilt_image and dose_per_movie_frame can be set.'
+        )
+    dose_override_provided = (
+        dose_per_tilt_image is not None
+        or dose_per_movie_frame is not None
+    )
+    if "ExposureDose" in df.columns and dose_override_provided is False:
+        pre_exposure_dose = np.cumsum(df["ExposureDose"].to_numpy())
     elif dose_per_tilt_image is not None:
         pre_exposure_dose = dose_per_tilt_image * np.arange(len(df))
     elif dose_per_movie_frame is not None:
-        cumulative_frame_number = np.cumsum(df["num_sub_frames"])
+        cumulative_frame_number = np.cumsum(df["NumSubFrames"])
         post_exposure_dose = dose_per_movie_frame * cumulative_frame_number
         pre_exposure_dose = np.pad(post_exposure_dose, pad_width=(1, 0))[:-1]
     else:
-        warnings.warn('no dose information found in mdoc or provided, defaulting to zero.')
+        warnings.warn(
+            'no dose information found in mdoc or provided, defaulting to zero.'
+        )
         pre_exposure_dose = [0] * len(df)
     return pre_exposure_dose
 
@@ -53,8 +60,9 @@ def construct_tomogram_id(mdoc_file: Path, prefix: str) -> str:
 def remove_missing_images(df: pd.DataFrame, mdoc_file: Path) -> pd.DataFrame:
     """Removes images from dataframe if image specified in mdoc file cannot be found, and warns user"""
     console = rich.console.Console(record=True)
-    missing_images =  df['SubFramePath'].loc[df['tilt_image_file'].isnull()] 
+    missing_images = df['SubFramePath'].loc[df['tilt_image_file'].isnull()]
     for missing_image in missing_images:
         missing_image = Path(str(missing_image).split("\\")[-1])
-        console.log(f'WARNING: Image {missing_image} from {mdoc_file} not found in image files.')
+        console.log(
+            f'WARNING: Image {missing_image} from {mdoc_file} not found in image files.')
     return df[df['tilt_image_file'].notna()]
