@@ -1276,12 +1276,14 @@ long int MetaDataTable::read(const FileName &filename, const std::string &name, 
 		REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_read + " does not exist" );
 	}
 
-	return readStar(in, name, do_only_count);
+	const long int ret = readStar(in, name, do_only_count);
 
 	in.close();
 
 	// Go to the first object
 	firstObject();
+
+	return ret;
 }
 
 void MetaDataTable::write(std::ostream& out) const

@@ -442,6 +442,8 @@ public:
 
 	bool validateCharactersStrict(bool do_allow_double_dollar = false) const;
 
+	bool endsWith(const std::string &target) const;
+
 	/** From a wild-card containing filename get a vector with all existing filenames,
 	 * return number of existing filenames
 	 * If do_clear, the output vector will be clear when starting, when false, files will just be added to the vector

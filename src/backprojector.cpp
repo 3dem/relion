@@ -1209,6 +1209,8 @@ void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
                                         MultidimArray<RFLOAT> &tau2_io,
 										MultidimArray<RFLOAT> &sigma2_ref,
 										MultidimArray<RFLOAT> &data_vs_prior,
+										RFLOAT pixel_size,
+										RFLOAT particle_diameter,
 										bool is_whole_instead_of_half,
                                         RFLOAT tau2_fudge,
                                         int verb)
@@ -1257,6 +1259,8 @@ void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
 	MDlist.setValue(EMDL_MLMODEL_DIMENSIONALITY, ref_dim);
 	MDlist.setValue(EMDL_MLMODEL_ORIGINAL_SIZE, ori_size);
 	MDlist.setValue(EMDL_MLMODEL_CURRENT_SIZE, 2*r_max);
+	MDlist.setValue(EMDL_MLMODEL_PIXEL_SIZE, pixel_size);
+	MDlist.setValue(EMDL_OPTIMISER_PARTICLE_DIAMETER, particle_diameter);
 
 	MDtau.setName("external_reconstruct_tau2");
 	for (int ii = 0; ii < XSIZE(tau2); ii++)
