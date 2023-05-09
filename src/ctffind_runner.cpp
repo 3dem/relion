@@ -519,7 +519,8 @@ void CtffindRunner::joinCtffindResults()
 	if (verb > 0)
 	{
 		progress_bar(fn_micrographs_all.size());
-		std::cout << " Done! Written out: " << fn_out <<  "micrographs_ctf.star" << std::endl;
+		if (is_tomo) std::cout << " Done! Written out: " << fn_out <<  "tilt_series_ctf.star" << std::endl;
+        else std::cout << " Done! Written out: " << fn_out <<  "micrographs_ctf.star" << std::endl;
 	}
 
 	if (verb > 0)
