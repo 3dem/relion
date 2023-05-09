@@ -1,3 +1,4 @@
+import warnings
 from pathlib import Path
 from typing import Optional, List
 
@@ -133,6 +134,10 @@ def import_tilt_series_from_serial_em(
             nominal_tilt_axis_angle=nominal_tilt_axis_angle,
             images_are_motion_corrected=images_are_motion_corrected
         )
+        if np.allclose(tilt_image_df['rlnMicrographPreExposure'], 0):
+            warnings.warn(
+                f'Pre-exposure dose is 0 for all micrographs in {tomogram_id}'
+            )
         starfile.write(
             data={f'{tomogram_id}': tilt_image_df},
             filename=output_filename,
