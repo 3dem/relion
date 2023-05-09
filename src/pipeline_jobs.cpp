@@ -6817,11 +6817,13 @@ bool RelionJob::getCommandsTomoPickTomogramsJob(std::string &outputname, std::ve
         return false;
     }
 
+    /*
     if (joboptions["pick_mode"].getString() == "surfaces" || joboptions["pick_mode"].getString() == "filaments")
     {
         error_message = "ERROR: sorry 'surfaces/filaments' picking is yet to be implemented. Please bear with us...";
         return false;
     }
+    */
 
     command += " " + joboptions["pick_mode"].getString();
     command += " --tilt-series-star-file " + joboptions["in_tomoset"].getString();
