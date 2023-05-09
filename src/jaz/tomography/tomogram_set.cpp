@@ -36,6 +36,7 @@ bool TomogramSet::read(FileName filename, bool verbose)
 
     const int tc = globalTable.numberOfObjects();
     tomogramTables.resize(tc);
+    if (tc == 0) return false;
 
     if (!globalTable.containsLabel(EMDL_TOMO_TILT_SERIES_STARFILE))
     {
@@ -86,15 +87,6 @@ bool TomogramSet::read(FileName filename, bool verbose)
 
             if (!tomogramTables[t].containsLabel(EMDL_MICROGRAPH_PRE_EXPOSURE))
                  REPORT_ERROR("ERROR: tomogramTable does not contain compulsory rlnMicrographPreExposure label");
-
-            // Make sure tilt images are again sorted in their original order when in convertBackFromSingleMetaDataTable() below,
-            // converting back from single large metadatatable for ctffind and motioncorr runners
-            int i = 0;
-            FOR_ALL_OBJECTS_IN_METADATA_TABLE(tomogramTables[t])
-            {
-                tomogramTables[t].setValue(EMDL_TOMO_TILT_MOVIE_INDEX, i);
-                i++;
-            }
         }
     }
     return true;
@@ -119,8 +111,6 @@ void TomogramSet::write(FileName filename)
         FileName newdir = fn_newstar.beforeLastOf("/");
         if (!exists(newdir)) mktree(newdir);
 
-        // Deactivate the label for sorting the tilt series images
-        tomogramTables[t].deactivateLabel(EMDL_TOMO_TILT_MOVIE_INDEX);
         // Write the individual tomogram starfile
         tomogramTables[t].write(fn_newstar);
     }
@@ -745,16 +735,17 @@ void TomogramSet::generateSingleMetaDataTable(MetaDataTable &MDout, ObservationM
 
 void TomogramSet::convertBackFromSingleMetaDataTable(MetaDataTable &MDin)
 {
+    if (!MDin.containsLabel(EMDL_MICROGRAPH_PRE_EXPOSURE))
+    {
+        REPORT_ERROR("BUG: MDin should contain a rlnMicrographPreExposure label");
+    }
 
     for (long int t = 0; t < tomogramTables.size(); t++)
     {
         MetaDataTable MDsub = subsetMetaDataTable(MDin, EMDL_IMAGE_OPTICS_GROUP, t+1, t+1);
 
         // Make sure no one unsorted the tilt images in each serie...
-        if (MDsub.containsLabel(EMDL_TOMO_TILT_MOVIE_INDEX))
-            MDsub.newSort(EMDL_TOMO_TILT_MOVIE_INDEX);
-        else
-            REPORT_ERROR("BUG: MDsub does no longer contain a rlnTomoTiltMovieIndex label");
+        MDsub.newSort(EMDL_MICROGRAPH_PRE_EXPOSURE);
 
         if (MDsub.numberOfObjects() != tomogramTables[t].numberOfObjects())
         {
