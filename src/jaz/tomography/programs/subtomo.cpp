@@ -78,7 +78,7 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 	write_normalised = parser.checkOption("--nrm", "Write multiplicity-normalised subtomograms");
 
     apply_offsets = !parser.checkOption("--dont_apply_offsets", "By default, rlnOriginX/Y/ZAngst are combined with rlnCoordinateX/Y/Z to construct the particles in their refined translations. Use this argument to skip that.");
-    apply_orientations = parser.checkOption("--apply_orientations", "rlnAngle<Rot/Tilt/Psi> are combined with rlnTomoSubtomogram<Rot/Tilt/Psi> to construct the particles in their refined orientations. This will also apply translations!");
+    apply_orientations = parser.checkOption("--apply_orientations", "rlnAngle<Rot/Tilt/Psi> are combined with rlnTomoSubtomogram<Rot/Tilt/Psi> to construct the particles in their refined orientations. This will also apply translations; No longer recommended in relion5!");
     if (apply_orientations) apply_offsets = true;
 
 	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process undone subtomograms");
