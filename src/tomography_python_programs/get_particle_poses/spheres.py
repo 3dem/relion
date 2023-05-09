@@ -42,22 +42,36 @@ def derive_poses_on_spheres(
         radii = sphere_df['rlnSphereRadius'].to_numpy() * scale_factor
         for center, radius in zip(centers, radii):
             sphere = Sphere(center=center, radius=radius)
-            sampler = sphere_samplers.PoseSampler(
-                spacing=spacing_angstroms / pixel_size)
+            sampler = sphere_samplers.PoseSampler(spacing=spacing_angstroms / pixel_size)
             poses = sampler.sample(sphere)
-            eulers = R.from_matrix(poses.orientations).inv().as_euler(
+
+            # rot/psi are locked when tilt==0
+            # rotate particles 90 degrees around the Y-axis so that tilt ~=90
+            # during refinement
+            rotated_basis = R.from_euler('y', angles=-90, degrees=True).as_matrix()
+            rotated_orientations = poses.orientations @ rotated_basis
+            eulers = R.from_matrix(rotated_orientations).inv().as_euler(
                 seq='ZYZ', degrees=True,
             )
+
             data = {
                 'rlnTomoName': [tilt_series_id] * len(poses),
                 'rlnCoordinateX': poses.positions[:, 0],
                 'rlnCoordinateY': poses.positions[:, 1],
                 'rlnCoordinateZ': poses.positions[:, 2],
-                'rlnAngleRot': eulers[:, 0],
-                'rlnAngleTilt': eulers[:, 1],
-                'rlnAnglePsi': eulers[:, 2],
+                'rlnTomoSubtomogramRot': eulers[:, 0],
+                'rlnTomoSubtomogramTilt': eulers[:, 1],
+                'rlnTomoSubtomogramPsi': eulers[:, 2],
             }
         dfs.append(pd.DataFrame(data))
     df = pd.concat(dfs)
+    rot_prior, tilt_prior, psi_prior = R.from_matrix(rotated_basis).inv().as_euler(
+        seq='ZYZ', degrees=True
+    )
+    df['rlnAngleRot'] = [rot_prior] * len(df)
+    df['rlnAngleTilt'] = [tilt_prior] * len(df)
+    df['rlnAnglePsi'] = [psi_prior]
+    df['rlnAngleTiltPrior'] = [tilt_prior] * len(df)
+    df['rlnAnglePsiPrior'] = [psi_prior] * len(df)
     output_file = output_directory / 'particles.star'
     starfile.write({'particles': df}, output_file, overwrite=True)
