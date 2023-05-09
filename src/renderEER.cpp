@@ -203,7 +203,8 @@ void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
 		}
 		else if (compression == EERRenderer::TIFF_COMPRESSION_EERDetailed)
 		{
-			// See "Default Tag Auto-registration" in http://www.simplesystems.org/libtiff/addingtags.html.
+			// See https://stackoverflow.com/questions/33522589/how-to-read-custom-tiff-tags-w-o-tifffieldinfo
+			// and "AUTOREGISTERED TAGS" in https://manpages.debian.org/testing/libtiff-dev/TIFFGetField.3tiff.en.html.
 			uint32_t count;
 			uint16_t *val;
 
