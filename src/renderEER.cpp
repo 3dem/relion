@@ -29,12 +29,14 @@
 
 const char EERRenderer::EER_FOOTER_OK[]  = "ThermoFisherECComprOK000";
 const char EERRenderer::EER_FOOTER_ERR[] = "ThermoFisherECComprERR00";
-const int EERRenderer::EER_IMAGE_WIDTH = 4096;
-const int EERRenderer::EER_IMAGE_HEIGHT = 4096;
-const int EERRenderer::EER_IMAGE_PIXELS = EERRenderer::EER_IMAGE_WIDTH * EERRenderer::EER_IMAGE_HEIGHT;
+const int EERRenderer::EER_4K= 4096;
+const int EERRenderer::EER_2K = 2048;
 const unsigned int EERRenderer::EER_LEN_FOOTER = 24;
 const uint16_t EERRenderer::TIFF_COMPRESSION_EER8bit = 65000;
 const uint16_t EERRenderer::TIFF_COMPRESSION_EER7bit = 65001;
+const uint16_t EERRenderer::TIFF_COMPRESSION_EERDetailed = 65002;
+const ttag_t EERRenderer::TIFFTAG_EER_RLE_LENGTH = 65007;
+const ttag_t EERRenderer::TIFFTAG_EER_SUBPIXEL_COUNT = 65008;
 
 TIFFErrorHandler EERRenderer::prevTIFFWarningHandler = NULL;
 
@@ -64,7 +66,7 @@ void EERRenderer::silenceTIFFWarnings()
 }
 
 template <typename T>
-void EERRenderer::render16K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons)
+void EERRenderer::render4K_to_16K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons)
 {
 	for (int i = 0; i < n_electrons; i++)
 	{
@@ -74,9 +76,8 @@ void EERRenderer::render16K(MultidimArray<T> &image, std::vector<unsigned int> &
 	}
 }
 
-
 template <typename T>
-void EERRenderer::render8K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons)
+void EERRenderer::render4K_to_8K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons)
 {
 	for (int i = 0; i < n_electrons; i++)
 	{
@@ -87,7 +88,7 @@ void EERRenderer::render8K(MultidimArray<T> &image, std::vector<unsigned int> &p
 }
 
 template <typename T>
-void EERRenderer::render4K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons)
+void EERRenderer::render4K_to_4K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons)
 {
 	for (int i = 0; i < n_electrons; i++)
 	{
@@ -98,12 +99,34 @@ void EERRenderer::render4K(MultidimArray<T> &image, std::vector<unsigned int> &p
 }
 
 template <typename T>
-void EERRenderer::render2K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons)
+void EERRenderer::render2K_to_4K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons)
+{
+	for (int i = 0; i < n_electrons; i++)
+	{
+		int x = ((positions[i] & 2047) << 1) | (symbols[i] & 2); // 2047 = 11111111111b
+		int y = ((positions[i] >> 11) << 1) | (symbols[i] >> 1); //  2048 = 2^11
+		DIRECT_A2D_ELEM(image, y, x)++;
+	}
+}
+
+template <typename T>
+void EERRenderer::render4K_to_2K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons)
 {
 	for (int i = 0; i < n_electrons; i++)
 	{
 		int x = (positions[i] & 4095) >> 1; // 4095 = 111111111111b
 		int y = (positions[i] >> 12) >> 1; //  4096 = 2^12
+		DIRECT_A2D_ELEM(image, y, x)++;
+	}
+}
+
+template <typename T>
+void EERRenderer::render2K_to_2K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons)
+{
+	for (int i = 0; i < n_electrons; i++)
+	{
+		int x = positions[i] & 2047; // 2047 = 11111111111b
+		int y = positions[i] >> 11; //  2048 = 2^11
 		DIRECT_A2D_ELEM(image, y, x)++;
 	}
 }
@@ -150,7 +173,6 @@ void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
 	if (ftiff == NULL)
 	{
 		is_legacy = true;
-		is_7bit = false;
 		readLegacy(fh);
 	}
 	else
@@ -158,33 +180,57 @@ void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
 		is_legacy = false;
 
 		// Check width & size
-		int width, height;
 		uint16_t compression = 0;
 		TIFFGetField(ftiff, TIFFTAG_IMAGEWIDTH, &width);
 		TIFFGetField(ftiff, TIFFTAG_IMAGELENGTH, &height);
 		TIFFGetField(ftiff, TIFFTAG_COMPRESSION, &compression);
 
 #ifdef DEBUG_EER
-		printf("EER in TIFF: %s size = %ld, width = %d, height = %d, compression = %d\n", fn_movie.c_str(), file_size, width, height, compression);
+		printf("EER in TIFF: %s size = %lld, width = %d, height = %d, compression = %d\n", fn_movie.c_str(), file_size, width, height, compression);
 #endif
 
 		// TIA can write an EER file whose first page is a sum and compressoin == 1.
 		// This is not supported (yet). EPU never writes such movies.
 		if (compression == EERRenderer::TIFF_COMPRESSION_EER8bit)
-			is_7bit = false;
+		{
+			rle_bits = 8;
+			subpixel_bits = 4;
+		}
 		else if (compression == EERRenderer::TIFF_COMPRESSION_EER7bit)
-			is_7bit = true;
-		else
-			REPORT_ERROR("Unknown compression scheme for EER " + integerToString(compression));
+		{
+			rle_bits = 7;
+			subpixel_bits = 4;
+		}
+		else if (compression == EERRenderer::TIFF_COMPRESSION_EERDetailed)
+		{
+			// See "Default Tag Auto-registration" in http://www.simplesystems.org/libtiff/addingtags.html.
+			uint32_t count;
+			uint16_t *val;
 
-		if (width != EER_IMAGE_WIDTH || height != EER_IMAGE_HEIGHT)
-			REPORT_ERROR("Currently we support only 4096x4096 pixel EER movies.");
+			TIFFGetField(ftiff, EERRenderer::TIFFTAG_EER_RLE_LENGTH, &count, (void*)&val);
+			rle_bits = *val;
+			TIFFGetField(ftiff, EERRenderer::TIFFTAG_EER_SUBPIXEL_COUNT, &count, (void*)&val);
+			subpixel_bits = 1 << *val;
+			if (rle_bits != 7 || subpixel_bits != 2)
+			{
+				REPORT_ERROR("Unsupported compression scheme: type = " + integerToString(compression) +
+				             ", rle_bits = " + integerToString(rle_bits) + ", subpixel_bits = " + integerToString(subpixel_bits));
+			}
+		}
+		else
+			REPORT_ERROR("Unknown compression scheme for EER: " + integerToString(compression));
+
+		if (width != height || (width != EER_4K && width != EER_2K))
+			REPORT_ERROR("Currently we support only 4096x4096 or 2048x2048 pixel EER movies.");
+
+		total_pixels = (long long)width * height;
 
 		// Find the number of frames
+		// TODO: FIXME: an EER movie might contain a summed frame
 		nframes = TIFFNumberOfDirectories(ftiff);
 		TIFFClose(ftiff);
 #ifdef DEBUG_EER
-		printf("EER in TIFF: %s nframes = %d\n", fn_movie.c_str(), nframes);
+		printf("EER in TIFF: %s rle_bits = %d, subpixel_bits = %d, nframes = %d\n", fn_movie.c_str(), rle_bits, subpixel_bits, nframes);
 #endif
 	}
 
@@ -301,9 +347,9 @@ int EERRenderer::getWidth()
 		REPORT_ERROR("EERRenderer::getNFrames called before ready.");
 
 	if (eer_upsampling == -1)
-		return EER_IMAGE_WIDTH >> 1;
+		return width >> 1;
 
-	return EER_IMAGE_WIDTH << (eer_upsampling - 1);
+	return width << (eer_upsampling - 1);
 }
 
 int EERRenderer::getHeight()
@@ -312,9 +358,9 @@ int EERRenderer::getHeight()
 		REPORT_ERROR("EERRenderer::getNFrames called before ready.");
 
 	if (eer_upsampling == -1)
-		return EER_IMAGE_HEIGHT >> 1;
+		return height >> 1;
 
-	return EER_IMAGE_HEIGHT << (eer_upsampling - 1);
+	return height << (eer_upsampling - 1);
 }
 
 template <typename T>
@@ -361,7 +407,7 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 			symbols.resize(max_electrons);
 		}
 
-		if (is_7bit)
+		if (rle_bits == 7 && subpixel_bits == 4)
 		{
 			unsigned int bit_pos = 0; // 4 K * 4 K * 11 bit << 2 ** 32
 			unsigned char p, s;
@@ -377,26 +423,27 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 				const unsigned int bit_offset_in_first_byte = bit_pos & 7; // 7 = 00000111 (same as % 8)
 				const unsigned int chunk = (*(unsigned int*)(buf + first_byte)) >> bit_offset_in_first_byte;
 
-				p = (unsigned char)(chunk & 127); // 127 = 01111111
+				p = (unsigned char)(chunk & 127); // 127 = 01111111; 7 bits for RLE
 				bit_pos += 7; // TODO: we can remove this for further speed.
 				n_pix += p;
-				if (n_pix >= EER_IMAGE_PIXELS) break;
+				if (n_pix >= total_pixels) break;
 				if (p == 127) continue; // this should be rare.
-				
-				s = (unsigned char)((chunk >> 7) & 15) ^ 0x0A; // 15 = 00001111; See below for 0x0A
+
+				// 15 = 00001111; 4 bits for symbol. See the 8+4 bit section for 0x0A
+				s = (unsigned char)((chunk >> 7) & 15) ^ 0x0A;
 				bit_pos += 4;
 				positions[n_electron] = n_pix;
 				symbols[n_electron] = s;
 				n_electron++;
 				n_pix++;
 
-				p = (unsigned char)((chunk >> 11) & 127); // 127 = 01111111
+				p = (unsigned char)((chunk >> 11) & 127);
 				bit_pos += 7;
 				n_pix += p;
-				if (n_pix >= EER_IMAGE_PIXELS) break;
+				if (n_pix >= total_pixels) break;
 				if (p == 127) continue;
-				
-				s = (unsigned char)((chunk >> 18) & 15) ^ 0x0A; // 15 = 00001111; See below for 0x0A
+
+				s = (unsigned char)((chunk >> 18) & 15) ^ 0x0A;
 				bit_pos += 4;
 				positions[n_electron] = n_pix;
 				symbols[n_electron] = s;
@@ -404,7 +451,64 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 				n_pix++;
 			}
 		}
-		else
+		else if (rle_bits == 7 && subpixel_bits == 2)
+		{
+			unsigned int bit_pos = 0; // 4 K * 4 K * 11 bit << 2 ** 32
+			unsigned char p, s;
+
+			while (true)
+			{
+				// Fetch 32 bits and unpack up to 3 chunks of 7 + 2 bits.
+				// This is faster than unpack 7 and 2 bits sequentially.
+				// Since the size of buf is larger than the actual size by the TIFF header size,
+				// it is always safe to read ahead.
+
+				long long first_byte = pos + (bit_pos >> 3);
+				const unsigned int bit_offset_in_first_byte = bit_pos & 7; // 7 = 00000111 (same as % 8)
+				const unsigned int chunk = (*(unsigned int*)(buf + first_byte)) >> bit_offset_in_first_byte;
+
+				p = (unsigned char)(chunk & 127); // 127 = 01111111; 7 bits for RLE
+				bit_pos += 7; // TODO: we can remove this for further speed.
+				n_pix += p;
+				if (n_pix >= total_pixels) break;
+				if (p == 127) continue; // this should be rare.
+
+				// TOOD: FIXME: do I need to flip bits?
+				s = (unsigned char)((chunk >> 7) & 3); // 3 = 00000011; 2 bits for symbol
+				bit_pos += 2;
+				positions[n_electron] = n_pix;
+				symbols[n_electron] = s;
+				n_electron++;
+				n_pix++;
+
+				p = (unsigned char)((chunk >> 9) & 127);
+				bit_pos += 7;
+				n_pix += p;
+				if (n_pix >= total_pixels) break;
+				if (p == 127) continue;
+
+				s = (unsigned char)((chunk >> 16) & 3);
+				bit_pos += 2;
+				positions[n_electron] = n_pix;
+				symbols[n_electron] = s;
+				n_electron++;
+				n_pix++;
+
+				p = (unsigned char)((chunk >> 18) & 127);
+				bit_pos += 7;
+				n_pix += p;
+				if (n_pix >= total_pixels) break;
+				if (p == 127) continue;
+
+				s = (unsigned char)((chunk >> 25) & 3);
+				bit_pos += 2;
+				positions[n_electron] = n_pix;
+				symbols[n_electron] = s;
+				n_electron++;
+				n_pix++;
+			}
+		}
+		else if (rle_bits == 8 && subpixel_bits == 4)
 		{
 			// unpack every two symbols = 12 bit * 2 = 24 bit = 3 byte
 			// high <- |bbbbBBBB|BBBBaaaa|AAAAAAAA| -> low
@@ -424,7 +528,7 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 
 				// Note the order. Add p before checking the size and placing a new electron.
 				n_pix += p1;
-				if (n_pix >= EER_IMAGE_PIXELS) break;
+				if (n_pix >= total_pixels) break;
 				if (p1 < 255)
 				{
 					positions[n_electron] = n_pix;
@@ -434,7 +538,7 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 				}
 
 				n_pix += p2;
-				if (n_pix >= EER_IMAGE_PIXELS) break;
+				if (n_pix >= total_pixels) break;
 				if (p2 < 255)
 				{
 					positions[n_electron] = n_pix;
@@ -449,7 +553,7 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 			}
 		}
 
-		if (n_pix != EER_IMAGE_PIXELS)
+		if (n_pix != total_pixels)
 		{
 			std::cerr << "WARNING: The number of pixels is not right in " + fn_movie + " frame " + integerToString(iframe + 1) + ". Probably this frame is corrupted. This frame is skipped." << std::endl;
 			continue;
@@ -458,16 +562,30 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 		RCTOC(TIMING_UNPACK_RLE);
 
 		RCTIC(TIMING_RENDER_ELECTRONS);
-		if (eer_upsampling == 3)
-			render16K(image, positions, symbols, n_electron);
-		else if (eer_upsampling == 2)
-			render8K(image, positions, symbols, n_electron);
-		else if (eer_upsampling == 1)
-			render4K(image, positions, symbols, n_electron);
-		else if (eer_upsampling == -1)
-			render2K(image, positions, symbols, n_electron);
+		if (width == EER_4K)
+		{
+			if (eer_upsampling == 3)
+				render4K_to_16K(image, positions, symbols, n_electron);
+			else if (eer_upsampling == 2)
+				render4K_to_8K(image, positions, symbols, n_electron);
+			else if (eer_upsampling == 1)
+				render4K_to_4K(image, positions, symbols, n_electron);
+			else if (eer_upsampling == -1)
+				render4K_to_2K(image, positions, symbols, n_electron);
+			else
+				REPORT_ERROR("Invalid EER upsamle for 4K images. This must be 3, 2, 1 or -1.");
+		}
+		else if (width == EER_2K)
+		{
+			if (eer_upsampling == 2)
+				render2K_to_4K(image, positions, symbols, n_electron);
+			else if (eer_upsampling == 1)
+				render2K_to_2K(image, positions, symbols, n_electron);
+			else
+				REPORT_ERROR("Invalid EER upsamle for 2K images. This must be 2 or 1.");
+		}
 		else
-			REPORT_ERROR("Invalid EER upsamle");
+			REPORT_ERROR("Logic error: an invalid EER size at EERRenderer::renderFrames().");
 		RCTOC(TIMING_RENDER_ELECTRONS);
 
 		total_n_electron += n_electron;

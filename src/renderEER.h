@@ -12,40 +12,48 @@
 class EERRenderer {
 	private:
 
+	// Constants
+	static const char EER_FOOTER_OK[];
+	static const char EER_FOOTER_ERR[];
+	static const int EER_4K, EER_2K;
+	static const unsigned int EER_LEN_FOOTER;
+	static const uint16_t TIFF_COMPRESSION_EER8bit, TIFF_COMPRESSION_EER7bit, TIFF_COMPRESSION_EERDetailed;
+	static const ttag_t TIFFTAG_EER_RLE_LENGTH, TIFFTAG_EER_SUBPIXEL_COUNT;
+
 	FileName fn_movie;
 
 	bool ready;
-	bool is_legacy;
-	bool is_7bit;
+	bool is_legacy; // legacy, non-TIFF container
 	bool read_data;
 
 	std::vector<long long> frame_starts, frame_sizes;
 	unsigned char* buf;
 
-	static const char EER_FOOTER_OK[];
-	static const char EER_FOOTER_ERR[];
-	static const int EER_IMAGE_WIDTH, EER_IMAGE_HEIGHT, EER_IMAGE_PIXELS;
-	static const unsigned int EER_LEN_FOOTER;
-	static const uint16_t TIFF_COMPRESSION_EER8bit, TIFF_COMPRESSION_EER7bit;
-
 	int eer_upsampling;
-	int nframes;
+	int nframes, width, height;
 	int preread_start, preread_end;
-	long long file_size;
+	uint16_t rle_bits, subpixel_bits;
+	long long file_size, total_pixels;
 	void readLegacy(FILE *fh);
 	void lazyReadFrames();
 
 	template <typename T>
-	void render16K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons);
+	void render4K_to_16K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons);
 
 	template <typename T>
-	void render8K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons);
+	void render4K_to_8K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons);
 
 	template <typename T>
-	void render4K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons);
+	void render4K_to_4K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons);
 
 	template <typename T>
-	void render2K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons);
+	void render4K_to_2K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons);
+
+	template <typename T>
+	void render2K_to_4K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons);
+
+	template <typename T>
+	void render2K_to_2K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons);
 
 	static TIFFErrorHandler prevTIFFWarningHandler;
 
@@ -108,6 +116,9 @@ class EERRenderer {
 			silenceTIFFWarnings();
 			fn_gain += ":tif";
 		}
+
+		// TODO: FIXME: support 2K
+		const int EER_IMAGE_WIDTH = 4096, EER_IMAGE_HEIGHT = 4096;
 
 		Image<T> original;
 		original.read(fn_gain, true, 0, false, true); // explicitly use the first page
