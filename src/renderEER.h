@@ -18,7 +18,7 @@ class EERRenderer {
 	static const int EER_4K, EER_2K;
 	static const unsigned int EER_LEN_FOOTER;
 	static const uint16_t TIFF_COMPRESSION_EER8bit, TIFF_COMPRESSION_EER7bit, TIFF_COMPRESSION_EERDetailed;
-	static const ttag_t TIFFTAG_EER_RLE_LENGTH, TIFFTAG_EER_SUBPIXEL_COUNT;
+	static const ttag_t TIFFTAG_EER_RLE_DEPTH, TIFFTAG_EER_SUBPIXEL_H_DEPTH, TIFFTAG_EER_SUBPIXEL_V_DEPTH;
 
 	FileName fn_movie;
 

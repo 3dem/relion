@@ -35,8 +35,9 @@ const unsigned int EERRenderer::EER_LEN_FOOTER = 24;
 const uint16_t EERRenderer::TIFF_COMPRESSION_EER8bit = 65000;
 const uint16_t EERRenderer::TIFF_COMPRESSION_EER7bit = 65001;
 const uint16_t EERRenderer::TIFF_COMPRESSION_EERDetailed = 65002;
-const ttag_t EERRenderer::TIFFTAG_EER_RLE_LENGTH = 65007;
-const ttag_t EERRenderer::TIFFTAG_EER_SUBPIXEL_COUNT = 65008;
+const ttag_t EERRenderer::TIFFTAG_EER_RLE_DEPTH = 65007;
+const ttag_t EERRenderer::TIFFTAG_EER_SUBPIXEL_H_DEPTH = 65008;
+const ttag_t EERRenderer::TIFFTAG_EER_SUBPIXEL_V_DEPTH = 65009;
 
 TIFFErrorHandler EERRenderer::prevTIFFWarningHandler = NULL;
 
@@ -206,17 +207,19 @@ void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
 			// See https://stackoverflow.com/questions/33522589/how-to-read-custom-tiff-tags-w-o-tifffieldinfo
 			// and "AUTOREGISTERED TAGS" in https://manpages.debian.org/testing/libtiff-dev/TIFFGetField.3tiff.en.html.
 			uint32_t count;
-			uint16_t *val;
+			uint16_t *rle, *subpix_h, *subpix_v;
 
-			TIFFGetField(ftiff, EERRenderer::TIFFTAG_EER_RLE_LENGTH, &count, (void*)&val);
-			rle_bits = *val;
-			TIFFGetField(ftiff, EERRenderer::TIFFTAG_EER_SUBPIXEL_COUNT, &count, (void*)&val);
-			subpixel_bits = 1 << *val;
-			if (rle_bits != 7 || subpixel_bits != 2)
+			TIFFGetField(ftiff, EERRenderer::TIFFTAG_EER_RLE_DEPTH, &count, (void*)&rle);
+			rle_bits = *rle;
+			TIFFGetField(ftiff, EERRenderer::TIFFTAG_EER_SUBPIXEL_H_DEPTH, &count, (void*)&subpix_h);
+			TIFFGetField(ftiff, EERRenderer::TIFFTAG_EER_SUBPIXEL_V_DEPTH, &count, (void*)&subpix_v);
+			if (rle_bits != 7 || *subpix_h != *subpix_v || *subpix_h != 1)
 			{
 				REPORT_ERROR("Unsupported compression scheme: type = " + integerToString(compression) +
-				             ", rle_bits = " + integerToString(rle_bits) + ", subpixel_bits = " + integerToString(subpixel_bits));
+				             ", rle_bits = " + integerToString(rle_bits) + ", subpix_h = " + integerToString(*subpix_h) +
+				             ", subpix_v = " + integerToString(*subpix_v));
 			}
+			subpixel_bits = 1 << *subpix_h;
 		}
 		else
 			REPORT_ERROR("Unknown compression scheme for EER: " + integerToString(compression));
