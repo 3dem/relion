@@ -74,7 +74,7 @@ def get_poses_along_filament_backbones(
 
             data = {
                 'rlnTomoName': [tilt_series_id] * len(poses),
-                'rlnHelicalTubeID': [int(filament_id)] * len(poses),
+                'rlnHelicalTubeID': [int(filament_id) + 1] * len(poses),
                 'rlnHelicalTrackLengthAngst': distance_along_helix,
                 'rlnCoordinateX': poses.positions[:, 0],
                 'rlnCoordinateY': poses.positions[:, 1],
