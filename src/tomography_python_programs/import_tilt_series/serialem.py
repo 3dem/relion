@@ -159,7 +159,7 @@ def _generate_tilt_image_dataframe(
 ) -> pd.DataFrame:
     """Generate a dataframe containing data about images in a tilt-series."""
     df = mdocfile.read(mdoc_file)
-    df['DateTime'] = pd.to_datetime(df['DateTime'], infer_datetime_format=True)
+    df['DateTime'] = pd.to_datetime(df['DateTime'])
     df = df.sort_values(by="DateTime", ascending=True)
     df['pre_exposure_dose'] = calculate_pre_exposure_dose(
         df, dose_per_tilt_image=dose_per_tilt_image, dose_per_movie_frame=dose_per_movie_frame,
