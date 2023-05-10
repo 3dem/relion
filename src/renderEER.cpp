@@ -139,7 +139,7 @@ EERRenderer::EERRenderer()
 	buf = NULL;
 	preread_start = -1;
 	preread_end = -1;
-	eer_upsampling = 2;
+	eer_upsampling = 1;
 }
 
 void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
@@ -212,7 +212,10 @@ void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
 			TIFFGetField(ftiff, EERRenderer::TIFFTAG_EER_RLE_DEPTH, &count, (void*)&rle);
 			rle_bits = *rle;
 			TIFFGetField(ftiff, EERRenderer::TIFFTAG_EER_SUBPIXEL_H_DEPTH, &count, (void*)&subpix_h);
-			TIFFGetField(ftiff, EERRenderer::TIFFTAG_EER_SUBPIXEL_V_DEPTH, &count, (void*)&subpix_v);
+			// Prototype images apparently don't have TIFFTAG_EER_SUBPIXEL_V_DEPTH
+			if (TIFFGetField(ftiff, EERRenderer::TIFFTAG_EER_SUBPIXEL_V_DEPTH, &count, (void*)&subpix_v) == 0)
+				subpix_v = subpix_h;
+
 			if (rle_bits != 7 || *subpix_h != *subpix_v || *subpix_h != 1)
 			{
 				REPORT_ERROR("Unsupported compression scheme: type = " + integerToString(compression) +
@@ -220,6 +223,11 @@ void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
 				             ", subpix_v = " + integerToString(*subpix_v));
 			}
 			subpixel_bits = 1 << *subpix_h;
+
+			if (subpixel_bits == 2 && (eer_upsampling == -1 || eer_upsampling >= 3))
+			{
+				REPORT_ERROR("For subpixel_bits = 2, eer_upsamling must be 1 or 2.");
+			}
 		}
 		else
 			REPORT_ERROR("Unknown compression scheme for EER: " + integerToString(compression));

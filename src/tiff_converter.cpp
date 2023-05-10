@@ -375,7 +375,9 @@ void TIFFConverter::initialise(int _rank, int _total_ranks)
 		{
 			if (fn_gain != "" && rank == 0)
 			{
-				EERRenderer::loadEERGain(fn_gain, gain(), eer_upsampling);
+				EERRenderer renderer;
+				renderer.read(fn_first, eer_upsampling);
+				renderer.loadEERGain(fn_gain, gain());
 				std::cout << "Read an EER gain file " << fn_gain << " NX = " << XSIZE(gain()) << " NY = " << YSIZE(gain()) << std::endl;
 				std::cout << "Taking inverse and re-scaling (when necessary)." << std::endl;
 				gain.write(fn_out + "gain-reference.mrc");
