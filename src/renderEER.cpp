@@ -485,8 +485,9 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 				if (n_pix >= total_pixels) break;
 				if (p == 127) continue; // this should be rare.
 
-				// TOOD: FIXME: do I need to flip bits?
-				s = (unsigned char)((chunk >> 7) & 3); // 3 = 00000011; 2 bits for symbol
+				// 3 = 00000011; 2 bits for symbol
+				// Note that we have to flip bits (see below).
+				s = (unsigned char)((chunk >> 7) & 3) ^ 3;
 				bit_pos += 2;
 				positions[n_electron] = n_pix;
 				symbols[n_electron] = s;
@@ -499,7 +500,7 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 				if (n_pix >= total_pixels) break;
 				if (p == 127) continue;
 
-				s = (unsigned char)((chunk >> 16) & 3);
+				s = (unsigned char)((chunk >> 16) & 3) ^ 3;
 				bit_pos += 2;
 				positions[n_electron] = n_pix;
 				symbols[n_electron] = s;
@@ -512,7 +513,7 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 				if (n_pix >= total_pixels) break;
 				if (p == 127) continue;
 
-				s = (unsigned char)((chunk >> 25) & 3);
+				s = (unsigned char)((chunk >> 25) & 3) ^ 3;
 				bit_pos += 2;
 				positions[n_electron] = n_pix;
 				symbols[n_electron] = s;
@@ -531,7 +532,13 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 			// Because there is a footer, it is safe to go beyond the limit by two bytes.
 			while (pos < pos_limit)
 			{
-				// symbol is bit tricky. 0000YyXx; Y and X must be flipped.
+				// Symbol is bit tricky: 0000YyXx, where Y and X must be flipped.
+				// In other words, the bits for shifts 0, 1, 2, 3 are 10, 11, 00, 01.
+				// This can be considered as 'signed 2 bit' representation of -2, -1, 0, 1.
+				// For 2 bit symbols (2K EER): 000000YX and Y and X must be flipped.
+				// That is, shifts 0 and 1 correspond to bits 1 and 0.
+				// This is "signed 1 bit" representation of -1 and 0..
+				// ref: Lingbo Yu, TFS (Email to Takanori on 10-11 May 2023)
 				p1 = buf[pos];
 				s1 = (buf[pos + 1] & 0x0F) ^ 0x0A; // 0x0F = 00001111, 0x0A = 00001010
 
