@@ -48,7 +48,7 @@ def derive_poses_on_spheres(
             # rot/psi are locked when tilt==0
             # rotate particles 90 degrees around the Y-axis so that tilt ~=90
             # during refinement
-            rotated_basis = R.from_euler('y', angles=-90, degrees=True).as_matrix()
+            rotated_basis = R.from_euler('y', angles=90, degrees=True).as_matrix()
             rotated_orientations = poses.orientations @ rotated_basis
             eulers = R.from_matrix(rotated_orientations).inv().as_euler(
                 seq='ZYZ', degrees=True,
@@ -65,12 +65,12 @@ def derive_poses_on_spheres(
             }
         dfs.append(pd.DataFrame(data))
     df = pd.concat(dfs)
-    rot_prior, tilt_prior, psi_prior = R.from_matrix(rotated_basis).inv().as_euler(
+    rot_prior, tilt_prior, psi_prior = R.from_matrix(rotated_basis).as_euler(
         seq='ZYZ', degrees=True
     )
     df['rlnAngleRot'] = [rot_prior] * len(df)
     df['rlnAngleTilt'] = [tilt_prior] * len(df)
-    df['rlnAnglePsi'] = [psi_prior]
+    df['rlnAnglePsi'] = [psi_prior] * len(df)
     df['rlnAngleTiltPrior'] = [tilt_prior] * len(df)
     df['rlnAnglePsiPrior'] = [psi_prior] * len(df)
     output_file = output_directory / 'particles.star'

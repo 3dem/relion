@@ -55,7 +55,7 @@ def get_poses_along_filament_backbones(
             # rot/psi are coupled when tilt==0,
             # pre-rotate particles such that they have tilt=90 relative to a reference
             # filament aligned along the z-axis
-            rotated_basis = R.from_euler('y', angles=-90, degrees=True).as_matrix()
+            rotated_basis = R.from_euler('y', angles=90, degrees=True).as_matrix()
             rotated_orientations = poses.orientations @ rotated_basis
             rotated_eulers = R.from_matrix(rotated_orientations).inv().as_euler(
                 seq='ZYZ', degrees=True,
@@ -87,7 +87,7 @@ def get_poses_along_filament_backbones(
     df = pd.concat(dfs)
 
     # add priors on orientations
-    rot_prior, tilt_prior, psi_prior = R.from_matrix(rotated_basis).inv().as_euler(
+    rot_prior, tilt_prior, psi_prior = R.from_matrix(rotated_basis).as_euler(
         seq='ZYZ', degrees=True
     )
     df['rlnAngleRot'] = [rot_prior] * len(df)
