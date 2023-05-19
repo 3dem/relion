@@ -1350,7 +1350,6 @@ void getAllSquaredDifferencesFine(
 
 				if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
 				{
-                    if (op.is_tomo) REPORT_ERROR("ERROR; TODO: think about the below for 2D shifts in stacks...");
                     RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
 					RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
 					RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PSI);
