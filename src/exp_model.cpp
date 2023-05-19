@@ -852,11 +852,11 @@ bool Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
             // For now read in particle table twice: once into MDimg and once into particleSet...
             // TODO: work with pointer to avoid duplication?
             // TODO: ObservationModel::loadSafely(fn_exp, obsModel, MDimg, "particles", verb, true, true);
-            tomogramSet.read(fn_tomo, verb>0);
-            particleSet.read(fn_exp, fn_motion, verb>0);
+            tomogramSet.read(fn_tomo, false);
+            particleSet.read(fn_exp, fn_motion, false);
 
             // For checking tomogram sanity below
-            particles_idx = particleSet.splitByTomogram(tomogramSet, verb>0);
+            particles_idx = particleSet.splitByTomogram(tomogramSet, false);
 
         }
 
