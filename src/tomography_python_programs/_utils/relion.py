@@ -71,12 +71,12 @@ def relion_pipeline_job(func: Callable) -> Callable:
         if job_directory is not None:
             job_directory.mkdir(parents=True, exist_ok=True)
         try:
-            kwargs.pop(PIPELINE_CONTROL_KEYWORD_ARGUMENT.name)
+            pipeline_directory = kwargs.pop(PIPELINE_CONTROL_KEYWORD_ARGUMENT.name)
             func(*args, **kwargs)
-            if job_directory is not None:
+            if job_directory is not None and pipeline_directory is not None:
                 write_job_success_file(job_directory)
         except BaseException:
-            if job_directory is not None:
+            if job_directory is not None and pipeline_directory is not None:
                 write_job_failure_file(job_directory)
             raise
     return pipeline_job

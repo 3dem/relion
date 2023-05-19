@@ -6225,7 +6225,7 @@ void RelionJob::initialiseTomoImportJob()
         joboptions["dose_per_movie_frame"] = JobOption("(Optional) dose per movie frame:", (std::string)"", "Electron dose (in e/A^2) per frame in the tilt series. This is optional and will override values from the mdoc file. Only one of the two dose options should be set.");
 
         joboptions["do_tiltseries"]= JobOption("Import tilt-series?", true, "Set this to Yes for importing tilt movies from SerialEM  mdoc format metadata.");
-        joboptions["movie_files"] = JobOption("Tilt image movie files:", (std::string)"frames/*.mrc","File pattern pointing to the raw movie files for the tilt images");
+        joboptions["movie_files"] = JobOption("Tilt image files:", (std::string)"frames/*.mrc","File pattern matching all tilt image files. These can be multi-frame micrographs or single 2D images.");
         joboptions["mdoc_files"] = JobOption("mdoc files:", (std::string)"mdoc/*.mdoc","File pattern pointing to the mdoc files.");
         joboptions["prefix"] = JobOption("Prefix:", (std::string)"","Optional prefix added to avoid tilt-series name collisions when dealing with multiple datasets.");
         joboptions["tilt_axis_angle"] = JobOption("Tilt axis angle (deg):", 85.0, 0.0, 180.0, 1.0 , "Nominal value for the tilt-axis rotation angle (positive is CCW from Y)");

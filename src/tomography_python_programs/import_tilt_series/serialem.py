@@ -159,9 +159,8 @@ def _generate_tilt_image_dataframe(
 ) -> pd.DataFrame:
     """Generate a dataframe containing data about images in a tilt-series."""
     df = mdocfile.read(mdoc_file)
-    df['DateTime'] = pd.to_datetime(df['DateTime'], infer_datetime_format=True)
+    df['DateTime'] = pd.to_datetime(df['DateTime'])
     df = df.sort_values(by="DateTime", ascending=True)
-    df['image_index'] = np.arange(len(df)) + 1  # 0 -> 1 indexing
     df['pre_exposure_dose'] = calculate_pre_exposure_dose(
         df, dose_per_tilt_image=dose_per_tilt_image, dose_per_movie_frame=dose_per_movie_frame,
     )
@@ -181,7 +180,6 @@ def _generate_tilt_image_dataframe(
         movie_information_df=pd.DataFrame({
             'rlnMicrographMovieName': df['tilt_image_file'],
             'rlnTomoTiltMovieFrameCount': df['NumSubFrames'],
-            'rlnTomoTiltMovieIndex': df['image_index']
         })
         output_df=pd.concat([movie_information_df, output_df], axis=1)
     if 'TargetDefocus' in df.columns:
