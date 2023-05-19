@@ -2683,6 +2683,12 @@ void JobWindow::initialiseTomoPickTomogramsWindow()
     current_y += STEPY/2;
 
     place("pick_mode", TOGGLE_DEACTIVATE);
+
+    // Add a little spacer
+    current_y += STEPY/2;
+
+    place("particle_spacing", TOGGLE_DEACTIVATE);
+
     tab1->end();
 
 }

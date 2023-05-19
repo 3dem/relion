@@ -6799,13 +6799,16 @@ void RelionJob::initialiseTomoPickTomogramsJob()
 
  	joboptions["pick_mode"] = JobOption("Picking mode:", job_tomo_pick_mode, 1, "Type of picking mode to use: particles, spheres or (todo:) cylinders.");
 
+     // for filaments, cylinders and spheres
+     joboptions["particle_spacing"] = JobOption("Particle spacing (A):",-1,10,250,10, "Spacing (in Angstroms) between particles sampled on a sphere, on surfaces, or in filaments. This option will be ignored if you are picking individual particles");
+
 }
 bool RelionJob::getCommandsTomoPickTomogramsJob(std::string &outputname, std::vector<std::string> &commands,
                                        std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
     commands.clear();
     initialisePipeline(outputname, job_counter);
-    std::string command;
+    std::string command, command2;
 
     if (error_message != "") return false;
 
@@ -6833,12 +6836,26 @@ bool RelionJob::getCommandsTomoPickTomogramsJob(std::string &outputname, std::ve
     inputNodes.push_back(node);
 
     command += " --output-directory " + outputname;
-    Node node2(outputname+"annotations.star", LABEL_TOMO_PARTS);
-    outputNodes.push_back(node2);
 
     // Other arguments for extraction
     command += " " + joboptions["other_args"].getString();
     commands.push_back(command);
+
+    command2 = "`which relion_tomo_get_particle_poses`";
+    command2 += " " + joboptions["pick_mode"].getString();
+    command2 += " --tilt-series-star-file " + joboptions["in_tomoset"].getString();
+    command2 += " --annotations-directory " + outputname + "annotations";
+    command2 += " --output-directory " + outputname;
+
+    if (joboptions["pick_mode"].getString() != "surfaces")
+        command2 += " --spacing-angstroms " + joboptions["particle_spacing"].getString();
+
+    // Other arguments for get-poses
+    command2 += " " + joboptions["other_args"].getString();
+    commands.push_back(command2);
+
+    Node node2(outputname+"particles.star", LABEL_TOMO_PARTS);
+    outputNodes.push_back(node2);
 
     return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 
