@@ -6847,7 +6847,7 @@ bool RelionJob::getCommandsTomoPickTomogramsJob(std::string &outputname, std::ve
     command2 += " --annotations-directory " + outputname + "annotations";
     command2 += " --output-directory " + outputname;
 
-    if (joboptions["pick_mode"].getString() != "surfaces")
+    if (joboptions["pick_mode"].getString() != "particles")
         command2 += " --spacing-angstroms " + joboptions["particle_spacing"].getString();
 
     // Other arguments for get-poses
