@@ -29,7 +29,7 @@ def _get_zyx(
         'rlnOriginYAngst',
         'rlnOriginXAngst',
     ]
-    if all(heading in particle_df.columns for heading in origin_headings) in particle_df.columns:
+    if all(heading in particle_df.columns for heading in origin_headings):
         origin_zyx = particle_df[origin_headings].to_numpy()
         origin_in_dataframe = True
     else:
@@ -99,7 +99,9 @@ def _load_particles(
     # get positions and add to viewer
     zyx = _get_zyx(df)
     if 'particle positions' not in viewer.layers:
-        viewer.add_points(zyx, name='particle positions', size=40, n_dimensional=True, opacity=0.5)
+        viewer.add_points(
+            zyx, name='particle positions', size=40, n_dimensional=True, opacity=0.5
+        )
     else:
         viewer.layers['particle positions'].data = zyx
 
@@ -109,21 +111,27 @@ def _load_particles(
     y_vec = np.stack([zyx, y_vec], axis=1)
     x_vec = np.stack([zyx, x_vec], axis=1)
     if 'particle z' not in viewer.layers:
-        viewer.add_vectors(z_vec, name='particle z', length=30, edge_color='orange', edge_width=8)
+        viewer.add_vectors(
+            z_vec, name='particle z', length=30, edge_color='orange', edge_width=8
+        )
     else:
         viewer.layers['particle z'].data = z_vec
     if 'particle y' not in viewer.layers:
-        viewer.add_vectors(y_vec, name='particle y', length=10, edge_color='blue', edge_width=8)
+        viewer.add_vectors(
+            y_vec, name='particle y', length=10, edge_color='blue', edge_width=8
+        )
     else:
         viewer.layers['particle y'].data = y_vec
     if 'particle x' not in viewer.layers:
-        viewer.add_vectors(x_vec, name='particle x', length=10, edge_color='purple', edge_width=8)
+        viewer.add_vectors(
+            x_vec, name='particle x', length=10, edge_color='purple', edge_width=8
+        )
     else:
         viewer.layers['particle x'].data = x_vec
 
 
 def _load_tomograms(
-    tilt_series_id, # TiltSeriesId, the type is created dynamically at runtime
+    tilt_series_id,  # TiltSeriesId, the type is created dynamically at runtime
     viewer: napari.viewer.Viewer,
     tomogram_df_grouped: DataFrameGroupBy,
 ):
@@ -133,21 +141,28 @@ def _load_tomograms(
     # load tomogram
     tomogram_file = df['rlnTomoReconstructedTomogram'].iloc[0]
     tomogram = mrcfile.read(tomogram_file)
-
     tomogram_binning = float(df['rlnTomoTomogramBinning'].iloc[0])
 
-    if 'tomogram' not in viewer.layers:
-        viewer.add_image(
-            tomogram,
-            rendering='minip',
-            depiction='plane',
-            plane={
-                'position': np.array(tomogram.shape) // 2,
-                'thickness': 5,
-            },
-            scale=[tomogram_binning, tomogram_binning, tomogram_binning]
-        )
+    # add to napari viewer
+    if 'tomogram' in viewer.layers:
+        viewer.layers.remove(viewer.layers['tomogram'])
+    image_layer = viewer.add_image(
+        tomogram,
+        name='tomogram',
+        rendering='minip',
+        blending='translucent',
+        depiction='plane',
+        plane={
+            'position': np.array(tomogram.shape) // 2,
+            'thickness': 5,
+        },
+        scale=[tomogram_binning, tomogram_binning, tomogram_binning]
+    )
 
+    # reorder layers and recenter camera
+    layer_index = viewer.layers.index(image_layer)
+    viewer.layers.insert(0, viewer.layers.pop(layer_index))
+    viewer.camera.center = (np.array(tomogram.shape) * tomogram_binning) // 2
 
 
 @cli.command(name=COMMAND_NAME, no_args_is_help=True)
