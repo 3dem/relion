@@ -92,7 +92,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	if (first_frame_sum < 1) first_frame_sum = 1;
 	last_frame_sum =  textToInteger(parser.getOption("--last_frame_sum", "Last movie frame used in output sum (0 or negative: use all)", "-1"));
 	eer_grouping = textToInteger(parser.getOption("--eer_grouping", "EER grouping", "40"));
-	eer_upsampling = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 = 4K or 2 = 8K)", "1"));
+	eer_upsampling = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 = physical or 2 = 2x super-resolution)", "1"));
 
 	int motioncor2_section = parser.addSection("MOTIONCOR2 options");
 	do_motioncor2 = parser.checkOption("--use_motioncor2", "Use Shawn Zheng's MOTIONCOR2.");
@@ -1190,7 +1190,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	RCTIC(TIMING_READ_GAIN);
 	if (fn_gain_reference != "") {
 		if (isEER)
-			EERRenderer::loadEERGain(fn_gain_reference, Igain(), eer_upsampling);
+			renderer.loadEERGain(fn_gain_reference, Igain());
 		else
 			Igain.read(fn_gain_reference);
 

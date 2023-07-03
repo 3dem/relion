@@ -55,7 +55,7 @@ class estimate_gain
 		max_frames = textToInteger(parser.getOption("--max_frames", "Target number of frames to average (rounded to movies; -1 means use all)", "-1"));
 		randomise_order = parser.checkOption("--random", "Randomise the order of input movies before taking subset");
 		dont_invert = parser.checkOption("--dont_invert", "Don't take the inverse but simply writes the sum");		
-		eer_upsampling = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 = 4K or 2 = 8K)", "2"));
+		eer_upsampling = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 = physical or 2 = 2x super-resolution)", "2"));
 		// --eer_upsampling 3 is only for debugging. Hidden.
 		if (eer_upsampling != 1 && eer_upsampling != 2 && eer_upsampling != 3)
 			REPORT_ERROR("eer_upsampling must be 1, 2 or 3");

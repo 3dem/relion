@@ -219,8 +219,11 @@ else()
 	endif(GUI)
 endif()
 
+# FFTW_LIBRARIES is used even with MKLFFT.
+# This is empty for ICC.
+# See https://github.com/3dem/relion/issues/958#issuecomment-1498521352.
+target_link_libraries(relion_lib ${FFTW_LIBRARIES})
 if(NOT MKLFFT)
-	target_link_libraries(relion_lib ${FFTW_LIBRARIES})
 	if(BUILD_OWN_FFTW)
 		add_dependencies(relion_lib own_fftw_lib)
 	endif()
