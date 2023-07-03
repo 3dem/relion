@@ -879,14 +879,6 @@ void Reconstructor::applyCTFPandCTFQ(MultidimArray<Complex> &Fin, CTF &ctf, Four
 
 				softMaskOutsideMap(Iapp, ROUND(mask_diameter/(angpix*2.)), (RFLOAT)width_mask_edge);
 
-				// Re-box to a smaller size if necessary....
-				if (newbox > 0 && newbox < YSIZE(Fin))
-				{
-					Iapp.setXmippOrigin();
-					Iapp.window(FIRST_XMIPP_INDEX(newbox), FIRST_XMIPP_INDEX(newbox),
-					            LAST_XMIPP_INDEX(newbox),  LAST_XMIPP_INDEX(newbox));
-
-				}
 				// Back into Fourier-space
 				transformer.FourierTransform(Iapp, Fapp, false); // false means: leave Fapp in the transformer
 				CenterFFTbySign(Fapp);

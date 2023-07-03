@@ -513,6 +513,7 @@ if(do_gpu)
     debug_split_random_half = textToInteger(getParameter(argc, argv, "--debug_split_random_half", "0"));
     do_red = parser.checkOption("--do_red", "", "false", true);
     skip_realspace_helical_sym = parser.checkOption("--skip_realspace_helical_sym", "", "false", true);
+	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
 
     // We read input optimiser set to create the output one
     fn_OS = parser.getOption("--ios", "Input tomo optimiser set file. It is used to set --i, --ref or --solvent_mask if they are not provided. Updated output optimiser set is created.", "");

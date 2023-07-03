@@ -92,7 +92,7 @@ void MotionRefiner::read(int argc, char **argv)
 	movie_toReplace = parser.getOption("--mov_toReplace", "Replace this string in micrograph names...", "");
 	movie_replaceBy = parser.getOption("--mov_replaceBy", "..by this one", "");
 
-	micrographHandler.eer_upsampling = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 = 4K or 2 = 8K)", "-1"));
+	micrographHandler.eer_upsampling = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 = physical or 2 = 2x super-resolution)", "-1"));
 	micrographHandler.eer_grouping = textToInteger(parser.getOption("--eer_grouping", "EER grouping", "-1"));
 
 	if (micrographHandler.eer_upsampling > 0 || micrographHandler.eer_grouping > 0)
