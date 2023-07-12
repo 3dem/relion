@@ -511,7 +511,6 @@ if(do_gpu)
     skip_gridding = !parser.checkOption("--dont_skip_gridding", "Perform gridding in the reconstruction step (obsolete?)");
     nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
     debug_split_random_half = textToInteger(getParameter(argc, argv, "--debug_split_random_half", "0"));
-    do_red = parser.checkOption("--do_red", "", "false", true);
     skip_realspace_helical_sym = parser.checkOption("--skip_realspace_helical_sym", "", "false", true);
 	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
 
