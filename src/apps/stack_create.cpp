@@ -36,7 +36,7 @@ class stack_create_parameters
 	MetaDataTable MD;
 	// I/O Parser
 	IOParser parser;
-	bool do_split_per_micrograph, do_apply_trans, do_apply_trans_only, do_ignore_optics, do_one_by_one;
+	bool do_split_per_micrograph, do_apply_trans, do_apply_trans_only, do_ignore_optics, do_one_by_one, do_float16;
 	ObservationModel obsModel;
 
 	void usage()
@@ -56,6 +56,7 @@ class stack_create_parameters
 		do_apply_trans_only = parser.checkOption("--apply_rounded_offsets_only", "Apply the rounded translations only (so-recentering without interpolation; needs _rlnOriginX/Y in STAR file)");
 		do_ignore_optics = parser.checkOption("--ignore_optics", "Ignore optics groups. This allows you to read and write RELION 3.0 STAR files but does NOT allow you to convert 3.1 STAR files back to the 3.0 format.");
 		do_one_by_one = parser.checkOption("--one_by_one", "Write particles one by one. This saves memory but can be slower.");
+        do_float16 = parser.checkOption("--float16", "Write images in 16bit float format (default is 32bit).");
 
 		if (do_apply_trans)
 			std::cerr << "WARNING: --apply_transformation uses real space interpolation. It also invalidates CTF parameters (e.g. beam tilt & astigmatism). This can degrade the resolution. USE WITH CARE!!" << std::endl;
@@ -232,10 +233,10 @@ class stack_create_parameters
 					}
 					else
 					{
-						if (n == 0)
-							in.write(fn_img, -1, false, WRITE_OVERWRITE);
+                        if (n == 0)
+							in.write(fn_img, -1, false, WRITE_OVERWRITE, do_float16 ? Float16: Float);
 						else
-							in.write(fn_img, -1, true, WRITE_APPEND);
+							in.write(fn_img, -1, true, WRITE_APPEND, do_float16 ? Float16: Float);
 					}
 
 					n++;
@@ -245,7 +246,7 @@ class stack_create_parameters
 			progress_bar(ndim);
 
 			if (!do_one_by_one)
-				out.write(fn_out);
+				out.write(fn_out, -1, true, WRITE_APPEND, do_float16 ? Float16: Float);
 			std::cout << "Written out: " << fn_out << std::endl;
 		}
 
