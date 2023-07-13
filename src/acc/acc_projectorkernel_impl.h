@@ -3,9 +3,13 @@
 
 
 #ifndef PROJECTOR_NO_TEXTURES
-#define PROJECTOR_PTR_TYPE cudaTextureObject_t
+	#ifdef _CUDA_ENABLED
+		#define PROJECTOR_PTR_TYPE cudaTextureObject_t
+	#elif _HIP_ENABLED
+		#define PROJECTOR_PTR_TYPE hipTextureObject_t
+	#endif
 #else
-#define PROJECTOR_PTR_TYPE XFLOAT *
+	#define PROJECTOR_PTR_TYPE XFLOAT *
 #endif
 
 class AccProjectorKernel
@@ -20,7 +24,7 @@ public:
 
 	PROJECTOR_PTR_TYPE mdlReal;
 	PROJECTOR_PTR_TYPE mdlImag;
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 	PROJECTOR_PTR_TYPE mdlComplex;
 #else
 	std::complex<XFLOAT> *mdlComplex;
@@ -32,7 +36,7 @@ public:
 			int mdlInitY, int mdlInitZ,
 			XFLOAT padding_factor,
 			int maxR,
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 			PROJECTOR_PTR_TYPE mdlComplex
 #else
 			std::complex<XFLOAT> *mdlComplex
@@ -61,7 +65,7 @@ public:
 				maxR(maxR), maxR2(maxR*maxR), maxR2_padded(maxR*maxR*padding_factor*padding_factor),
 				mdlReal(mdlReal), mdlImag(mdlImag)
 			{
-#ifndef _CUDA_ENABLED
+#if !defined _CUDA_ENABLED && !defined _HIP_ENABLED
 std::complex<XFLOAT> *pData = mdlComplex;
 				for(size_t i=0; i<(size_t)mdlX * (size_t)mdlY * (size_t)mdlZ; i++) {
 					std::complex<XFLOAT> arrayval(*mdlReal ++, *mdlImag ++);
@@ -70,7 +74,7 @@ std::complex<XFLOAT> *pData = mdlComplex;
 #endif
 			};
 
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 	__device__ __forceinline__
 #else
 	#ifndef __INTEL_COMPILER
@@ -112,8 +116,8 @@ std::complex<XFLOAT> *pData = mdlComplex;
 				zp = -zp;
 			}
 
-#ifdef _CUDA_ENABLED
-real =   no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
+			real =   no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 			imag = - no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 #else
 			CpuKernels::complex3D(mdlComplex, real, imag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
@@ -154,7 +158,7 @@ real =   no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 		}
 	}
 
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 	__device__ __forceinline__
 #else
 	#ifndef __INTEL_COMPILER
@@ -192,8 +196,8 @@ real =   no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 				zp = -zp;
 			}
 
-	#ifdef _CUDA_ENABLED
-real = no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+	#if defined _CUDA_ENABLED || defined _HIP_ENABLED
+			real = no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 			imag = no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 	#else
 			CpuKernels::complex3D(mdlComplex, real, imag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
@@ -232,7 +236,7 @@ real = no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 		}
 	}
 
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 __device__ __forceinline__
 #else
 	#ifndef __INTEL_COMPILER
@@ -265,8 +269,8 @@ __device__ __forceinline__
 				yp = -yp;
 			}
 
-	#ifdef _CUDA_ENABLED
-real = no_tex2D(mdlReal, xp, yp, mdlX, mdlInitY);
+	#if defined _CUDA_ENABLED || defined _HIP_ENABLED
+			real = no_tex2D(mdlReal, xp, yp, mdlX, mdlInitY);
 			imag = no_tex2D(mdlImag, xp, yp, mdlX, mdlInitY);
 	#else
 			CpuKernels::complex2D(mdlComplex, real, imag, xp, yp, mdlX, mdlInitY);
@@ -315,8 +319,8 @@ real = no_tex2D(mdlReal, xp, yp, mdlX, mdlInitY);
 					*p.mdlReal,
 					*p.mdlImag
 #else
-#ifdef _CUDA_ENABLED
-p.mdlReal,
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
+					p.mdlReal,
 					p.mdlImag
 #else
 					p.mdlComplex

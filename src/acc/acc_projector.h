@@ -7,7 +7,7 @@
 #include "src/acc/acc_ptr.h"
 //#include <cuda_runtime.h>
 //#include "src/acc/cuda/cuda_kernels/cuda_device_utils.cuh"
-#ifndef _CUDA_ENABLED
+#if !defined _CUDA_ENABLED && !defined _HIP_ENABLED
 #include <complex>
 #endif
 
@@ -25,12 +25,16 @@ class AccProjector
 #ifndef PROJECTOR_NO_TEXTURES
 
 	XFLOAT *texArrayReal2D, *texArrayImag2D;
-	cudaArray_t *texArrayReal, *texArrayImag;
-	cudaTextureObject_t *mdlReal, *mdlImag;
-
+	#ifdef _CUDA_ENABLED
+		cudaArray_t *texArrayReal, *texArrayImag;
+		cudaTextureObject_t *mdlReal, *mdlImag;
+	#elif _HIP_ENABLED
+		hipArray_t *texArrayReal, *texArrayImag;
+		hipTextureObject_t *mdlReal, *mdlImag;	
+	#endif
 	size_t pitch2D;
 #else
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 	XFLOAT *mdlReal, *mdlImag;
 #else
 	std::complex<XFLOAT> *mdlComplex;
@@ -56,7 +60,7 @@ public:
 		mdlImag = 0;
 		pitch2D = 0;
 #else
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 		mdlReal = 0;
 		mdlImag = 0;
 #else
@@ -73,8 +77,8 @@ public:
 
 	void initMdl(XFLOAT *real, XFLOAT *imag);
 	void initMdl(Complex *data);
-#ifndef _CUDA_ENABLED
-void initMdl(std::complex<XFLOAT> *data);
+#if !defined _CUDA_ENABLED && !defined _HIP_ENABLED
+	void initMdl(std::complex<XFLOAT> *data);
 #endif
 
 	void clear();

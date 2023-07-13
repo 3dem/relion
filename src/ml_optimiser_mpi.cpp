@@ -21,6 +21,8 @@
 #include "src/ml_optimiser.h"
 #ifdef _CUDA_ENABLED
 #include "src/acc/cuda/cuda_ml_optimiser.h"
+#elif _HIP_ENABLED
+#include "src/acc/hip/hip_ml_optimiser.h"
 #endif
 #ifdef ALTCPU
 	#include <tbb/tbb.h>
@@ -106,7 +108,7 @@ void MlOptimiserMpi::initialise()
 	}
 
 	grad_pseudo_halfsets = gradient_refine && !do_split_random_halves;
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
     /************************************************************************/
 	//Setup GPU related resources
 	int devCount, deviceAffinity;
@@ -129,24 +131,28 @@ void MlOptimiserMpi::initialise()
 		// ------------------------------ FIGURE OUT GLOBAL DEVICE MAP------------------------------------------
 		if (!node->isLeader())
 		{
-			cudaDeviceProp deviceProp;
+			accGPUDeviceProp deviceProp;
 			int compatibleDevices(0);
 			// Send device count seen by this follower
-			HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+			HANDLE_ERROR(accGPUGetDeviceCount(&devCount));
 			for(int i=0; i<devCount; i++ )
 			{
-				HANDLE_ERROR(cudaGetDeviceProperties(&deviceProp, i));
+				HANDLE_ERROR(accGPUGetDeviceProperties(&deviceProp, i));
+			#ifdef _CUDA_ENABLED
 				if(deviceProp.major>CUDA_CC_MAJOR)
 					compatibleDevices+=1;
 				else if(deviceProp.major==CUDA_CC_MAJOR && deviceProp.minor>=CUDA_CC_MINOR)
 					compatibleDevices+=1;
+			#elif _HIP_ENABLED
+				compatibleDevices+=1;
+			#endif
 				//else
 				//std::cout << "Rank " << node->rank  << " found a " << deviceProp.name << " GPU with compute-capability " << deviceProp.major << "." << deviceProp.minor << std::endl;
 			}
 			if(compatibleDevices==0)
-				REPORT_ERROR("You have no GPUs compatible with RELION (CUDA-capable and compute-capability >= 3.5");
+				REPORT_ERROR("You have no GPUs compatible with RELION (CUDA/HIP-capable with supported GPU targets");
 			else if(compatibleDevices!=devCount)
-				std::cerr << "WARNING : at least one of your GPUs is not compatible with RELION (CUDA-capable and compute-capability >= 3.5)" << std::endl;
+				std::cerr << "WARNING : at least one of your GPUs is not compatible with RELION (CUDA/HIP-capable with supported GPU targets)" << std::endl;
 
 
 			node->relion_MPI_Send(&devCount, 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
@@ -294,18 +300,18 @@ void MlOptimiserMpi::initialise()
 				//Only make a new bundle of not existing on device
 				int bundleId(-1);
 
-				for (int j = 0; j < cudaDevices.size(); j++)
-					if (cudaDevices[j] == deviceAffinity)
+				for (int j = 0; j < gpuDevices.size(); j++)
+					if (gpuDevices[j] == deviceAffinity)
 						bundleId = j;
 
 				if (bundleId == -1)
 				{
-					bundleId = cudaDevices.size();
-					cudaDevices.push_back(deviceAffinity);
-					cudaDeviceShares.push_back(1);
+					bundleId = gpuDevices.size();
+					gpuDevices.push_back(deviceAffinity);
+					gpuDeviceShares.push_back(1);
 				}
-				HANDLE_ERROR(cudaSetDevice(deviceAffinity));
-				cudaOptimiserDeviceMap.push_back(bundleId);
+				HANDLE_ERROR(accGPUSetDevice(deviceAffinity));
+				gpuOptimiserDeviceMap.push_back(bundleId);
 			}
 		}
 
@@ -315,7 +321,7 @@ void MlOptimiserMpi::initialise()
 
         if (! node->isLeader())
         {
-            int devCount = cudaDevices.size();
+            int devCount = gpuDevices.size();
             node->relion_MPI_Send(&devCount, 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
 
             for (int i = 0; i < devCount; i++)
@@ -326,7 +332,7 @@ void MlOptimiserMpi::initialise()
 				std::string didS(buffer, len);
 				std::stringstream didSs;
 
-				didSs << "Device " << cudaDevices[i] << " on " << didS;
+				didSs << "Device " << gpuDevices[i] << " on " << didS;
 				didS = didSs.str();
 
 //				std::cout << "SENDING: " << didS << std::endl;
@@ -337,7 +343,7 @@ void MlOptimiserMpi::initialise()
 
             for (int i = 0; i < devCount; i++)
 			{
-	        	node->relion_MPI_Recv(&cudaDeviceShares[i], 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD, status);
+	        	node->relion_MPI_Recv(&gpuDeviceShares[i], 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD, status);
 //	        	std::cout << "Received: " << bundle->rank_shared_count << std::endl;
             }
 		}
@@ -414,11 +420,11 @@ void MlOptimiserMpi::initialise()
 			if (!node->isLeader())
 			{
 				unsigned long long boxLim (10000);
-				for (int i = 0; i < cudaDevices.size(); i ++)
+				for (int i = 0; i < gpuDevices.size(); i ++)
 				{
 					MlDeviceBundle b(this);
-					b.setDevice(cudaDevices[i]);
-					unsigned long long t = b.checkFixedSizedObjects(cudaDeviceShares[i]);
+					b.setDevice(gpuDevices[i]);
+					unsigned long long t = b.checkFixedSizedObjects(gpuDeviceShares[i]);
 					boxLim = ((t < boxLim) ? t : boxLim );
 				}
 				node->relion_MPI_Send(&boxLim, 1, MPI_UNSIGNED_LONG_LONG, 0, MPITAG_INT, MPI_COMM_WORLD);
@@ -466,7 +472,7 @@ will still yield good performance and possibly a more stable execution. \n" << s
 		mymodel.do_gpu = do_gpu;
 	}
 	/************************************************************************/
-#endif // CUDA
+#endif // _CUDA_ENABLED or _HIP_ENABLED
 
 	// Split the data into two random halves
 	if (do_split_random_halves)
@@ -898,7 +904,7 @@ void MlOptimiserMpi::expectation()
 #define JOB_LEN_FN_RECIMG  (first_last_nr_images(5))
 #define JOB_NPAR  (JOB_LAST - JOB_FIRST + 1)
 
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 	/************************************************************************/
 	//GPU memory setup
 
@@ -907,13 +913,13 @@ void MlOptimiserMpi::expectation()
 
 	if (do_gpu && ! node->isLeader())
 	{
-		for (int i = 0; i < cudaDevices.size(); i ++)
+		for (int i = 0; i < gpuDevices.size(); i ++)
 		{
 #ifdef TIMING
 		timer.tic(TIMING_EXP_4b);
 #endif
 			MlDeviceBundle *b = new MlDeviceBundle(this);
-			b->setDevice(cudaDevices[i]);
+			b->setDevice(gpuDevices[i]);
 			b->setupFixedSizedObjects();
 			accDataBundles.push_back((void*)b);
 #ifdef TIMING
@@ -923,19 +929,19 @@ void MlOptimiserMpi::expectation()
 
 		std::vector<unsigned> threadcountOnDevice(accDataBundles.size(),0);
 
-		for (int i = 0; i < cudaOptimiserDeviceMap.size(); i ++)
+		for (int i = 0; i < gpuOptimiserDeviceMap.size(); i ++)
 		{
 			std::stringstream didSs;
 			didSs << "RRr" << node->rank << "t" << i;
-			MlOptimiserCuda *b = new MlOptimiserCuda(this, (MlDeviceBundle*) accDataBundles[cudaOptimiserDeviceMap[i]],didSs.str().c_str());
+			MlOptimiserAccGPU *b = new MlOptimiserAccGPU(this, (MlDeviceBundle*) accDataBundles[gpuOptimiserDeviceMap[i]],didSs.str().c_str());
 			b->resetData();
-			cudaOptimisers.push_back((void*)b);
-			threadcountOnDevice[cudaOptimiserDeviceMap[i]] ++;
+			gpuOptimisers.push_back((void*)b);
+			threadcountOnDevice[gpuOptimiserDeviceMap[i]] ++;
 		}
 
 		int devCount;
-		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
-		HANDLE_ERROR(cudaDeviceSynchronize());
+		HANDLE_ERROR(accGPUGetDeviceCount(&devCount));
+		HANDLE_ERROR(accGPUDeviceSynchronize());
 
 		for (int i = 0; i < accDataBundles.size(); i ++)
 		{
@@ -945,21 +951,37 @@ void MlOptimiserMpi::expectation()
 				CRITICAL(ERR_GPUID);
 			}
 			else
-				HANDLE_ERROR(cudaSetDevice(((MlDeviceBundle*)accDataBundles[i])->device_id));
+				HANDLE_ERROR(accGPUSetDevice(((MlDeviceBundle*)accDataBundles[i])->device_id));
 
 			size_t free, total, allocationSize;
-			HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
+			HANDLE_ERROR(accGPUMemGetInfo( &free, &total ));
 
-			free = (float) free / (float)cudaDeviceShares[i];
+			free = (float) free / (float)gpuDeviceShares[i];
 			size_t required_free = requested_free_gpu_memory + GPU_THREAD_MEMORY_OVERHEAD_MB*1000*1000*threadcountOnDevice[i];
 
 			if (free < required_free)
 			{
 				printf("WARNING: Ignoring required free GPU memory amount of %zu MB, due to space insufficiency.\n", required_free/1000000);
-				allocationSize = (double)free *0.7;
+				#ifdef _CUDA_ENABLED
+					allocationSize = (double)free *0.7;
+				#elif defined _HIP_ENABLED
+					allocationSize = (double)free *0.7;
+				#endif
 			}
 			else
-				allocationSize = free - required_free;
+			{
+				#ifdef _CUDA_ENABLED	
+					allocationSize = free - required_free;
+				#elif defined _HIP_ENABLED
+					allocationSize = free - required_free;
+					// allocationSize = (double)free *0.5;
+					// #ifdef DEBUG_HIP
+					// 	printf("WARNING: due to 296623 ticket, use 50%% of free GPU memory as allocationSize %zu MB.\n", allocationSize/1000000);
+					// #else
+					// 	printf("WARNING: Using 50%% of free GPU memory as allocationSize %zu MB.\n", allocationSize/1000000);
+					// #endif
+				#endif
+			}
 
 			if (allocationSize < 200000000)
 				printf("WARNING: The available space on the GPU after initialization (%zu MB) might be insufficient for the expectation step.\n", allocationSize/1000000);
@@ -979,7 +1001,7 @@ void MlOptimiserMpi::expectation()
 		for (int i = 0; i < accDataBundles.size(); i ++)
 			((MlDeviceBundle*)accDataBundles[i])->setupTunableSizedObjects(allocationSizes[i]);
 	}
-#endif // CUDA
+#endif // _CUDA_ENABLED or _HIP_ENABLED
 #ifdef ALTCPU
 	/************************************************************************/
 	//CPU memory setup
@@ -1390,7 +1412,7 @@ void MlOptimiserMpi::expectation()
 			}
 //		TODO: define MPI_COMM_SLAVES!!!!	MPI_Barrier(node->MPI_COMM_SLAVES);
 
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 			if (do_gpu)
 			{
 				for (int i = 0; i < accDataBundles.size(); i ++)
@@ -1436,10 +1458,10 @@ void MlOptimiserMpi::expectation()
 #ifdef TIMING
 		timer.tic(TIMING_EXP_8);
 #endif
-				for (int i = 0; i < cudaOptimisers.size(); i ++)
-					delete (MlOptimiserCuda*) cudaOptimisers[i];
+				for (int i = 0; i < gpuOptimisers.size(); i ++)
+					delete (MlOptimiserAccGPU*) gpuOptimisers[i];
 
-				cudaOptimisers.clear();
+				gpuOptimisers.clear();
 
 
 				for (int i = 0; i < accDataBundles.size(); i ++)
@@ -1448,7 +1470,7 @@ void MlOptimiserMpi::expectation()
 					((MlDeviceBundle*)accDataBundles[i])->allocator->syncReadyEvents();
 					((MlDeviceBundle*)accDataBundles[i])->allocator->freeReadyAllocs();
 
-#ifdef DEBUG_CUDA
+#if defined DEBUG_CUDA || defined DEBUG_HIP
 					if (((MlDeviceBundle*) accDataBundles[i])->allocator->getNumberOfAllocs() != 0)
 					{
 						printf("DEBUG_ERROR: Non-zero allocation count encountered in custom allocator between iterations.\n");
@@ -1467,7 +1489,7 @@ void MlOptimiserMpi::expectation()
 		timer.toc(TIMING_EXP_8);
 #endif
 			}
-#endif // CUDA
+#endif // DEBUG_CUDA or DEBUG_HIP
 #ifdef ALTCPU
 			if (do_cpu)
 			{

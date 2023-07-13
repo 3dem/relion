@@ -22,6 +22,8 @@
 #include "src/motioncorr_runner.h"
 #ifdef _CUDA_ENABLED
 #include "src/acc/cuda/cuda_mem_utils.h"
+#elif _HIP_ENABLED
+#include "src/acc/hip/hip_mem_utils.h"
 #endif
 #include "src/micrograph_model.h"
 #include "src/matrix2d.h"
@@ -221,14 +223,14 @@ void MotioncorrRunner::initialise()
 		REPORT_ERROR("ERROR: when not providing an input STAR file, it is mandatory to provide the voltage in kV through --voltage.");
 	}
 
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 	if (do_motioncor2)
 	{
 		if (gpu_ids.length() > 0)
 			untangleDeviceIDs(gpu_ids, allThreadIDs);
 		else if (verb>0)
 			std::cout << "gpu-ids not specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
-		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+		HANDLE_ERROR(accGPUGetDeviceCount(&devCount));
 	}
 #endif
 

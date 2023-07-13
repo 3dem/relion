@@ -99,9 +99,9 @@ class MlOptimiser
 public:
 
 	// For GPU-maps
-	std::vector<int> cudaDevices;
-	std::vector<int> cudaOptimiserDeviceMap;
-	std::vector<void*> cudaOptimisers;
+	std::vector<int> gpuDevices;
+	std::vector<int> gpuOptimiserDeviceMap;
+	std::vector<void*> gpuOptimisers;
 	std::vector<void*> accDataBundles;
 
 #ifdef ALTCPU

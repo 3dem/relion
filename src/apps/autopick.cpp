@@ -20,6 +20,8 @@
 #include <src/autopicker.h>
 #ifdef _CUDA_ENABLED
 #include <src/acc/cuda/cuda_autopicker.h>
+#elif _HIP_ENABLED
+#include <src/acc/hip/hip_autopicker.h>
 #endif
 
 int main(int argc, char *argv[])
@@ -32,7 +34,7 @@ int main(int argc, char *argv[])
 
 		prm.initialise();
 
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 		std::stringstream didSs;
 		if (prm.do_gpu)
 		{
@@ -42,8 +44,8 @@ int main(int argc, char *argv[])
 
 		if (prm.do_gpu && !(prm.do_topaz_train || prm.do_topaz_extract))
 		{
-			prm.cudaPicker = (void*) new AutoPickerCuda((AutoPicker*)&prm, didSs.str().c_str());
-			((AutoPickerCuda*)prm.cudaPicker)->run();
+			prm.gpuPicker = (void*) new AutoPickerAccGPU((AutoPicker*)&prm, didSs.str().c_str());
+			((AutoPickerAccGPU*)prm.gpuPicker)->run();
 		}
 		else
 #endif

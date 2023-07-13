@@ -47,6 +47,9 @@
 #include "src/acc/cuda/cuda_ml_optimiser.h"
 #include <nvToolsExt.h>
 #include <cuda_profiler_api.h>
+#elif _HIP_ENABLED
+#include "src/acc/hip/hip_ml_optimiser.h"
+#include <roctracer/roctx.h>
 #endif
 #ifdef ALTCPU
 	#include <atomic>
@@ -67,13 +70,13 @@ static omp_lock_t global_mutex;
 
 void globalThreadExpectationSomeParticles(void *self, int thread_id)
 {
-	MlOptimiser *MLO = (MlOptimiser*)self; 
+	MlOptimiser *MLO = (MlOptimiser*)self;
 
 	try
 	{
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 		if (MLO->do_gpu)
-			((MlOptimiserCuda*) MLO->cudaOptimisers[thread_id])->doThreadExpectationSomeParticles(thread_id);
+			((MlOptimiserAccGPU*) MLO->gpuOptimisers[thread_id])->doThreadExpectationSomeParticles(thread_id);
 		else
 #endif
 		MLO->doThreadExpectationSomeParticles(thread_id);
@@ -458,10 +461,10 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
-#ifndef _CUDA_ENABLED
+#if !defined _CUDA_ENABLED && !defined _HIP_ENABLED
 if(do_gpu)
 	{
-		std::cerr << "+ WARNING : Relion was compiled without CUDA of at least version 7.0 - you do NOT have support for GPUs" << std::endl;
+		std::cerr << "+ WARNING : Relion was compiled without CUDA >= 7.0 or HIP with ROCm >= 4.0 - you do NOT have support for GPUs" << std::endl;
 		do_gpu = false;
 	}
 #endif
@@ -826,10 +829,10 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
-#ifndef _CUDA_ENABLED
+#if !defined _CUDA_ENABLED && !defined _HIP_ENABLED
 if(do_gpu)
 	{
-		std::cerr << "+ WARNING : Relion was compiled without CUDA of at least version 7.0 - you do NOT have support for GPUs" << std::endl;
+		std::cerr << "+ WARNING : Relion was compiled without CUDA >= 7.0 or HIP with ROCm >= 4.0 - you do NOT have support for GPUs" << std::endl;
 		do_gpu = false;
 	}
 #endif
@@ -1393,28 +1396,32 @@ void MlOptimiser::initialise()
 
 	if (do_gpu)
 	{
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 		int devCount;
-		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+		HANDLE_ERROR(accGPUGetDeviceCount(&devCount));
 
-		cudaDeviceProp deviceProp;
+		accGPUDeviceProp deviceProp;
 		int compatibleDevices(0);
 		// Send device count seen by this follower
-		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+		HANDLE_ERROR(accGPUGetDeviceCount(&devCount));
 		for(int i=0; i<devCount; i++ )
                 {
-                	HANDLE_ERROR(cudaGetDeviceProperties(&deviceProp, i));
+                	HANDLE_ERROR(accGPUGetDeviceProperties(&deviceProp, i));
+					#ifdef _CUDA_ENABLED
                         if(deviceProp.major>CUDA_CC_MAJOR)
                         	compatibleDevices+=1;
                        	else if(deviceProp.major==CUDA_CC_MAJOR && deviceProp.minor>=CUDA_CC_MINOR)
                         	compatibleDevices+=1;
+					#elif _HIP_ENABLED
+						compatibleDevices+=1;
+					#endif
                         //else
                         //std::cout << "Found a " << deviceProp.name << " GPU with compute-capability " << deviceProp.major << "." << deviceProp.minor << std::endl;
                 }
 		if(compatibleDevices==0)
-			REPORT_ERROR("You have no GPUs compatible with RELION (CUDA-capable and compute-capability >= 3.5");
+			REPORT_ERROR("You have no GPUs compatible with RELION (CUDA/HIP-capable for supported GPU targets");
 		else if(compatibleDevices!=devCount)
-			std::cerr << "WARNING : at least one of your GPUs is not compatible with RELION (CUDA-capable and compute-capability >= 3.5)" << std::endl;
+			std::cerr << "WARNING : at least one of your GPUs is not compatible with RELION (CUDA/HIP-capable for supported GPU targets)" << std::endl;
 
 		std::vector < std::vector < std::string > > allThreadIDs;
 		untangleDeviceIDs(gpu_ids, allThreadIDs);
@@ -1468,21 +1475,21 @@ void MlOptimiser::initialise()
 			//Only make a new bundle of not existing on device
 			int bundleId(-1);
 
-			for (int j = 0; j < cudaDevices.size(); j++)
-				if (cudaDevices[j] == dev_id)
+			for (int j = 0; j < gpuDevices.size(); j++)
+				if (gpuDevices[j] == dev_id)
 					bundleId = j;
 
 			if (bundleId == -1)
 			{
-				bundleId = cudaDevices.size();
-				cudaDevices.push_back(dev_id);
+				bundleId = gpuDevices.size();
+				gpuDevices.push_back(dev_id);
 			}
 
-			cudaOptimiserDeviceMap.push_back(bundleId);
+			gpuOptimiserDeviceMap.push_back(bundleId);
 		}
 		mymodel.do_gpu = do_gpu;
 #else
-        REPORT_ERROR("GPU usage requested, but RELION was compiled without CUDA support");
+        REPORT_ERROR("GPU usage requested, but RELION was compiled without CUDA or HIP support");
 #endif
 	}
 
@@ -3203,35 +3210,35 @@ void MlOptimiser::expectation()
 	std::cerr << "Expectation: done setupCheckMemory" << std::endl;
 #endif
 
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || _HIP_ENABLED
 	/************************************************************************/
 	//GPU memory setup
 
 	if (do_gpu)
     {
-		for (int i = 0; i < cudaDevices.size(); i ++)
+		for (int i = 0; i < gpuDevices.size(); i ++)
 		{
 			MlDeviceBundle *b = new MlDeviceBundle(this);
-			b->setDevice(cudaDevices[i]);
+			b->setDevice(gpuDevices[i]);
 			b->setupFixedSizedObjects();
 			accDataBundles.push_back((void*)b);
 		}
 
 		std::vector<unsigned> threadcountOnDevice(accDataBundles.size(),0);
 
-		for (int i = 0; i < cudaOptimiserDeviceMap.size(); i ++)
+		for (int i = 0; i < gpuOptimiserDeviceMap.size(); i ++)
 		{
 			std::stringstream didSs;
 			didSs << "RRt" << i;
-			MlOptimiserCuda *b = new MlOptimiserCuda(this, (MlDeviceBundle*) accDataBundles[cudaOptimiserDeviceMap[i]], didSs.str().c_str());
+			MlOptimiserAccGPU *b = new MlOptimiserAccGPU(this, (MlDeviceBundle*) accDataBundles[gpuOptimiserDeviceMap[i]], didSs.str().c_str());
 			b->resetData();
-			cudaOptimisers.push_back((void*)b);
-			threadcountOnDevice[cudaOptimiserDeviceMap[i]] ++;
+			gpuOptimisers.push_back((void*)b);
+			threadcountOnDevice[gpuOptimiserDeviceMap[i]] ++;
 		}
 
 		int devCount;
-		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
-		HANDLE_ERROR(cudaDeviceSynchronize());
+		HANDLE_ERROR(accGPUGetDeviceCount(&devCount));
+		HANDLE_ERROR(accGPUDeviceSynchronize());
 		for (int i = 0; i < accDataBundles.size(); i ++)
 		{
 			if(((MlDeviceBundle*)accDataBundles[i])->device_id >= devCount || ((MlDeviceBundle*)accDataBundles[i])->device_id < 0 )
@@ -3240,10 +3247,10 @@ void MlOptimiser::expectation()
 				CRITICAL(ERR_GPUID);
 			}
 			else
-				HANDLE_ERROR(cudaSetDevice(((MlDeviceBundle*)accDataBundles[i])->device_id));
+				HANDLE_ERROR(accGPUSetDevice(((MlDeviceBundle*)accDataBundles[i])->device_id));
 
 			size_t free, total, allocationSize;
-			HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
+			HANDLE_ERROR(accGPUMemGetInfo( &free, &total ));
 
 			size_t required_free = requested_free_gpu_memory + GPU_THREAD_MEMORY_OVERHEAD_MB*1000*1000*threadcountOnDevice[i];
 
@@ -3413,7 +3420,7 @@ void MlOptimiser::expectation()
 	if (verb > 0)
 		progress_bar(my_nr_particles);
 
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 	if (do_gpu)
 	{
 		for (int i = 0; i < accDataBundles.size(); i ++)
@@ -3452,10 +3459,10 @@ void MlOptimiser::expectation()
 				b->coarseProjectionPlans[j].clear();
 		}
 
-		for (int i = 0; i < cudaOptimisers.size(); i ++)
-			delete (MlOptimiserCuda*) cudaOptimisers[i];
+		for (int i = 0; i < gpuOptimisers.size(); i ++)
+			delete (MlOptimiserAccGPU*) gpuOptimisers[i];
 
-		cudaOptimisers.clear();
+		gpuOptimisers.clear();
 
 
 		for (int i = 0; i < accDataBundles.size(); i ++)
@@ -3464,7 +3471,7 @@ void MlOptimiser::expectation()
 			((MlDeviceBundle*)accDataBundles[i])->allocator->syncReadyEvents();
 			((MlDeviceBundle*)accDataBundles[i])->allocator->freeReadyAllocs();
 
-#ifdef DEBUG_CUDA
+#if defined DEBUG_CUDA || defined DEBUG_HIP
 			if (((MlDeviceBundle*) accDataBundles[i])->allocator->getNumberOfAllocs() != 0)
 			{
 				printf("DEBUG_ERROR: Non-zero allocation count encountered in custom allocator between iterations.\n");
@@ -4071,7 +4078,7 @@ void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
 		std::cerr << "Before getFourierTransformsAndCtfs, press any key to continue... " << std::endl;
 		std::cin >> c;
 	}
-	#pragma omp barrier	
+	#pragma omp barrier
 #endif
 
 
