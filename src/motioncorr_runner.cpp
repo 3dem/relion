@@ -511,6 +511,8 @@ bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, int rank)
 
 	if (fn_mic.getExtension() == "tif" || fn_mic.getExtension() == "tiff")
 		command += " -InTiff " + fn_mic;
+	else if (fn_mic.getExtension() == "eer")
+		command += " -InEer " + fn_mic;
 	else
 		command += " -InMrc " + fn_mic;
 
