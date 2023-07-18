@@ -127,6 +127,8 @@ private:
 	void initialiseLocresWindow();
 	void initialiseMotionrefineWindow();
 	void initialiseCtfrefineWindow();
+    void initialiseModelAngeloWindow();
+    void initialiseDynaMightWindow();
 	void initialiseExternalWindow();
 
 	// relion-3.2: add subtomogram averaging programs by Jasenko
