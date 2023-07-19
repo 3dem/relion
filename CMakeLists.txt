@@ -476,6 +476,19 @@ if(INSTALL_OWN_FLTK)
     install(DIRECTORY external/fltk/lib/ DESTINATION lib FILES_MATCHING PATTERN "*")
 endif()
 
+# -----------------------------------------------------------------PYTHON DEPENDENCIES--
+
+set(PYTHON_EXE_PATH "" CACHE PATH "Path to Python executable")
+if(NOT "${PYTHON_EXE_PATH}" STREQUAL "")
+    add_compile_definitions(PYTHON_EXE_PATH=${PYTHON_EXE_PATH})
+endif()
+
+set(TORCH_HOME_PATH "" CACHE PATH "Path to Torch home directory for storage of trained models.")
+
+if(NOT "${TORCH_HOME_PATH}" STREQUAL "")
+    add_compile_definitions(TORCH_HOME_PATH=${TORCH_HOME_PATH})
+endif()
+
 # -----------------------------------------------------------------RELION COMPONENTS--
 option(BUILD_SHARED_LIBS "BUILD_SHARED_LIBS" OFF)
 message("BUILD_SHARED_LIBS = ${BUILD_SHARED_LIBS}")
