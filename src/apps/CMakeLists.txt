@@ -290,7 +290,7 @@ if (CUDA_FOUND)
 	target_link_libraries(relion_lib relion_jaz_gpu_util ${CUDA_CUFFT_LIBRARIES})
 	target_link_libraries(relion_lib relion_jaz_gpu_util ${CUDA_CUFFT_LIBRARIES} ${CUDA_curand_LIBRARY})
 
-else (HIP_FOUND)
+elseif (HIP_FOUND)
 	file(GLOB REL_HIP_SRC "${CMAKE_SOURCE_DIR}/src/acc/hip/*.cpp" "${CMAKE_SOURCE_DIR}/src/acc/hip/hip_kernels/*.cpp" )
 	hip_add_library(relion_gpu_util ${REL_HIP_SRC})
 
@@ -423,11 +423,6 @@ foreach (_target ${RELION_TARGETS})
 	install (TARGETS ${_target} RUNTIME DESTINATION bin)
 
 endforeach()
-
-# Python script for running pytorch is required for class_ranker along with torch model
-if(FETCH_TORCH_MODELS)
-	add_dependencies(class_ranker copy_scripts class_ranker_model_file)
-endif()
 
 foreach (_target ${RELION_JAZ_SPA_TARGETS})
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)

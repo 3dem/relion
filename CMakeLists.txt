@@ -176,7 +176,7 @@ if(CUDA)
     else(CUDA_FOUND)
         message(FATAL_ERROR "CUDA enabled but unlable to locate packages...")
     endif(CUDA_FOUND)
-else(HIP)
+elseif(HIP)
     # ------------------------------------------------------------------------------HIP--
     if (DEFINED ENV{ROCM_PATH})
         include($ENV{ROCM_PATH}/hip/cmake/FindHIP.cmake)
@@ -437,20 +437,6 @@ find_package(JPEG)
 if(JPEG_FOUND)
 	add_definitions(-DHAVE_JPEG)
 endif(JPEG_FOUND)
-
-# -----------------------------------------------------------------------------Torch--
-
-#option(TORCH "Enable support for LibTorch" OFF)
-#if(TORCH)
-#    message(STATUS "Torch support requested by user.")
-#    include(${CMAKE_SOURCE_DIR}/cmake/BuildTorch.cmake)
-#    add_definitions(-D_TORCH_ENABLED)
-#endif(TORCH)
-
-option(FETCH_TORCH_MODELS "Do download pre-trained torch models" OFF)
-if (FETCH_TORCH_MODELS)
-    include(${CMAKE_SOURCE_DIR}/cmake/FetchTorchModels.cmake)
-endif()
 
 # ----------------------------------------------------------------------COPY SCRIPTS--
 
