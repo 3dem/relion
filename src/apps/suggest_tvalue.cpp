@@ -19,6 +19,7 @@
 ***************************************************************************/
 
 #include <src/args.h>
+#include "src/time.h"
 #include <src/image.h>
 #include <src/transformations.h>
 #include <src/fftw.h>
@@ -102,20 +103,20 @@ void SuggestTvalue::run()
         std::cerr << " minval= " << minval << " maxval= " << maxval << std::endl;
         REPORT_ERROR("SuggestTvalue ERROR: mask values not in range [0,1]!");
     }
-    std::cout << " - The mask occupies " << avg*100. << "% of the box" << std::endl;
-    std::cout << " - Standard T-value                    = " << standard_t << std::endl;
+    std::cout << "  This program provides suggestions for regularization parameter T in focussed classification or refinement " << std::endl;
+    std::cout << "  The mask occupies " << avg*100. << "% of the box" << std::endl;
+    std::cout << "  Standard T-value = " << standard_t << std::endl;
 
 	RFLOAT sum_ori = getSumAmpl2(Imap());
-    std::cout << " - Power of input map                   = " << sum_ori << std::endl;
 	RFLOAT sum_msk = getSumAmpl2(Imap() * Imask());
-    std::cout << " - Power of masked map                  = " << sum_msk << std::endl;
 
+    std::cout << "  Randomly shifting mask around the map to find a region with higher power. " << std::endl;
+    init_progress_bar(n_try+1);
     // Place mask in the center of the map
     selfTranslateCenterOfMassToCenter(Imask());
     RFLOAT sum_max = getSumAmpl2(Imap() * Imask());
-    std::cout << " - Power of centered masked map          = " << sum_max << std::endl;
 
-    // Translate mask n_try times randomly within 1/3 of the box to see if there are more stronger powers than at the center
+    // Translate mask n_try times randomly within 1/3 of the box to see if there are stronger powers than at the center
     MultidimArray<RFLOAT> Mshift;
     Matrix1D<RFLOAT> shift(3);
     RFLOAT thirdbox = XSIZE(Imap())/3.;
@@ -128,14 +129,27 @@ void SuggestTvalue::run()
         RFLOAT sum_shift = getSumAmpl2(Imap() * Mshift);
         if (sum_shift > sum_max) sum_max = sum_shift;
         //std::cout << " random shift = " << shift << " sum_shift " << sum_shift << std::endl;
+
+        progress_bar(i+1);
     }
-    std::cout << " - Power of randomly shifted masked map  = " << sum_max << std::endl;
+    progress_bar(n_try+1);
+
+    std::cout << "  " << std::endl;
+    std::cout << "  Power of input map                        = " << sum_ori << std::endl;
+    std::cout << "  Power of masked map                       = " << sum_msk << std::endl;
+    std::cout << "  Max power of randomly shifted masked map  = " << sum_max << std::endl;
 
     RFLOAT t_min = XMIPP_MIN(standard_t * sum_ori/sum_max, standard_t * sum_ori/sum_msk);
     RFLOAT t_max = XMIPP_MAX(standard_t * sum_ori/sum_max, standard_t * sum_ori/sum_msk);
 
-    std::cout << " - " << std::endl;
-    std::cout << " - Suggested range of T-values: " << t_min << " to " << t_max << std::endl;
+    std::cout << "  " << std::endl;
+    std::cout << "  Suggested T-value based on power in masked region: " << standard_t * sum_ori/sum_msk << std::endl;
+    std::cout << "  Suggested T-value based on power in other regions: " << standard_t * sum_ori/sum_max << std::endl;
+    std::cout << "  " << std::endl;
+    std::cout << "  You may want to run focussed classifications or refinements with T-values around these values... " << std::endl;
+    std::cout << "  But, always keep an eye on the noise in the resulting maps: " << std::endl;
+    std::cout << "  Too much high-res noise means your T-value is too high." << std::endl;
+    std::cout << "  Too low-resolution maps mean your T-value is too low." << std::endl;
 
 
 }
