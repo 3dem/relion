@@ -30,20 +30,22 @@
 
 // Helper macro for stringification
 #define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
 
 namespace python_dependencies
 {
 	std::string get_python_exe_path()
 	{
 		// First check if the environmental variable is set
-		const char* python_exe_path = getenv("RELION_PYTHON_EXECUTABLE");
-		if (python_exe_path != nullptr)
-			return std::string{python_exe_path};
-
+		const char* python_exe_path = getenv("RELION_PYTHON_EXE");
+		if (python_exe_path != nullptr) {
+			std::string python_exe_path_str = std::string{python_exe_path};
+			if (python_exe_path_str.length() > 1)
+				return python_exe_path_str;
+		}
 		// Then check if pre-compiled variables are set
 #ifdef PYTHON_EXE_PATH
-#define PYTHON_EXE_PATH_STRING STRINGIFY(PYTHON_EXE_PATH)
-		return PYTHON_EXE_PATH_STRING;
+		return TOSTRING(PYTHON_EXE_PATH);
 #else
 		// If not, return default
 		return "python";
@@ -59,8 +61,7 @@ namespace python_dependencies
 
 		// Then check if pre-compiled variables are set
 #ifdef TORCH_HOME_PATH
-#define TORCH_HOME_PATH_STRING STRINGIFY(PYTHON_EXE_PATH)
-		return TORCH_HOME_PATH_STRING;
+		return TOSTRING(TORCH_HOME_PATH);
 #else
 		// If not, return empty string
 		return "";
@@ -94,13 +95,15 @@ namespace python_dependencies
 		explicit InterpreterException(std::string cmd="")
 				: cmd_(std::move(cmd)) {}
 
-		const char* what() const noexcept override {
-			errorMessage_ =
+		const char* what() const noexcept override
+		{
+			errorMessage_ = "\n"
 			"---------------------------------- PYTHON ERROR ---------------------------------\n"
 			"   Has RELION been provided a Python interpreter with the correct environment?   \n"
-			" The interpreter can be passed to RELION either during Cmake configuration with  \n"
-			"     using the Cmake flag -DPYTHON_EXE_PATH=<path to python interpreter> or      \n"
-			"          by setting the environmental variable RELION_PYTHON_EXECUTABLE.        \n"
+			"   The interpreter can be passed to RELION either during Cmake configuration by  \n"
+			"     using the Cmake flag -DPYTHON_EXE_PATH=<path/to/python/interpreter> or      \n"
+			"             by setting the environmental variable RELION_PYTHON_EXE.            \n"
+			"   NOTE: For some modules TORCH_HOME needs to be set to find pretrained models   \n"
 			"---------------------------------------------------------------------------------\n"
 			"Failed to execute command: " + cmd_;
 			return errorMessage_.c_str();
@@ -118,7 +121,10 @@ namespace python_dependencies
 	{
 		std::string python_exe_path = get_python_exe_path();
 		std::string torch_home_path = get_torch_home_path();
-		return "TORCH_HOME=" + torch_home_path + " " + python_exe_path + " " + python_cmd;
+		if (torch_home_path.length() > 1)
+			return "TORCH_HOME=" + torch_home_path + " " + python_exe_path + " " + python_cmd;
+		else
+			return python_exe_path + " " + python_cmd;
 	}
 
 	std::string execute(const std::string& python_cmd)

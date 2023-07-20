@@ -454,7 +454,6 @@ list(APPEND RELION_SCRIPT_FILES
         qsub.csh
         it.py
         schemegui.py
-        class_ranker.py
 )
 
 add_custom_target(copy_scripts ALL)

@@ -21,6 +21,8 @@
 
 #include "src/npy.hpp"
 #include "src/class_ranker.h"
+#include "src/python_dependencies.h"
+
 const static int IMGSIZE = 64;
 const static int NR_FEAT = 24;
 
@@ -1880,7 +1882,7 @@ void ClassRanker::deployTorchModel(std::vector<float> &features, std::vector<flo
 	const long unsigned image_shape [] = {count, IMGSIZE, IMGSIZE};
 	npy::SaveArrayAsNumpy(fn_out + "images.npy", false, 3, image_shape, subimages);
 
-	std::string python_cmd = "classranker " + fn_out;
+	std::string python_cmd = "-c \"from relion_classranker import main; exit(main())\" " + fn_out;
 	std::string cmd = python_dependencies::get_full_cmd(python_cmd);
 	std::string result = python_dependencies::execute(python_cmd);
 

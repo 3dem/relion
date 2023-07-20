@@ -118,8 +118,6 @@ endif(RELION_TEST)
 
 set(GUI_TARGETS maingui display manualpick)
 
-set(TORCH_TARGETS class_ranker)
-
 #--Remove apps using X11 if no GUI--
 if(NOT GUI)
 	foreach(TARGET ${GUI_TARGETS})

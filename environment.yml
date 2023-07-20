@@ -1,4 +1,4 @@
-name: relion
+name: relion-5.0
 channels:
   - conda-forge
   - defaults
@@ -13,4 +13,4 @@ dependencies:
       - tqdm==4.65.0
       - mrcfile==1.4.3
       - starfile==0.4.12
-      - git+https://github.com/3dem/relion-classranker@6f0fc648c623885145b7941cc05618dab58d5699
+      - git+https://github.com/3dem/relion-classranker@9a9dd026d584a2b8a3b34bb6835d6824c383b09d

@@ -26,7 +26,6 @@
 #include <limits.h>
 #include <fstream>
 #include "src/ml_optimiser.h"
-#include "src/python_dependencies.h"
 
 static float feature_normalization_local_ps_mean=0., feature_normalization_local_ps_stddev=0.;
 static float feature_normalization_local_ss_mean=0., feature_normalization_local_ss_stddev=0.;
