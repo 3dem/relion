@@ -176,7 +176,7 @@ if(CUDA)
     else(CUDA_FOUND)
         message(FATAL_ERROR "CUDA enabled but unlable to locate packages...")
     endif(CUDA_FOUND)
-else(HIP)
+elseif(HIP)
     # ------------------------------------------------------------------------------HIP--
     if (DEFINED ENV{ROCM_PATH})
         include($ENV{ROCM_PATH}/hip/cmake/FindHIP.cmake)
@@ -438,20 +438,6 @@ if(JPEG_FOUND)
 	add_definitions(-DHAVE_JPEG)
 endif(JPEG_FOUND)
 
-# -----------------------------------------------------------------------------Torch--
-
-#option(TORCH "Enable support for LibTorch" OFF)
-#if(TORCH)
-#    message(STATUS "Torch support requested by user.")
-#    include(${CMAKE_SOURCE_DIR}/cmake/BuildTorch.cmake)
-#    add_definitions(-D_TORCH_ENABLED)
-#endif(TORCH)
-
-option(FETCH_TORCH_MODELS "Do download pre-trained torch models" OFF)
-if (FETCH_TORCH_MODELS)
-    include(${CMAKE_SOURCE_DIR}/cmake/FetchTorchModels.cmake)
-endif()
-
 # ----------------------------------------------------------------------COPY SCRIPTS--
 
 if(FORCE_OWN_FFTW)
@@ -488,6 +474,19 @@ install( DIRECTORY ${CMAKE_BINARY_DIR}/bin
 # install fltk if we built our own version
 if(INSTALL_OWN_FLTK)
     install(DIRECTORY external/fltk/lib/ DESTINATION lib FILES_MATCHING PATTERN "*")
+endif()
+
+# -----------------------------------------------------------------PYTHON DEPENDENCIES--
+
+set(PYTHON_EXE_PATH "" CACHE PATH "Path to Python executable")
+if(NOT "${PYTHON_EXE_PATH}" STREQUAL "")
+    add_compile_definitions(PYTHON_EXE_PATH=${PYTHON_EXE_PATH})
+endif()
+
+set(TORCH_HOME_PATH "" CACHE PATH "Path to Torch home directory for storage of trained models.")
+
+if(NOT "${TORCH_HOME_PATH}" STREQUAL "")
+    add_compile_definitions(TORCH_HOME_PATH=${TORCH_HOME_PATH})
 endif()
 
 # -----------------------------------------------------------------RELION COMPONENTS--

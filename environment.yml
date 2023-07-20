@@ -1,0 +1,16 @@
+name: relion
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - conda-forge::python=3.10
+  - conda-forge::setuptools=59.5.0
+  - conda-forge::pip
+  - pip:
+      - torch==2.0.1
+      - torchvision==0.15.2
+      - numpy==1.24.4
+      - tqdm==4.65.0
+      - mrcfile==1.4.3
+      - starfile==0.4.12
+      - git+https://github.com/3dem/relion-classranker@6f0fc648c623885145b7941cc05618dab58d5699
