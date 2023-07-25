@@ -5405,8 +5405,10 @@ void RelionJob::initialiseModelAngeloJob()
     hidden_name = ".gui_modelangelo";
 
     joboptions["fn_map"] = JobOption("B-factor sharpened map:", NODE_MAP_CPIPE, "", "MRC map files (*.mrc)",  "Provide a (RELION-postprocessed) B-factor sharpened map for model building");
-    joboptions["fn_seq"] = JobOption("FASTA sequence for chains:", NODE_SEQUENCE_CPIPE, "", "FASTA sequence files (*.{mrc,txt})",  "Provide a FASTA file with sequences for all chains to be built in the map. You can leave this empty if you don't know the proteins that are there, and then run a HMMer search to identify the unknown proteins. ModelAngelo will build much better models when provided with a FASTA sequence file!");
-    joboptions["gpu_id"] = JobOption("Which GPU to use:", std::string("0"), "Provide a number for the GPU to be used (e.g. 0, 1 etc).");
+    joboptions["p_seq"] = JobOption("FASTA sequence for proteins:", NODE_SEQUENCE_CPIPE, "", "FASTA sequence files (*.{fasta,txt})",  "Provide a FASTA file with sequences for all protein chains to be built in the map. You can leave this empty if you don't know the proteins that are there, and then run a HMMer search to identify the unknown proteins. ModelAngelo will build much better models when provided with a FASTA sequence file!");
+    joboptions["d_seq"] = JobOption("FASTA sequence for DNA:", NODE_SEQUENCE_CPIPE, "", "FASTA sequence files (*.{fasta,txt})",  "Provide a FASTA file with sequences for all DNA chains to be built in the map.");
+    joboptions["r_seq"] = JobOption("FASTA sequence for RNA:", NODE_SEQUENCE_CPIPE, "", "FASTA sequence files (*.{fasta,txt})",  "Provide a FASTA file with sequences for all RNA chains to be built in the map.");
+    joboptions["gpu_id"] = JobOption("Which GPUs to use:", std::string("0"), "Provide a number for the GPU to be used (e.g. 0, 1 etc). Use comman-separated values to use multiple GPUs, e.g. 0,1,2");
 
     // Check for environment variable RELION_MODELANGELO_EXECUTABLE
 	char *default_location = getenv("RELION_MODELANGELO_EXECUTABLE");
@@ -5420,6 +5422,10 @@ void RelionJob::initialiseModelAngeloJob()
     joboptions["do_hhmer"] = JobOption("Perform HMMer search?", false ,"If set to Yes, model-angelo will perform a HMM search using HHMer in the output directory of the model-angelo run (without sequence). You can continue an old run with this option switched on, and the model building step will be skipped if the output .cif exists. This way, you can try multiple HHMer runs.");
     joboptions["fn_lib"] = JobOption("Library with sequences for HMMer search:", NODE_SEQUENCE_CPIPE, "", "FASTA sequence files (*.{mrc,txt})", "FASTA file with library with all sequences for HMMer search. This is often an entire proteome.");
     joboptions["alphabet"] = JobOption("Alphabet for the HMMer search:", job_modelangelo_alphabet_options, 0, "Type of Alphabet for HMM searches.");
+    joboptions["F1"] = JobOption("HMMSearch F1: ", 0.02, 1., 10., 0.1, "F1 parameter for HMMSearch, see their documentation at http://eddylab.org/software/hmmer/Userguide.pdf");
+    joboptions["F2"] = JobOption("HMMSearch F2: ", 0.001, 1., 10., 0.1, "F2 parameter for HMMSearch, see their documentation at http://eddylab.org/software/hmmer/Userguide.pdf");
+    joboptions["F3"] = JobOption("HMMSearch F3: ", 0.00001, 0., 10., 0.1, "F3 parameter for HMMSearch, see their documentation at http://eddylab.org/software/hmmer/Userguide.pdf");
+    joboptions["E"] = JobOption("HMMSearch E: ", 10, 0., 100., 10, "E parameter for HMMSearch, see their documentation at http://eddylab.org/software/hmmer/Userguide.pdf");
 
 }
 
@@ -5429,73 +5435,98 @@ bool RelionJob::getCommandsModelAngeloJob(std::string &outputname, std::vector<s
 {
     commands.clear();
     initialisePipeline(outputname, job_counter);
-    std::string command;
 
     FileName outputmodel = outputname;
     outputmodel = (outputmodel.afterFirstOf("/")).beforeLastOf("/");
     outputmodel = outputname + outputmodel + ".cif";
 
-    if (joboptions["fn_map"].getString() != "")
+    // Only run model building for new job or if output.cif is not there yet.
+    if (!is_continue || !exists(outputmodel) )
     {
-        // Only run model building for new job or if output.cif is not there yet.
-        if (!is_continue || !exists(outputmodel) )
+
+        // Run on a map
+        Node node(joboptions["fn_map"].getString(), joboptions["fn_map"].node_type);
+        inputNodes.push_back(node);
+
+        std::string command=joboptions["exe_modelangelo"].getString();
+        if (joboptions["p_seq"].getString() != "" || joboptions["d_seq"].getString() != "" || joboptions["r_seq"].getString() != "" )
         {
+            command += " build ";
 
-            // Run on a map
-            Node node(joboptions["fn_map"].getString(), joboptions["fn_map"].node_type);
-            inputNodes.push_back(node);
-
-            command=joboptions["exe_modelangelo"].getString();
-
-            if (joboptions["fn_seq"].getString() != "" )
+            if (joboptions["p_seq"].getString() != "" )
             {
-                // Run with a sequence file
-                Node node2(joboptions["fn_seq"].getString(), joboptions["fn_seq"].node_type);
+                // Run with a protein sequence file
+                Node node2(joboptions["p_seq"].getString(), joboptions["p_seq"].node_type);
                 inputNodes.push_back(node2);
 
-                command += " build -f " + joboptions["fn_seq"].getString();
+                command += " -pf " + joboptions["p_seq"].getString();
             }
-            else
+            if (joboptions["d_seq"].getString() != "" )
             {
-                command += " build_no_seq ";
+                // Run with a DNA sequence file
+                Node node2(joboptions["d_seq"].getString(), joboptions["d_seq"].node_type);
+                inputNodes.push_back(node2);
+
+                command += " -df " + joboptions["d_seq"].getString();
             }
+            if (joboptions["r_seq"].getString() != "" )
+            {
+                // Run with a protein sequence file
+                Node node2(joboptions["r_seq"].getString(), joboptions["r_seq"].node_type);
+                inputNodes.push_back(node2);
 
-            command += " -v " + joboptions["fn_map"].getString();
-            command += " -o " + outputname;
-            command += " -d " + joboptions["gpu_id"].getString();
-
-            Node node3(outputmodel, LABEL_ATOMCOORDS_CPIPE);
-            outputNodes.push_back(node3);
+                command += " -rf " + joboptions["r_seq"].getString();
+            }
+        }
+        else
+        {
+            command += " build_no_seq ";
         }
 
+        command += " -v " + joboptions["fn_map"].getString();
+        command += " -o " + outputname;
+        command += " -d " + joboptions["gpu_id"].getString();
+
+        Node node3(outputmodel, LABEL_ATOMCOORDS_CPIPE);
+        outputNodes.push_back(node3);
+
         // Other arguments for model_angelo
+        command += " --pipeline-control ";
         command += " " + joboptions["other_args"].getString();
         commands.push_back(command);
 
-        // If no sequence was provided, but a library was provided, then also run an HMM search
-        if (joboptions["do_hhmer"].getBoolean())
+    }
+
+
+    // If no sequence was provided, but a library was provided, then also run an HMM search
+    if (joboptions["do_hhmer"].getBoolean())
+    {
+
+        if (joboptions["fn_lib"].getString() == "")
         {
-
-            if (joboptions["fn_lib"].getString() == "")
-            {
-                error_message = "ERROR: you need to provide a library to perform the HMM search against.";
-                return false;
-            }
-
-            std::string command2 = "`which model-angelo`";
-
-            command2 = joboptions["exe_modelangelo"].getString();
-            command2 += " hmm_search ";
-            command2 += " -i " + outputname;
-            command2 += " -f " + joboptions["fn_lib"].getString();
-            command2 += " -o " + outputname;
-            command2 += " -a " + joboptions["alphabet"].getString();
-
-            // Other arguments for model_angelo
-            command2 += " " + joboptions["other_args"].getString();
-            commands.push_back(command2);
-
+            error_message = "ERROR: you need to provide a library to perform the HMM search against.";
+            return false;
         }
+
+        std::string command2 = joboptions["exe_modelangelo"].getString();
+
+        command2 += " hmm_search ";
+        command2 += " -i " + outputname;
+        command2 += " -f " + joboptions["fn_lib"].getString();
+        command2 += " -o " + outputname;
+        command2 += " -a " + joboptions["alphabet"].getString();
+
+        //HMMSearch parameters
+        command2 += " --F1 " + joboptions["F1"].getString();
+        command2 += " --F2 " + joboptions["F2"].getString();
+        command2 += " --F3 " + joboptions["F3"].getString();
+        command2 += " --E " + joboptions["E"].getString();
+
+        command2 += " --pipeline-control ";
+
+        // Other arguments for model_angelo
+        command2 += " " + joboptions["other_args"].getString();
+        commands.push_back(command2);
 
     }
 

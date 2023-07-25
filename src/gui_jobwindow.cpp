@@ -2331,7 +2331,9 @@ void JobWindow::initialiseModelAngeloWindow()
 
     // I/O
     place("fn_map", TOGGLE_DEACTIVATE);
-    place("fn_seq", TOGGLE_DEACTIVATE);
+    place("p_seq", TOGGLE_DEACTIVATE);
+    place("d_seq", TOGGLE_DEACTIVATE);
+    place("r_seq", TOGGLE_DEACTIVATE);
 
  	current_y += STEPY /2 ;
     place("exe_modelangelo", TOGGLE_DEACTIVATE);
@@ -2352,6 +2354,13 @@ void JobWindow::initialiseModelAngeloWindow()
     group1->begin();
     place("fn_lib", TOGGLE_LEAVE_ACTIVE);
     place("alphabet", TOGGLE_LEAVE_ACTIVE);
+
+	current_y += STEPY /2 ;
+    place("F1", TOGGLE_LEAVE_ACTIVE);
+    place("F2", TOGGLE_LEAVE_ACTIVE);
+    place("F3", TOGGLE_LEAVE_ACTIVE);
+    place("E", TOGGLE_LEAVE_ACTIVE);
+
 
     group1->end();
     //guientries["do_hmmer"].cb_menu_i();
