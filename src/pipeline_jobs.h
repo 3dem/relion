@@ -60,6 +60,8 @@
 #define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
 #define DEFAULTTOPAZLOCATION "/public/EM/RELION/topaz"
 #define DEFAULTRESMAPLOCATION "/public/EM/ResMap/ResMap-1.1.4-linux64"
+#define DEFAULTDYNAMIGHTLOCATION "/public/EM/DynaMight/dynamight"
+#define DEFAULTMODELANGELOLOCATION "/public/EM/model-angelo/model-angelo"
 #define DEFAULTPYTHONLOCATION "python"
 #define DEFAULTMODELANGELOLOCATION "/public/EM/model-angelo/model-angelo"
 #define DEFAULTQSUBCOMMAND "qsub"
@@ -154,7 +156,11 @@ static const std::vector<std::string> job_tomo_pick_mode{
 "filaments"
 };
 
-
+static const std::vector<std::string> job_modelangelo_alphabet_options{
+"amino",
+"DNA",
+"RNA"
+};
 
 // To have a line on the GUI to change the minimum number of dedicated in a job
 static bool do_allow_change_minimum_dedicated;
@@ -231,6 +237,9 @@ static bool do_allow_change_minimum_dedicated;
 #define NODE_HALFMAP_CPIPE				11
 #define NODE_RESMAP_CPIPE				12
 #define NODE_LOGFILE_CPIPE				13
+#define NODE_SEQUENCE_CPIPE             14
+#define NODE_SEQUENCEALIGNMENT_CPIPE    15
+#define NODE_ATOMCOORDS_CPIPE           16
 
 // Job-specific output nodes
 // Import
@@ -364,6 +373,9 @@ static bool do_allow_change_minimum_dedicated;
 #define LABEL_HALFMAP_CPIPE	           "DensityMap.mrc.halfmap"
 #define LABEL_RESMAP_CPIPE             "Image3D.mrc.localresmap"
 #define LABEL_LOGFILE_CPIPE            "LogFile.pdf.relion"
+#define LABEL_SEQUENCE_CPIPE           "Sequence.fasta"
+#define LABEL_SEQUENCEALIGNMENT_CPIPE  "SequenceAlignment.hmm"
+#define LABEL_ATOMCOORDS_CPIPE         "AtomCoords.cif"
 #define LABEL_IMPORT_MOVIES            "MicrographMoviesData.star.relion"
 #define LABEL_IMPORT_MICS              "MicrographsData.star.relion"
 #define LABEL_IMPORT_COORDS            "MicrographsCoords.star.relion"
@@ -455,6 +467,9 @@ static std::map<int, std::string> node_type2pipeliner_label = {{NODE_MOVIES_CPIP
 	{NODE_HALFMAP_CPIPE	, LABEL_HALFMAP_CPIPE},
 	{NODE_RESMAP_CPIPE, LABEL_RESMAP_CPIPE},
 	{NODE_LOGFILE_CPIPE, LABEL_LOGFILE_CPIPE},
+    {NODE_SEQUENCE_CPIPE, LABEL_SEQUENCE_CPIPE},
+    {NODE_SEQUENCEALIGNMENT_CPIPE, LABEL_SEQUENCEALIGNMENT_CPIPE},
+    {NODE_ATOMCOORDS_CPIPE, LABEL_ATOMCOORDS_CPIPE},
 	{OUTNODE_IMPORT_MOVIES, LABEL_IMPORT_MOVIES},
 	{OUTNODE_IMPORT_MICS, LABEL_IMPORT_MICS},
 	{OUTNODE_IMPORT_COORDS, LABEL_IMPORT_COORDS},
@@ -545,6 +560,9 @@ static std::map<std::string, int> pipeliner_label2type = {{LABEL_MOVIES_CPIPE, N
 	{LABEL_HALFMAP_CPIPE	, NODE_HALFMAP_CPIPE},
 	{LABEL_RESMAP_CPIPE, NODE_RESMAP_CPIPE},
 	{LABEL_LOGFILE_CPIPE, NODE_LOGFILE_CPIPE},
+	{LABEL_SEQUENCE_CPIPE, NODE_SEQUENCE_CPIPE},
+    {LABEL_SEQUENCEALIGNMENT_CPIPE, NODE_SEQUENCEALIGNMENT_CPIPE},
+	{LABEL_ATOMCOORDS_CPIPE, NODE_ATOMCOORDS_CPIPE},
 	{LABEL_IMPORT_MOVIES, OUTNODE_IMPORT_MOVIES},
 	{LABEL_IMPORT_MICS, OUTNODE_IMPORT_MICS},
 	{LABEL_IMPORT_COORDS, OUTNODE_IMPORT_COORDS},
@@ -694,6 +712,8 @@ static int get_node_type(std::string label)
 #define PROC_MULTIBODY_DIRNAME	      "MultiBody"    // Multi-body refinement
 #define PROC_MOTIONREFINE_DIRNAME     "Polish"       // Jasenko's motion fitting program for Bayesian polishing (to replace MovieRefine?)
 #define PROC_CTFREFINE_DIRNAME        "CtfRefine"    // Jasenko's program for defocus and beamtilt optimisation
+#define PROC_DYNAMIGHT_DIRNAME        "DynaMight"    // Johannes' DynaMight for modelling continuous heterogeneity
+#define PROC_MODELANGELO_DIRNAME      "ModelAngelo"  // Kiarash's ModelAngelo for automated model building
 #define PROC_TOMO_IMPORT_DIRNAME      "ImportTomo"              // Import for tomography GUI
 #define PROC_TOMO_SUBTOMO_DIRNAME     "PseudoSubtomo"           // Creation of pseudo-subtomograms from tilt series images
 #define PROC_TOMO_CTFREFINE_DIRNAME   "CtfRefineTomo"           // CTF refinement (defocus & aberrations) for tomography
@@ -705,7 +725,6 @@ static int get_node_type(std::string label)
 #define PROC_EXTERNAL_DIRNAME         "External"     // For running non-relion programs
 #define PROC_TOMO_ALIGN_TILTSERIES_DIRNAME "AlignTiltSeries" // Tilt series alignment for tomogram reconstruction
 #define PROC_TOMO_RECONSTRUCT_TOMOGRAM_DIRNAME "ReconstructTomograms" // Reconstruction of tomograms for particle picking
-#define PROC_BUILD_MODEL_DIRNAME  "BuildModel" // Atomic model building
 
 // All the directory names of the different types of jobs defined inside the pipeline
 #define PROC_IMPORT_LABELNEW           "relion.import"       // Import any file as a Node of a given type
@@ -727,6 +746,8 @@ static int get_node_type(std::string label)
 #define PROC_MULTIBODY_LABELNEW	       "relion.multibody"    // Multi-body refinement
 #define PROC_MOTIONREFINE_LABELNEW     "relion.polish"       // Jasenko's motion fitting program for Bayesian polishing (to replace MovieRefine?)
 #define PROC_CTFREFINE_LABELNEW        "relion.ctfrefine"    // Jasenko's program for defocus and beamtilt optimisation
+#define PROC_DYNAMIGHT_LABELNEW        "dynamight"           // Johannes' DynaMight for modelling continuous heterogeneity
+#define PROC_MODELANGELO_LABELNEW      "modelangelo"         // Kiarash's ModelAngelo for automated model building
 #define PROC_TOMO_IMPORT_LABELNEW      "relion.importtomo"              // Import for tomography GUI
 #define PROC_TOMO_EXCLUDE_TILT_IMAGES_LABELNEW "relion.excludetilts"    // Exclude bad tilt-images
 #define PROC_TOMO_SUBTOMO_LABELNEW     "relion.pseudosubtomo"           // Creation of pseudo-subtomograms from tilt series images
@@ -738,7 +759,6 @@ static int get_node_type(std::string label)
 #define PROC_EXTERNAL_LABELNEW         "relion.external"     // For running non-relion programs
 #define PROC_TOMO_ALIGN_TILTSERIES_LABELNEW "relion.aligntiltseries" // Tilt series alignment for tomogram reconstruction
 #define PROC_TOMO_RECONSTRUCT_TOMOGRAM_LABELNEW "relion.reconstructtomograms" // Reconstruction of tomograms for particle picking
-#define PROC_BUILD_MODEL_LABELNEW  "relion.buildmodel" // Atomic model building
 
 
 #define PROC_IMPORT         0 // Import any file as a Node of a given type
@@ -763,7 +783,9 @@ static int get_node_type(std::string label)
 #define PROC_MULTIBODY      19// Multi-body refinement
 #define PROC_MOTIONREFINE   20// Jasenko's motion_refine
 #define PROC_CTFREFINE      21// Jasenko's ctf_refine
-#define PROC_TOMO_IMPORT        50// Import for tomography GUI
+#define PROC_DYNAMIGHT      22// wrapper to Johannes' DynaMight
+#define PROC_MODELANGELO    23// wrapper to Kiasrash's ModelAngelo
+#define PROC_TOMO_IMPORT    50// Import for tomography GUI
 #define PROC_TOMO_SUBTOMO   51// Creation of pseudo-subtomograms from tilt series images
 #define PROC_TOMO_CTFREFINE     52// CTF refinement (defocus & aberrations for tomography)
 #define PROC_TOMO_ALIGN        53// Frame alignment and particle polishing for subtomography
@@ -773,7 +795,6 @@ static int get_node_type(std::string label)
 #define PROC_TOMO_EXCLUDE_TILT_IMAGES 57 // Exclude bad tilt-images from tilt-series
 #define PROC_TOMO_DENOISE_TOMOGRAM 58 // Denoise tomograms
 #define PROC_TOMO_PICK_TOMOGRAM 59 // Denoise tomograms
-#define PROC_BUILD_MODEL 60 // Build atomic model
 #define PROC_EXTERNAL       99// External scripts
 
 
@@ -796,6 +817,8 @@ static std::map<int, std::string> proc_type2dirname = {{PROC_IMPORT, PROC_IMPORT
 		{PROC_MULTIBODY,        PROC_MULTIBODY_DIRNAME},
 		{PROC_MOTIONREFINE,     PROC_MOTIONREFINE_DIRNAME},
 		{PROC_CTFREFINE,        PROC_CTFREFINE_DIRNAME},
+        {PROC_DYNAMIGHT,        PROC_DYNAMIGHT_DIRNAME},
+        {PROC_MODELANGELO,      PROC_MODELANGELO_DIRNAME},
 		{PROC_TOMO_IMPORT,      PROC_TOMO_IMPORT_DIRNAME},
 		{PROC_TOMO_SUBTOMO,     PROC_TOMO_SUBTOMO_DIRNAME},
 		{PROC_TOMO_CTFREFINE,   PROC_TOMO_CTFREFINE_DIRNAME},
@@ -806,7 +829,6 @@ static std::map<int, std::string> proc_type2dirname = {{PROC_IMPORT, PROC_IMPORT
  	    {PROC_TOMO_DENOISE_TOMOGRAM, PROC_TOMO_DENOISE_DIRNAME},
         {PROC_TOMO_PICK_TOMOGRAM, PROC_TOMO_PICK_DIRNAME},
         {PROC_TOMO_EXCLUDE_TILT_IMAGES, PROC_TOMO_EXCLUDE_TILT_IMAGES_DIRNAME},
-        {PROC_BUILD_MODEL, PROC_BUILD_MODEL_DIRNAME},
 		{PROC_EXTERNAL,         PROC_EXTERNAL_DIRNAME}};
 
 static std::map<int, std::string> proc_type2labelnew = {{PROC_IMPORT, PROC_IMPORT_LABELNEW},
@@ -828,6 +850,8 @@ static std::map<int, std::string> proc_type2labelnew = {{PROC_IMPORT, PROC_IMPOR
 		{PROC_MULTIBODY,        PROC_MULTIBODY_LABELNEW},
 		{PROC_MOTIONREFINE,     PROC_MOTIONREFINE_LABELNEW},
 		{PROC_CTFREFINE,        PROC_CTFREFINE_LABELNEW},
+        {PROC_DYNAMIGHT,        PROC_DYNAMIGHT_LABELNEW},
+        {PROC_MODELANGELO,      PROC_MODELANGELO_LABELNEW},
 		{PROC_TOMO_IMPORT,      PROC_TOMO_IMPORT_LABELNEW},
 		{PROC_TOMO_SUBTOMO,     PROC_TOMO_SUBTOMO_LABELNEW},
 		{PROC_TOMO_CTFREFINE,   PROC_TOMO_CTFREFINE_LABELNEW},
@@ -838,7 +862,6 @@ static std::map<int, std::string> proc_type2labelnew = {{PROC_IMPORT, PROC_IMPOR
  	    {PROC_TOMO_DENOISE_TOMOGRAM, PROC_TOMO_DENOISE_LABELNEW},
  	    {PROC_TOMO_PICK_TOMOGRAM, PROC_TOMO_PICK_LABELNEW},
 	    {PROC_TOMO_EXCLUDE_TILT_IMAGES, PROC_TOMO_EXCLUDE_TILT_IMAGES_LABELNEW},
-        {PROC_BUILD_MODEL, PROC_BUILD_MODEL_LABELNEW},
         {PROC_EXTERNAL,         PROC_EXTERNAL_LABELNEW}};
 
 static std::map<std::string, int> proc_dirname2type = {
@@ -861,6 +884,8 @@ static std::map<std::string, int> proc_dirname2type = {
 		{PROC_MULTIBODY_DIRNAME,        PROC_MULTIBODY},
 		{PROC_MOTIONREFINE_DIRNAME,     PROC_MOTIONREFINE},
 		{PROC_CTFREFINE_DIRNAME,        PROC_CTFREFINE},
+        {PROC_DYNAMIGHT_DIRNAME,        PROC_DYNAMIGHT},
+        {PROC_MODELANGELO_DIRNAME,      PROC_MODELANGELO},
 		{PROC_TOMO_IMPORT_DIRNAME,      PROC_TOMO_IMPORT},
 		{PROC_TOMO_SUBTOMO_DIRNAME,     PROC_TOMO_SUBTOMO},
 		{PROC_TOMO_CTFREFINE_DIRNAME,   PROC_TOMO_CTFREFINE},
@@ -871,7 +896,6 @@ static std::map<std::string, int> proc_dirname2type = {
         {PROC_TOMO_DENOISE_DIRNAME, PROC_TOMO_DENOISE_TOMOGRAM},
         {PROC_TOMO_PICK_DIRNAME, PROC_TOMO_PICK_TOMOGRAM},
 	    {PROC_TOMO_EXCLUDE_TILT_IMAGES_DIRNAME, PROC_TOMO_EXCLUDE_TILT_IMAGES},
-        {PROC_BUILD_MODEL_DIRNAME, PROC_BUILD_MODEL},
         {PROC_EXTERNAL_DIRNAME,         PROC_EXTERNAL}};
 
 static std::map<std::string, int> proc_labelnew2type = {
@@ -894,6 +918,8 @@ static std::map<std::string, int> proc_labelnew2type = {
 		{PROC_MULTIBODY_LABELNEW,        PROC_MULTIBODY},
 		{PROC_MOTIONREFINE_LABELNEW,     PROC_MOTIONREFINE},
 		{PROC_CTFREFINE_LABELNEW,        PROC_CTFREFINE},
+        {PROC_DYNAMIGHT_LABELNEW,        PROC_DYNAMIGHT},
+        {PROC_MODELANGELO_LABELNEW,      PROC_MODELANGELO},
 		{PROC_TOMO_IMPORT_LABELNEW,      PROC_TOMO_IMPORT},
 		{PROC_TOMO_SUBTOMO_LABELNEW,     PROC_TOMO_SUBTOMO},
 		{PROC_TOMO_CTFREFINE_LABELNEW,   PROC_TOMO_CTFREFINE},
@@ -904,7 +930,6 @@ static std::map<std::string, int> proc_labelnew2type = {
  	    {PROC_TOMO_DENOISE_LABELNEW, PROC_TOMO_DENOISE_TOMOGRAM},
  	    {PROC_TOMO_PICK_LABELNEW, PROC_TOMO_PICK_TOMOGRAM},
 	    {PROC_TOMO_EXCLUDE_TILT_IMAGES_LABELNEW, PROC_TOMO_EXCLUDE_TILT_IMAGES},
-        {PROC_BUILD_MODEL_LABELNEW, PROC_BUILD_MODEL},
         {PROC_EXTERNAL_LABELNEW,         PROC_EXTERNAL}};
 
 
@@ -1269,6 +1294,14 @@ public:
 	bool getCommandsLocalresJob(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
+  	void initialiseDynaMightJob();
+	bool getCommandsDynaMightJob(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+
+  	void initialiseModelAngeloJob();
+	bool getCommandsModelAngeloJob(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+
 	void initialiseMotionrefineJob();
 	bool getCommandsMotionrefineJob(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
@@ -1318,24 +1351,20 @@ public:
                                   std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 				  
     void initialiseTomoSubtomoJob();
-	bool getCommandsTomoSubtomoJob(std::string &outputname, std::vector<std::string> &commands,
+    bool getCommandsTomoSubtomoJob(std::string &outputname, std::vector<std::string> &commands,
 								   std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
-	void initialiseTomoCtfRefineJob();
-	bool getCommandsTomoCtfRefineJob(std::string &outputname, std::vector<std::string> &commands,
+    void initialiseTomoCtfRefineJob();
+    bool getCommandsTomoCtfRefineJob(std::string &outputname, std::vector<std::string> &commands,
 									 std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
-	void initialiseTomoAlignJob();
-	bool getCommandsTomoAlignJob(std::string &outputname, std::vector<std::string> &commands,
+    void initialiseTomoAlignJob();
+    bool getCommandsTomoAlignJob(std::string &outputname, std::vector<std::string> &commands,
 								 std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
-	void initialiseTomoReconPartJob();
-	bool getCommandsTomoReconPartJob(std::string &outputname, std::vector<std::string> &commands,
+    void initialiseTomoReconPartJob();
+    bool getCommandsTomoReconPartJob(std::string &outputname, std::vector<std::string> &commands,
 									 std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
-
-    void initialiseBuildModelJob();
-    bool getCommandsBuildModelJob(std::string &outputname, std::vector<std::string> &commands,
-                                     std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
 
 };

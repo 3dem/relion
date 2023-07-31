@@ -127,6 +127,8 @@ private:
 	void initialiseLocresWindow();
 	void initialiseMotionrefineWindow();
 	void initialiseCtfrefineWindow();
+        void initialiseModelAngeloWindow();
+        void initialiseDynaMightWindow();
 	void initialiseExternalWindow();
 
 	// relion-4.0: add subtomogram averaging programs by Jasenko
@@ -142,8 +144,6 @@ private:
 	void initialiseTomoCtfRefineWindow();
 	void initialiseTomoAlignWindow();
 	void initialiseTomoReconParWindow();
-
-    void initialiseBuildModelWindow();
 
 };
 

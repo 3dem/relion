@@ -599,6 +599,14 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 		gui_jobwindows[nr_browse_tabs]->initialise(PROC_MOTIONREFINE);
 		browse_grp[nr_browse_tabs]->end();
 		nr_browse_tabs++;
+
+        browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+        browser->add("Flexibility");
+        gui_jobwindows[nr_browse_tabs] = new JobWindow();
+        gui_jobwindows[nr_browse_tabs]->initialise(PROC_DYNAMIGHT);
+        browse_grp[nr_browse_tabs]->end();
+        nr_browse_tabs++;
+
 	}
 
 	browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
@@ -638,16 +646,13 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 
     if (!_do_tomo)
     {
-
         browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
         browser->add("Model building");
         gui_jobwindows[nr_browse_tabs] = new JobWindow();
-        gui_jobwindows[nr_browse_tabs]->initialise(PROC_BUILD_MODEL);
+        gui_jobwindows[nr_browse_tabs]->initialise(PROC_MODELANGELO);
         browse_grp[nr_browse_tabs]->end();
         nr_browse_tabs++;
-
     }
-
 	browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("External");
 	gui_jobwindows[nr_browse_tabs] = new JobWindow();

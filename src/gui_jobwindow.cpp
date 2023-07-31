@@ -409,6 +409,16 @@ void JobWindow::initialise(int my_job_type, bool _is_tomo)
 		myjob.initialise(my_job_type);
 		initialiseCtfrefineWindow();
 	}
+	else if (my_job_type == PROC_MODELANGELO)
+	{
+		myjob.initialise(my_job_type);
+		initialiseModelAngeloWindow();
+	}
+	else if (my_job_type == PROC_DYNAMIGHT)
+	{
+		myjob.initialise(my_job_type);
+		initialiseDynaMightWindow();
+	}
 	else if (my_job_type == PROC_TOMO_IMPORT)
 	{
 		myjob.initialise(my_job_type);
@@ -459,11 +469,6 @@ void JobWindow::initialise(int my_job_type, bool _is_tomo)
 		myjob.initialise(my_job_type);
 		initialiseTomoReconParWindow();
 	}
-    else if (my_job_type == PROC_BUILD_MODEL)
-    {
-        myjob.initialise(my_job_type);
-        initialiseBuildModelWindow();
-    }
 	else if (my_job_type == PROC_EXTERNAL)
 	{
 		myjob.initialise(my_job_type);
@@ -1548,6 +1553,11 @@ void JobWindow::initialiseClass3DWindow()
 
 	place("highres_limit", TOGGLE_DEACTIVATE);
 
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("do_blush", TOGGLE_DEACTIVATE);
+
 	tab4->end();
 
 	tab5->begin();
@@ -1720,6 +1730,11 @@ void JobWindow::initialiseAutorefineWindow()
 
 	place("do_solvent_fsc");
 
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("do_blush", TOGGLE_DEACTIVATE);
+
 	tab4->end();
 	tab5->begin();
 	tab5->label("Auto-sampling");
@@ -1824,6 +1839,10 @@ void JobWindow::initialiseMultiBodyWindow()
 	current_y += STEPY/2;
 
 	place("do_subtracted_bodies", TOGGLE_DEACTIVATE);
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("do_blush", TOGGLE_DEACTIVATE);
 
 	tab1->end();
 	tab2->begin();
@@ -2335,6 +2354,70 @@ void JobWindow::initialiseCtfrefineWindow()
 	place("minres", TOGGLE_DEACTIVATE);
 
 	tab2->end();
+}
+void JobWindow::initialiseDynaMightWindow()
+{
+    setupTabs(2);
+
+    tab1->begin();
+    tab1->label("I/O");
+    resetHeight();
+
+
+    tab1->end();
+
+    tab2->begin();
+    tab2->label("TODO");
+    resetHeight();
+
+    tab2->end();
+}
+
+void JobWindow::initialiseModelAngeloWindow()
+{
+    setupTabs(2);
+
+    tab1->begin();
+    tab1->label("I/O");
+    resetHeight();
+
+    // I/O
+    place("fn_map", TOGGLE_DEACTIVATE);
+    place("p_seq", TOGGLE_DEACTIVATE);
+    place("d_seq", TOGGLE_DEACTIVATE);
+    place("r_seq", TOGGLE_DEACTIVATE);
+
+ 	current_y += STEPY /2 ;
+    place("exe_modelangelo", TOGGLE_DEACTIVATE);
+    place("gpu_id", TOGGLE_DEACTIVATE);
+
+    tab1->end();
+
+    tab2->begin();
+    tab2->label("Hmmer");
+    resetHeight();
+
+    group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group1->end();
+
+    place("do_hhmer", TOGGLE_LEAVE_ACTIVE, group1, false);
+	current_y += STEPY /2 ;
+
+    group1->begin();
+    place("fn_lib", TOGGLE_LEAVE_ACTIVE);
+    place("alphabet", TOGGLE_LEAVE_ACTIVE);
+
+	current_y += STEPY /2 ;
+    place("F1", TOGGLE_LEAVE_ACTIVE);
+    place("F2", TOGGLE_LEAVE_ACTIVE);
+    place("F3", TOGGLE_LEAVE_ACTIVE);
+    place("E", TOGGLE_LEAVE_ACTIVE);
+
+
+    group1->end();
+    //guientries["do_hmmer"].cb_menu_i();
+
+    tab2->end();
 }
 
 void JobWindow::initialiseExternalWindow()
@@ -2926,41 +3009,4 @@ void JobWindow::initialiseTomoExcludeTiltImagesWindow()
 
     place("cache_size", TOGGLE_DEACTIVATE);
     tab1->end();
-}
-
-void JobWindow::initialiseBuildModelWindow()
-{
-	setupTabs(2);
-
-	tab1->begin();
-	tab1->label("I/O");
-	resetHeight();
-
-    place("fn_post", TOGGLE_DEACTIVATE);
-
-	current_y += STEPY /2 ;
-
-	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group1->end();
-	place("have_fasta", TOGGLE_DEACTIVATE, group1);
-
-	group1->begin();
-	place("fn_fasta", TOGGLE_DEACTIVATE);
-
-	group1->end();
-	guientries["have_fasta"].cb_menu_i();
-
-    tab1->end();
-
-	tab2->begin();
-	tab2->label("ModelAngelo");
-	resetHeight();
-
-    place("fn_modelangelo_exe", TOGGLE_DEACTIVATE);
-
-	current_y += STEPY /2 ;
-
-    place("gpu_id", TOGGLE_DEACTIVATE);
-
-	tab2->end();
 }

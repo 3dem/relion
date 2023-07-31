@@ -246,7 +246,7 @@ class stack_create_parameters
 			progress_bar(ndim);
 
 			if (!do_one_by_one)
-				out.write(fn_out, -1, true, WRITE_APPEND, do_float16 ? Float16: Float);
+				out.write(fn_out, -1, true, WRITE_OVERWRITE, do_float16 ? Float16: Float);
 			std::cout << "Written out: " << fn_out << std::endl;
 		}
 

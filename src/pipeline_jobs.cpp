@@ -472,6 +472,7 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 		    type != PROC_INIMODEL &&
 		    type != PROC_MOTIONREFINE &&
 		    type != PROC_CTFREFINE &&
+            type != PROC_MODELANGELO &&
 			type != PROC_TOMO_IMPORT &&
 			type != PROC_TOMO_SUBTOMO &&
 			type != PROC_TOMO_CTFREFINE &&
@@ -482,7 +483,6 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
             type != PROC_TOMO_PICK_TOMOGRAM &&
             type != PROC_TOMO_RECONSTRUCT &&
 			type != PROC_TOMO_EXCLUDE_TILT_IMAGES &&
-            type != PROC_BUILD_MODEL &&
             type != PROC_EXTERNAL)
 			return false;
 
@@ -872,6 +872,16 @@ void RelionJob::initialise(int _job_type)
 		has_mpi = has_thread = true;
 		initialiseCtfrefineJob();
 	}
+	else if (type == PROC_DYNAMIGHT)
+	{
+		has_mpi = has_thread = true;
+		initialiseDynaMightJob();
+	}
+	else if (type == PROC_MODELANGELO)
+	{
+		has_mpi = has_thread = true;
+		initialiseModelAngeloJob();
+	}
 	else if (type == PROC_TOMO_IMPORT)
 	{
 		has_mpi = has_thread = false;
@@ -927,11 +937,6 @@ void RelionJob::initialise(int _job_type)
 		has_mpi = has_thread = true;
 		initialiseTomoReconPartJob();
 	}
-    else if (type == PROC_BUILD_MODEL)
-    {
-        has_mpi = has_thread = false;
-        initialiseBuildModelJob();
-    }
 	else if (type == PROC_EXTERNAL)
 	{
 		has_mpi = false;
@@ -1146,6 +1151,14 @@ bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &c
 	{
 		result = getCommandsCtfrefineJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
+	else if (type == PROC_DYNAMIGHT)
+	{
+		result = getCommandsDynaMightJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
+	}
+	else if (type == PROC_MODELANGELO)
+	{
+		result = getCommandsModelAngeloJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
+	}
 	else if (type == PROC_TOMO_IMPORT)
 	{
 		result = getCommandsTomoImportJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
@@ -1186,10 +1199,6 @@ bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &c
     else if (type == PROC_TOMO_RECONSTRUCT)
 	{
 		result = getCommandsTomoReconPartJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-	}
-	else if (type == PROC_BUILD_MODEL)
-	{
-		result = getCommandsBuildModelJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
 	else if (type == PROC_EXTERNAL)
 	{
@@ -3701,6 +3710,7 @@ High-resolution refinements (e.g. ribosomes or other large complexes in 3D auto-
 	joboptions["highres_limit"] = JobOption("Limit resolution E-step to (A): ", -1, -1, 20, 1, "If set to a positive number, then the expectation step (i.e. the alignment) will be done only including the Fourier components up to this resolution (in Angstroms). \
 This is useful to prevent overfitting, as the classification runs in RELION are not to be guaranteed to be 100% overfitting-free (unlike the 3D auto-refine with its gold-standard FSC). In particular for very difficult data sets, e.g. of very small or featureless particles, this has been shown to give much better class averages. \
 In such cases, values in the range of 7-12 Angstroms have proven useful.");
+	joboptions["do_blush"] = JobOption("Use Blush regularisation?", false, "If set to Yes, relion_refine will use a neural network to perform regularisation by denoising at every iteration, instead of the standard smoothness regularisation.");
 
 	joboptions["dont_skip_align"] = JobOption("Perform image alignment?", true, "If set to No, then rather than \
 performing both alignment and classification, only classification will be performed. This allows the use of very focused masks.\
@@ -3952,11 +3962,16 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 	// Optimisation
 	command += " --iter " + joboptions["nr_iter"].getString();
 	command += " --tau2_fudge " + joboptions["tau_fudge"].getString();
-        command += " --particle_diameter " + joboptions["particle_diameter"].getString();
-	if (!is_continue)
+    command += " --particle_diameter " + joboptions["particle_diameter"].getString();
+    if (!is_continue)
 	{
 		if (joboptions["do_fast_subsets"].getBoolean())
 			command += " --fast_subsets ";
+
+        if (joboptions["do_blush"].getBoolean())
+        {
+            command += " --blush ";
+        }
 
 		command += " --K " + joboptions["nr_classes"].getString();
 		// Always flatten the solvent
@@ -4195,6 +4210,7 @@ High-resolution refinements (e.g. ribosomes or other large complexes in 3D auto-
 	joboptions["do_solvent_fsc"] = JobOption("Use solvent-flattened FSCs?", false, "If set to Yes, then instead of using unmasked maps to calculate the gold-standard FSCs during refinement, \
 masked half-maps are used and a post-processing-like correction of the FSC curves (with phase-randomisation) is performed every iteration. This only works when a reference mask is provided on the I/O tab. \
 This may yield higher-resolution maps, especially when the mask contains only a relatively small volume inside the box.");
+    joboptions["do_blush"] = JobOption("Use Blush regularisation?", false, "If set to Yes, relion_refine will use a neural network to perform regularisation by denoising at every iteration, instead of the standard smoothness regularisation.");
 
 	joboptions["sampling"] = JobOption("Initial angular sampling:", job_sampling_options, 2, "There are only a few discrete \
 angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
@@ -4355,7 +4371,12 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 	{
 		command += " --auto_refine --split_random_halves";
 
-		// If tomo optimiser set is passed, fn_img and fn_ref can be empty
+        if (joboptions["do_blush"].getBoolean())
+        {
+            command += " --blush ";
+        }
+
+        // If tomo optimiser set is passed, fn_img and fn_ref can be empty
 		if (is_tomo && joboptions["in_optimisation"].getString() != "")
 		{
 			// Optimiser set should contain particles, halfmap and refmask or they should be set especifically
@@ -4639,6 +4660,7 @@ Also note that larger bodies should be above smaller bodies in the STAR file. Fo
 
 	joboptions["do_subtracted_bodies"] = JobOption("Reconstruct subtracted bodies?", true, "If set to Yes, then the reconstruction of each of the bodies will use the subtracted images. This may give \
 useful insights about how well the subtraction worked. If set to No, the original particles are used for reconstruction (while the subtracted ones are still used for alignment). This will result in fuzzy densities for bodies outside the one used for refinement.");
+    joboptions["do_blush"] = JobOption("Use Blush regularisation?", false, "If set to Yes, relion_refine will use a neural network to perform regularisation by denoising at every iteration, instead of the standard smoothness regularisation.");
 
 	joboptions["sampling"] = JobOption("Initial angular sampling:", job_sampling_options, 4, "There are only a few discrete \
 angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
@@ -4737,6 +4759,11 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 			command += " --o " + outputname + fn_run;
 			outputNodes = getOutputNodesRefine(outputname + "run", "MultiBody", -1, 1, 3, nr_bodies, is_tomo);
 			command += " --solvent_correct_fsc --multibody_masks " + joboptions["fn_bodies"].getString();
+
+            if (joboptions["do_blush"].getBoolean())
+            {
+                command += " --blush ";
+            }
 
 			Node node(joboptions["fn_in"].getString(), LABEL_REFINE3D_OPT);
 			inputNodes.push_back(node);
@@ -5417,6 +5444,7 @@ This is a developmental feature in need of further testing, but initial results 
 	joboptions["fn_mtf"] = JobOption("MTF of the detector (STAR file)", "", "STAR Files (*.star)", ".", "The MTF of the detector is used to complement the user-provided B-factor in the sharpening. If you don't have this curve, you can leave this field empty.");
 }
 
+
 bool RelionJob::getCommandsLocalresJob(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
@@ -5536,6 +5564,173 @@ bool RelionJob::getCommandsLocalresJob(std::string &outputname, std::vector<std:
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
+}
+
+void RelionJob::initialiseDynaMightJob()
+{
+    hidden_name = ".gui_dynamight";
+
+    // Check for environment variable RELION_DYNAMIGHT_EXECUTABLE
+	char *default_location = getenv("RELION_DYNAMIGHT_EXECUTABLE");
+	char default_dynamight[] = DEFAULTDYNAMIGHTLOCATION;
+	if (default_location == NULL)
+	{
+		default_location = default_dynamight;
+	}
+
+
+
+}
+
+bool RelionJob::getCommandsDynaMightJob(std::string &outputname, std::vector<std::string> &commands,
+                                       std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+{
+    commands.clear();
+    initialisePipeline(outputname, job_counter);
+    std::string command;
+
+    error_message = "ERROR: sorry, this is work in progress... DynaMight will be available soon!";
+    return false;
+
+    // Other arguments for model_angelo
+    command += " " + joboptions["other_args"].getString();
+    commands.push_back(command);
+
+    return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
+}
+
+
+void RelionJob::initialiseModelAngeloJob()
+{
+    hidden_name = ".gui_modelangelo";
+
+    joboptions["fn_map"] = JobOption("B-factor sharpened map:", NODE_MAP_CPIPE, "", "MRC map files (*.mrc)",  "Provide a (RELION-postprocessed) B-factor sharpened map for model building");
+    joboptions["p_seq"] = JobOption("FASTA sequence for proteins:", NODE_SEQUENCE_CPIPE, "", "FASTA sequence files (*.{fasta,txt})",  "Provide a FASTA file with sequences for all protein chains to be built in the map. You can leave this empty if you don't know the proteins that are there, and then run a HMMer search to identify the unknown proteins. ModelAngelo will build much better models when provided with a FASTA sequence file!");
+    joboptions["d_seq"] = JobOption("FASTA sequence for DNA:", NODE_SEQUENCE_CPIPE, "", "FASTA sequence files (*.{fasta,txt})",  "Provide a FASTA file with sequences for all DNA chains to be built in the map.");
+    joboptions["r_seq"] = JobOption("FASTA sequence for RNA:", NODE_SEQUENCE_CPIPE, "", "FASTA sequence files (*.{fasta,txt})",  "Provide a FASTA file with sequences for all RNA chains to be built in the map.");
+    joboptions["gpu_id"] = JobOption("Which GPUs to use:", std::string("0"), "Provide a number for the GPU to be used (e.g. 0, 1 etc). Use comman-separated values to use multiple GPUs, e.g. 0,1,2");
+
+    // Check for environment variable RELION_MODELANGELO_EXECUTABLE
+	char *default_location = getenv("RELION_MODELANGELO_EXECUTABLE");
+	char default_modelangelo[] = DEFAULTMODELANGELOLOCATION;
+	if (default_location == NULL)
+	{
+		default_location = default_modelangelo;
+	}
+	joboptions["exe_modelangelo"] = JobOption("ModelAngelo executable:", std::string(default_location), "*", ".", "Location of the ModelAngelo executable. You can control the default of this field by setting environment variable RELION_MODELANGELO_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+
+    joboptions["do_hhmer"] = JobOption("Perform HMMer search?", false ,"If set to Yes, model-angelo will perform a HMM search using HHMer in the output directory of the model-angelo run (without sequence). You can continue an old run with this option switched on, and the model building step will be skipped if the output .cif exists. This way, you can try multiple HHMer runs.");
+    joboptions["fn_lib"] = JobOption("Library with sequences for HMMer search:", NODE_SEQUENCE_CPIPE, "", "FASTA sequence files (*.{mrc,txt})", "FASTA file with library with all sequences for HMMer search. This is often an entire proteome.");
+    joboptions["alphabet"] = JobOption("Alphabet for the HMMer search:", job_modelangelo_alphabet_options, 0, "Type of Alphabet for HMM searches.");
+    joboptions["F1"] = JobOption("HMMSearch F1: ", 0.02, 1., 10., 0.1, "F1 parameter for HMMSearch, see their documentation at http://eddylab.org/software/hmmer/Userguide.pdf");
+    joboptions["F2"] = JobOption("HMMSearch F2: ", 0.001, 1., 10., 0.1, "F2 parameter for HMMSearch, see their documentation at http://eddylab.org/software/hmmer/Userguide.pdf");
+    joboptions["F3"] = JobOption("HMMSearch F3: ", 0.00001, 0., 10., 0.1, "F3 parameter for HMMSearch, see their documentation at http://eddylab.org/software/hmmer/Userguide.pdf");
+    joboptions["E"] = JobOption("HMMSearch E: ", 10, 0., 100., 10, "E parameter for HMMSearch, see their documentation at http://eddylab.org/software/hmmer/Userguide.pdf");
+
+}
+
+
+bool RelionJob::getCommandsModelAngeloJob(std::string &outputname, std::vector<std::string> &commands,
+                                       std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+{
+    commands.clear();
+    initialisePipeline(outputname, job_counter);
+
+    FileName outputmodel = outputname;
+    outputmodel = (outputmodel.afterFirstOf("/")).beforeLastOf("/");
+    outputmodel = outputname + outputmodel + ".cif";
+
+    // Only run model building for new job or if output.cif is not there yet.
+    if (!is_continue || !exists(outputmodel) )
+    {
+
+        // Run on a map
+        Node node(joboptions["fn_map"].getString(), joboptions["fn_map"].node_type);
+        inputNodes.push_back(node);
+
+        std::string command=joboptions["exe_modelangelo"].getString();
+        if (joboptions["p_seq"].getString() != "" || joboptions["d_seq"].getString() != "" || joboptions["r_seq"].getString() != "" )
+        {
+            command += " build ";
+
+            if (joboptions["p_seq"].getString() != "" )
+            {
+                // Run with a protein sequence file
+                Node node2(joboptions["p_seq"].getString(), joboptions["p_seq"].node_type);
+                inputNodes.push_back(node2);
+
+                command += " -pf " + joboptions["p_seq"].getString();
+            }
+            if (joboptions["d_seq"].getString() != "" )
+            {
+                // Run with a DNA sequence file
+                Node node2(joboptions["d_seq"].getString(), joboptions["d_seq"].node_type);
+                inputNodes.push_back(node2);
+
+                command += " -df " + joboptions["d_seq"].getString();
+            }
+            if (joboptions["r_seq"].getString() != "" )
+            {
+                // Run with a protein sequence file
+                Node node2(joboptions["r_seq"].getString(), joboptions["r_seq"].node_type);
+                inputNodes.push_back(node2);
+
+                command += " -rf " + joboptions["r_seq"].getString();
+            }
+        }
+        else
+        {
+            command += " build_no_seq ";
+        }
+
+        command += " -v " + joboptions["fn_map"].getString();
+        command += " -o " + outputname;
+        command += " -d " + joboptions["gpu_id"].getString();
+
+        Node node3(outputmodel, LABEL_ATOMCOORDS_CPIPE);
+        outputNodes.push_back(node3);
+
+        // Other arguments for model_angelo
+        command += " --pipeline-control ";
+        command += " " + joboptions["other_args"].getString();
+        commands.push_back(command);
+
+    }
+
+
+    // If no sequence was provided, but a library was provided, then also run an HMM search
+    if (joboptions["do_hhmer"].getBoolean())
+    {
+
+        if (joboptions["fn_lib"].getString() == "")
+        {
+            error_message = "ERROR: you need to provide a library to perform the HMM search against.";
+            return false;
+        }
+
+        std::string command2 = joboptions["exe_modelangelo"].getString();
+
+        command2 += " hmm_search ";
+        command2 += " -i " + outputname;
+        command2 += " -f " + joboptions["fn_lib"].getString();
+        command2 += " -o " + outputname;
+        command2 += " -a " + joboptions["alphabet"].getString();
+
+        //HMMSearch parameters
+        command2 += " --F1 " + joboptions["F1"].getString();
+        command2 += " --F2 " + joboptions["F2"].getString();
+        command2 += " --F3 " + joboptions["F3"].getString();
+        command2 += " --E " + joboptions["E"].getString();
+
+        command2 += " --pipeline-control ";
+
+        // Other arguments for model_angelo
+        command2 += " " + joboptions["other_args"].getString();
+        commands.push_back(command2);
+
+    }
+
+    return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
 
 void RelionJob::initialiseMotionrefineJob()
@@ -7356,66 +7551,6 @@ bool RelionJob::getCommandsTomoReconPartJob(std::string &outputname, std::vector
 	{
 		commands.push_back(command2);
 	}
-
-    return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
-}
-
-void RelionJob::initialiseBuildModelJob()
-{
-    hidden_name = ".gui_build_model";
-
-    char* default_location = getenv ("RELION_MODELANGELO_EXECUTABLE");
-    char default_modelangelo[] = DEFAULTMODELANGELOLOCATION;
-    if (default_location == NULL)
-    {
-        default_location = default_modelangelo;
-    }
-    joboptions["fn_modelangelo_exe"] = JobOption("model-angelo executable:", std::string(default_location), "*", ".", "Location of the ModelAngelo executable. This needs to be installed separately from RELION. See XXX for instructions. You can control the default of this field by setting environment variable RELION_MODELANGELO_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
-
-    joboptions["fn_post"] = JobOption("Postprocess STAR file:", OUTNODE_POST,  "", "STAR files (postprocess.star)", "The STAR file generated by a PostProcess job, which contains the map for atomic model building.");
-    joboptions["have_fasta"] = JobOption("Do you have a FASTA sequence file?", true, "If set to Yes, then ModelAngelo will use the FASTA sequence file, which should contain the sequences of every chain you expect in the map, for model building. This is the preferred option to run ModelAngelo. If set to NO, ModelAngelo will search the Uniclust sequence database instead. ");
-    joboptions["fn_fasta"] = JobOption("FASTA sequence file::", "", "*.fasta", ".", "Location of the FASTA file (extension .fasta) with the sequence for each chain in the map.");
-    joboptions["gpu_id"] = JobOption("Which GPU to use:", std::string("0"), "Provide the device ID of the GPU to use. Only a single GPU can be used.");
-
-}
-
-bool RelionJob::getCommandsBuildModelJob(std::string &outputname, std::vector<std::string> &commands,
-                                            std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
-{
-
-    commands.clear();
-    initialisePipeline(outputname, job_counter);
-    std::string command, command2;
-
-    command= joboptions["fn_modelangelo_exe"].getString();
-
-    FileName fn_post =  joboptions["fn_post"].getString();
-    FileName fn_map = fn_post.withoutExtension()+"_masked.mrc";
-
-    Node node(joboptions["fn_post"].getString(), joboptions["fn_post"].node_type);
-    inputNodes.push_back(node);
-
-    if (joboptions["have_fasta"].getBoolean())
-    {
-        command += " build ";
-        command += " -f " + joboptions["fn_fasta"].getString();
-    }
-    else
-    {
-        command += " build_no_seq ";
-    }
-
-    command += " -v " + fn_map;
-    command += " -o " + outputname;
-    command += " -d " + joboptions["gpu_id"].getString();
-
-    //ModelAngelo has its own pipeline control option. :-)
-    command += " --pipeline_control ";
-
-    // Other arguments for extraction
-    command += " " + joboptions["other_args"].getString();
-    commands.push_back(command);
 
     return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 
