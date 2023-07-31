@@ -81,15 +81,20 @@ static void multiply(int MultiBsize, int block_size, deviceStream_t stream, T *a
 }
 
 template <typename T>
-static void add(int block_size, cudaStream_t stream, T *array, T value, size_t size)
+static void add(int block_size, deviceStream_t stream, T *array, T value, size_t size)
 {
-#ifdef _CUDA_ENABLED
 	size_t MultiBsize = ( (size_t) ceilf((float)size/(float)BLOCK_SIZE));
+#ifdef _CUDA_ENABLED
 	CudaKernels::cuda_kernel_add<T><<<MultiBsize,block_size,0,stream>>>(
 		array,
 		value,
 		size
 	);
+#elif _HIP_ENABLED
+	hipLaunchKernelGGL(HIP_KERNEL_NAME(HipKernels::hip_kernel_add<T>), dim3(MultiBsize), dim3(block_size), 0, stream,
+		array,
+		value,
+		size);
 #else
 	CpuKernels::cpu_kernel_add<T>(
 		array,

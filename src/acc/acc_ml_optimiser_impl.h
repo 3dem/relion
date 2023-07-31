@@ -438,7 +438,6 @@ void getFourierTransformsAndCtfs(long int part_id,
                                                     YY(my_old_offset),
                                                     (accMLO->shiftsIs3D) ? ZZ(my_old_offset) : 0.,
                                                     accMLO->dataIs3D);
-            LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 #ifdef _CUDA_ENABLED
             LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 #elif _HIP_ENABLED
@@ -828,8 +827,18 @@ void getFourierTransformsAndCtfs(long int part_id,
                         -1.);
 
 				ctf.getFftwImage(Fctf, baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group], my_pixel_size,
-						baseMLO->ctf_phase_flipped, baseMLO->only_flip_phases, baseMLO->intact_ctf_first_peak, true, baseMLO->do_ctf_padding);
-				CTOC(accMLO->timer,"CTFRead2D");
+                                                 baseMLO->ctf_phase_flipped, baseMLO->only_flip_phases, baseMLO->intact_ctf_first_peak, true, baseMLO->do_ctf_padding);
+
+                                // SHWS 13feb2020: when using CTF-premultiplied, from now on use the normal kernels, but replace ctf by ctf^2
+				if (ctf_premultiplied)
+				{
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+					{
+						DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+					}
+				}
+
+                                CTOC(accMLO->timer,"CTFRead2D");
 			}
 		}
 		else
@@ -2253,7 +2262,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
                 }
             }
 
-            op.min_diff2[img_id] += 50 - weights_max;
+            op.min_diff2 += 50 - weights_max;
 #ifdef _CUDA_ENABLED
             for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
                 DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
@@ -2611,7 +2620,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
     p_weights.cpToHost();
     p_thr_wsum_prior_offsetxyz_class.cpToHost();
 
+#ifdef _CUDA_ENABLED
     DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
+#elif _HIP_ENABLED
+    DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
+#endif
     int iorient = 0;
     partial_pos=0;
     for (long int iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)

@@ -95,6 +95,7 @@ public:
 
 	bool refIs3D;
 	bool dataIs3D;
+        bool shiftsIs3D;
 
 	int device_id;
 

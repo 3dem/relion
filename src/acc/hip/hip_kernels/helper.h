@@ -451,6 +451,7 @@ __global__ void hip_kernel_multi( 	T *A,
 		OUT[pixel] = A[pixel]*S;
 }
 
+
 namespace HipKernels
 {
 /*
@@ -466,6 +467,21 @@ __global__ void hip_kernel_multi( 	T *A,
 	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
 	if(pixel<image_size)
 		A[pixel] = A[pixel]*S;
+}
+
+/*
+ * In place add scalar S to scalar array A
+ *
+ *  A[i] = A[i] + S
+ */
+template <typename T>
+__global__ void hip_kernel_add( 	T *A,
+                                        T S,
+                                        int image_size)
+{
+	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
+	if(pixel<image_size)
+		A[pixel]+=S;
 }
 
 }
