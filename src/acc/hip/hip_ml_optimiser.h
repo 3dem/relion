@@ -118,7 +118,8 @@ public:
 			transformer2(hipStreamPerThread, bundle->allocator, baseMLOptimiser->mymodel.data_dim),
 			refIs3D(baseMLO->mymodel.ref_dim == 3),
 			dataIs3D(baseMLO->mymodel.data_dim == 3),
-			bundle(bundle),
+			shiftsIs3D(baseMLO->mymodel.data_dim == 3 || baseMLO->mydata.is_tomo),
+            bundle(bundle),
 			device_id(bundle->device_id),
 #ifdef TIMING_FILES
 			timer(timing_fnm),
