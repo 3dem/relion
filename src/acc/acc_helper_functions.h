@@ -6,6 +6,8 @@
 	using deviceStream_t = cudaStream_t;
 #elif _HIP_ENABLED
 	using deviceStream_t = hipStream_t;
+#else
+	using deviceStream_t = cudaStream_t;
 #endif
 /*
  * This assisting function goes over the orientations determined as significant for this image, and checks
@@ -322,6 +324,8 @@ void runCenterFFT(MultidimArray< T >& v, bool forward,
 	CudaCustomAllocator *allocator
 #elif _HIP_ENABLED
 	HipCustomAllocator *allocator
+#else
+	CudaCustomAllocator *allocator
 #endif
 )
 {

@@ -352,10 +352,10 @@ void getFourierTransformsAndCtfs(long int part_id,
 		Fimg.initZeros(current_size_z, current_size_y, current_size_x);
 
 		// ------------------------------------------------------------------------------------------
-#ifdef _CUDA_ENABLED
+#ifdef _HIP_ENABLED
+        CTIC(hipMLO->timer,"makeNoiseMask");
+#else
 		CTIC(cudaMLO->timer,"makeNoiseMask");
-#elif _HIP_ENABLED
-		CTIC(hipMLO->timer,"makeNoiseMask");
 #endif
         // Either mask with zeros or noise. Here, make a noise-image that will be optional in the softMask-kernel.
 		AccDataTypes::Image<XFLOAT> RandomImage(img(),ptrFactory);
@@ -384,10 +384,10 @@ void getFourierTransformsAndCtfs(long int part_id,
     					DIRECT_A1D_ELEM(remapped_sigma2_noise, i_remap) = DIRECT_A1D_ELEM(baseMLO->mymodel.sigma2_noise[optics_group], i);
     			}
 
-#ifdef _CUDA_ENABLED
-                        LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-#elif _HIP_ENABLED
-                        LAUNCH_PRIVATE_ERROR(hipGetLastError(),accMLO->errorStatus);
+#ifdef _HIP_ENABLED
+            LAUNCH_PRIVATE_ERROR(hipGetLastError(),accMLO->errorStatus);
+#else
+            LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 #endif
                 // construct the noise-image
                 AccUtilities::makeNoiseImage<MlClass>(	temp_sigmaFudgeFactor,
@@ -396,16 +396,16 @@ void getFourierTransformsAndCtfs(long int part_id,
 												accMLO,
 												RandomImage,
 												RandomImage.is3D());
-#ifdef _CUDA_ENABLED
-                LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-#elif _HIP_ENABLED
-                LAUNCH_PRIVATE_ERROR(hipGetLastError(),accMLO->errorStatus);
+#ifdef _HIP_ENABLED
+            LAUNCH_PRIVATE_ERROR(hipGetLastError(),accMLO->errorStatus);
+#else
+            LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 #endif
         }
-#ifdef _CUDA_ENABLED
-        CTOC(cudaMLO->timer,"makeNoiseMask");
-#elif _HIP_ENABLED
+#ifdef _HIP_ENABLED
         CTOC(hipMLO->timer,"makeNoiseMask");
+#else
+        CTOC(cudaMLO->timer,"makeNoiseMask");
 #endif
 
 		// ------------------------------------------------------------------------------------------
@@ -438,10 +438,10 @@ void getFourierTransformsAndCtfs(long int part_id,
                                                     YY(my_old_offset),
                                                     (accMLO->shiftsIs3D) ? ZZ(my_old_offset) : 0.,
                                                     accMLO->dataIs3D);
-#ifdef _CUDA_ENABLED
-            LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-#elif _HIP_ENABLED
+#ifdef _HIP_ENABLED
             LAUNCH_PRIVATE_ERROR(hipGetLastError(),accMLO->errorStatus);
+#else
+            LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 #endif
 
             CTOC(accMLO->timer,"TranslateAndNormCorrect");
@@ -462,10 +462,10 @@ void getFourierTransformsAndCtfs(long int part_id,
                                                       YY(my_old_offset),
                                                       (accMLO->shiftsIs3D) ? ZZ(my_old_offset) : 0.,
                                                       accMLO->dataIs3D);
-#ifdef _CUDA_ENABLED
-                LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-#elif _HIP_ENABLED
+#ifdef _HIP_ENABLED
                 LAUNCH_PRIVATE_ERROR(hipGetLastError(),accMLO->errorStatus);
+#else
+                LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 #endif
                 CTOC(accMLO->timer, "TranslateAndNormCorrect_recImg");
             }
@@ -489,10 +489,10 @@ void getFourierTransformsAndCtfs(long int part_id,
         if(baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
         {
 
-#ifdef _CUDA_ENABLED
-            CTIC(cudaMLO->timer,"normalizeAndTransform_recImg");
-#elif _HIP_ENABLED
+#ifdef _HIP_ENABLED
             CTIC(hipMLO->timer,"normalizeAndTransform_recImg");
+#else
+            CTIC(cudaMLO->timer,"normalizeAndTransform_recImg");
 #endif
             // The image used to reconstruct is not masked, so we transform and beam-tilt it
             AccUtilities::normalizeAndTransformImage<MlClass>(d_rec_img,		// input  acc-side  Array
@@ -501,21 +501,21 @@ void getFourierTransformsAndCtfs(long int part_id,
                                                               current_size_x,
                                                               current_size_y,
                                                               current_size_z);
-#ifdef _CUDA_ENABLED
-            LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-            CTOC(cudaMLO->timer,"normalizeAndTransform_recImg");
-#elif _HIP_ENABLED
+#ifdef _HIP_ENABLED
             LAUNCH_PRIVATE_ERROR(hipGetLastError(),accMLO->errorStatus);
             CTOC(hipMLO->timer,"normalizeAndTransform_recImg");
+#else
+            LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
+            CTOC(cudaMLO->timer,"normalizeAndTransform_recImg");
 #endif
 
         }
         else // if we don't have special images, just use the same as for alignment. But do it here, *before masking*
         {
-#ifdef _CUDA_ENABLED
-            CTIC(cudaMLO->timer,"normalizeAndTransform_recImg");
-#elif _HIP_ENABLED
+#ifdef _HIP_ENABLED
             CTIC(hipMLO->timer,"normalizeAndTransform_recImg");
+#else
+            CTIC(cudaMLO->timer,"normalizeAndTransform_recImg");
 #endif
             // The image used to reconstruct is not masked, so we transform and beam-tilt it
             AccUtilities::normalizeAndTransformImage<MlClass>(	 d_img,		// input  acc-side  Array
@@ -524,12 +524,12 @@ void getFourierTransformsAndCtfs(long int part_id,
                                                                  current_size_x,
                                                                  current_size_y,
                                                                  current_size_z);
-#ifdef _CUDA_ENABLED
-            LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-            CTOC(cudaMLO->timer,"normalizeAndTransform_recImg");
-#elif _HIP_ENABLED
+#ifdef _HIP_ENABLED
             LAUNCH_PRIVATE_ERROR(hipGetLastError(),accMLO->errorStatus);
             CTOC(hipMLO->timer,"normalizeAndTransform_recImg");
+#else
+            LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
+            CTOC(cudaMLO->timer,"normalizeAndTransform_recImg");
 #endif
         }
 
@@ -636,10 +636,10 @@ void getFourierTransformsAndCtfs(long int part_id,
                     softMaskSum,
                     softMaskSum_bg);
 
-#ifdef _CUDA_ENABLED
-            	LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-#elif _HIP_ENABLED
+#ifdef _HIP_ENABLED
                 LAUNCH_PRIVATE_ERROR(hipGetLastError(),accMLO->errorStatus);
+#else
+            	LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 #endif
                 softMaskSum.streamSync();
 
@@ -663,12 +663,12 @@ void getFourierTransformsAndCtfs(long int part_id,
                 cosine_width,
                 bg_val);
 
-#ifdef _CUDA_ENABLED
-            LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-            DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-#elif _HIP_ENABLED
+#ifdef _HIP_ENABLED
             LAUNCH_PRIVATE_ERROR(hipGetLastError(),accMLO->errorStatus);
             DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
+#else
+            LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
+            DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 #endif
 
             CTOC(accMLO->timer,"applyMask");
@@ -676,10 +676,10 @@ void getFourierTransformsAndCtfs(long int part_id,
 
         // ------------------------------------------------------------------------------------------
 
-#ifdef _CUDA_ENABLED
-        CTIC(cudaMLO->timer,"normalizeAndTransform");
-#elif _HIP_ENABLED
+#ifdef _HIP_ENABLED
         CTIC(hipMLO->timer,"normalizeAndTransform");
+#else
+        CTIC(cudaMLO->timer,"normalizeAndTransform");
 #endif
         AccUtilities::normalizeAndTransformImage<MlClass>(	 d_img,		// input
                                                                  Fimg,		// output
@@ -687,12 +687,12 @@ void getFourierTransformsAndCtfs(long int part_id,
                                                                  current_size_x,
                                                                  current_size_y,
                                                                  current_size_z);
-#ifdef _CUDA_ENABLED
-        LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-        CTOC(cudaMLO->timer,"normalizeAndTransform");
-#elif _HIP_ENABLED
+#ifdef _HIP_ENABLED
         LAUNCH_PRIVATE_ERROR(hipGetLastError(),accMLO->errorStatus);
         CTOC(hipMLO->timer,"normalizeAndTransform");
+#else
+        LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
+        CTOC(cudaMLO->timer,"normalizeAndTransform");
 #endif
 
         // ------------------------------------------------------------------------------------------
@@ -718,10 +718,10 @@ void getFourierTransformsAndCtfs(long int part_id,
                                                accMLO->transformer1.zFSize,
                                                (baseMLO->image_current_size[optics_group]/2)+1, // note: NOT baseMLO->image_full_size[optics_group]/2+1
                                                &(~spectrumAndXi2)[spectrumAndXi2.getSize()-1],
-#ifdef _CUDA_ENABLED
-                                               cudaStreamPerThread); // last element is the hihgres_Xi2
-#elif _HIP_ENABLED
+#ifdef _HIP_ENABLED
                                                hipStreamPerThread); // last element is the hihgres_Xi2
+#else
+                                               cudaStreamPerThread); // last element is the hihgres_Xi2
 #endif
         else
             AccUtilities::powerClass<false>(gridSize,POWERCLASS_BLOCK_SIZE,
@@ -734,10 +734,10 @@ void getFourierTransformsAndCtfs(long int part_id,
                                             accMLO->transformer1.zFSize,
                                             (baseMLO->image_current_size[optics_group]/2)+1, // note: NOT baseMLO->image_full_size[optics_group]/2+1
                                             &(~spectrumAndXi2)[spectrumAndXi2.getSize()-1], // last element is the hihgres_Xi2
-#ifdef _CUDA_ENABLED
-                                            cudaStreamPerThread); // last element is the hihgres_Xi2
-#elif _HIP_ENABLED
+#ifdef _HIP_ENABLED
                                             hipStreamPerThread); // last element is the hihgres_Xi2
+#else
+                                            cudaStreamPerThread); // last element is the hihgres_Xi2
 #endif
 
 #ifdef _CUDA_ENABLED
@@ -1033,10 +1033,10 @@ void getAllSquaredDifferencesCoarse(
 			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2, op.FstMulti, dummyRF);
 
 	CTOC(accMLO->timer,"diff_pre_gpu");
-#ifdef _CUDA_ENABLED
-	std::vector< AccProjectorPlan > projectorPlans(0, (CudaCustomAllocator *)accMLO->getAllocator());
-#elif _HIP_ENABLED
-	std::vector< AccProjectorPlan > projectorPlans(0, (HipCustomAllocator *)accMLO->getAllocator());
+#ifdef _HIP_ENABLED
+    std::vector< AccProjectorPlan > projectorPlans(0, (HipCustomAllocator *)accMLO->getAllocator());
+#else
+    std::vector< AccProjectorPlan > projectorPlans(0, (CudaCustomAllocator *)accMLO->getAllocator());
 #endif
 
     int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id); // get optics group of first image for this particle...
@@ -1047,10 +1047,10 @@ void getAllSquaredDifferencesCoarse(
 	if (accMLO->generateProjectionPlanOnTheFly)
 	{
 		CTIC(accMLO->timer,"generateProjectionSetupCoarse");
-#ifdef _CUDA_ENABLED
-		projectorPlans.resize(baseMLO->mymodel.nr_classes, (CudaCustomAllocator *)accMLO->getAllocator());
-#elif _HIP_ENABLED
-		projectorPlans.resize(baseMLO->mymodel.nr_classes, (HipCustomAllocator *)accMLO->getAllocator());
+#ifdef _HIP_ENABLED
+        projectorPlans.resize(baseMLO->mymodel.nr_classes, (HipCustomAllocator *)accMLO->getAllocator());
+#else
+        projectorPlans.resize(baseMLO->mymodel.nr_classes, (CudaCustomAllocator *)accMLO->getAllocator());
 #endif
 
 		for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
@@ -1259,15 +1259,15 @@ void getAllSquaredDifferencesCoarse(
             );
         }
 
-	#ifdef _CUDA_ENABLED
-		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
-		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-	#elif _HIP_ENABLED
+	#ifdef _HIP_ENABLED
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(hipStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
-	#endif
+    #else
+   		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
+		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
+    #endif
 
 		for (unsigned long iclass = sp.iclass_min, allWeights_pos=0; iclass <= sp.iclass_max; iclass++)
 		{
@@ -1321,14 +1321,14 @@ void getAllSquaredDifferencesCoarse(
 
 		} // end loop iclass
 
-	#ifdef _CUDA_ENABLED
+	#ifdef _HIP_ENABLED
+        for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+			DEBUG_HANDLE_ERROR(hipStreamSynchronize(accMLO->classStreams[exp_iclass]));
+		DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread)); // does not appear to be NEEDED FOR NON-BLOCKING CLASS STREAMS in tests, but should be to sync against classStreams
+    #else
 		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread)); // does not appear to be NEEDED FOR NON-BLOCKING CLASS STREAMS in tests, but should be to sync against classStreams
-	#elif _HIP_ENABLED
-		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-			DEBUG_HANDLE_ERROR(hipStreamSynchronize(accMLO->classStreams[exp_iclass]));
-		DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread)); // does not appear to be NEEDED FOR NON-BLOCKING CLASS STREAMS in tests, but should be to sync against classStreams
 	#endif
 
 	} // end loop img_id
@@ -1652,14 +1652,14 @@ void getAllSquaredDifferencesFine(
 		FinePassWeights.rot_idx.cpToDevice();
 		FinePassWeights.trans_idx.cpToDevice();
 
-	#ifdef _CUDA_ENABLED
+	#ifdef _HIP_ENABLED
+        for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+			DEBUG_HANDLE_ERROR(hipStreamSynchronize(accMLO->classStreams[exp_iclass]));
+		DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
+    #else
 		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-	#elif _HIP_ENABLED
-		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-			DEBUG_HANDLE_ERROR(hipStreamSynchronize(accMLO->classStreams[exp_iclass]));
-		DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
 	#endif
 
 		for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
@@ -1730,14 +1730,14 @@ void getAllSquaredDifferencesFine(
 			} // end if class significant
 		} // end loop iclass
 
-	#ifdef _CUDA_ENABLED
+	#ifdef _HIP_ENABLED
+        for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+			DEBUG_HANDLE_ERROR(hipStreamSynchronize(accMLO->classStreams[exp_iclass]));
+		DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
+    #else
 		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-	#elif _HIP_ENABLED
-		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-			DEBUG_HANDLE_ERROR(hipStreamSynchronize(accMLO->classStreams[exp_iclass]));
-		DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
 	#endif
 
 
@@ -1877,10 +1877,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
         std::pair<size_t, XFLOAT> min_pair=AccUtilities::getArgMinOnDevice<XFLOAT>(PassWeights.weights);
         PassWeights.weights.cpToHost();
-#ifdef _CUDA_ENABLED
-        DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-#elif _HIP_ENABLED
+#ifdef _HIP_ENABLED
         DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
+#else
+        DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 #endif
 
         // This gives the non-reproducible results with oversampling==0 and do_firstiter_cc....
@@ -2054,10 +2054,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
             AccUtilities::kernel_exponentiate( ipartMweight, 50 - weights_max);
 
             CTIC(accMLO->timer,"sort");
-#ifdef _CUDA_ENABLED
-            DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-#elif _HIP_ENABLED
+#ifdef _HIP_ENABLED
             DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
+#else
+            DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 #endif
 
             unsigned long ipart_length = (sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans;
@@ -2165,16 +2165,16 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
                 CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_SIG");
                 Mcoarse_significant.deviceAlloc();
 
-#ifdef _CUDA_ENABLED
-                DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-                arrayOverThreshold<XFLOAT>(unsorted_ipart, Mcoarse_significant, significant_weight);
-                Mcoarse_significant.cpToHost();
-                DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-#elif _HIP_ENABLED
+#ifdef _HIP_ENABLED
                 DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
                 arrayOverThreshold<XFLOAT>(unsorted_ipart, Mcoarse_significant, significant_weight);
                 Mcoarse_significant.cpToHost();
                 DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
+#else
+                DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
+                arrayOverThreshold<XFLOAT>(unsorted_ipart, Mcoarse_significant, significant_weight);
+                Mcoarse_significant.cpToHost();
+                DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 #endif
             }
             else if (ipart_length == 1)
@@ -2187,14 +2187,14 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
         else
         {
 
-#ifdef _CUDA_ENABLED
-            for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-                DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
-            DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-#elif _HIP_ENABLED
+#ifdef _HIP_ENABLED
             for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
                 DEBUG_HANDLE_ERROR(hipStreamSynchronize(accMLO->classStreams[exp_iclass]));
             DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
+#else
+            for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+                DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
+            DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 #endif
 
             XFLOAT weights_max = -std::numeric_limits<XFLOAT>::max();
@@ -2263,14 +2263,14 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
             }
 
             op.min_diff2 += 50 - weights_max;
-#ifdef _CUDA_ENABLED
-            for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-                DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
-            DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-#elif _HIP_ENABLED
+#ifdef _HIP_ENABLED
             for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
                 DEBUG_HANDLE_ERROR(hipStreamSynchronize(accMLO->classStreams[exp_iclass]));
             DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
+#else
+            for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+                DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
+            DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 #endif
 
             if(baseMLO->is_som_iter) {
@@ -2290,10 +2290,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
             PassWeights.weights.cpToHost(); // note that the host-pointer is shared: we're copying to Mweight.
 
             CTIC(accMLO->timer,"sort");
-#ifdef _CUDA_ENABLED
-            DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-#elif _HIP_ENABLED
+#ifdef _HIP_ENABLED
             DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
+#else
+            DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 #endif
             size_t weightSize = PassWeights.weights.getSize();
             AccPtr<XFLOAT> sorted =         ptrFactory.make<XFLOAT>((size_t)weightSize);
@@ -2549,10 +2549,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
     bundleSWS.cpToDevice();
     oo_otrans.cpToDevice();
 
-#ifdef _CUDA_ENABLED
-    DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-#elif  _HIP_ENABLED
+#ifdef _HIP_ENABLED
     DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
+#else
+    DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 #endif
 
     // here we introduce offsets for the clases in an array as it is more efficient to
@@ -2605,12 +2605,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
                     ~FPCMasks[exp_iclass].jobOrigin,
                     ~FPCMasks[exp_iclass].jobExtent,
                     accMLO->dataIs3D,
-#ifdef _CUDA_ENABLED
-                    cudaStreamPerThread);
-        LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-#elif _HIP_ENABLED
+#ifdef _HIP_ENABLED
                     hipStreamPerThread);
         LAUNCH_PRIVATE_ERROR(hipGetLastError(),accMLO->errorStatus);
+#else
+                    cudaStreamPerThread);
+        LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 #endif
 
         partial_pos+=block_num;
@@ -2620,10 +2620,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
     p_weights.cpToHost();
     p_thr_wsum_prior_offsetxyz_class.cpToHost();
 
-#ifdef _CUDA_ENABLED
-    DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-#elif _HIP_ENABLED
+#ifdef _HIP_ENABLED
     DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
+#else
+    DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 #endif
     int iorient = 0;
     partial_pos=0;
@@ -2934,14 +2934,14 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			std::vector<AccPtr<XFLOAT> > eulers(baseMLO->mymodel.nr_classes, ptrFactory.make<XFLOAT>());
 
 			unsigned long classPos = 0;
-		#ifdef _CUDA_ENABLED
+		#ifdef _HIP_ENABLED
+            for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+				DEBUG_HANDLE_ERROR(hipStreamSynchronize(accMLO->classStreams[exp_iclass]));
+			DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
+        #else
 			for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-		#elif _HIP_ENABLED
-			for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-				DEBUG_HANDLE_ERROR(hipStreamSynchronize(accMLO->classStreams[exp_iclass]));
-			DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
 		#endif
 
 			for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
@@ -3036,14 +3036,14 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			sorted_weights.cpToDevice();
 
 			// These syncs are necessary (for multiple ranks on the same GPU), and (assumed) low-cost.
-		#ifdef _CUDA_ENABLED
+		#ifdef _HIP_ENABLED
+            for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
+				DEBUG_HANDLE_ERROR(hipStreamSynchronize(accMLO->classStreams[iclass]));
+			DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
+        #else
 			for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[iclass]));
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-		#elif _HIP_ENABLED
-			for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
-				DEBUG_HANDLE_ERROR(hipStreamSynchronize(accMLO->classStreams[iclass]));
-			DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
 		#endif
 
 			classPos = 0;
@@ -3208,7 +3208,16 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			CUSTOM_ALLOCATOR_REGION_NAME("UNSET");
 
-	#ifdef _CUDA_ENABLED
+	#ifdef _HIP_ENABLED
+            // NOTE: We've never seen that this sync is necessary, but it is needed in principle, and
+			// its absence in other parts of the code has caused issues. It is also very low-cost.
+			for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+				DEBUG_HANDLE_ERROR(hipStreamSynchronize(accMLO->classStreams[exp_iclass]));
+			DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
+
+			wdiff2s.cpToHost();
+			DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
+    #else
 			// NOTE: We've never seen that this sync is necessary, but it is needed in principle, and
 			// its absence in other parts of the code has caused issues. It is also very low-cost.
 			for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -3217,15 +3226,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			wdiff2s.cpToHost();
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-	#elif _HIP_ENABLED
-			// NOTE: We've never seen that this sync is necessary, but it is needed in principle, and
-			// its absence in other parts of the code has caused issues. It is also very low-cost.
-			for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-				DEBUG_HANDLE_ERROR(hipStreamSynchronize(accMLO->classStreams[exp_iclass]));
-			DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
-
-			wdiff2s.cpToHost();
-			DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
 	#endif
 
 			AAXA_pos=0;

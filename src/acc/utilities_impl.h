@@ -20,6 +20,7 @@ using deviceStream_t = hipStream_t;
 #include "src/acc/cpu/cpu_kernels/helper.h"
 #include "src/acc/cpu/cpu_kernels/wavg.h"
 #include "src/acc/cpu/cpu_kernels/diff2.h"
+using deviceStream_t = cudaStream_t;
 #endif
 
 void dump_array(char *name, bool *ptr, size_t size)
@@ -863,11 +864,11 @@ void run_padTranslatedMap(
 
 void run_CenterFFTbySign(Complex *img_in, int xSize, int ySize, int zSize, deviceStream_t stream)
 {
-	dim3 bs(32,4,2);
-	dim3 gs(ceil(xSize/(float)bs.x), ceil(ySize/(float)bs.y), ceil(zSize/(float)bs.z));
-
 #ifdef _CUDA_ENABLED
-	if(sizeof(RFLOAT) == sizeof(double))
+    dim3 bs(32,4,2);
+    dim3 gs(ceil(xSize/(float)bs.x), ceil(ySize/(float)bs.y), ceil(zSize/(float)bs.z));
+
+    if(sizeof(RFLOAT) == sizeof(double))
 		cuda_kernel_centerFFTbySign<<<gs,bs, 0, stream>>>(
 				(double2*)img_in,
 				xSize,
@@ -881,6 +882,9 @@ void run_CenterFFTbySign(Complex *img_in, int xSize, int ySize, int zSize, devic
 				zSize);
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 #elif _HIP_ENABLED
+    dim3 bs(32,4,2);
+	dim3 gs(ceil(xSize/(float)bs.x), ceil(ySize/(float)bs.y), ceil(zSize/(float)bs.z));
+
 	if(sizeof(RFLOAT) == sizeof(double))
 		hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_centerFFTbySign), gs, bs, 0, stream,
 				(double2*)img_in,

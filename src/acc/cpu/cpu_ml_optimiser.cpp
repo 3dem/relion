@@ -120,7 +120,7 @@ void MlDataBundle::setup(MlOptimiser *baseMLO)
 	coarseProjectionPlans.resize(nr_classes);
 
 	//Can we pre-generate projector plan and corresponding euler matrices for all particles
-	if (!baseMLO->do_skip_align && !baseMLO->do_skip_rotate && !baseMLO->do_auto_refine && baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
+	if (!baseMLO->do_skip_align && !baseMLO->do_skip_rotate && !baseMLO->do_auto_refine && baseMLO->mymodel.orientational_prior_mode == NOPRIOR && !baseMLO->mydata.is_tomo)
 		for (int iclass = 0; iclass < nr_classes; iclass++)
 		{
 			//If doing predefined projector plan at all and is this class significant

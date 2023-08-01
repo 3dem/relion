@@ -20,6 +20,7 @@ using deviceStream_t = hipStream_t;
 #include "src/acc/cpu/cpu_kernels/helper.h"
 #include "src/acc/cpu/cpu_kernels/wavg.h"
 #include "src/acc/cpu/cpu_kernels/diff2.h"
+using deviceStream_t = cudaStream_t;
 #endif
 
 void dump_array(char *name, bool *ptr, size_t size);
@@ -518,13 +519,14 @@ cuda_kernel_make_eulers_3D<invert,doL,doR><<<grid_size,block_size,0,stream>>>(
 template< typename T>
 void InitComplexValue(AccPtr<T> &data, XFLOAT value)
 {
-int grid_size = ceil((float)(data.getSize())/(float)INIT_VALUE_BLOCK_SIZE);
 #ifdef _CUDA_ENABLED
+    int grid_size = ceil((float)(data.getSize())/(float)INIT_VALUE_BLOCK_SIZE);
 	cuda_kernel_init_complex_value<T><<< grid_size, INIT_VALUE_BLOCK_SIZE, 0, data.getStream() >>>(
 			~data,
 			value,
 			data.getSize(), INIT_VALUE_BLOCK_SIZE);
 #elif _HIP_ENABLED
+    int grid_size = ceil((float)(data.getSize())/(float)INIT_VALUE_BLOCK_SIZE);
 	hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_init_complex_value<T>), dim3(grid_size), dim3(INIT_VALUE_BLOCK_SIZE), 0, data.getStream() ,
 			~data,
 			value,
@@ -542,8 +544,8 @@ int grid_size = ceil((float)(data.getSize())/(float)INIT_VALUE_BLOCK_SIZE);
 template< typename T>
 void InitValue(AccPtr<T> &data, T value)
 {
-int grid_size = ceil((float)data.getSize()/(float)INIT_VALUE_BLOCK_SIZE);
 #ifdef _CUDA_ENABLED
+    int grid_size = ceil((float)data.getSize()/(float)INIT_VALUE_BLOCK_SIZE);
 	cuda_kernel_init_value<T><<< grid_size, INIT_VALUE_BLOCK_SIZE, 0, data.getStream() >>>(
 			~data,
 			value,
@@ -551,6 +553,7 @@ int grid_size = ceil((float)data.getSize()/(float)INIT_VALUE_BLOCK_SIZE);
 			INIT_VALUE_BLOCK_SIZE);
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 #elif _HIP_ENABLED
+    int grid_size = ceil((float)data.getSize()/(float)INIT_VALUE_BLOCK_SIZE);
 	hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_init_value<T>), dim3(grid_size), dim3(INIT_VALUE_BLOCK_SIZE), 0, data.getStream() ,
 			~data,
 			value,
@@ -567,14 +570,15 @@ int grid_size = ceil((float)data.getSize()/(float)INIT_VALUE_BLOCK_SIZE);
 template< typename T>
 void InitValue(AccPtr<T> &data, T value, size_t Size)
 {
-int grid_size = ceil((float)Size/(float)INIT_VALUE_BLOCK_SIZE);
 #ifdef _CUDA_ENABLED
+    int grid_size = ceil((float)Size/(float)INIT_VALUE_BLOCK_SIZE);
 	cuda_kernel_init_value<T><<< grid_size, INIT_VALUE_BLOCK_SIZE, 0, data.getStream() >>>(
 			~data,
 			value,
 			Size,
 			INIT_VALUE_BLOCK_SIZE);
 #elif _HIP_ENABLED
+    int grid_size = ceil((float)Size/(float)INIT_VALUE_BLOCK_SIZE);
 	hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_init_value<T>), dim3(grid_size), dim3(INIT_VALUE_BLOCK_SIZE), 0, data.getStream() ,
 			~data,
 			value,

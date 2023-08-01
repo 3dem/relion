@@ -7,6 +7,8 @@ using deviceStream_t = cudaStream_t;
 #elif _HIP_ENABLED
 #  include <hip/hip_runtime.h>
 using deviceStream_t = hipStream_t;
+#else
+using deviceStream_t = cudaStream_t;
 #endif
 #include "src/complex.h"
 #include "src/acc/settings.h"

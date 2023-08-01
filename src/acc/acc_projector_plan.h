@@ -18,10 +18,10 @@ public:
 		orientation_num(0)
     {};
 	
-	#ifdef _CUDA_ENABLED
-		AccProjectorPlan(CudaCustomAllocator *allocator):
-	#elif _HIP_ENABLED
+	#ifdef _HIP_ENABLED
 		AccProjectorPlan(HipCustomAllocator *allocator):
+    #else
+ 		AccProjectorPlan(CudaCustomAllocator *allocator):
 	#endif
 		iorientclasses(allocator),
 		eulers(allocator),

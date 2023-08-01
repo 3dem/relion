@@ -1394,6 +1394,8 @@ public:
 		allocator(alloc), stream(0), accType(accCUDA)
 #elif _HIP_ENABLED
 		allocator(alloc), stream(0), accType(accHIP)
+#else
+		allocator(alloc), stream(0), accType(accCPU)
 #endif
 	{}
 
@@ -1402,6 +1404,8 @@ public:
 		allocator(alloc), stream(s), accType(accCUDA)
 #elif _HIP_ENABLED
 		allocator(alloc), stream(s), accType(accHIP)
+#else
+		allocator(alloc), stream(0), accType(accCPU)
 #endif
 	{}
 
