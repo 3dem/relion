@@ -1048,9 +1048,9 @@ void getAllSquaredDifferencesCoarse(
 	{
 		CTIC(accMLO->timer,"generateProjectionSetupCoarse");
 #ifdef _HIP_ENABLED
-        projectorPlans.resize(baseMLO->mymodel.nr_classes, (HipCustomAllocator *)accMLO->getAllocator());
+        projectorPlans.resize(baseMLO->mymodel.nr_classes * sp.nr_images, (HipCustomAllocator *)accMLO->getAllocator());
 #else
-        projectorPlans.resize(baseMLO->mymodel.nr_classes, (CudaCustomAllocator *)accMLO->getAllocator());
+        projectorPlans.resize(baseMLO->mymodel.nr_classes * sp.nr_images, (CudaCustomAllocator *)accMLO->getAllocator());
 #endif
 
 		for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
