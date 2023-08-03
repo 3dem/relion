@@ -525,6 +525,11 @@ RFLOAT Postprocessing::sharpenMap()
 		}
 		applyBFactorToMap(FT, XSIZE(I1()), global_bfactor, angpix);
 	}
+        else
+        {
+            // Write a warning that the map will not be sharpened
+            std::cerr << " WARNING: map will not be sharpened. This map may be used as reference for subsequent refinements, but you would need to run a postprocessing job with B-factor sharpening to better visualise high-resolution features." << std::endl;
+        }
 
 	makeGuinierPlot(FT, guiniersharpen);
 
@@ -992,7 +997,7 @@ void Postprocessing::run_locres(int rank, int size)
 	Isumw.initZeros(I1());
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(I1())
 	{
-		DIRECT_MULTIDIM_ELEM(Isum, n) = DIRECT_MULTIDIM_ELEM(I1(), n) + DIRECT_MULTIDIM_ELEM(I2(), n);
+		DIRECT_MULTIDIM_ELEM(Isum, n) = 0.5 * (DIRECT_MULTIDIM_ELEM(I1(), n) + DIRECT_MULTIDIM_ELEM(I2(), n));
 		DIRECT_MULTIDIM_ELEM(I1p, n) = DIRECT_MULTIDIM_ELEM(I1(), n);
 		DIRECT_MULTIDIM_ELEM(I2p, n) = DIRECT_MULTIDIM_ELEM(I2(), n);
 	}
@@ -1176,9 +1181,11 @@ void Postprocessing::run_locres(int rank, int size)
 		}
 
 		fn_tmp = fn_out + "_locres.mrc";
+		I1.setStatisticsInHeader();
 		I1.setSamplingRateInHeader(angpix);
 		I1.write(fn_tmp);
 		fn_tmp = fn_out + "_locres_filtered.mrc";
+		I2.setStatisticsInHeader();
 		I2.setSamplingRateInHeader(angpix);
 		I2.write(fn_tmp);
 

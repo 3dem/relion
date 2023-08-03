@@ -67,6 +67,7 @@ class helix_analyse_classes_parameters
 
 	// Minimum score to assign group based on voting
 	float voting_threshold, consistency_check_ratio;
+    int min_nr_picks, min_picks_group;
 
 	// All helices in the data set
 	std::vector<Helix> helices;
@@ -92,7 +93,9 @@ class helix_analyse_classes_parameters
 		fn_group_names = parser.getOption("--group_names", "A string with :-separated names for all groups (e.g. phf:sf)", "");
 		voting_threshold = textToFloat(parser.getOption("--voting_threshold", "Minimum fraction to assign a helix to a group", "0.0"));
 		consistency_check_ratio = textToFloat(parser.getOption("--consistency_check", "Check this fraction of particles to be on line of start-end coordinates", "0.05"));
-		do_norm = parser.checkOption("--norm", "Perform normalisation before voting?");
+		min_nr_picks = textToInteger(parser.getOption("--min_nr_picks", "Select filaments that have at least this many picks for the group indicated below", "-1"));
+        min_picks_group = textToInteger(parser.getOption("--min_picks_group", "Number of the group (first one is 1) to select based on minimum number of particles", "-1"));
+        do_norm = parser.checkOption("--norm", "Perform normalisation before voting?");
 		verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
 
 	    if (parser.checkForErrors(verb))
@@ -422,25 +425,57 @@ class helix_analyse_classes_parameters
 
 	void run()
 	{
-        if (verb>0) std::cout << " + Voting ..." << std::endl;
-
-        // Voting
-        for (long int idx = 0; idx < helices.size(); idx++)
+        if (min_nr_picks > 0 && min_picks_group > 0)
         {
-        	long int igr;
-        	if (helices[idx].count_classes.maxIndex(igr) >= voting_threshold && group_names[igr] != "notgrouped" && helices[idx].count_classes.sum() > 0.)
-        	{
-        		if (verb > 2)
-        		{
-        			std::cout << "group= " << group_names[igr] << helices[idx].fn_mic << " id= " << helices[idx].tube_id << " l= " << helices[idx].length << " " << helices[idx].count_classes << std::endl;
-    	        }
-        		helices[idx].my_group = igr+1;
-        	}
-        }
 
-        // Write out voting results
-        write();
-        if (verb>0) std::cout << " + Done voting!" << std::endl;
+            if (verb > 0) std::cout << " + Selecting filaments with at least " << min_nr_picks << " particles for group " << min_picks_group << " ..." << std::endl;
+
+            // Selecting
+            for (long int idx = 0; idx < helices.size(); idx++)
+            {
+                if (helices[idx].count_classes(min_picks_group - 1) >= min_nr_picks)
+                {
+                    helices[idx].my_group = min_picks_group;
+                    if (verb > 2) {
+                        std::cout << "group= " << group_names[min_picks_group - 1] << helices[idx].fn_mic << " id= "
+                                  << helices[idx].tube_id << " l= " << helices[idx].length << " "
+                                  << helices[idx].count_classes << std::endl;
+                    }
+                }
+                else
+                {
+                    helices[idx].my_group = nr_groups;
+                }
+            }
+
+            // Write out voting results
+            write();
+            if (verb > 0) std::cout << " + Done selecting!" << std::endl;
+
+        }
+        else
+        {
+
+            if (verb > 0) std::cout << " + Voting ..." << std::endl;
+
+            // Voting
+            for (long int idx = 0; idx < helices.size(); idx++) {
+                long int igr;
+                if (helices[idx].count_classes.maxIndex(igr) >= voting_threshold && group_names[igr] != "notgrouped" &&
+                    helices[idx].count_classes.sum() > 0.) {
+                    if (verb > 2) {
+                        std::cout << "group= " << group_names[igr] << helices[idx].fn_mic << " id= "
+                                  << helices[idx].tube_id << " l= " << helices[idx].length << " "
+                                  << helices[idx].count_classes << std::endl;
+                    }
+                    helices[idx].my_group = igr + 1;
+                }
+            }
+
+            // Write out voting results
+            write();
+            if (verb > 0) std::cout << " + Done voting!" << std::endl;
+        }
 
         /*
         // Make 2D coincidence matrix

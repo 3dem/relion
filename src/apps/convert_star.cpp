@@ -30,6 +30,7 @@ public:
 	FileName fn_in, fn_out;
 	IOParser parser;
 	RFLOAT Cs, Q0;
+	int box_size;
 
 	void usage()
 	{
@@ -45,6 +46,13 @@ public:
 		fn_out = parser.getOption("--o", "Output STAR file to be written", "None");
 		Cs = textToFloat(parser.getOption("--Cs", "Spherical aberration (mm)", "-1"));
 		Q0 = textToFloat(parser.getOption("--Q0", "Amplitude contrast", "-1"));
+		box_size = textToInteger(
+		parser.getOption(
+				"--box_size",
+				"Image box size. If image stack is missing you can try using this. Assumes 2D image stack.",
+				"-1"
+			)
+		);
 
 		if (fn_in == "None" || fn_out == "None")
 		{
@@ -59,7 +67,7 @@ public:
 		MetaDataTable mdtOut, optOut;
 		mdt.read(fn_in);
 		const bool isMotionCorrSTAR = mdt.containsLabel(EMDL_MICROGRAPH_METADATA_NAME);
-		StarConverter::convert_3p0_particlesTo_3p1(mdt, mdtOut, optOut, "", false); // don't die
+		StarConverter::convert_3p0_particlesTo_3p1(mdt, mdtOut, optOut, "", box_size, false); // don't die
 
 		if (mdt.containsLabel(EMDL_IMAGE_NAME))
 		{

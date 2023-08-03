@@ -18,6 +18,9 @@
  * author citations must be preserved.
  ***************************************************************************/
 
+// LIMITATIONS:
+//  This program ignores (anisotropic) magnification and antisymmetric aberrations!
+
 #include <src/projector.h>
 #include <src/backprojector.h>
 #include <src/fftw.h>
@@ -40,7 +43,7 @@ public:
 	RFLOAT rot, tilt, psi, xoff, yoff, zoff, angpix, maxres, stddev_white_noise, particle_diameter, ana_prob_range, ana_prob_step, sigma_offset;
 	int padding_factor;
 	int r_max, r_min_nn, interpolator, nr_uniform;
-	bool do_only_one, do_ctf, do_ctf2, ctf_phase_flipped, do_ctf_intact_1st_peak, do_timing, do_add_noise, do_subtract_exp, do_ignore_particle_name, do_3d_rot;
+	bool do_only_one, do_ctf, do_ctf2, ctf_phase_flipped, do_ctf_intact_1st_peak, do_timing, do_add_noise, do_subtract_exp, do_ignore_particle_name, do_3d_rot, write_float16;
 	bool do_simulate;
 	RFLOAT simulate_SNR;
 	// I/O Parser
@@ -59,6 +62,7 @@ public:
 		int general_section = parser.addSection("Options");
 		fn_map = parser.getOption("--i", "Input map to be projected");
 		fn_out = parser.getOption("--o", "Rootname for output projections", "proj");
+		write_float16  = parser.checkOption("--float16", "Write in half-precision 16 bit floating point numbers (MRC mode 12), instead of 32 bit (MRC mode 0).");
 		do_ctf = parser.checkOption("--ctf", "Apply CTF to reference projections");
 		ctf_phase_flipped = parser.checkOption("--ctf_phase_flip", "Flip phases of the CTF in the output projections");
 		do_ctf_intact_1st_peak = parser.checkOption("--ctf_intact_first_peak", "Ignore CTFs until their first peak?");
@@ -97,7 +101,11 @@ public:
 
 		if (do_simulate)
 		{
-			do_ctf = true;
+			if (!do_ctf)
+			{
+				std::cerr << "WARNING: with --simulate, --ctf is automatically activated." << std::endl;
+				do_ctf = true;
+			}
 		}
 
 		// Check for errors in the command-line option
@@ -181,7 +189,14 @@ public:
 		else if (!do_only_one)
 		{
 			std::cout << " Reading STAR file with all angles " << fn_ang << std::endl;
-			ObservationModel::loadSafely(fn_ang, obsModel, MDang);
+			if (do_ignore_particle_name)
+            {
+                MDang.read(fn_ang);
+            }
+            else
+            {
+                ObservationModel::loadSafely(fn_ang, obsModel, MDang);
+            }
 			std::cout << " Done reading STAR file!" << std::endl;
 
 
@@ -272,7 +287,7 @@ public:
 			// Shift the image back to the center...
 			CenterFFT(img(), false);
 			img.setSamplingRateInHeader(angpix);
-			img.write(fn_out);
+			img.write(fn_out, -1, false, WRITE_OVERWRITE, write_float16 ? Float16: Float);
 			std::cout<<" Done writing "<<fn_out<<std::endl;
 		}
 		else // not do_only_one
@@ -622,7 +637,7 @@ public:
 				if (do_3d_rot)
 				{
 					fn_img.compose(fn_out, imgno+1,"mrc");
-					img.write(fn_img);
+					img.write(fn_img, -1, false, WRITE_OVERWRITE, write_float16 ? Float16: Float);
 				}
 				else
 				{
@@ -630,9 +645,9 @@ public:
 					// First particle: write stack in overwrite mode, from then on just append to it
 					fn_img.compose(imgno+1,fn_out+".mrcs");
 					if (imgno == 0)
-						img.write(fn_img, -1, false, WRITE_OVERWRITE);
+						img.write(fn_img, -1, false, WRITE_OVERWRITE, write_float16 ? Float16: Float);
 					else
-						img.write(fn_img, -1, false, WRITE_APPEND);
+						img.write(fn_img, -1, false, WRITE_APPEND, write_float16 ? Float16: Float);
 				}
 
 				// Set the image name to the output STAR file

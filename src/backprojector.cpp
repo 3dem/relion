@@ -1044,8 +1044,10 @@ void BackProjector::updateSSNRarrays(RFLOAT tau2_fudge,
                                      MultidimArray<RFLOAT> &data_vs_prior_out,
                                      MultidimArray<RFLOAT> &fourier_coverage_out,
                                      const MultidimArray<RFLOAT>& fsc,
+									 const MultidimArray<RFLOAT>& avgctf2,
                                      bool update_tau2_with_fsc,
-                                     bool is_whole_instead_of_half)
+                                     bool is_whole_instead_of_half,
+									 bool correct_tau2_by_avgctf2)
 {
 	// never rely on references (handed to you from the outside) for computation:
 	// they could be the same (i.e. reconstruct(..., dummy, dummy, dummy, dummy, ...); )
@@ -1137,6 +1139,11 @@ void BackProjector::updateSSNRarrays(RFLOAT tau2_fudge,
 			{
 				// Calculate inverse of tau2
 				invtau2 = 1. / (oversampling_correction * tau2_fudge * DIRECT_A1D_ELEM(tau2, ires));
+
+				// Correct tau2 estimate by avgctf2 (for ctf_premultiplied images)
+				if (correct_tau2_by_avgctf2 && DIRECT_A1D_ELEM(avgctf2, ires) > 0.)
+					invtau2 *= 1. / DIRECT_A1D_ELEM(avgctf2, ires);
+
 			}
 			else if (DIRECT_A1D_ELEM(tau2, ires) == 0.)
 			{
@@ -1202,6 +1209,8 @@ void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
                                         MultidimArray<RFLOAT> &tau2_io,
 										MultidimArray<RFLOAT> &sigma2_ref,
 										MultidimArray<RFLOAT> &data_vs_prior,
+										RFLOAT pixel_size,
+										RFLOAT particle_diameter,
 										bool is_whole_instead_of_half,
                                         RFLOAT tau2_fudge,
                                         int verb)
@@ -1250,6 +1259,8 @@ void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
 	MDlist.setValue(EMDL_MLMODEL_DIMENSIONALITY, ref_dim);
 	MDlist.setValue(EMDL_MLMODEL_ORIGINAL_SIZE, ori_size);
 	MDlist.setValue(EMDL_MLMODEL_CURRENT_SIZE, 2*r_max);
+	MDlist.setValue(EMDL_MLMODEL_PIXEL_SIZE, pixel_size);
+	MDlist.setValue(EMDL_OPTIMISER_PARTICLE_DIAMETER, particle_diameter);
 
 	MDtau.setName("external_reconstruct_tau2");
 	for (int ii = 0; ii < XSIZE(tau2); ii++)
@@ -1505,11 +1516,12 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			const int r2 = kp * kp + ip * ip + jp * jp;
 			const int ires = FLOOR(sqrt((RFLOAT)r2) / padding_factor);
 			const RFLOAT weight =  XMIPP_MAX(DIRECT_A3D_ELEM(Fweight, k, i, j), DIRECT_A1D_ELEM(radavg_weight, (ires < r_max) ? ires : (r_max - 1)));
-			if (weight == 0)
+			if (weight == 0.)
 			{
-				if (!have_warned)
+				if (!have_warned && abs(DIRECT_A3D_ELEM(Fconv, k, i, j)) > 0.)
 				{
 					std::cerr << " WARNING: ignoring divide by zero in skip_gridding: ires = " << ires << " kp = " << kp << " ip = " << ip << " jp = " << jp << std::endl;
+                    std::cerr << " Fconv= " << DIRECT_A3D_ELEM(Fconv, k, i, j) << " Fweight= " << DIRECT_A3D_ELEM(Fweight, k, i, j) << " radavg_weight=" <<DIRECT_A1D_ELEM(radavg_weight, (ires < r_max) ? ires : (r_max - 1)) << std::endl;
 					std::cerr << " max_r2 = " << max_r2 << " r_max = " << r_max << " padding_factor = " << padding_factor
 					           << " ROUND(sqrt(max_r2)) = " << ROUND(sqrt(max_r2)) << " ROUND(r_max * padding_factor) = " << ROUND(r_max * padding_factor) << std::endl;
 					have_warned = true;

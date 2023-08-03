@@ -52,13 +52,10 @@ void MicrographHandler::init(
 		std::string& metaFn)
 {
 	this->nr_omp_threads = nr_omp_threads;
-	this->firstFrame = firstFrame;
-	this->lastFrame = lastFrame;
 
-	
 	MetaDataTable corrMic;		
 	ObservationModel obsModel;
-	
+
 	// Don't die even if conversion failed. Polishing does not use obsModel from a motion correction STAR file
 	ObservationModel::loadSafely(corrMicFn, obsModel, corrMic, "micrographs", verb, false);
 	mic2meta.clear();
@@ -652,6 +649,7 @@ std::string MicrographHandler::getMovieFilename(const MetaDataTable& mdt, bool d
 	}
 	else
 	{
+		// Does this make sense!?
 		return metaFn;
 	}
 }

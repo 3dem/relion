@@ -227,7 +227,8 @@ public:
 
 	void setName(std::string _name)
 	{
-		name = _name;
+		if (name[name.length()-1] != '/') name = name + '/';
+        name = _name;
 	}
 
 	void read(bool do_lock = false, FileName fn = "");

@@ -135,7 +135,7 @@ double LocalParticleRefinement::f(const std::vector<double>& x, void* tempStorag
 {
 	for (int i = 0; i < 6; i++)
 	{
-		if (isnan(x[i])) return std::numeric_limits<double>::max();
+		if (std::isnan(x[i])) return std::numeric_limits<double>::max();
 	}
 
 	const int s = reference.getBoxSize();
@@ -222,7 +222,7 @@ void LocalParticleRefinement::grad(const std::vector<double> &x, std::vector<dou
 {
 	for (int i = 0; i < 6; i++)
 	{
-		if (isnan(x[i])) return;
+		if (std::isnan(x[i])) return;
 	}
 
 	const int s = reference.getBoxSize();
@@ -398,7 +398,7 @@ double LocalParticleRefinement::gradAndValue(const std::vector<double> &x, std::
 
 	for (int i = 0; i < 6; i++)
 	{
-		if (isnan(x[i])) return std::numeric_limits<double>::max();
+		if (std::isnan(x[i])) return std::numeric_limits<double>::max();
 	}
 
 	const int s = reference.getBoxSize();

@@ -685,9 +685,6 @@ public:
 	// This can be set by user or automatically
 	int maximum_significants;
 
-	//Do regularization by denoising
-	bool do_red;
-
 	// Tabulated sine and cosine values (for 3D helical sub-tomogram averaging with on-the-fly shifts)
 	TabSine tab_sin;
 	TabCosine tab_cos;
@@ -1002,6 +999,14 @@ public:
 	 * Then elongate and fill the perfect helix along Z axis.
 	 * */
 	void makeGoodHelixForEachRef();
+
+    /*
+     * Calculate the average CTF^2 from the summed weights in wsum_model and return boolean whether to
+     * correct tau2 estimates by the average CTF^2 (which is needed when using ctf_premultiplied image
+     * because the tau2 is estimated from the CTF-corrected map, whereas the sigma2_noise estimates are
+     * from the CTF-affected differences)
+     */
+    bool setAverageCTF2(MultidimArray<RFLOAT> &avgctf2);
 
 	/* Maximization step
 	 * Updates the current model: reconstructs and updates all other model parameter

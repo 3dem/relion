@@ -1,7 +1,5 @@
 include_directories("${CMAKE_SOURCE_DIR}")
 
-SET(RELION_TEST TRUE)
-
 message("Running apps/CMakeLists.txt...")
 
 if(NOT MKLFFT)
@@ -131,7 +129,7 @@ endif(NOT GUI)
 
 #--Remove apps for testing--
 
-set(TEST_TARGETS movie_reconstruct double_reconstruct_openmp cs_fit ctf_nyquist_test free_aberration_plot split_stack defocus_stats double_bfac_fit interpolation_test motion_diff paper_data_synth Zernike_test vis_delocalisation vis_Ewald_weight)
+set(TEST_TARGETS movie_reconstruct double_reconstruct_openmp cs_fit ctf_nyquist_test free_aberration_plot split_stack defocus_stats double_bfac_fit interpolation_test motion_diff paper_data_synth Zernike_test vis_delocalisation vis_Ewald_weight mpi_tester)
 if(NOT RELION_TEST)
 	foreach(TARGET ${TEST_TARGETS})
 		list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/${TARGET}.cpp")
@@ -221,8 +219,11 @@ else()
 	endif(GUI)
 endif()
 
+# FFTW_LIBRARIES is used even with MKLFFT.
+# This is empty for ICC.
+# See https://github.com/3dem/relion/issues/958#issuecomment-1498521352.
+target_link_libraries(relion_lib ${FFTW_LIBRARIES})
 if(NOT MKLFFT)
-	target_link_libraries(relion_lib ${FFTW_LIBRARIES})
 	if(BUILD_OWN_FFTW)
 		add_dependencies(relion_lib own_fftw_lib)
 	endif()
@@ -275,16 +276,16 @@ if (CUDA_FOUND)
 
 
 
-	file(GLOB REL_JAZ_CUDA_SRC "${CMAKE_SOURCE_DIR}/src/jaz/cuda/*.cu" "${CMAKE_SOURCE_DIR}/src/jaz/cuda/kernels/*.cu" )
+	file(GLOB REL_JAZ_CUDA_SRC "${CMAKE_SOURCE_DIR}/src/jaz/cuda/*.cu")
 	cuda_add_library(relion_jaz_gpu_util ${REL_JAZ_CUDA_SRC})
 
-	#list(APPEND EXTRA_LIBS "${CUDA_CUFFT_LIBRARIES}")
-	#if(BUILD_SHARED_LIBS)
-	#	install (TARGETS relion_jaz_gpu_util LIBRARY DESTINATION lib)
-	#else()
-	#	target_link_libraries(relion_jaz_gpu_util relion_lib)
-	#	target_link_libraries(relion_jaz_gpu_util ${CUDA_CUFFT_LIBRARIES})
-	#endif()
+	list(APPEND EXTRA_LIBS "${CUDA_CUFFT_LIBRARIES}")
+	if(BUILD_SHARED_LIBS)
+		install (TARGETS relion_jaz_gpu_util LIBRARY DESTINATION lib)
+	else()
+		target_link_libraries(relion_jaz_gpu_util relion_lib)
+		target_link_libraries(relion_jaz_gpu_util ${CUDA_CUFFT_LIBRARIES})
+	endif()
 
 	target_link_libraries(relion_lib relion_jaz_gpu_util ${CUDA_CUFFT_LIBRARIES})
 	target_link_libraries(relion_lib relion_jaz_gpu_util ${CUDA_CUFFT_LIBRARIES} ${CUDA_curand_LIBRARY})

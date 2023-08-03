@@ -1,5 +1,5 @@
-RELION 4.0 beta 
-================
+RELION 4.0.1
+============
 
 RELION (for REgularised LIkelihood OptimisatioN) is a stand-alone computer
 program for Maximum A Posteriori refinement of (multiple) 3D reconstructions
@@ -33,12 +33,16 @@ Once git and cmake are installed, relion can be easily installed through:
 ```
 git clone https://github.com/3dem/relion.git
 cd relion
-git checkout ver4.0
+git checkout master # or ver4.0; see below
 mkdir build
 cd build
 cmake ..
 make
 ```
+
+By performing `git checkout ver4.0` instead of `git checkout master`, you can access the latest
+(developmental) updates for RELION 4.0.x. The code there is not tested as throughfully as that in
+the master branch and not generally recommended.
 
 The binaries will be produced in the `build/bin` directory. If you want to copy binaries
 into somewhere else, run `cmake` with `-DCMAKE_INSTALL_PREFIX=/where/to/install/` and
@@ -75,3 +79,8 @@ make install # Only when you have specified CMAKE_INSTALL_PREFIX in the cmake st
 ```
 
 If something went wrong, remove the `build` directory and try again from `cmake`.
+
+
+## Class Ranker
+The default model for the class ranker has been trained and tested in Python 3.9.12 with Pytorch 1.10.0 and Numpy 1.20.0.
+If you wish to retrain the class ranker model with your own data, please refer to [this repo](https://github.com/3dem/relion-classranker).

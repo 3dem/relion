@@ -97,11 +97,6 @@ void MlOptimiserMpi::initialise()
 
 	// Print information about MPI nodes:
 	printMpiNodesMachineNames(*node, nr_threads);
-#ifdef _CUDA_ENABLED
-    /************************************************************************/
-	//Setup GPU related resources
-	int devCount, deviceAffinity;
-	bool is_split(false);
 
 	if (gradient_refine && !do_split_random_halves) {
 		if (node->isLeader())
@@ -111,6 +106,11 @@ void MlOptimiserMpi::initialise()
 	}
 
 	grad_pseudo_halfsets = gradient_refine && !do_split_random_halves;
+#ifdef _CUDA_ENABLED
+    /************************************************************************/
+	//Setup GPU related resources
+	int devCount, deviceAffinity;
+	bool is_split(false);
 
 	if (do_gpu)
 	{
@@ -1477,6 +1477,9 @@ void MlOptimiserMpi::expectation()
 				std::cerr << "Faux thread id: " << b->thread_id << std::endl;
 #endif
 
+				for (int j = 0; j < b->projectors.size(); j++)
+					b->projectors[j].clear();
+
 				for (int j = 0; j < b->backprojectors.size(); j++)
 				{
 					unsigned long s = wsum_model.BPref[j].data.nzyxdim;
@@ -1493,7 +1496,6 @@ void MlOptimiserMpi::expectation()
 						wsum_model.BPref[j].weight.data[n] += (RFLOAT) weights[n];
 					}
 
-					b->projectors[j].clear();
 					b->backprojectors[j].clear();
 				}
 
@@ -1978,6 +1980,11 @@ void MlOptimiserMpi::maximization()
 		}
 	}
 
+    // When doing ctf_premultiplied, correct the tau2 estimates for the average CTF^2
+    // When doing ctf_premultiplied, correct the tau2 estimates for the average CTF^2
+    MultidimArray<RFLOAT> avgctf2;
+    bool do_correct_tau2_by_avgctf2 = setAverageCTF2(avgctf2);
+
 	// First reconstruct all classes in parallel
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
@@ -2014,8 +2021,10 @@ void MlOptimiserMpi::maximization()
 								mymodel.data_vs_prior_class[ith_recons],
 								mymodel.fourier_coverage_class[ith_recons],
 								mymodel.fsc_halves_class[ibody],
+                                avgctf2,
 								do_split_random_halves,
-								(do_join_random_halves || do_always_join_random_halves));
+								(do_join_random_halves || do_always_join_random_halves),
+                                do_correct_tau2_by_avgctf2);
 
 						if (do_external_reconstruct)
 						{
@@ -2031,6 +2040,8 @@ void MlOptimiserMpi::maximization()
 									mymodel.tau2_class[ith_recons],
 									mymodel.sigma2_class[ith_recons],
 									mymodel.data_vs_prior_class[ith_recons],
+									mymodel.pixel_size,
+									particle_diameter,
 									(do_join_random_halves || do_always_join_random_halves),
 									mymodel.tau2_fudge_factor,
 									node->rank==1); // only first followers is verbose
@@ -2148,8 +2159,10 @@ void MlOptimiserMpi::maximization()
 									mymodel.data_vs_prior_class[ith_recons],
 									mymodel.fourier_coverage_class[ith_recons],
 									mymodel.fsc_halves_class[ibody],
+                                    avgctf2,
 									do_split_random_halves,
-									(do_join_random_halves || do_always_join_random_halves));
+									(do_join_random_halves || do_always_join_random_halves),
+                                    do_correct_tau2_by_avgctf2);
 
 							if (do_external_reconstruct)
 							{
@@ -2165,6 +2178,8 @@ void MlOptimiserMpi::maximization()
 										mymodel.tau2_class[ith_recons],
 										mymodel.sigma2_class[ith_recons],
 										mymodel.data_vs_prior_class[ith_recons],
+										mymodel.pixel_size,
+										particle_diameter,
 										(do_join_random_halves || do_always_join_random_halves),
 										mymodel.tau2_fudge_factor);
 							}

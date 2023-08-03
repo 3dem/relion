@@ -97,7 +97,7 @@ void TIFFConverter::estimate(FileName fn_movie)
 //#define DEBUG
 #ifdef DEBUG
 				printf(" negative: %s frame %2d pos %4d %4d obs % 8.4f gain %.4f\n", 
-				       fn_movie.c_str(), iframe, n / XSIZE(gain()), n % XSIZE(gain()), (double)val, (double)gain_here);
+				       fn_movie.c_str(), iframe + 1, n / XSIZE(gain()), n % XSIZE(gain()), (double)val, (double)gain_here);
 #endif
 				negative++;
 				DIRECT_MULTIDIM_ELEM(defects(), n) = -1;
@@ -116,7 +116,7 @@ void TIFFConverter::estimate(FileName fn_movie)
 				{
 #ifdef DEBUG
 					printf(" mismatch: %s frame %2d pos %4d %4d obs % 8.4f expected % 8.4f gain %.4f\n",
-					       fn_movie.c_str(), iframe, n / XSIZE(gain()), n % XSIZE(gain()), (double)val,
+					       fn_movie.c_str(), iframe + 1, n / XSIZE(gain()), n % XSIZE(gain()), (double)val,
 					       (double)expected, (double)gain_here);
 #endif
 					error++;
@@ -138,8 +138,8 @@ void TIFFConverter::estimate(FileName fn_movie)
 				stable++;
 		}
 
-		printf(" %s Frame %03d #Changed %10d #Mismatch %10d, #Negative %10d, #Unreliable %10d / %10d\n",
-			   fn_movie.c_str(), iframe + 1, changed, error, negative, (int)(YXSIZE(defects()) - stable), (int)(YXSIZE(defects())));
+		printf(" %s Frame %03d #Changed %10d #Mismatch %10d, #Negative %10d, #Unreliable %10ld / %10ld\n",
+		       fn_movie.c_str(), iframe + 1, changed, error, negative, YXSIZE(defects()) - stable, YXSIZE(defects()));
 	}
 }
 
@@ -208,7 +208,7 @@ void TIFFConverter::unnormalise(FileName fn_movie, FileName fn_tiff)
 			if (fabs(expected - val) > 0.0001)
 			{
 				snprintf(msg, 255, " mismatch: %s frame %2d pos %4ld %4ld obs % 8.4f status %d expected % 8.4f gain %.4f\n",
-					 fn_movie.c_str(), iframe, n / XSIZE(gain()), n % XSIZE(gain()), (double)val, DIRECT_MULTIDIM_ELEM(defects(), n),
+					 fn_movie.c_str(), iframe + 1, n / XSIZE(gain()), n % XSIZE(gain()), (double)val, DIRECT_MULTIDIM_ELEM(defects(), n),
 					 (double)expected, (double)gain_here);
 				std::cerr << msg << std::endl;
 				if (!dont_die_on_error)
@@ -227,7 +227,7 @@ void TIFFConverter::unnormalise(FileName fn_movie, FileName fn_tiff)
 					error++;
 					
 					printf(" underflow: %s frame %2d pos %4ld %4ld obs % 8.4f expected % 8.4f gain %.4f\n",
-					       fn_movie.c_str(), iframe, n / XSIZE(gain()), n % XSIZE(gain()), (double)val,
+					       fn_movie.c_str(), iframe + 1, n / XSIZE(gain()), n % XSIZE(gain()), (double)val,
 					       (double)expected, (double)gain_here);
 				}
 				else if (ival > overflow)
@@ -236,7 +236,7 @@ void TIFFConverter::unnormalise(FileName fn_movie, FileName fn_tiff)
 					error++;
 
 					printf(" overflow: %s frame %2d pos %4ld %4ld obs % 8.4f expected % 8.4f gain %.4f\n",
-					       fn_movie.c_str(), iframe, n / XSIZE(buf), n % XSIZE(buf), (double)val,
+					       fn_movie.c_str(), iframe + 1, n / XSIZE(buf), n % XSIZE(buf), (double)val,
 					       (double)expected, (double)gain_here);
 				}
 			}

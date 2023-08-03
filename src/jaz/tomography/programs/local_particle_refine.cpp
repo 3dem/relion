@@ -90,7 +90,7 @@ void LocalParticleRefineProgram::run()
 		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(boxSize, 1);
 
 		particleSet.checkTrajectoryLengths(
-				particles[t][0], pc, fc, "LocalParticleRefineProgram::run");
+				particles[t], fc, "LocalParticleRefineProgram::run");
 
 		const int data_pad = 256;
 

@@ -18,7 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/gui_jobwindow.h"
-JobWindow::JobWindow(int _x, int _y, int _w, int _h, const char* title ) : Fl_Box(x,y,w,h,title)
+JobWindow::JobWindow(int _x, int _y, int _w, int _h, const char* title ) : Fl_Box(_x,_y,_w,_h,title)
 {
 	clear();
 	x = _x; y = _y; w = _w; h = _h;
@@ -1397,7 +1397,6 @@ void JobWindow::initialiseInimodelWindow()
 
 	place("do_parallel_discio");
 	place("nr_pool");
-	place("skip_gridding");
 	group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group5->end();
 	place("do_preread_images", TOGGLE_LEAVE_ACTIVE, group5, true);
@@ -1584,7 +1583,6 @@ void JobWindow::initialiseClass3DWindow()
 	place("do_parallel_discio");
 	place("nr_pool");
 	place("do_pad1");
-	place("skip_gridding");
 	group7 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group7->end();
 	place("do_preread_images", TOGGLE_LEAVE_ACTIVE, group7, true);
@@ -1731,7 +1729,6 @@ void JobWindow::initialiseAutorefineWindow()
 	place("do_parallel_discio");
 	place("nr_pool");
 	place("do_pad1");
-	place("skip_gridding");
 	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group4->end();
 	place("do_preread_images", TOGGLE_LEAVE_ACTIVE, group4, true);
@@ -1818,7 +1815,6 @@ void JobWindow::initialiseMultiBodyWindow()
 	place("do_parallel_discio");
 	place("nr_pool");
 	place("do_pad1");
-	place("skip_gridding");
 	group7 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group7->end();
 	place("do_preread_images", TOGGLE_LEAVE_ACTIVE, group7, true);
@@ -2444,6 +2440,12 @@ void JobWindow::initialiseTomoSubtomoWindow()
 	place("crop_size", TOGGLE_DEACTIVATE);
 	place("binning", TOGGLE_DEACTIVATE);
 
+    current_y += STEPY /2 ;
+
+    place("do_float16", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY /2 ;
+
 	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group1->end();
 	place("do_cone_weight", TOGGLE_DEACTIVATE, group1);
@@ -2454,10 +2456,6 @@ void JobWindow::initialiseTomoSubtomoWindow()
 
 	group1->end();
 	guientries["do_cone_weight"].cb_menu_i();
-
-	current_y += STEPY /2 ;
-
-	place("do_float16", TOGGLE_DEACTIVATE);
 
 	tab2->end();
 }

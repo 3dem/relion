@@ -239,6 +239,7 @@ enum EMDLabel
 	EMDL_MICROGRAPH_ACCUM_MOTION_EARLY,
 	EMDL_MICROGRAPH_ACCUM_MOTION_LATE,
 	EMDL_MICROGRAPH_COORDINATES,
+    EMDL_MICROGRAPH_ICE_THICKNESS,
 	EMDL_MICROGRAPH_ID,
 	EMDL_MICROGRAPH_NAME,
 	EMDL_MICROGRAPH_GAIN_NAME,
@@ -477,6 +478,7 @@ enum EMDLabel
 	EMDL_PARTICLE_HELICAL_TUBE_PITCH,
 	EMDL_PARTICLE_HELICAL_TRACK_LENGTH, //deprecated
 	EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM,
+	EMDL_PARTICLE_SELECTION_TYPE,
 	EMDL_PARTICLE_CLASS,
 	EMDL_PARTICLE_DLL,
 	EMDL_PARTICLE_ID,
@@ -926,7 +928,8 @@ private:
 		EMDL::addLabel(EMDL_MICROGRAPH_ACCUM_MOTION_EARLY, EMDL_DOUBLE, "rlnAccumMotionEarly","Accumulated global motion during the first frames of the movie (in A)");
 		EMDL::addLabel(EMDL_MICROGRAPH_ACCUM_MOTION_LATE, EMDL_DOUBLE, "rlnAccumMotionLate","Accumulated global motion during the last frames of the movie (in A)");
 		EMDL::addLabel(EMDL_MICROGRAPH_COORDINATES, EMDL_STRING, "rlnMicrographCoordinates", "Filename of a file (in .star, .box or .txt format) with X,Y (Z) coordinates of picked particles in micrographs/tomograms");
-		EMDL::addLabel(EMDL_MICROGRAPH_ID, EMDL_INT, "rlnMicrographId", "ID (i.e. a unique number) of a micrograph");
+        EMDL::addLabel(EMDL_MICROGRAPH_ICE_THICKNESS, EMDL_DOUBLE, "rlnMicrographIceThickness", "Ice thickness (in Angstrom) of a micrograph");
+        EMDL::addLabel(EMDL_MICROGRAPH_ID, EMDL_INT, "rlnMicrographId", "ID (i.e. a unique number) of a micrograph");
 		EMDL::addLabel(EMDL_MICROGRAPH_NAME, EMDL_STRING, "rlnMicrographName", "Name of a micrograph");
 		EMDL::addLabel(EMDL_MICROGRAPH_GAIN_NAME, EMDL_STRING, "rlnMicrographGainName", "Name of a gain reference");
 		EMDL::addLabel(EMDL_MICROGRAPH_DEFECT_FILE, EMDL_STRING, "rlnMicrographDefectFile", "Name of a defect list file");
@@ -1070,7 +1073,7 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_STEPSIZE_SCHEME, EMDL_STRING, "rlnSgdStepsizeScheme", "Stepsize scheme used in gradient refinement");
 		EMDL::addLabel(EMDL_OPTIMISER_TAU2_FUDGE_SCHEME, EMDL_STRING, "rlnTau2FudgeScheme", "Tau2 fudge scheme for updating the tau2 fudge");
 		EMDL::addLabel(EMDL_OPTIMISER_TAU2_FUDGE_ARG, EMDL_DOUBLE, "rlnTau2FudgeArg", "Tau2 fudge chosen by user");
-		EMDL::addLabel(EMDL_MAX_SIGNIFICANTS, EMDL_INT, "rlnSgdStepsizeScheme", "Maximum number of most significant poses & translations to consider");
+		EMDL::addLabel(EMDL_MAX_SIGNIFICANTS, EMDL_INT, "rlnMaximumSignificantPoses", "Maximum number of most significant poses & translations to consider");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_AUTO_REFINE, EMDL_BOOL, "rlnDoAutoRefine", "Flag to indicate that 3D auto-refine procedure is being used");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_AUTO_SAMPLING, EMDL_BOOL, "rlnDoAutoSampling", "Flag to indicate that auto-sampling is to be used (outside the auto-refine procedure)");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_ONLY_FLIP_CTF_PHASES, EMDL_BOOL, "rlnDoOnlyFlipCtfPhases", "Flag to indicate that CTF-correction should only comprise phase-flipping");
@@ -1165,6 +1168,7 @@ private:
 		EMDL::addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, EMDL_DOUBLE, "rlnHelicalTrackLength", "Distance (in pix) from the position of this helical segment to the starting point of the tube");
 		EMDL::addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM, EMDL_DOUBLE, "rlnHelicalTrackLengthAngst", "Distance (in A) from the position of this helical segment to the starting point of the tube");
 		EMDL::addLabel(EMDL_PARTICLE_CLASS, EMDL_INT, "rlnClassNumber", "Class number for which a particle has its highest probability");
+		EMDL::addLabel(EMDL_PARTICLE_SELECTION_TYPE, EMDL_INT, "rlnParticleSelectionType", "Selection type for manually picked particles");
 		EMDL::addLabel(EMDL_PARTICLE_DLL, EMDL_DOUBLE, "rlnLogLikeliContribution", "Contribution of a particle to the log-likelihood target function");
 		EMDL::addLabel(EMDL_PARTICLE_ID, EMDL_INT, "rlnParticleId", "ID (i.e. a unique number) for a particle");
 		EMDL::addLabel(EMDL_PARTICLE_FOM, EMDL_DOUBLE, "rlnParticleFigureOfMerit", "Developmental FOM for a particle");

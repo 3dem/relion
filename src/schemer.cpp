@@ -681,7 +681,7 @@ void Scheme::read(bool do_lock, FileName fn)
 #ifdef DEBUG_LOCK
 		std::cerr <<  " A status= " << status << std::endl;
 #endif
-		while (!status == 0)
+		while (status != 0)
 		{
 			if (errno == EACCES) // interestingly, not EACCESS!
 				REPORT_ERROR("ERROR: Scheme::read cannot create a lock directory " + dir_lock + ". You don't have write permission to this project. If you want to look at other's project directory (but run nothing there), please start RELION with --readonly.");
@@ -1560,40 +1560,59 @@ bool Scheme::changeStringForJobnames(FileName &mystring, FileName current_node)
 		// Remove leading directory and tailing slash to get the process current_name in the pipeline_schemer
 		FileName my_scheme_name = (mystring.afterFirstOf("Schemes/")).beforeFirstOf("/");
 		FileName my_scheme_star = "Schemes/"+my_scheme_name+"/scheme.star";
-		if (exists(my_scheme_star))
-		{
+		if (exists(my_scheme_star)) {
+            // Remove leading directory and tailing slash to get the process current_name in the pipeline_schemer
+            FileName my_ori_name = (mystring.afterFirstOf(my_scheme_name + "/")).beforeLastOf("/");
 
-			// Remove leading directory and tailing slash to get the process current_name in the pipeline_schemer
-			FileName my_ori_name = (mystring.afterFirstOf(my_scheme_name+"/")).beforeLastOf("/");
+            // Read only the jobs table from the other scheme;
+            // otherwise global variables like schemer_global_floats, strings etc get overwritten!
+            // But be careful, as STAR file might just be written out be the other Schemer
+            // Therefore try at least 3 times
+            MetaDataTable MDjobs;
 
-			// Read only the jobs table from the other scheme;
-			// otherwise global variables like schemer_global_floats, strings etc get overwritten!
-			MetaDataTable MDjobs;
-			MDjobs.read(my_scheme_star, "scheme_jobs");
-			FileName job_current_name, job_ori_name, my_current_name = "undefined";
-			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDjobs)
-			{
-				MDjobs.getValue(EMDL_SCHEME_JOB_ORI_NAME, job_ori_name);
-				MDjobs.getValue(EMDL_SCHEME_JOB_NAME, job_current_name);
-				if (job_ori_name == my_ori_name)
-				{
-					my_current_name = job_current_name;
-				}
-			}
+            int itry = 0;
+            bool have_jobs = false;
+            while (!have_jobs)
+            {
 
-			if (my_current_name[my_current_name.length()-1] != '/')
-				my_current_name += "/";
+                MDjobs.read(my_scheme_star, "scheme_jobs");
+                have_jobs = (MDjobs.numberOfObjects() > 0);
 
-			if (my_current_name == "undefined")
-			{
-				REPORT_ERROR("ERROR: cannot find job " + my_ori_name + " in scheme: " + my_scheme_star);
-			}
-			std::string to_replace = "Schemes/" + my_scheme_name + "/" + my_ori_name + "/";
-			mystring.replaceAllSubstrings(to_replace, my_current_name);
+                if (!have_jobs)
+                {
+                    // Wait one second before trying again
+                    sleep(1);
 
-			std::cout << " ++ in " << current_node << ": " << original_string  << " -> " << mystring << std::endl;
+                    itry++;
+                    if (itry > 5) REPORT_ERROR("ERROR: trying to read scheme_jobs table from " + my_scheme_star +
+                                               " but cannot find any jobs in it....");
+                }
+            }
 
-			return true;
+            FileName job_current_name, job_ori_name, my_current_name = "undefined";
+            FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDjobs)
+            {
+                MDjobs.getValue(EMDL_SCHEME_JOB_ORI_NAME, job_ori_name);
+                MDjobs.getValue(EMDL_SCHEME_JOB_NAME, job_current_name);
+                if (job_ori_name == my_ori_name)
+                {
+                    my_current_name = job_current_name;
+                }
+            }
+
+            if (my_current_name[my_current_name.length()-1] != '/')
+                    my_current_name += "/";
+
+            if (my_current_name == "undefined")
+            {
+                    REPORT_ERROR("ERROR: cannot find job " + my_ori_name + " in scheme: " + my_scheme_star);
+            }
+            std::string to_replace = "Schemes/" + my_scheme_name + "/" + my_ori_name + "/";
+            mystring.replaceAllSubstrings(to_replace, my_current_name);
+
+            std::cout << " ++ in " << current_node << ": " << original_string  << " -> " << mystring << std::endl;
+
+            return true;
 		}
 		else
 		{
@@ -1672,7 +1691,8 @@ RelionJob Scheme::prepareJob(FileName current_node)
 
 	// Always re-read from the original job.star from the Scheme directory,
 	// because $$ variables and input jobnames may have been replaced when continuing existing jobs
-	myjob.read(name + current_node + '/', dummy, true);
+	if (!myjob.read(name + current_node + '/', dummy, true))
+        REPORT_ERROR("ERROR: there was a problem reading job " + name + current_node);
 
     // Check whether there are any joboption values with a jobname from one of the processes in this Schemer
 	// And replace these by their corresponding 'current_name'

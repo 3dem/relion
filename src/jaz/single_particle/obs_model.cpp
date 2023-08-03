@@ -774,7 +774,7 @@ int ObservationModel::getOpticsGroup(const MetaDataTable &particlesMdt, long int
 {
 	int opticsGroup = -1;
 	if (!particlesMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle))
-		REPORT_ERROR("ObservationModel::getOpticsGroup: Failed to get optics group for particle #" + particle);
+		REPORT_ERROR("ObservationModel::getOpticsGroup: Failed to get optics group for particle #" + std::to_string(particle));
 	opticsGroup--;
 
 	return opticsGroup;
@@ -1310,7 +1310,7 @@ void ObservationModel::loadSafely(std::string filename, ObservationModel& obsMod
 		MetaDataTable oldMdt;
 		oldMdt.read(filename);
 
-		StarConverter::convert_3p0_particlesTo_3p1(oldMdt, particlesMdt, opticsMdt, mytablename, do_die_upon_error);
+		StarConverter::convert_3p0_particlesTo_3p1(oldMdt, particlesMdt, opticsMdt, mytablename, -1, do_die_upon_error);
 		if (!do_die_upon_error && opticsMdt.numberOfObjects() == 0) return; // return an empty optics table if error was raised
 
 		if (mytablename == "" || mytablename == "discover")

@@ -508,11 +508,11 @@ if(do_gpu)
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
 	maximum_angular_sampling = textToFloat(getParameter(argc, argv, "--maximum_angular_sampling", "0"));
 	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
-	skip_gridding = parser.checkOption("--skip_gridding", "Skip gridding in the M step");
+	skip_gridding = !parser.checkOption("--dont_skip_gridding", "Perform gridding in the reconstruction step (obsolete?)");
 	nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
 	debug_split_random_half = textToInteger(getParameter(argc, argv, "--debug_split_random_half", "0"));
-    do_red = parser.checkOption("--do_red", "", "false", true);
     skip_realspace_helical_sym = parser.checkOption("--skip_realspace_helical_sym", "", "false", true);
+	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
 
 	// We read input optimiser set to create the output one
 	fn_OS = parser.getOption("--ios", "Input tomo optimiser set file. It is used to set --i, --ref or --solvent_mask if they are not provided. Updated output optimiser set is created.", "");
@@ -931,7 +931,7 @@ if(do_gpu)
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
 	maximum_angular_sampling = textToFloat(getParameter(argc, argv, "--maximum_angular_sampling", "0"));
 	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
-	skip_gridding = parser.checkOption("--skip_gridding", "Skip gridding in the M step");
+	skip_gridding = !parser.checkOption("--dont_skip_gridding", "Perform gridding in the reconstruction step (obsolete?)");
 	debug_split_random_half = textToInteger(getParameter(argc, argv, "--debug_split_random_half", "0"));
     skip_realspace_helical_sym = parser.checkOption("--skip_realspace_helical_sym", "", "false", true);
 
@@ -1994,7 +1994,11 @@ void MlOptimiser::initialiseGeneral(int rank)
 			mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
 			sampling.is_3D = (mymodel.ref_dim == 3);
 			RFLOAT rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
-			mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = 2. * 2. * rottilt_step * rottilt_step;
+            //SHWS 9may2022: Briggs lab uses --sigma_ang together with sampling.healpix_order >= autosampling_hporder_local_searches...
+            if (mymodel.sigma2_rot <= 0. || mymodel.sigma2_tilt <= 0. || mymodel.sigma2_psi <= 0.)
+            {
+                mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = 2. * 2. * rottilt_step * rottilt_step;
+            }
 		}
 
 		// Check whether we had converged already
@@ -2413,9 +2417,12 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 	int total_nr_particles_todo = minimum_nr_particles_sigma2_noise * mymodel.nr_optics_groups;
 	int barstep;
 
+        // Check that we always have at least 5 particles per class if no references are provided
+        if (fn_ref == "None") total_nr_particles_todo = XMIPP_MAX(mymodel.nr_classes*5, total_nr_particles_todo);
+
 	if (myverb > 0)
 	{
-		std::cout << " Estimating initial noise spectra " << std::endl;
+            std::cout << " Estimating initial noise spectra from " << total_nr_particles_todo << " particles " << std::endl;
 		init_progress_bar(total_nr_particles_todo);
 		barstep = XMIPP_MAX(1, total_nr_particles_todo / 60);
 	}
@@ -2644,16 +2651,8 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 					tilt = (mymodel.ref_dim == 2) ? 0. : rnd_unif() * 180.;
 					psi  = rnd_unif() * 360.;
 				}
-				int iclass  = rnd_unif() * mymodel.nr_classes;
-				if (iclass == mymodel.nr_classes) iclass = mymodel.nr_classes - 1;
-				if (iclass >= mymodel.nr_classes)
-				{
-					// Should not happen but without this some people get errors in Set2DFourierTransform
-					// TODO: investigate
-					std::cerr << "WARNING: numerical issue in initial class assignment. Your result is NOT compromised but please report this to our issue tracker.\n";
-					std::cerr << "         iclass = " << iclass << " nr_classes = " << mymodel.nr_classes << " sizeof(RFLOAT) = " << sizeof(RFLOAT) << std::endl;
-					iclass = mymodel.nr_classes - 1;
-				}
+                                // SHWS 25Aug2022: make sure all classes have particles in them, their order has been randomised already
+				int iclass  = part_id_sorted % mymodel.nr_classes;
 				Matrix2D<RFLOAT> A;
 				Euler_angles2matrix(rot, tilt, psi, A, true);
 
@@ -4534,6 +4533,35 @@ void MlOptimiser::makeGoodHelixForEachRef()
 	return;
 }
 
+bool MlOptimiser::setAverageCTF2(MultidimArray<RFLOAT> &avgctf2)
+{
+    // When doing ctf_premultiplied, correct the tau2 estimates for the average CTF^2
+    bool do_correct_tau2_by_avgctf2 = false;
+    if (mydata.hasCtfPremultiplied() && !fix_tau && !do_split_random_halves)
+    {
+        do_correct_tau2_by_avgctf2 = true;
+        MultidimArray<RFLOAT> sumw_multi;
+        avgctf2.initZeros(mymodel.sigma2_noise[0]);
+        sumw_multi.initZeros(mymodel.sigma2_noise[0]);
+        for (int igroup = 0; igroup < mymodel.nr_optics_groups; igroup++)
+        {
+            FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(avgctf2)
+            {
+                DIRECT_MULTIDIM_ELEM(avgctf2, n) += DIRECT_MULTIDIM_ELEM(wsum_model.sumw_ctf2[igroup], n);
+                DIRECT_MULTIDIM_ELEM(sumw_multi, n) += DIRECT_MULTIDIM_ELEM(wsum_model.sumw_stMulti[igroup], n);
+            }
+        }
+        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(avgctf2)
+        {
+            if (DIRECT_MULTIDIM_ELEM(sumw_multi, n) > 0.)
+                DIRECT_MULTIDIM_ELEM(avgctf2, n) /= DIRECT_MULTIDIM_ELEM(sumw_multi, n);
+        }
+    }
+
+    return do_correct_tau2_by_avgctf2;
+
+}
+
 void MlOptimiser::maximization()
 {
 	int skip_class(-1);
@@ -4546,7 +4574,11 @@ void MlOptimiser::maximization()
 		init_progress_bar(mymodel.nr_classes);
 	}
 
-	// First reconstruct the images for each class
+    // When doing ctf_premultiplied, correct the tau2 estimates for the average CTF^2
+    MultidimArray<RFLOAT> avgctf2;
+    bool do_correct_tau2_by_avgctf2 = setAverageCTF2(avgctf2);
+
+    // First reconstruct the images for each class
 	// multi-body refinement will never get here, as it is only 3D auto-refine and that requires MPI!
 	for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
 	{
@@ -4563,8 +4595,10 @@ void MlOptimiser::maximization()
 						mymodel.data_vs_prior_class[iclass],
 						mymodel.fourier_coverage_class[iclass],
 						mymodel.fsc_halves_class[0],
+                        avgctf2,
 						false,
-						false);
+						false,
+                        do_correct_tau2_by_avgctf2);
 
 				if (do_external_reconstruct)
 				{
@@ -4578,6 +4612,8 @@ void MlOptimiser::maximization()
 							mymodel.tau2_class[iclass],
 							mymodel.sigma2_class[iclass],
 							mymodel.data_vs_prior_class[iclass],
+							mymodel.pixel_size,
+							particle_diameter,
 							(do_join_random_halves || do_always_join_random_halves),
 							mymodel.tau2_fudge_factor,
 							1); // verbose
@@ -4831,7 +4867,8 @@ void MlOptimiser::maximizationOtherParameters()
 	// Also refrain from updating sigma_noise after the first iteration with first_iter_cc!
 	if (!fix_sigma_noise && !((iter == 1 && do_firstiter_cc) || do_always_cc) )
 	{
-		for (int igroup = 0; igroup < mymodel.nr_optics_groups; igroup++)
+		bool do_subtomo_correction = wsum_model.sumw_stMulti[0].sum() > 0.;
+        for (int igroup = 0; igroup < mymodel.nr_optics_groups; igroup++)
 		{
 			RFLOAT tsum = wsum_model.sigma2_noise[igroup].sum();
 			if(tsum!=0)
@@ -4840,9 +4877,21 @@ void MlOptimiser::maximizationOtherParameters()
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.sigma2_noise[igroup])
 				{
 					DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) *= my_mu;
-					DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) +=
-							(1. - my_mu) * DIRECT_MULTIDIM_ELEM(wsum_model.sigma2_noise[igroup], n ) /
-								(2. * wsum_model.sumw_group[igroup] * DIRECT_MULTIDIM_ELEM(Npix_per_shell, n));
+
+                    if (do_subtomo_correction && DIRECT_MULTIDIM_ELEM(wsum_model.sumw_stMulti[igroup], n) > 0.)
+                    {
+                        // If wsum_model.sumw_stMulti is zero, just keep the old sigma2_noise
+                        DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) +=
+                                (1. - my_mu) * DIRECT_MULTIDIM_ELEM(wsum_model.sigma2_noise[igroup], n) /
+                                (2. * DIRECT_MULTIDIM_ELEM(wsum_model.sumw_stMulti[igroup], n) );
+                    }
+                    else
+                    {
+                        DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) +=
+                                (1. - my_mu) * DIRECT_MULTIDIM_ELEM(wsum_model.sigma2_noise[igroup], n) /
+                                (2. * wsum_model.sumw_group[igroup] * DIRECT_MULTIDIM_ELEM(Npix_per_shell, n));
+                    }
+
 					// Watch out for all-zero sigma2 in case of CTF-premultiplication!
 					if (mydata.hasCtfPremultiplied())
 						DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) = XMIPP_MAX(DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n), 1e-15);
@@ -6353,7 +6402,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 	exp_local_Fctf.resize(exp_nr_images);
 	exp_local_sqrtXi2.resize(exp_nr_images);
 
-	bool do_subtomo_correction = is_for_store_wsums && exp_STMulti.size() > 0 && NZYXSIZE(exp_STMulti[0]) > 0;
+	bool do_subtomo_correction = exp_STMulti.size() > 0 && NZYXSIZE(exp_STMulti[0]) > 0;
 
 	MultidimArray<Complex > Fimg, Fimg_nomask;
 	for (int img_id = 0, my_trans_image = 0; img_id < exp_nr_images; img_id++)
@@ -6426,8 +6475,8 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 
 			// Also prepare Minvsigma2
 			if (mymodel.data_dim == 3)
-				exp_local_Minvsigma2[img_id].initZeros(ZSIZE(Fimg), YSIZE(Fimg), XSIZE(Fimg));
-			else
+                exp_local_Minvsigma2[img_id].initZeros(ZSIZE(Fimg), YSIZE(Fimg), XSIZE(Fimg));
+            else
 				exp_local_Minvsigma2[img_id].initZeros(YSIZE(Fimg), XSIZE(Fimg));
 
 			// With optics_group and relevant size of Fimg, calculate inverse of sigma^2 for relevant parts of Mresol
@@ -6442,20 +6491,40 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 			}
 		}
 
-		if (do_subtomo_correction)
+        if (do_subtomo_correction)
 		{
-			// We store the downsized subtomogram Fourier Multiplicity weights
-			windowFourierTransform(exp_STMulti[img_id], exp_local_STMulti[img_id], exp_current_image_size);
+			MultidimArray<RFLOAT> STmult;
+            windowFourierTransform(exp_STMulti[img_id], STmult, exp_current_image_size);
 
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Minvsigma2[img_id])
-			{
-				int ires = *(myMresol + n);
-				int ires_remapped = ROUND(remap_image_sizes * ires);
-				// Exclude origin (ires==0) from the Probability-calculation
-				// This way we are invariant to additive factors
-				if (ires > 0 && ires_remapped < XSIZE(mymodel.sigma2_noise[optics_group]))
-					DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], n) *= sqrt(DIRECT_MULTIDIM_ELEM(exp_local_STMulti[img_id], n));
-			}
+            if (is_for_store_wsums)
+            {
+                // We store the downsized subtomogram Fourier Multiplicity weights for updates of sigma2_noise in the storeWeightedSums function
+                exp_local_STMulti[img_id] = STmult;
+
+                // We also undo the division by STmult in the first pass for getAllSquareDifferences, if in this pass do_ctf_invsig is false
+                if (!do_ctf_invsig)
+                {
+                    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Minvsigma2[img_id])
+                    {
+                        if (DIRECT_MULTIDIM_ELEM(STmult, n) > 0.1)
+                        {
+                            DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], n) *= DIRECT_MULTIDIM_ELEM(STmult, n);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // SHWS 23may2022: For getAllSquareDifferences: use ||CTF X- CTF^2*P*V||^2 / (sigma2_noise * M)
+                // For storedWeightedSums, the factor M should not be there anymore!
+                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Minvsigma2[img_id])
+                {
+                    if (DIRECT_MULTIDIM_ELEM(STmult, n) > 0.1)
+                    {
+                        DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], n) /= DIRECT_MULTIDIM_ELEM(STmult, n);
+                    }
+                }
+            }
 		}
 
 		//Shifts are done on the fly on the gpu, if do_gpu || do_cpu, do_shifts_onthefly is always false!
@@ -6765,7 +6834,6 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 								int my_metadata_offset = metadata_offset + img_id;
 								RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, img_id);
 								int optics_group = mydata.getOpticsGroup(part_id, img_id);
-								bool ctf_premultiplied = mydata.obsModel.getCtfPremultiplied(optics_group);
 
 								// Get the Euler matrix
 								Euler_angles2matrix(oversampled_rot[iover_rot],
@@ -7814,10 +7882,11 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 	}
 
 	//Sigma2_noise estimation
-	std::vector<MultidimArray<RFLOAT> > thr_wsum_sigma2_noise;
+	std::vector<MultidimArray<RFLOAT> > thr_wsum_sigma2_noise, thr_wsum_ctf2;
 	std::vector<MultidimArray<RFLOAT> >  thr_wsum_stMulti;
 	// Wsum_sigma_noise2 is a 1D-spectrum for each img_id
 	thr_wsum_sigma2_noise.resize(exp_nr_images);
+    thr_wsum_ctf2.resize(exp_nr_images);
 	if (do_subtomo_correction)
 		thr_wsum_stMulti.resize(exp_nr_images);
 
@@ -7825,6 +7894,9 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 	{
 		int optics_group = mydata.getOpticsGroup(part_id, img_id);
 		thr_wsum_sigma2_noise[img_id].initZeros(image_full_size[optics_group]/2 + 1);
+        thr_wsum_ctf2[img_id].initZeros(image_full_size[optics_group]/2 + 1);
+        if (do_subtomo_correction)
+            thr_wsum_stMulti[img_id].initZeros(image_full_size[optics_group]/2 + 1);
 		if (do_scale_correction)
 		{
 			exp_wsum_scale_correction_XA[img_id] = 0.;
@@ -8180,31 +8252,6 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 													}
 												}
 											}
-											if (do_subtomo_correction)
-											{
-												thr_wsum_stMulti[img_id].initZeros(image_full_size[optics_group]/2 + 1);
-												MultidimArray<RFLOAT> &MySTMulti = exp_local_STMulti[img_id];
-												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mresol_fine[optics_group])
-												{
-													int ires = DIRECT_MULTIDIM_ELEM(Mresol_fine[optics_group], n);
-													if (DIRECT_MULTIDIM_ELEM(MySTMulti, n) > 0 && ires > -1)
-														DIRECT_MULTIDIM_ELEM(thr_wsum_stMulti[img_id], ires) += DIRECT_MULTIDIM_ELEM(MySTMulti, n);
-												}
-
-												long int igroup = mydata.getGroupId(part_id, img_id);
-												int my_image_size = mydata.getOpticsImageSize(optics_group);
-												RFLOAT my_optics_pixel_size = mydata.getOpticsPixelSize(optics_group);
-												RFLOAT remap_image_sizes = (mymodel.ori_size * mymodel.pixel_size) / (my_image_size * my_optics_pixel_size);
-												FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(thr_wsum_sigma2_noise[img_id])
-												{
-													int i_resam = ROUND(i * remap_image_sizes);
-													if (i_resam < XSIZE(Npix_per_shell))
-													{
-														DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], i) *= DIRECT_A1D_ELEM(Npix_per_shell, i_resam) /
-																DIRECT_A1D_ELEM(thr_wsum_stMulti[img_id], i);
-													}
-												}
-											}
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
 											if (part_id == mydata.sorted_idx[exp_my_first_part_id])
@@ -8337,7 +8384,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 													(DIRECT_MULTIDIM_ELEM(Fimg, n)).imag += (*(Fimg_store + n)).imag * weightxinvsigma2;
 													// now Fweight stores sum of all w and multiply by CTF^2
 													DIRECT_MULTIDIM_ELEM(Fweight, n) += weightxinvsigma2 * myctf;
-												}
+                                                }
 											}
 											else
 											{
@@ -8351,7 +8398,6 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 													// now Fweight stores sum of all w
 													// Note that CTF needs to be squared in Fweight, weightxinvsigma2 already contained one copy
 													DIRECT_MULTIDIM_ELEM(Fweight, n) += weightxinvsigma2 * myctf;
-
 												}
 											}
 
@@ -8630,8 +8676,30 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 		omp_set_lock(&global_mutex);
 		for (int img_id = 0; img_id < exp_nr_images; img_id++)
 		{
-			long int igroup = mydata.getGroupId(part_id, img_id);
-			int optics_group = mydata.getOpticsGroup(part_id, img_id);
+
+            long int igroup = mydata.getGroupId(part_id, img_id);
+            int optics_group = mydata.getOpticsGroup(part_id, img_id);
+            if (do_subtomo_correction)
+            {
+                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mresol_fine[optics_group])
+                {
+                    int ires = DIRECT_MULTIDIM_ELEM(Mresol_fine[optics_group], n);
+                    if (ires > -1)
+                        DIRECT_MULTIDIM_ELEM(thr_wsum_stMulti[img_id], ires) += DIRECT_MULTIDIM_ELEM(exp_local_STMulti[img_id], n);
+                }
+            }
+
+            if (mydata.obsModel.getCtfPremultiplied(optics_group))
+            {
+                RFLOAT myscale = XMIPP_MAX(0.001, mymodel.scale_correction[igroup]);
+                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mresol_fine[optics_group])
+                {
+                    int ires = DIRECT_MULTIDIM_ELEM(Mresol_fine[optics_group], n);
+                    if (ires > -1)
+                        DIRECT_MULTIDIM_ELEM(thr_wsum_ctf2[img_id], ires) += myscale * DIRECT_MULTIDIM_ELEM(exp_local_Fctf[img_id], n);
+                }
+            }
+
 			int my_image_size = mydata.getOpticsImageSize(optics_group);
 			RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
 			RFLOAT remap_image_sizes = (mymodel.ori_size * mymodel.pixel_size) / (my_image_size * my_pixel_size);
@@ -8641,6 +8709,9 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 				if (i_resam < XSIZE(wsum_model.sigma2_noise[optics_group]))
 				{
 					DIRECT_A1D_ELEM(wsum_model.sigma2_noise[optics_group], i_resam) += DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], i);
+                    DIRECT_A1D_ELEM(wsum_model.sumw_ctf2[optics_group], i_resam) += DIRECT_A1D_ELEM(thr_wsum_ctf2[img_id], i);
+                    if (do_subtomo_correction)
+                        DIRECT_A1D_ELEM(wsum_model.sumw_stMulti[optics_group], i_resam) += DIRECT_A1D_ELEM(thr_wsum_stMulti[img_id], i);
 				}
 			}
 			wsum_model.sumw_group[optics_group] += thr_sumw_group[img_id];
@@ -10237,7 +10308,8 @@ void MlOptimiser::applySubtomoCorrection(MultidimArray<Complex > &Fimg, Multidim
 	{
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fimg)
 		{
-			RFLOAT mySTMulti = sqrt(FFTW_ELEM(FstMulti, kp, ip, jp));
+			//SHWS 11may2022: removed sqrt!
+            RFLOAT mySTMulti = FFTW_ELEM(FstMulti, kp, ip, jp);
 			FFTW_ELEM(Fimg, kp, ip, jp) *= mySTMulti;
 			FFTW_ELEM(Fimg_nomask, kp, ip, jp) *= mySTMulti;
 			FFTW_ELEM(Fctf, kp, ip, jp) *= mySTMulti;
@@ -10245,23 +10317,20 @@ void MlOptimiser::applySubtomoCorrection(MultidimArray<Complex > &Fimg, Multidim
 	}
 	else if (!do_skip_subtomo_correction)
 	{
-		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fimg)
+		// This is the default for subtomogram averaging in RELION-4.0: just use the sums!
+        // SHWS 11may2022: removed all pre-divisions!
+        // Just enforce the images are zero when M is zero!
+        FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fimg)
 		{
-			RFLOAT mySTMulti = sqrt(FFTW_ELEM(FstMulti, kp, ip, jp));
-			if (mySTMulti == 0)
+			if (FFTW_ELEM(FstMulti, kp, ip, jp) < subtomo_multi_thr)
 			{
-				FFTW_ELEM(Fimg, kp, ip, jp) = 0;
-				FFTW_ELEM(Fimg_nomask, kp, ip, jp) = 0;
-				FFTW_ELEM(Fctf, kp, ip, jp) = 0;
+                FFTW_ELEM(Fimg, kp, ip, jp) = 0.;
+				FFTW_ELEM(Fimg_nomask, kp, ip, jp) = 0.;
+				FFTW_ELEM(Fctf, kp, ip, jp) = 0.;
+                FFTW_ELEM(FstMulti, kp, ip, jp) = 0.;
 			}
-			else
-			{
-				FFTW_ELEM(Fimg, kp, ip, jp) /= mySTMulti;
-				FFTW_ELEM(Fimg_nomask, kp, ip, jp) /= mySTMulti;
-				FFTW_ELEM(Fctf, kp, ip, jp) /= mySTMulti;
-			}
-		}
-	}
+        }
+    }
 	else // We apply the multiplicity normalisation to process in the old way, without the corrected algorithm
 	{
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fimg)

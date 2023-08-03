@@ -286,8 +286,10 @@ public:
 	                      MultidimArray<RFLOAT> &evidence_vs_prior_out,
 	                      MultidimArray<RFLOAT> &fourier_coverage_out,
 	                      const MultidimArray<RFLOAT>& fsc,
+                          const MultidimArray<RFLOAT>& avgctf2,
 	                      bool update_tau2_with_fsc = false,
-	                      bool is_whole_instead_of_half = false);
+	                      bool is_whole_instead_of_half = false,
+                          bool correct_tau2_by_avgctf2 = false);
 
 	/* Get the 3D reconstruction, but perform it through a system call outside relion_refine!
 	*/
@@ -297,6 +299,8 @@ public:
 	                         MultidimArray<RFLOAT> &tau2_io,
 							 MultidimArray<RFLOAT> &sigma2_ref,
 							 MultidimArray<RFLOAT> &data_vs_prior,
+							 RFLOAT pixel_size=1,
+							 RFLOAT particle_diameter=0,
 							 bool is_whole_instead_of_half = false,
 	                         RFLOAT tau2_fudge = 1.,
 	                         int verb = 0);

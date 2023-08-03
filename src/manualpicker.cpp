@@ -257,6 +257,7 @@ int manualpickerGuiWindow::fill()
 	{
 		menubar->add("File/Save selection",  FL_ALT+'s', cb_menubar_save, this);
 		menubar->add("File/Invert selection",  FL_ALT+'i', cb_menubar_invert_selection, this);
+        menubar->add("File/Select all",  FL_ALT+'a', cb_menubar_select_all, this);
 	}
 	menubar->add("File/Recount picked particles",  FL_ALT+'c', cb_menubar_recount, this);
 	menubar->add("File/Set FOM threshold",  FL_ALT+'c', cb_menubar_setFOM, this);
@@ -391,30 +392,42 @@ int manualpickerGuiWindow::fill()
 
 void manualpickerGuiWindow::readOutputStarfile()
 {
-	if (exists(fn_sel))
+	FileName fn_select = global_fn_odir + "local_selection.star";
+    if (exists(fn_select))
 	{
-		for (int imic = 0; imic < selected.size(); imic++)
-			selected[imic] = false;
-		MetaDataTable MDmics;
+        for (int imic = 0; imic < selected.size(); imic++)
+			selected[imic] = true;
 
-		ObservationModel::loadSafely(fn_sel, obsModel, MDmics, "micrographs");
-		FileName fn_mic, fn_mic_in;
+        MetaDataTable MDselect;
+        MDselect.read(fn_select);
+
+        // Set all unselected micrographs to false
+        FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDselect)
+        {
+
+            FileName fn_mic;
+            int is_selected;
+            MDselect.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
+            MDselect.getValue(EMDL_SELECTED, is_selected);
+            if (is_selected == 0)
+            {
+                // find fn_mic
+                for (int imic = 0; imic < selected.size(); imic++)
+                {
+                    if (global_fn_mics[imic] == fn_mic)
+                    {
+                        selected[imic] = false;
+                        break;
+                    }
+                }
+            }
+
+        }
+
+        // Apply the selection to the buttons
 		for (int imic = 0; imic < selected.size(); imic++)
 		{
-			MDin.getValue(EMDL_MICROGRAPH_NAME, fn_mic_in, imic);
-			bool has_found = false;
-			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDmics)
-			{
-				MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
-				// Which one in the input metadatatable was this one?
-				if (fn_mic == fn_mic_in)
-				{
-					has_found = true;
-					break;
-				}
-			}
-			selected[imic] = has_found;
-			if (has_found)
+			if (selected[imic])
 			{
 				check_buttons[imic]->value(1);
 				text_displays[imic]->color(GUI_INPUT_COLOR, GUI_INPUT_COLOR);
@@ -445,7 +458,7 @@ void manualpickerGuiWindow::writeOutputStarfiles(bool verb)
 	if (!do_allow_save) return;
 
 	MDcoords.clear();
-	MetaDataTable MDmics;
+	MetaDataTable MDmics, MDselect;
 	int c = 0;
 	for (int imic = 0; imic < selected.size(); imic++)
 	{
@@ -460,8 +473,14 @@ void manualpickerGuiWindow::writeOutputStarfiles(bool verb)
 				MDcoords.setValue(EMDL_MICROGRAPH_COORDINATES, fn_coord);
 				c++;
 			}
-		}
-	}
+        }
+
+        MDselect.addObject();
+        MDselect.setValue(EMDL_MICROGRAPH_NAME, global_fn_mics[imic]);
+        int sel = (selected[imic]) ? 1 : 0;
+        MDselect.setValue(EMDL_SELECTED, sel);
+
+    }
 
 	if (obsModel.opticsMdt.numberOfObjects() > 0)
 	{
@@ -472,6 +491,10 @@ void manualpickerGuiWindow::writeOutputStarfiles(bool verb)
 		MDmics.write(fn_sel);
 	}
 	if (verb) std::cout << " Saved list of selected micrographs in: " << fn_sel << std::endl;
+
+    // Save selection star file for manualpicker continue jobs only
+    FileName fn_select = global_fn_odir + "local_selection.star";
+    MDselect.write(fn_select);
 
 	FileName fn_coords = global_fn_odir + global_pickname + ".star";
 	MDcoords.setName("coordinate_files");
@@ -489,6 +512,29 @@ void manualpickerGuiWindow::cb_menubar_save_i()
 {
 	writeOutputStarfiles();
 	RELION_EXIT_SUCCESS;
+}
+
+void manualpickerGuiWindow::cb_menubar_select_all(Fl_Widget* w, void* v)
+{
+    manualpickerGuiWindow* T=(manualpickerGuiWindow*)v;
+    T->cb_menubar_select_all_i();
+}
+
+void manualpickerGuiWindow::cb_menubar_select_all_i()
+{
+	for (int imic = 0; imic < selected.size(); imic++)
+    {
+        selected[imic] = true;
+        check_buttons[imic]->value(1);
+        text_displays[imic]->color(GUI_INPUT_COLOR, GUI_INPUT_COLOR);
+        text_displays[imic]->activate();
+        viewmic_buttons[imic]->activate();
+        count_displays[imic]->color(GUI_INPUT_COLOR, GUI_INPUT_COLOR);
+        count_displays[imic]->activate();
+        if (global_has_ctf)
+            viewctf_buttons[imic]->activate();
+    }
+
 }
 
 void manualpickerGuiWindow::cb_menubar_invert_selection(Fl_Widget* w, void* v)
