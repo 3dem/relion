@@ -69,7 +69,7 @@ MpiNode::MpiNode(int &argc, char ** argv)
 	MPI_Comm_group(MPI_COMM_WORLD, &worldG);
 	int mstr[1] = {0};
 	MPI_Group_excl(worldG, 1, mstr, &followerG); // exclude leader
-	MPI_Comm_create(MPI_COMM_WORLD, followerG, &followerC);
+	MPI_Comm_create_group(MPI_COMM_WORLD, followerG, 0, &followerC);
 	if (rank != 0)
 	{
 		MPI_Group_rank(followerG, &followerRank);
@@ -101,15 +101,14 @@ MpiNode::MpiNode(int &argc, char ** argv)
 		else
 			odd.push_back(i);
 	}
-	MPI_Group root_evenG, root_oddG;
+	root_evenC = MPI_COMM_NULL;
+	root_oddC = MPI_COMM_NULL;
 	MPI_Group_excl(worldG, odd.size(), odd.data(), &root_evenG);
 	MPI_Group_excl(worldG, even.size(), even.data(), &root_oddG);
-	MPI_Comm_create(MPI_COMM_WORLD, root_evenG, &root_evenC);
-	MPI_Comm_create(MPI_COMM_WORLD, root_oddG, &root_oddC);
-	MPI_Group_free(&root_evenG);
-	MPI_Group_free(&root_oddG);
+	MPI_Comm_create_group(MPI_COMM_WORLD, root_evenG, 1, &root_evenC);
+	MPI_Comm_create_group(MPI_COMM_WORLD, root_oddG, 2, &root_oddC);
 
-	constexpr std::ptrdiff_t defBlock = RELION_MPI_MAX_SIZE;	// default for MPI Collective
+	constexpr std::ptrdiff_t defBlock = RELION_MPI_MAX_SIZE;	// default for MPI communication
 	constexpr std::ptrdiff_t maxPtBlock = 8ULL*1024*1024*1024;		// 8 GiB, max for MPI pt-2-pt. Normal limit is sizeof(variable) * INT_MAX bytes
 	constexpr std::ptrdiff_t maxCollBlock = 4ULL*1024*1024*1024;	// 4 GiB, max for MPI collective. Normal limit is sizeof(variable) * INT_MAX bytes
 
@@ -171,14 +170,17 @@ MpiNode::MpiNode(int &argc, char ** argv)
 
 MpiNode::~MpiNode()
 {
-	MPI_Group_free(&worldG);
-	MPI_Group_free(&followerG);
-	MPI_Comm_free(&followerC);
 #ifdef USE_MPI_COLLECTIVE
 	MPI_Comm_free(&root_evenC);
 	MPI_Comm_free(&root_oddC);
 	MPI_Comm_free(&splitC);
+	MPI_Group_free(&root_evenG);
+	MPI_Group_free(&root_oddG);
 #endif
+	MPI_Comm_free(&followerC);
+	MPI_Group_free(&followerG);
+	MPI_Group_free(&worldG);
+
 	MPI_Finalize();
 }
 

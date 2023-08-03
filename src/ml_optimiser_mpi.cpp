@@ -588,7 +588,8 @@ void MlOptimiserMpi::initialiseWorkLoad()
             // First do half-set 1
             if (node->isLeader()) mydata.getNumberOfParticlesPerGroup(mymodel.nr_particles_per_group, 1);
 #ifdef USE_MPI_COLLECTIVE
-            node->relion_MPI_Bcast(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, node->root_oddC);
+			if (node->myRandomSubset() != 2)
+				node->relion_MPI_Bcast(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, node->root_oddC);
 #else
             for (int follower = 1; follower < node->size; follower+=2)
             {
@@ -601,7 +602,8 @@ void MlOptimiserMpi::initialiseWorkLoad()
             // Then do half-set 2
             if (node->isLeader()) mydata.getNumberOfParticlesPerGroup(mymodel.nr_particles_per_group, 2);
 #ifdef USE_MPI_COLLECTIVE
-            node->relion_MPI_Bcast(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, node->root_evenC);
+			if (node->myRandomSubset() != 1)
+				node->relion_MPI_Bcast(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, node->root_evenC);
 #else
             for (int follower = 2; follower < node->size; follower+=2)
             {
