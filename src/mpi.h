@@ -82,6 +82,7 @@ public:
 	MPI_Comm splitC;	// communicator when doing split random halves
 	int splitRank;		// index of ranks within the split random halves group
 
+	MPI_Group root_evenG, root_oddG;    // MPI group for root+[even or odd] ranks
 	MPI_Comm root_evenC, root_oddC;	// communicators for root+[even or odd] ranks
 
 	// Prints splitRank(split_random_halves case run) for the given nrank
