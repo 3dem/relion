@@ -33,7 +33,7 @@ void MotioncorrOwnDevolved::read(int argc, char **argv)
 	printMpiNodesMachineNames(*node);
 }
 
-void MotioncorrOwnDevolved::addClArgs() override
+void MotioncorrOwnDevolved::addClArgs()
 {
 	int path_section =  parser.addSection("In/out paths options");
 	movie_path = parser.getOption("--in_movie", "Path to input movie");
