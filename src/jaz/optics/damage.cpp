@@ -731,7 +731,7 @@ void Damage::renormalise(
 {
 	const int tc = B_t.size();
 	
-	double B_max = -std::numeric_limits<double>::max();
+	double B_max = std::numeric_limits<double>::lowest();
 	
 	for (int t = 0; t < tc; t++)
 	{

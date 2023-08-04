@@ -53,8 +53,7 @@ void exponentiate_weights_fine(
 			c_itrans = ( iy - (iy % oversamples_trans))/ oversamples_trans;
 
 			if( g_weights[pos+itrans] < min_diff2 || g_pdf_orientation_zeros[ix] || g_pdf_offset_zeros[c_itrans])
-		// TODO - replace with lowest() when C++11 is supported
-				g_weights[pos+itrans] = -std::numeric_limits<XFLOAT>::max(); //large negative number
+				g_weights[pos+itrans] = std::numeric_limits<XFLOAT>::lowest();
 			else
 				g_weights[pos+itrans] = g_pdf_orientation[ix] + g_pdf_offset[c_itrans] + min_diff2 - g_weights[pos+itrans];
 		}

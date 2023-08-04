@@ -118,7 +118,7 @@ std::pair<d3Vector, d3Vector> TiltGeometry::findPresentWedge(
 	d3Vector tilt_axis(Q[0][d_min], Q[1][d_min], Q[2][d_min]);
 
 	double min_cross = std::numeric_limits<double>::max();
-	double max_cross = -std::numeric_limits<double>::max();
+	double max_cross = std::numeric_limits<double>::lowest();
 	int max_cross_f = fc/2;
 	int min_cross_f = fc/2;
 

@@ -286,7 +286,7 @@ void MotionEM::consolidateVelocities(int maxPc)
                 }
             }
 
-            double maxVal = -std::numeric_limits<double>::max();
+            double maxVal = std::numeric_limits<double>::lowest();
 
             for (int y = 0; y < s_vel[f]; y++)
             for (int x = 0; x < s_vel[f]; x++)
