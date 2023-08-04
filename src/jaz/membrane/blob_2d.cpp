@@ -774,7 +774,7 @@ double Blob2D::scanForMinimalRadius(int samples) const
 
 double Blob2D::scanForMaximalRadius(int samples) const
 {
-	double max = -std::numeric_limits<double>::max();
+	double max = std::numeric_limits<double>::lowest();
 	
 	for (int i = 0; i < samples; i++)
 	{

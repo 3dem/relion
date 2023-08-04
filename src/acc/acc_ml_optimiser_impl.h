@@ -2197,7 +2197,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
             DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 #endif
 
-            XFLOAT weights_max = -std::numeric_limits<XFLOAT>::max();
+            XFLOAT weights_max = std::numeric_limits<XFLOAT>::lowest();
 
             pdf_offset.streamSync();
 
@@ -3024,7 +3024,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				CTIC(accMLO->timer,"pre_wavg_map");
 
 				for (long unsigned i = 0; i < orientation_num*translation_num; i++)
-					sorted_weights[classPos+i] = -std::numeric_limits<XFLOAT>::max();
+					sorted_weights[classPos+i] = std::numeric_limits<XFLOAT>::lowest();
 
 				for (long unsigned i = 0; i < thisClassFinePassWeights.weights.getSize(); i++)
 					sorted_weights[classPos+(thisClassFinePassWeights.rot_idx[i]) * translation_num + thisClassFinePassWeights.trans_idx[i] ]
@@ -3604,7 +3604,7 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_B);
 				Mweight.setSize(weightsPerPart);
 				Mweight.setHostPtr(op.Mweight.data);
 				Mweight.deviceAlloc();
-				deviceInitValue<XFLOAT>(Mweight, -std::numeric_limits<XFLOAT>::max());
+				deviceInitValue<XFLOAT>(Mweight, std::numeric_limits<XFLOAT>::lowest());
                 // SHWS 7July2022: not entirely sure about how this works, but as I'm adding to the diff2 for loop over all img_id, this can no longer be a large negative value...
                 //deviceInitValue<XFLOAT>(Mweight, 0.);
 				Mweight.streamSync();

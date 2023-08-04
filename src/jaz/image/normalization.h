@@ -44,7 +44,7 @@ BufferedImage<T> Normalization::toUnitInterval(const RawImage<T>& img)
 	const size_t d = img.zdim;
 	
 	T minVal = std::numeric_limits<T>::max();
-	T maxVal = -std::numeric_limits<T>::max();
+	T maxVal = std::numeric_limits<T>::lowest();
 			
 	for (size_t z = 0; z < d; z++)
 	for (size_t y = 0; y < h; y++)
