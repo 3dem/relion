@@ -449,7 +449,9 @@ set(PYTHON_EXE_PATH "" CACHE PATH "Path to Python executable")
 set(TORCH_HOME_PATH "" CACHE PATH "Path to Torch home directory for storage of trained models.")
 
 list(APPEND RELION_PYTHON_WRAPPERS
-        class_ranker.sh
+        python_classranker
+        python_blush
+        python_dynamight
 )
 
 foreach (SCRIPT_FILE ${RELION_PYTHON_WRAPPERS})

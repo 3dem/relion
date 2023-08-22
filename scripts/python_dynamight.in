@@ -16,7 +16,6 @@ echo "
 
 # Set the Python executable path
 python_executable="@PYTHON_EXE_PATH@"
-torch_home="@TORCH_HOME_PATH@"
 
 # Check if the python executable exists
 if [ ! -x "$python_executable" ]; then
@@ -30,7 +29,7 @@ if [ ! -x "$python_executable" ]; then
 fi
 
 # Run the Python script with forwarded arguments
-TORCH_HOME="$torch_home" "$python_executable" -c "from relion_classranker import main; exit(main())" "$@"
+"$python_executable" -c "from relion_dynamight import main; exit(main())" "$@"
 
 # Check the return status of the python command
 if [ $? -ne 0 ]; then
