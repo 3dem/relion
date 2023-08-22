@@ -2106,7 +2106,7 @@ void MlOptimiserMpi::maximization()
 								(do_join_random_halves || do_always_join_random_halves),
                                 do_correct_tau2_by_avgctf2);
 
-						if (do_external_reconstruct)
+						if (do_external_reconstruct || do_blush)
 						{
 							FileName fn_ext_root;
 							if (iter > -1) fn_ext_root.compose(fn_out+"_it", iter, "", 3);
@@ -2123,6 +2123,7 @@ void MlOptimiserMpi::maximization()
 									mymodel.pixel_size,
 									particle_diameter,
 									(do_join_random_halves || do_always_join_random_halves),
+									do_blush,
 									mymodel.tau2_fudge_factor,
 									node->rank==1); // only first followers is verbose
 						}
@@ -2244,7 +2245,7 @@ void MlOptimiserMpi::maximization()
 									(do_join_random_halves || do_always_join_random_halves),
                                     do_correct_tau2_by_avgctf2);
 
-							if (do_external_reconstruct)
+							if (do_external_reconstruct || do_blush)
 							{
 								FileName fn_ext_root;
 								if (iter > -1) fn_ext_root.compose(fn_out+"_it", iter, "", 3);
@@ -2261,6 +2262,7 @@ void MlOptimiserMpi::maximization()
 										mymodel.pixel_size,
 										particle_diameter,
 										(do_join_random_halves || do_always_join_random_halves),
+										do_blush,
 										mymodel.tau2_fudge_factor);
 							}
 							else

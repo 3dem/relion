@@ -302,6 +302,7 @@ public:
 							 RFLOAT pixel_size=1,
 							 RFLOAT particle_diameter=0,
 							 bool is_whole_instead_of_half = false,
+							 bool do_blush = false,
 	                         RFLOAT tau2_fudge = 1.,
 	                         int verb = 0);
 

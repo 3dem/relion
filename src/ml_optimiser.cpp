@@ -515,6 +515,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
     nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
     debug_split_random_half = textToInteger(getParameter(argc, argv, "--debug_split_random_half", "0"));
     skip_realspace_helical_sym = parser.checkOption("--skip_realspace_helical_sym", "", "false", true);
+	do_blush = parser.checkOption("--blush", "Perform the reconstruction with the Blush algorithm.");
 	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
 
     // We read input optimiser set to create the output one
@@ -884,7 +885,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     do_phase_random_fsc = parser.checkOption("--solvent_correct_fsc", "Correct FSC curve for the effects of the solvent mask?");
     do_skip_maximization = parser.checkOption("--skip_maximize", "Skip maximization step (only write out data.star file)?");
     failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be handled by fail-safe mode, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
-    do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
+    do_blush = parser.checkOption("--blush", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
+    do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction with the Blush algorithm.");
     nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
     auto_ignore_angle_changes = parser.checkOption("--auto_ignore_angles", "In auto-refinement, update angular sampling regardless of changes in orientations for convergence. This makes convergence faster.");
     auto_resolution_based_angles= parser.checkOption("--auto_resol_angles", "In auto-refinement, update angular sampling based on resolution-based required sampling. This makes convergence faster.");
@@ -4590,7 +4592,7 @@ void MlOptimiser::maximization()
                         false,
                         do_correct_tau2_by_avgctf2);
 
-                if (do_external_reconstruct)
+                if (do_external_reconstruct || do_blush)
                 {
                     FileName fn_ext_root;
                     if (iter > -1) fn_ext_root.compose(fn_out+"_it", iter, "", 3);
@@ -4605,6 +4607,7 @@ void MlOptimiser::maximization()
 			    mymodel.pixel_size,
 			    particle_diameter,
                             (do_join_random_halves || do_always_join_random_halves),
+			    do_blush,
                             mymodel.tau2_fudge_factor,
                             1); // verbose
                 }

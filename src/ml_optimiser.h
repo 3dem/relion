@@ -486,6 +486,9 @@ public:
 	/** Perform reconstruction outside of relion_refine, e.g. for learned priors */
 	bool do_external_reconstruct;
 
+	/** Perform reconstruction using the Blush algorithm */
+	bool do_blush;
+
 	/* Flag whether to use the Adaptive approach as by Tagare et al (2010) J. Struc. Biol.
 	 * where two passes through the integrations are made: a first one with a coarse angular sampling and
 	 * smaller images and a second one with finer angular sampling and larger images
