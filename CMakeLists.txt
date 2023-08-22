@@ -443,6 +443,23 @@ if(JPEG_FOUND)
 	add_definitions(-DHAVE_JPEG)
 endif(JPEG_FOUND)
 
+# -----------------------------------------------------------------PYTHON DEPENDENCIES--
+
+set(PYTHON_EXE_PATH "" CACHE PATH "Path to Python executable")
+set(TORCH_HOME_PATH "" CACHE PATH "Path to Torch home directory for storage of trained models.")
+
+list(APPEND RELION_PYTHON_WRAPPERS
+        class_ranker.sh
+)
+
+foreach (SCRIPT_FILE ${RELION_PYTHON_WRAPPERS})
+    configure_file(
+            ${CMAKE_SOURCE_DIR}/scripts/${SCRIPT_FILE}.in
+            ${CMAKE_BINARY_DIR}/bin/relion_${SCRIPT_FILE}
+            @ONLY
+    )
+endforeach()
+
 # ----------------------------------------------------------------------COPY SCRIPTS--
 
 if(FORCE_OWN_FFTW)
@@ -478,19 +495,6 @@ install( DIRECTORY ${CMAKE_BINARY_DIR}/bin
 # install fltk if we built our own version
 if(INSTALL_OWN_FLTK)
     install(DIRECTORY external/fltk/lib/ DESTINATION lib FILES_MATCHING PATTERN "*")
-endif()
-
-# -----------------------------------------------------------------PYTHON DEPENDENCIES--
-
-set(PYTHON_EXE_PATH "" CACHE PATH "Path to Python executable")
-if(NOT "${PYTHON_EXE_PATH}" STREQUAL "")
-    add_compile_definitions(PYTHON_EXE_PATH=${PYTHON_EXE_PATH})
-endif()
-
-set(TORCH_HOME_PATH "" CACHE PATH "Path to Torch home directory for storage of trained models.")
-
-if(NOT "${TORCH_HOME_PATH}" STREQUAL "")
-    add_compile_definitions(TORCH_HOME_PATH=${TORCH_HOME_PATH})
 endif()
 
 # -----------------------------------------------------------------RELION COMPONENTS--
