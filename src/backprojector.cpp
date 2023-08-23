@@ -1297,8 +1297,9 @@ void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
 
 		pclose(pipe);
 
-		if (result != "success") {
-			std::cerr << "Something when wrong in the external Python call..." << std::endl;
+		if (trim2(result) != "success")
+		{
+			std::cerr << std::endl << "Something went wrong in the external Python call..." << std::endl;
 			std::cerr << "Command: " << cmd << std::endl;
 			std::cerr << result << std::endl;
 			exit(1);

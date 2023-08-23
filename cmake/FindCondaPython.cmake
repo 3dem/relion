@@ -38,38 +38,42 @@ if (PYTHON_EXE_PATH STREQUAL "")
 
   find_program(CONDA_EXECUTABLE conda)
 
-  message(STATUS "Found Conda executable: ${CONDA_EXECUTABLE}")
+  if(CONDA_EXECUTABLE)
+    message(STATUS "Found Conda executable: ${CONDA_EXECUTABLE}")
 
-  # Run the conda command and capture its output
-  execute_process(COMMAND ${CONDA_EXECUTABLE} config --show envs_dirs
-          OUTPUT_VARIABLE CONDA_ENVS_OUTPUT
-          OUTPUT_STRIP_TRAILING_WHITESPACE
-          RESULT_VARIABLE CONDA_RESULT)
+    # Run the conda command and capture its output
+    execute_process(COMMAND ${CONDA_EXECUTABLE} config --show envs_dirs
+            OUTPUT_VARIABLE CONDA_ENVS_OUTPUT
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            RESULT_VARIABLE CONDA_RESULT)
 
-  # Check if the conda command was successful
-  if(CONDA_RESULT EQUAL 0)
-    # Split the output into lines
-    string(REPLACE "\n" ";" CONDA_ENVS_LIST ${CONDA_ENVS_OUTPUT})
+    # Check if the conda command was successful
+    if(CONDA_RESULT EQUAL 0)
+      # Split the output into lines
+      string(REPLACE "\n" ";" CONDA_ENVS_LIST ${CONDA_ENVS_OUTPUT})
 
-    # Loop through the list of paths
-    foreach(path ${CONDA_ENVS_LIST})
-      string(STRIP "${path}" path)
-      string(REPLACE " " ";" path "${path}")
-      list(GET path -1 path)
-      set(path "${path}/${CONDA_ENV_NAME}/bin/python")
-      if(EXISTS "${path}")
-        set(PYTHON_EXE_PATH "${path}")
-        message(STATUS "Found Conda environment (name: ${CONDA_ENV_NAME}) and its Python executable.")
-        break()  # Exit the loop once a valid path is found
-      endif()
-    endforeach()
-  endif()
-  if (PYTHON_EXE_PATH STREQUAL "")
-    message(
-            WARNING
-            "Failed to find path to Conda environment (name: ${CONDA_ENV_NAME}) and its Python executable.\n"
-            "You can specify it directly with -DPYTHON_EXE_PATH=<path>\n"
-    )
+      # Loop through the list of paths
+      foreach(path ${CONDA_ENVS_LIST})
+        string(STRIP "${path}" path)
+        string(REPLACE " " ";" path "${path}")
+        list(GET path -1 path)
+        set(path "${path}/${CONDA_ENV_NAME}/bin/python")
+        if(EXISTS "${path}")
+          set(PYTHON_EXE_PATH "${path}")
+          message(STATUS "Found Conda environment (name: ${CONDA_ENV_NAME}) and its Python executable.")
+          break()  # Exit the loop once a valid path is found
+        endif()
+      endforeach()
+    endif()
+    if (PYTHON_EXE_PATH STREQUAL "")
+      message(
+              WARNING
+              "Could NOT find path to Conda environment (name: ${CONDA_ENV_NAME}) and its Python executable.\n"
+              "You can specify it directly with -DPYTHON_EXE_PATH=<path>\n"
+      )
+    endif()
+  else (CONDA_EXECUTABLE)
+    message(WARNING "Could NOT find Conda executable...")
   endif()
 endif ()
 
@@ -97,7 +101,7 @@ if (NOT PYTHON_EXE_PATH STREQUAL "")
     else ()
       message(
               WARNING
-              "Failed to find Torch home directory for Conda environment (name: ${CONDA_ENV_NAME}).\n"
+              "Could NOT find Torch home directory for Conda environment (name: ${CONDA_ENV_NAME}).\n"
               "You can specify it directly with -DTORCH_HOME_PATH=<path>\n"
       )
     endif ()

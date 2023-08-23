@@ -1910,8 +1910,9 @@ void ClassRanker::deployTorchModel(std::vector<float> &features, std::vector<flo
 			scores.push_back(std::stof(token, &sz));
 			s.erase(0, pos + delimiter.length());
 		}
-		if (scores.size() != count) {
-			std::cerr << "Something when wrong in the external Python call..." << std::endl;
+		if (scores.size() != count)
+		{
+			std::cerr << std::endl << "Something went wrong in the external Python call..." << std::endl;
 			std::cerr << "Command: " << cmd << std::endl;
 			std::cerr << result << std::endl;
 			exit(1);

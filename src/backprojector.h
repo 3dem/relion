@@ -30,6 +30,7 @@
 
 #define DEFAULT_EXTERNAL_RECONSTRUCT "relion_external_reconstruct"
 
+#include "src/strings.h"
 #include "src/projector.h"
 #include "src/mask.h"
 #include "src/tabfuncs.h"

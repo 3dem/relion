@@ -174,6 +174,25 @@ void trim(std::string& str)
 		str.clear();
 }
 
+// C++11 doesn't have lambdas with capture by value, so we need a helper function
+bool IsNotSpace(unsigned char ch) {
+	return !std::isspace(ch);
+}
+
+/** Trim all spaces and new lines from the begining and the end */
+std::string trim2(const std::string& input)
+{
+	std::string result = input;
+
+	// Remove spaces and new lines from the beginning
+	result.erase(result.begin(), std::find_if(result.begin(), result.end(), IsNotSpace));
+
+	// Remove spaces and new lines from the end
+	result.erase(std::find_if(result.rbegin(), result.rend(), IsNotSpace).base(), result.end());
+
+	return result;
+}
+
 /* NOTE: not a very safe implemenation but standard c functions do not retrieve
  * more than 6 significative digits */
 double textToDouble(const char* str, int _errno, std::string errmsg)
