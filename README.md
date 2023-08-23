@@ -28,7 +28,28 @@ RedHat-like systems (CentOS, RHEL, Scientific Linux etc) use `yum` package manag
 sudo yum install cmake git gcc gcc-c++ openmpi-devel fftw-devel libtiff-devel libpng-devel ghostscript libXft-devel libX11-devel
 ```
 
-Once git and cmake are installed, RELION can be easily installed through:
+To add support for Python modules (e.g. Blush, ModelAngelo and DynaMight) you will have to install a Python environment.
+We recommend installing miniconda3. You can find that here: [miniconda](https://docs.conda.io/en/latest/miniconda.html)
+
+Once you have Conda setup, you can install all the RELION Python dependencies into a new environment by running:
+```conda env create -f environment.yml```
+
+<details>
+<summary><b>Using a Custom Conda/Python Environment with RELION (Advanced)</b></summary>
+To enforce RELION to utilize a particular Python interpreter, incorporate the following flag during the cmake call: 
+
+```-DPYTHON_EXE_PATH=path/to/python```
+
+Additionally, if you intend to make use of automatically downloaded pretrained model weights (used in e.g. Blush, ModelAngelo and Classranker),
+it's recommended to set the TORCH_HOME directory. To do this, include the following flag:
+
+```-DTORCH_HOME_PATH=path/to/torch/home```
+</details>
+
+Before installing RELION make sure Conda is not active. If it is, you can deactivate it by running:
+```conda deactivate```
+
+RELION can now be installed through:
 
 ```
 git clone https://github.com/3dem/relion.git
@@ -40,8 +61,8 @@ cmake ..
 make
 ```
 
-By performing `git checkout ver4.0` instead of `git checkout master`, you can access the latest
-(developmental) updates for RELION 4.0.x. The code there is not tested as throughfully as that in
+By performing `git checkout ver5.0` instead of `git checkout master`, you can access the latest
+(developmental) updates for RELION 5.0.x. The code there is not tested as throughfully as that in
 the master branch and not generally recommended.
 
 The binaries will be produced in the `build/bin` directory. If you want to copy binaries
