@@ -5,8 +5,7 @@ echo "
 ---------------------------------- PYTHON ERROR ---------------------------------
    Has RELION been provided a Python interpreter with the correct environment?
    The interpreter can be passed to RELION either during Cmake configuration by
-     using the Cmake flag -DPYTHON_EXE_PATH=<path/to/python/interpreter> or
-             by setting the environmental variable RELION_PYTHON_EXE.
+     using the Cmake flag -DPYTHON_EXE_PATH=<path/to/python/interpreter>.
    NOTE: For some modules TORCH_HOME needs to be set to find pretrained models
 ---------------------------------------------------------------------------------
 

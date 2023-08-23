@@ -75,6 +75,80 @@ set(CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+
+
+
+
+
+set(PYTHON_EXE_PATH "" CACHE PATH "Path to Python executable")
+set(TORCH_HOME_PATH "" CACHE PATH "Path to Torch home directory for storage of trained models.")
+
+
+
+
+set(RELION_CONDA_ENV_NAME "relion-5.0" CACHE PATH "The Conda environment path")
+
+find_program(CONDA_EXECUTABLE conda)
+
+message(STATUS "CONDA_EXECUTABLE: ${CONDA_EXECUTABLE}")
+
+# Run the conda command and capture its output
+execute_process(COMMAND ${CONDA_EXECUTABLE} config --show envs_dirs
+        OUTPUT_VARIABLE CONDA_ENVS_OUTPUT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE CONDA_RESULT)
+
+# Check if the conda command was successful
+if(CONDA_RESULT EQUAL 0)
+    # Split the output into lines
+    string(REPLACE "\n" ";" CONDA_ENVS_LIST ${CONDA_ENVS_OUTPUT})
+
+    # Loop through the list of paths
+    foreach(path ${CONDA_ENVS_LIST})
+        string(STRIP "${path}" path)
+        string(REPLACE " " ";" path "${path}")
+        list(GET path -1 path)
+        set(path "${path}/${RELION_CONDA_ENV_NAME}/bin/python")
+        if(EXISTS "${path}")
+            set(PYTHON_EXE_PATH "${path}")
+            break()  # Exit the loop once a valid path is found
+        endif()
+    endforeach()
+else()
+    message(STATUS "Failed to automatically retrieve conda environment directories.")
+endif()
+
+execute_process(
+        COMMAND ${PYTHON_EXE_PATH} -c "import torch; print(torch.hub._get_torch_home())"
+        OUTPUT_VARIABLE TORCH_HUB_PATH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE PYTHON_RESULT
+)
+message(STATUS"TORCH_HUB_PATH: ${TORCH_HUB_PATH}")
+
+
+# Display the Python executable path
+message(STATUS "Automatically found Python executable path: ${CONDA_ENV}")
+
+message(STATUS "Using Python executable: ${PYTHON_EXE_PATH}")
+message(STATUS "Using Torch home: ${TORCH_HOME_PATH}")
+
+list(APPEND RELION_PYTHON_WRAPPERS
+        python_classranker
+        python_blush
+        python_dynamight
+)
+
+foreach (SCRIPT_FILE ${RELION_PYTHON_WRAPPERS})
+    configure_file(
+            ${CMAKE_SOURCE_DIR}/scripts/${SCRIPT_FILE}.in
+            ${CMAKE_BINARY_DIR}/bin/relion_${SCRIPT_FILE}
+            @ONLY
+    )
+endforeach()
+
+
+
 # ------------------OPTIONS WHICH ARE NEEDED TO SET BUILD-TYPES (COMPILATION FLAGS)--
 # ----------------------------------------------------------CUDA-ARCH--OR--HIP-ARCH--
 if(NOT (DEFINED CUDA_ARCH OR DEFINED HIP_ARCH))
@@ -445,22 +519,6 @@ endif(JPEG_FOUND)
 
 # -----------------------------------------------------------------PYTHON DEPENDENCIES--
 
-set(PYTHON_EXE_PATH "" CACHE PATH "Path to Python executable")
-set(TORCH_HOME_PATH "" CACHE PATH "Path to Torch home directory for storage of trained models.")
-
-list(APPEND RELION_PYTHON_WRAPPERS
-        python_classranker
-        python_blush
-        python_dynamight
-)
-
-foreach (SCRIPT_FILE ${RELION_PYTHON_WRAPPERS})
-    configure_file(
-            ${CMAKE_SOURCE_DIR}/scripts/${SCRIPT_FILE}.in
-            ${CMAKE_BINARY_DIR}/bin/relion_${SCRIPT_FILE}
-            @ONLY
-    )
-endforeach()
 
 # ----------------------------------------------------------------------COPY SCRIPTS--
 

@@ -1282,7 +1282,7 @@ void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
 	if (do_blush)
 	{
 		//run python wrapper command
-		std::string cmd = "relion_python_blush" + fn_star;
+		std::string cmd = "relion_python_blush " + fn_star;
 		FILE* pipe = popen(cmd.c_str(), "r");
 		if (!pipe)
 			throw std::runtime_error("Failed to dispatch command: " + cmd);
@@ -1299,7 +1299,9 @@ void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
 
 		if (result != "success") {
 			std::cerr << "Something when wrong in the external Python call..." << std::endl;
+			std::cerr << "Command: " << cmd << std::endl;
 			std::cerr << result << std::endl;
+			exit(1);
 		}
 	}
 	else
