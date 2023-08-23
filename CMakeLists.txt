@@ -75,87 +75,13 @@ set(CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-
-
-
-
-
-set(PYTHON_EXE_PATH "" CACHE PATH "Path to Python executable")
-set(TORCH_HOME_PATH "" CACHE PATH "Path to Torch home directory for storage of trained models.")
-
-
-
-
-set(RELION_CONDA_ENV_NAME "relion-5.0" CACHE PATH "The Conda environment path")
-
-find_program(CONDA_EXECUTABLE conda)
-
-message(STATUS "CONDA_EXECUTABLE: ${CONDA_EXECUTABLE}")
-
-# Run the conda command and capture its output
-execute_process(COMMAND ${CONDA_EXECUTABLE} config --show envs_dirs
-        OUTPUT_VARIABLE CONDA_ENVS_OUTPUT
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-        RESULT_VARIABLE CONDA_RESULT)
-
-# Check if the conda command was successful
-if(CONDA_RESULT EQUAL 0)
-    # Split the output into lines
-    string(REPLACE "\n" ";" CONDA_ENVS_LIST ${CONDA_ENVS_OUTPUT})
-
-    # Loop through the list of paths
-    foreach(path ${CONDA_ENVS_LIST})
-        string(STRIP "${path}" path)
-        string(REPLACE " " ";" path "${path}")
-        list(GET path -1 path)
-        set(path "${path}/${RELION_CONDA_ENV_NAME}/bin/python")
-        if(EXISTS "${path}")
-            set(PYTHON_EXE_PATH "${path}")
-            break()  # Exit the loop once a valid path is found
-        endif()
-    endforeach()
-else()
-    message(STATUS "Failed to automatically retrieve conda environment directories.")
-endif()
-
-execute_process(
-        COMMAND ${PYTHON_EXE_PATH} -c "import torch; print(torch.hub._get_torch_home())"
-        OUTPUT_VARIABLE TORCH_HUB_PATH
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-        RESULT_VARIABLE PYTHON_RESULT
-)
-message(STATUS"TORCH_HUB_PATH: ${TORCH_HUB_PATH}")
-
-
-# Display the Python executable path
-message(STATUS "Automatically found Python executable path: ${CONDA_ENV}")
-
-message(STATUS "Using Python executable: ${PYTHON_EXE_PATH}")
-message(STATUS "Using Torch home: ${TORCH_HOME_PATH}")
-
-list(APPEND RELION_PYTHON_WRAPPERS
-        python_classranker
-        python_blush
-        python_dynamight
-)
-
-foreach (SCRIPT_FILE ${RELION_PYTHON_WRAPPERS})
-    configure_file(
-            ${CMAKE_SOURCE_DIR}/scripts/${SCRIPT_FILE}.in
-            ${CMAKE_BINARY_DIR}/bin/relion_${SCRIPT_FILE}
-            @ONLY
-    )
-endforeach()
-
-
-
 # ------------------OPTIONS WHICH ARE NEEDED TO SET BUILD-TYPES (COMPILATION FLAGS)--
 # ----------------------------------------------------------CUDA-ARCH--OR--HIP-ARCH--
 if(NOT (DEFINED CUDA_ARCH OR DEFINED HIP_ARCH))
   if (CUDA)
     message(STATUS "Setting fallback CUDA_ARCH=50")
     set(CUDARCH "-arch=sm_50")
-  else (HIP)
+  elseif (HIP)
     message(STATUS "Setting fallback HIP_ARCH=gfx906")
     set(AMDGPU_TARGETS "gfx906" CACHE STRING "Semicolon delimited list of AMD GPU targets to compile for (e.g gf908;gfx90a)")
   endif()
@@ -163,7 +89,7 @@ else(NOT (DEFINED CUDA_ARCH OR DEFINED HIP_ARCH))
 if (CUDA)
   message(STATUS "Using provided CUDA_ARCH=${CUDA_ARCH}")
   set(CUDARCH "-arch=sm_${CUDA_ARCH}")
-else (HIP)
+elseif (HIP)
   message(STATUS "Using provided HIP_ARCH=${HIP_ARCH}")
   set(AMDGPU_TARGETS "${HIP_ARCH}" CACHE STRING "Semicolon delimited list of AMD GPU targets to compile for (e.g gf908;gfx90a)")
   endif()
@@ -311,7 +237,7 @@ if (CUDA)
         add_definitions(-DCUDA_FORCESTL)
         message(STATUS "Building cuda files using stl-libs for sort, min and max.")
     endif(CudaForceSTL)
-else (HIP)
+elseif (HIP)
     option(HipForceSTL "HipForceSTL" OFF)
     if(HipForceSTL)
         add_definitions(-DHIP_FORCESTL)
@@ -519,6 +445,23 @@ endif(JPEG_FOUND)
 
 # -----------------------------------------------------------------PYTHON DEPENDENCIES--
 
+
+set(CONDA_ENV_NAME "relion-5.0" CACHE STRING "The Conda environment name")
+include(${CMAKE_SOURCE_DIR}/cmake/FindCondaPython.cmake)
+
+list(APPEND RELION_PYTHON_WRAPPERS
+        python_classranker
+        python_blush
+        python_dynamight
+)
+
+foreach (SCRIPT_FILE ${RELION_PYTHON_WRAPPERS})
+    configure_file(
+            ${CMAKE_SOURCE_DIR}/scripts/${SCRIPT_FILE}.in
+            ${CMAKE_BINARY_DIR}/bin/relion_${SCRIPT_FILE}
+            @ONLY
+    )
+endforeach()
 
 # ----------------------------------------------------------------------COPY SCRIPTS--
 
