@@ -3,6 +3,9 @@
 
 
 bool AccProjector::setMdlDim(
+#ifdef _SYCL_ENABLED
+		deviceStream_t dev,
+#endif
 		int xdim, int ydim, int zdim,
 		int inity, int initz,
 		int maxr, XFLOAT paddingFactor)
@@ -179,6 +182,10 @@ bool AccProjector::setMdlDim(
 #elif _HIP_ENABLED
 	DEBUG_HANDLE_ERROR(hipMalloc( (void**) &mdlReal, mdlXYZ * sizeof(XFLOAT)));
 	DEBUG_HANDLE_ERROR(hipMalloc( (void**) &mdlImag, mdlXYZ * sizeof(XFLOAT)));
+#elif _SYCL_ENABLED
+	devAcc = dev;
+	mdlReal = (XFLOAT*)devAcc->syclMalloc(mdlXYZ * sizeof(XFLOAT), syclMallocType::device, "mdlReal");
+	mdlImag = (XFLOAT*)devAcc->syclMalloc(mdlXYZ * sizeof(XFLOAT), syclMallocType::device, "mdlImag");
 #else
 	mdlComplex = NULL;
 #endif
@@ -194,7 +201,7 @@ void AccProjector::initMdl(XFLOAT *real, XFLOAT *imag)
         printf("DEBUG_ERROR: Model dimensions must be set with setMdlDim before call to setMdlData.");
 		CRITICAL(ERR_MDLDIM);
 	}
-#if defined _CUDA_ENABLED || defined _HIP_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED || defined _SYCL_ENABLED
 	if (mdlReal == NULL)
 	{
         printf("DEBUG_ERROR: initMdl called before call to setMdlData.");
@@ -260,6 +267,10 @@ void AccProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 #elif _HIP_ENABLED
 	DEBUG_HANDLE_ERROR(hipMemcpy( mdlReal, real, mdlXYZ * sizeof(XFLOAT), hipMemcpyHostToDevice));
 	DEBUG_HANDLE_ERROR(hipMemcpy( mdlImag, imag, mdlXYZ * sizeof(XFLOAT), hipMemcpyHostToDevice));
+#elif _SYCL_ENABLED
+	devAcc->syclMemcpy(mdlReal, real, mdlXYZ * sizeof(XFLOAT));
+	devAcc->syclMemcpy(mdlImag, imag, mdlXYZ * sizeof(XFLOAT));
+	devAcc->waitAll();
 #else
 	std::complex<XFLOAT> *pData = mdlComplex;
     for(size_t i=0; i<mdlXYZ; i++) {
@@ -271,7 +282,7 @@ void AccProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 
 }
 
-#if !defined _CUDA_ENABLED && !defined _HIP_ENABLED
+#ifdef ALTCPU
 void AccProjector::initMdl(std::complex<XFLOAT> *data)
 {
 	mdlComplex = data;  // No copy needed - everyone shares the complex reference arrays
@@ -281,11 +292,21 @@ void AccProjector::initMdl(std::complex<XFLOAT> *data)
 
 void AccProjector::initMdl(Complex *data)
 {
+#ifdef _SYCL_ENABLED
+	XFLOAT *tmpReal = (XFLOAT*)devAcc->syclMalloc(mdlXYZ * sizeof(XFLOAT), syclMallocType::host);
+	XFLOAT *tmpImag = (XFLOAT*)devAcc->syclMalloc(mdlXYZ * sizeof(XFLOAT), syclMallocType::host);
+	if (nullptr == tmpReal || nullptr == tmpImag)
+	{
+		std::string str = "syclMalloc HOST error of size " + std::to_string(mdlXYZ * sizeof(XFLOAT)) + ".\n";
+		ACC_PTR_DEBUG_FATAL(str.c_str());
+		CRITICAL(RAMERR);
+	}
+#else
 	XFLOAT *tmpReal;
 	XFLOAT *tmpImag;
 	if (posix_memalign((void **)&tmpReal, MEM_ALIGN, mdlXYZ * sizeof(XFLOAT))) CRITICAL(RAMERR);
 	if (posix_memalign((void **)&tmpImag, MEM_ALIGN, mdlXYZ * sizeof(XFLOAT))) CRITICAL(RAMERR);
-
+#endif
 
 	for (size_t i = 0; i < mdlXYZ; i ++)
 	{
@@ -295,13 +316,18 @@ void AccProjector::initMdl(Complex *data)
 
 	initMdl(tmpReal, tmpImag);
 
+#ifdef _SYCL_ENABLED
+	devAcc->syclFree(tmpReal);
+	devAcc->syclFree(tmpImag);
+#else
 	free(tmpReal);
 	free(tmpImag);
+#endif
 }
 
 void AccProjector::clear()
 {
-#if defined _CUDA_ENABLED || defined _HIP_ENABLED
+#ifndef ALTCPU
 	if (mdlReal != 0)
 	{
 #ifndef PROJECTOR_NO_TEXTURES
@@ -347,6 +373,10 @@ void AccProjector::clear()
 	#elif _HIP_ENABLED
 		hipFree(mdlReal);
 		hipFree(mdlImag);
+	#elif _SYCL_ENABLED
+		devAcc->waitAll();
+		devAcc->syclFree(mdlReal);
+		devAcc->syclFree(mdlImag);
 	#endif
 #endif
 		mdlReal = 0;

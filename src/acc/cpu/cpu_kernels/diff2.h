@@ -1067,10 +1067,10 @@ inline void diff2_CC_coarse_2D(
 			}
 
 	#ifdef RELION_SINGLE_PRECISION                  
-			g_diff2[(unsigned long)iorient*(unsigned long)trans_num + itrans] = 
+			g_diff2[(unsigned long)iorient*(unsigned long)trans_num + itrans] += 
 					- ( sum_weight / sqrtf(sum_norm));
 	#else                   
-			g_diff2[(unsigned long)iorient*(unsigned long)trans_num + itrans] = 
+			g_diff2[(unsigned long)iorient*(unsigned long)trans_num + itrans] += 
 					- ( sum_weight / sqrt(sum_norm));
 	#endif
 		}
@@ -1233,10 +1233,10 @@ inline void diff2_CC_coarse_3D(
 			}
 
 	#ifdef RELION_SINGLE_PRECISION                  
-			g_diff2[(unsigned long)iorient*(unsigned long)trans_num + itrans] = 
+			g_diff2[(unsigned long)iorient*(unsigned long)trans_num + itrans] += 
 					- ( sum_weight / sqrtf(sum_norm));
 	#else                   
-			g_diff2[(unsigned long)iorient*(unsigned long)trans_num + itrans] = 
+			g_diff2[(unsigned long)iorient*(unsigned long)trans_num + itrans] += 
 					- ( sum_weight / sqrt(sum_norm));
 	#endif
 		}
@@ -1391,9 +1391,9 @@ inline void diff2_CC_fine_2D(
 
 			unsigned long int iy = d_job_idx[bid] + itrans;
 	#ifdef RELION_SINGLE_PRECISION         
-			g_diff2s[iy] = - sum1 / sqrtf(sum2);
+			g_diff2s[iy] += - sum1 / sqrtf(sum2);
 	#else
-			g_diff2s[iy] = - sum1 / sqrt(sum2);
+			g_diff2s[iy] += - sum1 / sqrt(sum2);
 	#endif
 		}
 	} // for bid
@@ -1574,9 +1574,9 @@ inline void diff2_CC_fine_3D(
 
 			unsigned long int iy = d_job_idx[bid] + itrans;
 	#ifdef RELION_SINGLE_PRECISION         
-			g_diff2s[iy] = - sum1 / sqrtf(sum2);
+			g_diff2s[iy] += - sum1 / sqrtf(sum2);
 	#else
-			g_diff2s[iy] = - sum1 / sqrt(sum2);
+			g_diff2s[iy] += - sum1 / sqrt(sum2);
 	#endif
 
 		}		

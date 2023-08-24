@@ -1,542 +1,584 @@
-cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
+include_directories("${CMAKE_SOURCE_DIR}")
 
-#if(POLICY CMP0048)
-#  cmake_policy(SET CMP0048 NEW)
-#endif()
-project(Relion)
-
-# Use new policy for OS X @rpath
-if(POLICY CMP0042)
-    cmake_policy(SET CMP0042 NEW)
-endif()
-
-# Add the path to the additional Find<module>.cmake files
-# which are included with the distributed RLEION-code
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-
-add_definitions(-DINSTALL_LIBRARY_DIR=${CMAKE_INSTALL_PREFIX}/lib/)
-add_definitions(-DSOURCE_DIR=${CMAKE_SOURCE_DIR}/src/)
-
-# message(STATUS "INSTALL_LIBRARY_DIR set to ${CMAKE_INSTALL_PREFIX}/lib/")
-# message(STATUS "SOURCE_DIR set to ${CMAKE_SOURCE_DIR}/src/")
-
-# ------------------------------------------------------------------RPATH SETTINGS--
-if(NOT APPLE)
-    # use, i.e. don't skip the full RPATH for the build tree
-    SET(CMAKE_SKIP_BUILD_RPATH  FALSE)
-
-    # when building, don't use the install RPATH already
-    # (but later on when installing)
-    SET(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
-
-    SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
-
-    # add the automatically determined parts of the RPATH
-    # which point to directories outside the build tree to the install RPATH
-    SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-
-    # the RPATH to be used when installing, but only if it's not a system directory
-    LIST(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
-    IF("${isSystemDir}" STREQUAL "-1")
-        SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
-    ENDIF("${isSystemDir}" STREQUAL "-1")
-endif(NOT APPLE)
-
-# ---------------------------------------------------------SET SPECIFIC BUILD TYPE--
-if(NOT ${CMAKE_BUILD_TYPE} STREQUAL "")
-	string( TOLOWER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_LOWER )
-
-	if( ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "none" ) AND
-	    ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "release" ) AND
-	    ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "debug" ) AND
-	    ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "relwithdebinfo" ) AND
-	    ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "profiling" )  AND
-	    ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "benchmarking" ) )
-	     message( FATAL_ERROR "CMAKE_BUILD_TYPE : '${CMAKE_BUILD_TYPE}' is not a valid build type. "
-		"Valid options are: 'None', 'Release', 'Debug', 'RelWithDebInfo', and 'Profiling'." )
-	endif()
-
-	message(STATUS "BUILD TYPE set to '${CMAKE_BUILD_TYPE}'")
-	SET(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE} CACHE STRING "Choose the type of
-build, options are: 'None', 'Release', 'Debug', 'RelWithDebInfo', and 'Profiling'.")
-
-	if (${CMAKE_BUILD_TYPE_LOWER} STREQUAL "debug")
-		set(MDT_TYPE_CHECK ON)
-	endif()
-
-else()
-	SET(CMAKE_BUILD_TYPE "Release")
-	message(STATUS "BUILD TYPE set to the default type:  '${CMAKE_BUILD_TYPE}'")
-	string( TOLOWER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_LOWER )
-endif()
-
-# ----------------------------------------------------------------SET CXX STANDARD--
-set(CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-# ------------------OPTIONS WHICH ARE NEEDED TO SET BUILD-TYPES (COMPILATION FLAGS)--
-# ----------------------------------------------------------CUDA-ARCH--OR--HIP-ARCH--
-if(NOT (DEFINED CUDA_ARCH OR DEFINED HIP_ARCH))
-  if (CUDA)
-    message(STATUS "Setting fallback CUDA_ARCH=50")
-    set(CUDARCH "-arch=sm_50")
-  else (HIP)
-    message(STATUS "Setting fallback HIP_ARCH=gfx906")
-    set(AMDGPU_TARGETS "gfx906" CACHE STRING "Semicolon delimited list of AMD GPU targets to compile for (e.g gf908;gfx90a)")
-  endif()
-else(NOT (DEFINED CUDA_ARCH OR DEFINED HIP_ARCH))
-if (CUDA)
-  message(STATUS "Using provided CUDA_ARCH=${CUDA_ARCH}")
-  set(CUDARCH "-arch=sm_${CUDA_ARCH}")
-else (HIP)
-  message(STATUS "Using provided HIP_ARCH=${HIP_ARCH}")
-  set(AMDGPU_TARGETS "${HIP_ARCH}" CACHE STRING "Semicolon delimited list of AMD GPU targets to compile for (e.g gf908;gfx90a)")
-  endif()
-endif(NOT (DEFINED CUDA_ARCH OR DEFINED HIP_ARCH))
-
-# -------------------------------------------------------------------FURTHER OPTIONS--
-
-
-# CUDA on by default, so check for other GPU/CPU-accelration request and possible conflicting dual-requests
-option(HIP "Enable HIP GPU acceleration" OFF)
-option(ALTCPU "Enable Accelerated CPU version" OFF)
-if(HIP)
-  option(CUDA "Enable CUDA GPU acceleration" OFF)
-  if(HIP AND CUDA)
-    message(FATAL_ERROR "You cannot build with both CUDA=ON and HIP=ON.  Please choose one and rerun CMAKE")
-  endif()
-elseif(ALTCPU)
-	option(CUDA "Enable CUDA GPU acceleration" OFF)
-	if(ALTCPU AND CUDA)
-   		message(FATAL_ERROR "You cannot build with both CUDA=ON and ALTCPU=ON.  Please choose one and rerun CMAKE")
-	endif()
-else()
-	option(CUDA "Enable CUDA GPU acceleration" ON)
-endif()
-
-option(DoublePrec_CPU "DoublePrec_CPU" ON)
-option(DoublePrec_ACC "Accelerated Code use double-precision" OFF)
-option(MKLFFT "Use MKL rather than FFTW for FFT" OFF)
-option(DeviceTexture "Texture Memory on the Device" ON)
-
-if(ALTCPU)
-    message(STATUS "ALTCPU enabled - Building CPU-accelerated version of RELION")
-elseif(HIP)
-    message(STATUS "HIP enabled - Building HIP-accelerated version of RELION")
-elseif(CUDA)
-    message(STATUS "CUDA enabled - Building CUDA-accelerated version of RELION")
-else()
-    message(STATUS "Acceleration not enabled - Building CPU-only version of RELION")
-endif()
-
-if(CUDA OR ALTCPU)
-    add_definitions(-DACC_HIP=3 -DACC_CUDA=2 -DACC_CPU=1)
-endif()
-
-# -----------------------------------------------DOUBLE PRECISION (GPU-CODE) OR NOT--
-if(DoublePrec_CPU)
-    message(STATUS "Setting cpu precision to double")
-else(DoublePrec_CPU)
-    message(STATUS "Setting cpu precision to single")
-    add_definitions(-DRELION_SINGLE_PRECISION)
-endif(DoublePrec_CPU)
-
-if(DoublePrec_ACC)
-    message(STATUS "Setting accelerated code precision to double")
-    add_definitions(-DACC_DOUBLE_PRECISION)
-	  set(DeviceTexture FALSE)
-else(DoublePrec_ACC)
-    message(STATUS "Setting accelerated code precision to single")
-endif(DoublePrec_ACC)
-
-if(MDT_TYPE_CHECK)
-    message("-- MetaDataTable type check is enabled.")
-    add_definitions(-DMETADATA_TABLE_TYPE_CHECK)
-endif()
-
-if(CUDA)
-    # -----------------------------------------------------------------------------CUDA--
-    # DOC: http://www.cmake.org/cmake/help/v3.0/module/FindCUDA.html
-    FIND_PACKAGE(CUDA)
-
-    if(CUDA_FOUND)
-      message(STATUS "Using cuda wrapper to compile....")
-      if( (NOT ${CUDA_VERSION} VERSION_LESS "7.5") AND (NOT DoublePrec_ACC) )
-          message(STATUS "Cuda version is >= 7.5 and single-precision build, enable double usage warning.")
-		      set(WARN_DBL "--ptxas-options=-warn-double-usage") # cuda>=7.5
-	    else( ${CUDA_VERSION} VERSION_LESS "7.0")
-		      message(WARNING "Cuda version is less than 7.0, so relion will be compiled without GPU support.")
-          message(STATUS "Using non-cuda compilation....")
-		      set(CUDA OFF)
-      endif()
-      if(CUDA)
-          add_definitions(-D_CUDA_ENABLED)
-      endif()
-    else(CUDA_FOUND)
-        message(FATAL_ERROR "CUDA enabled but unlable to locate packages...")
-    endif(CUDA_FOUND)
-elseif(HIP)
-    # ------------------------------------------------------------------------------HIP--
-    if (DEFINED ENV{ROCM_PATH})
-        include($ENV{ROCM_PATH}/hip/cmake/FindHIP.cmake)
-    elseif(DEFINED ENV{HIP_PATH})
-        include($ENV{HIP_PATH}/cmake/FindHIP.cmake)
-    elseif(EXISTS "${CMAKE_SOURCE_DIR}/cmake/FindHIP.cmake")
-        include(${CMAKE_SOURCE_DIR}/cmake/FindHIP.cmake)
-    else()
-        include(/opt/rocm/hip/cmake/FindHIP.cmake)
-    endif()
-
-    find_package(HIP REQUIRED)
-
-    if(HIP_FOUND)
-      message(STATUS "Using hip wrapper to compile....")
-      if( ${HIP_VERSION} VERSION_LESS "5.0")
-		      message(WARNING "ROCm version is less than 5.0, so relion will be compiled without GPU support.")
-          set(HIP OFF)
-      endif()
-      if(HIP)
-          add_definitions(-D_HIP_ENABLED)
-          foreach(hiplib hipfft hipcub rocfft rocprim hiprand rocrand)
-            find_package(${hiplib} REQUIRED)
-            if(${hiplib}_FOUND)
-                message(STATUS "Found ${${hiplib}_LIBRARIES} in ${${hiplib}_INCLUDE_DIR}")
-            endif()
-          endforeach()
-      endif()
-    else(HIP_FOUND)
-        message(FATAL_ERROR "HIP enabled but unlable to locate packages. ROCm >= 5.0 is required to configure RELION with HIP using CMake.")
-    endif(HIP_FOUND)
-endif()
-
-# ----------------------------------------------------------INCLUDE ALL BUILD TYPES--
- #This *has* to be AFTER project()
- include(${CMAKE_SOURCE_DIR}/cmake/BuildTypes.cmake)
- 
-# ------------------------------------------------------------------ALLOCATOR CHOICE--
-option(CachedAlloc "CachedAlloc" ON)
-if(NOT CachedAlloc)
-    if (CUDA)
-        add_definitions(-DCUDA_NO_CUSTOM_ALLOCATION)
-    endif()
-    if (HIP)
-        add_definitions(-DHIP_NO_CUSTOM_ALLOCATION)
-    endif()
-	message(STATUS "Cached allocation is disabled.")
-endif(NOT CachedAlloc)
-option(CustomAllocMemGuards "CustomAllocMemGuards" OFF)
-if(CustomAllocMemGuards)
-    add_definitions(-DCUSTOM_ALLOCATOR_MEMGUARD)
-    message(STATUS "Abort on out of bound write.")
-endif(CustomAllocMemGuards)
-# -------------------------------------------------------------FORCE USE OF STL-LIBS--
-if (CUDA)
-    option(CudaForceSTL "CudaForceSTL" OFF)
-    if(CudaForceSTL)
-        add_definitions(-DCUDA_FORCESTL)
-        message(STATUS "Building cuda files using stl-libs for sort, min and max.")
-    endif(CudaForceSTL)
-else (HIP)
-    option(HipForceSTL "HipForceSTL" OFF)
-    if(HipForceSTL)
-        add_definitions(-DHIP_FORCESTL)
-        message(STATUS "Building hip files using stl-libs for sort, min and max.")
-    endif(HipForceSTL)
-endif()
-# ------------------------------------------------------------------------GUI OR NOT--
-# Skip FLTK/X11-dependent binaries or not
-option(GUI "GUI" ON)
-if(NOT GUI)
-    message(STATUS "Omitting GUI targets as per your request")
-endif()
-
-# ---------------------------------------------------------------------------TBB --
-
-option(FORCE_OWN_TBB "FORCE_OWN_TBB" OFF)
-
-if (ALTCPU)
-
-	if (FORCE_OWN_TBB)
-		message(STATUS "Will ignore any potentially installed system TBB lib, as per your request.")
-		include(${CMAKE_SOURCE_DIR}/cmake/BuildTBB.cmake)
-		set(INSTALL_OWN_TBB 1)
-	else(FORCE_OWN_TBB)
-		find_package(TBB)
-		if(TBB_FOUND)
-			include_directories("${TBB_INCLUDE_DIRS}")
-			message(STATUS "TBB_FOUND :        ${TBB_FOUND}")
-			message(STATUS "TBB_INCLUDE_DIRS : ${TBB_INCLUDE_DIRS}")
-			message(STATUS "TBB_VERSION :      ${TBB_VERSION}")
-			message(STATUS "TBB_LIBRARIES :    ${TBB_LIBRARIES}")
-		else(TBB_FOUND)
-			include(${CMAKE_SOURCE_DIR}/cmake/BuildTBB.cmake)
-			set(INSTALL_OWN_TBB 1)
-		endif(TBB_FOUND)
-	endif(FORCE_OWN_TBB)
-endif(ALTCPU)
-
-# -------------------------------------------------------------------------------MPI--
-find_package(MPI REQUIRED)
-
-if ("${MPI_CXX_INCLUDE_DIRS}" STREQUAL "")
-	if (NOT "${MPI_CXX_INCLUDE_PATH}" STREQUAL "")
-		include_directories("${MPI_CXX_INCLUDE_PATH}")
-	endif()
-else()
-	include_directories("${MPI_CXX_INCLUDE_DIRS}")
-endif()
-
-message(STATUS "MPI_INCLUDE_PATH : ${MPI_INCLUDE_PATH}")
-message(STATUS "MPI_LIBRARIES : ${MPI_LIBRARIES}")
-message(STATUS "MPI_CXX_INCLUDE_PATH : ${MPI_CXX_INCLUDE_PATH}")
-message(STATUS "MPI_CXX_LIBRARIES : ${MPI_CXX_LIBRARIES}")
-
-message(STATUS "CMAKE_C_COMPILER : ${CMAKE_C_COMPILER}")
-message(STATUS "CMAKE_CXX_COMPILER : ${CMAKE_CXX_COMPILER}")
-message(STATUS "MPI_C_COMPILER : ${MPI_C_COMPILER}")
-message(STATUS "MPI_CXX_COMPILER : ${MPI_CXX_COMPILER}")
-
-SET(CMAKE_C_COMPILER ${MPI_C_COMPILER})
-SET(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
-if(HIP)
-    set(CMAKE_CXX_COMPILER hipcc)
-    message(STATUS "CMAKE_CXX_COMPILER : ${CMAKE_CXX_COMPILER}")
-endif()
-
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-
-# ----------------------------------------------------------Intel Compiler support --
-# ----------------------------------  and build flags including MKL and TBB ---------
-
-message(STATUS "CMAKE_CXX_COMPILER_ID : ${CMAKE_CXX_COMPILER_ID}")
-
-if(MKLFFT)
-    if (NOT "$ENV{MKLROOT}" STREQUAL "")
-        include_directories("$ENV{MKLROOT}/include/fftw")
-        message(STATUS "MKL FFTW wrapper header files: $ENV{MKLROOT}/include/fftw")
-    else()
-        message("COMPILATION MAY FAIL since no MKL FFTW wrapper header files could be found. Please make sure the MKLROOT environmental variable is set.")
-    endif()
-    add_definitions(-DMKLFFT)
-endif(MKLFFT)
-
-if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Intel" OR "${CMAKE_CXX_COMPILER}" MATCHES "icpx")
-# "Intel" is for classic Intel compiler and "IntelLLVM" is for oneAPI compiler which is supported from CMake 3.20
-    if(MKLFFT)
-        if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
-            SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -qopenmp -mkl=parallel -limf ")
-        else()	# Intel oneAPI compiler
-            SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fiopenmp -qmkl=parallel -limf ")
-        endif()
-    endif(MKLFFT)
-    if(ALTCPU)
-        add_definitions(-DFAST_CENTERFFT)
-    endif()
-else()
-    if(MKLFFT)
-        # For the time being, let's use the sequential version (as with FFTW)
-        link_directories("$ENV{MKLROOT}/lib/intel64")
-        SET(FFTW_LIBRARIES mkl_intel_lp64 mkl_sequential mkl_core)
-    endif(MKLFFT)
-endif()
-
-if(ALTCPU)
-    add_definitions(-DALTCPU)
-endif()
-
-# ----------------------------------------------------------------- MPI COLLECTIVE --
-if(ALTCPU)
-    add_definitions(-DUSE_MPI_COLLECTIVE)	# Adding MPI collective for some routines
-endif()
-
-# ---------------------------------------------------------------USE TEXTURES OR NOT--
-if(NOT DeviceTexture OR ALTCPU)
-    add_definitions(-DPROJECTOR_NO_TEXTURES)
-    message(STATUS "Texture interpolation is omitted.")
-endif(NOT DeviceTexture OR ALTCPU)
-
-# --------------------------------------------------------------------------X11/FLTK--
-option(FORCE_OWN_FLTK "FORCE_OWN_FLTK" OFF)
-FIND_PACKAGE(X11)
-if(GUI)
-    if(X11_FOUND)
-        set(FLTK_SKIP_FLUID TRUE) #FLUID is not required for relion
-        set(FLTK_SKIP_OPENGL TRUE) #OpenGL is not required for relion
-        if(NOT FORCE_OWN_FLTK)
-            FIND_PACKAGE(FLTK)
-		    if(FLTK_FOUND)
-				message(STATUS "X11 and FLTK were found")
-				message(STATUS "FLTK_LIBRARIES: ${FLTK_LIBRARIES}")
-		    else()
-				message(STATUS "No FLTK installation was found")
-		    endif()
-        endif(NOT FORCE_OWN_FLTK)
-
-	if(NOT FLTK_FOUND)
-		include(${CMAKE_SOURCE_DIR}/cmake/BuildFLTK.cmake)
-		set(INSTALL_OWN_FLTK 1)
-	endif(NOT FLTK_FOUND)
-
-    else(X11_FOUND)
-        message( STATUS "\n-- ------------------ YOU HAVE NO X11-LIBS ------------------")
-        message( STATUS "CCmake found no X11-libs on your system, which are required for the GUI.")
-        message( STATUS " You CAN add the flag -DGUI=OFF to avoid using X11" )
-        message(FATAL_ERROR "X11 is required for GUI.")
-    endif(X11_FOUND)
-
-endif(GUI)
-
-# -------------------------------------------------------------------------------FFT--
+message("Running apps/CMakeLists.txt...")
 
 if(NOT MKLFFT)
-	option(FORCE_OWN_FFTW "FORCE_OWN_FFTW" OFF)
-	option(AMDFFTW "Use AMD optimized version of FFTW. This needs a new version of GCC (>= 8.3 recommended)." OFF)
-
-	set(FFTW_DOUBLE_REQUIRED TRUE)
-	set(FFTW_SINGLE_REQUIRED TRUE)
-
-	if(AMDFFTW)
-		set(FORCE_OWN_FFTW ON)
-	endif()
-
-	if(NOT FORCE_OWN_FFTW)
-		FIND_PACKAGE(FFTW COMPONENTS SINGLE DOUBLE)
-	endif(NOT FORCE_OWN_FFTW)
-
-	if(NOT FFTW_FOUND)
-		include(${CMAKE_SOURCE_DIR}/cmake/BuildFFTW.cmake)
-	endif(NOT FFTW_FOUND)
+	include_directories("${FFTW_INCLUDES}")
 endif(NOT MKLFFT)
+#include_directories(${CMAKE_BINARY_DIR}/include)
 
-# ---------------------------------------------------------------------------SIN/COS--
+find_path (X11_INCLUDES Xdbe.h)
 
-include(CheckCXXSymbolExists)
-check_cxx_symbol_exists(sincos    math.h   HAVE_SINCOS)
-check_cxx_symbol_exists(__sincos  math.h   HAVE___SINCOS)
+message(STATUS "CMAKE_BINARY_DIR:" ${CMAKE_BINARY_DIR})
 
-if(HAVE_SINCOS)
-    add_definitions(-DHAVE_SINCOS)
+file(GLOB REL_GUI_SRC "${CMAKE_SOURCE_DIR}/src/manualpicker.cpp" "${CMAKE_SOURCE_DIR}/src/gui_*.cpp" "${CMAKE_SOURCE_DIR}/src/displayer.cpp")
+
+# AUTOMATIC VERSIONING
+# Reference: https://stackoverflow.com/questions/1435953/how-can-i-pass-git-sha1-to-compiler-as-definition-using-cmake
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
+include(GetGitRevisionDescription)
+get_git_head_revision(GIT_REFSPEC GIT_SHA1_FULL)
+set(RELION_VERSION_SUFFIX "")
+if (GIT_SHA1_FULL)
+   string(SUBSTRING ${GIT_SHA1_FULL} 0 6 GIT_SHA1_PREFIX)
+   if (NOT GIT_SHA1_PREFIX STREQUAL "GITDIR")
+      message(STATUS "Git commit ID: ${GIT_SHA1_FULL}")
+      set(RELION_VERSION_SUFFIX "-commit-${GIT_SHA1_PREFIX}")
+   endif()
 endif()
-if(HAVE___SINCOS)
-    add_definitions(-DHAVE___SINCOS)
-endif()
+configure_file("${CMAKE_SOURCE_DIR}/src/macros.cpp.in" "${CMAKE_BINARY_DIR}/macros.cpp" @ONLY)
 
-# ------------------------------------------------------------------------------TIFF--
+if (ALTCPU)
+	file(GLOB REL_SRC "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_BINARY_DIR}/macros.cpp" "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/acc/cpu/*.cpp" "${CMAKE_SOURCE_DIR}/src/acc/cpu/cpu_kernels/*.cpp" )
+	file(GLOB REL_SRC_H "${CMAKE_SOURCE_DIR}/src/*.h" "${CMAKE_SOURCE_DIR}/src/acc/*.h" "${CMAKE_SOURCE_DIR}/src/acc/cpu/*.h" "${CMAKE_SOURCE_DIR}/src/acc/cpu/cpu_kernels/*.h" )
+else()
+	file(GLOB REL_SRC "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_BINARY_DIR}/macros.cpp" "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/acc/*.cpp" )
+	file(GLOB REL_SRC_H "${CMAKE_SOURCE_DIR}/src/*.h" "${CMAKE_SOURCE_DIR}/src/acc/*.h" )
+endif(ALTCPU)
 
-find_package(TIFF REQUIRED)
-if(TIFF_FOUND)
-	add_definitions(-DHAVE_TIFF)
-endif()
-
-# ------------------------------------------------------------------ZLIB, PNG & JPEG--
-find_package(ZLIB)
-find_package(PNG)
-if(PNG_FOUND)
-	add_definitions(-DHAVE_PNG)
-endif(PNG_FOUND)
-
-find_package(JPEG)
-if(JPEG_FOUND)
-	add_definitions(-DHAVE_JPEG)
-endif(JPEG_FOUND)
-
-# ----------------------------------------------------------------------COPY SCRIPTS--
-
-if(FORCE_OWN_FFTW)
-    install(DIRECTORY external/fftw/lib/ DESTINATION lib FILES_MATCHING PATTERN "*")
-endif()
-
-list(APPEND RELION_SCRIPT_FILES
-        star_printtable
-        star_plottable
-        star_loopheader
-        star_datablock_stack
-        star_datablock_singlefiles
-        star_datablock_ctfdat
-        qsub.csh
-        it.py
-        schemegui.py
-)
-
-add_custom_target(copy_scripts ALL)
-
-foreach (SCRIPT_FILE ${RELION_SCRIPT_FILES})
-    add_custom_command(TARGET copy_scripts POST_BUILD
-                     COMMAND ${CMAKE_COMMAND} -E
-                     copy ${CMAKE_SOURCE_DIR}/scripts/${SCRIPT_FILE}
-                     ${CMAKE_BINARY_DIR}/bin/relion_${SCRIPT_FILE} )
+# Remove GUI files from relion_lib
+foreach(GUI_SRC_FILE ${REL_GUI_SRC})
+	list(REMOVE_ITEM REL_SRC "${GUI_SRC_FILE}")
 endforeach()
 
-install( DIRECTORY ${CMAKE_BINARY_DIR}/bin
-	 DESTINATION ${CMAKE_INSTALL_PREFIX}
-         USE_SOURCE_PERMISSIONS
-         FILES_MATCHING PATTERN "*")
+file(GLOB REL_JAZ_MATH_SRC "${CMAKE_SOURCE_DIR}/src/jaz/math/*.cpp")
+file(GLOB REL_JAZ_MATH_H "${CMAKE_SOURCE_DIR}/src/jaz/math/*.h")
+file(GLOB REL_JAZ_IMG_PROC_SRC "${CMAKE_SOURCE_DIR}/src/jaz/image/*.cpp")
+file(GLOB REL_JAZ_IMG_PROC_H "${CMAKE_SOURCE_DIR}/src/jaz/image/*.h")
+file(GLOB REL_JAZ_MESH_PROC_SRC "${CMAKE_SOURCE_DIR}/src/jaz/mesh/*.cpp")
+file(GLOB REL_JAZ_MESH_PROC_H "${CMAKE_SOURCE_DIR}/src/jaz/mesh/*.h")
+file(GLOB REL_JAZ_UTIL_SRC "${CMAKE_SOURCE_DIR}/src/jaz/util/*.cpp")
+file(GLOB REL_JAZ_UTIL_H "${CMAKE_SOURCE_DIR}/src/jaz/util/*.h")
+file(GLOB REL_JAZ_TOMO_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomography/*.cpp")
+file(GLOB REL_JAZ_TOMO_H "${CMAKE_SOURCE_DIR}/src/jaz/tomography/*.h")
+file(GLOB REL_JAZ_TOMO_PROJ_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomography/projection/*.cpp")
+file(GLOB REL_JAZ_TOMO_PROJ_H "${CMAKE_SOURCE_DIR}/src/jaz/tomography/projection/*.h")
+file(GLOB REL_JAZ_TOMO_LATTICE_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomography/lattice/*.cpp")
+file(GLOB REL_JAZ_TOMO_LATTICE_H "${CMAKE_SOURCE_DIR}/src/jaz/tomography/lattice/*.h")
+file(GLOB REL_JAZ_TOMO_MEMBRANE_SRC "${CMAKE_SOURCE_DIR}/src/jaz/membrane/*.cpp")
+file(GLOB REL_JAZ_TOMO_MEMBRANE_H "${CMAKE_SOURCE_DIR}/src/jaz/membrane/*.h")
+file(GLOB REL_JAZ_TOMO_FILAMENT_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomography/filament/*.cpp")
+file(GLOB REL_JAZ_TOMO_FILAMENT_H "${CMAKE_SOURCE_DIR}/src/jaz/tomography/filament/*.h")
+file(GLOB REL_JAZ_TOMO_MOTION_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomography/motion/*.cpp")
+file(GLOB REL_JAZ_TOMO_MOTION_H "${CMAKE_SOURCE_DIR}/src/jaz/tomography/motion/*.h")
+file(GLOB REL_JAZ_TOMO_MOTION_MODULAR_ALIGNMENT_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomography/motion/modular_alignment/*.cpp")
+file(GLOB REL_JAZ_TOMO_MOTION_MODULAR_ALIGNMENT_H "${CMAKE_SOURCE_DIR}/src/jaz/tomography/motion/modular_alignment/*.h")
+file(GLOB REL_JAZ_TOMO_MANIFOLD_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomography/manifold/*.cpp")
+file(GLOB REL_JAZ_TOMO_MANIFOLD_H "${CMAKE_SOURCE_DIR}/src/jaz/tomography/manifold/*.h")
+file(GLOB REL_JAZ_OPTIM_SRC "${CMAKE_SOURCE_DIR}/src/jaz/optimization/*.cpp")
+file(GLOB REL_JAZ_OPTIM_H "${CMAKE_SOURCE_DIR}/src/jaz/optimization/*.h")
+file(GLOB REL_JAZ_OPTICS_SRC "${CMAKE_SOURCE_DIR}/src/jaz/optics/*.cpp")
+file(GLOB REL_JAZ_OPTICS_H "${CMAKE_SOURCE_DIR}/src/jaz/optics/*.h")
+file(GLOB REL_JAZ_OPTICS_DUAL_CONTRAST_SRC "${CMAKE_SOURCE_DIR}/src/jaz/optics/dual_contrast/*.cpp")
+file(GLOB REL_JAZ_OPTICS_DUAL_CONTRAST_H "${CMAKE_SOURCE_DIR}/src/jaz/optics/dual_contrast/*.h")
+file(GLOB REL_JAZ_SEGMENTATION_SRC "${CMAKE_SOURCE_DIR}/src/jaz/segmentation/*.cpp")
+file(GLOB REL_JAZ_SEGMENTATION_H "${CMAKE_SOURCE_DIR}/src/jaz/segmentation/*.h")
+file(GLOB REL_JAZ_ATOMIC_SRC "${CMAKE_SOURCE_DIR}/src/jaz/atomic/*.cpp")
+file(GLOB REL_JAZ_ATOMIC_H "${CMAKE_SOURCE_DIR}/src/jaz/atomic/*.h")
+file(GLOB REL_JAZ_PROGRAMS_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomography/programs/*.cpp")
+file(GLOB REL_JAZ_PROGRAMS_H "${CMAKE_SOURCE_DIR}/src/jaz/tomography/programs/*.h")
+file(GLOB REL_JAZ_DYNAMO_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomography/dynamo/*.cpp")
+file(GLOB REL_JAZ_DYNAMO_H "${CMAKE_SOURCE_DIR}/src/jaz/tomography/dynamo/*.h")
 
-# install fltk if we built our own version
-if(INSTALL_OWN_FLTK)
-    install(DIRECTORY external/fltk/lib/ DESTINATION lib FILES_MATCHING PATTERN "*")
-endif()
+file(GLOB REL_JAZ_SPA_SRC "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/*.cpp")
+file(GLOB REL_JAZ_SPA_H "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/*.h")
+file(GLOB REL_JAZ_SPA_OPT_SRC "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/optimization/*.cpp")
+file(GLOB REL_JAZ_SPA_OPT_H "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/optimization/*.h")
+file(GLOB REL_JAZ_SPA_CTF_SRC "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/ctf/*.cpp")
+file(GLOB REL_JAZ_SPA_CTF_H "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/ctf/*.h")
+file(GLOB REL_JAZ_SPA_MOTION_SRC "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/motion/*.cpp")
+file(GLOB REL_JAZ_SPA_MOTION_H "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/motion/*.h")
+file(GLOB REL_JAZ_SPA_MATH_SRC "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/math/*.cpp")
+file(GLOB REL_JAZ_SPA_MATH_H "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/math/*.h")
+file(GLOB REL_JAZ_SPA_IMG_PROC_SRC "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/img_proc/*.cpp")
+file(GLOB REL_JAZ_SPA_IMG_PROC_H "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/img_proc/*.h")
+file(GLOB REL_JAZ_SPA_TOMO_SRC "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/tomo/*.cpp")
+file(GLOB REL_JAZ_SPA_TOMO_H "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/tomo/*.h")
+file(GLOB REL_JAZ_SPA_IO_SRC "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/io/*.cpp")
+file(GLOB REL_JAZ_SPA_IO_H "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/io/*.h")
+file(GLOB REL_JAZ_SPA_PROGRAMS_SRC "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/programs/*.cpp")
+file(GLOB REL_JAZ_SPA_PROGRAMS_H "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/programs/*.h")
 
-# -----------------------------------------------------------------PYTHON DEPENDENCIES--
+file(GLOB REL_SPHERICAL_HARMONICS_SRC "${CMAKE_SOURCE_DIR}/src/spherical-harmonics/*.cc")
+file(GLOB REL_SPHERICAL_HARMONICS_H "${CMAKE_SOURCE_DIR}/src/spherical-harmonics/*.h")
+file(GLOB REL_D3x3_SRC "${CMAKE_SOURCE_DIR}/src/jaz/d3x3/*.c")
+file(GLOB REL_D3x3_H "${CMAKE_SOURCE_DIR}/src/jaz/d3x3/*.h")
+file(GLOB REL_LBFGS_SRC "${CMAKE_SOURCE_DIR}/src/lbfgs/*.c")
+file(GLOB REL_LBFGS_H "${CMAKE_SOURCE_DIR}/src/lbfgs/*.h")
 
-set(PYTHON_EXE_PATH "" CACHE PATH "Path to Python executable")
-if(NOT "${PYTHON_EXE_PATH}" STREQUAL "")
-    add_compile_definitions(PYTHON_EXE_PATH=${PYTHON_EXE_PATH})
-endif()
+file(GLOB REL_HP "${CMAKE_SOURCE_DIR}/src/Healpix_2.15a/*.cc")
+file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/*.cpp")
+file(GLOB RELION_JAZ_SPA_TARGETS "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/apps/*.cpp")
+file(GLOB RELION_JAZ_TOMO_TARGETS "${CMAKE_SOURCE_DIR}/src/jaz/tomography/apps/*.cpp")
 
-set(TORCH_HOME_PATH "" CACHE PATH "Path to Torch home directory for storage of trained models.")
+file(GLOB RELION_MPI_TARGETS RELATIVE "${CMAKE_SOURCE_DIR}/src/apps" "${CMAKE_SOURCE_DIR}/src/apps/*_mpi.cpp")
+list(APPEND RELION_MPI_TARGETS "postprocess.cpp;flex_analyse.cpp;autopick.cpp")
 
-if(NOT "${TORCH_HOME_PATH}" STREQUAL "")
-    add_compile_definitions(TORCH_HOME_PATH=${TORCH_HOME_PATH})
-endif()
+if(RELION_TEST)
+	file(GLOB RELION_JAZ_EXPERIMENTAL_TARGETS "${CMAKE_SOURCE_DIR}/src/jaz/scripts/*.cpp")
+endif(RELION_TEST)
 
-# -----------------------------------------------------------------RELION COMPONENTS--
-option(BUILD_SHARED_LIBS "BUILD_SHARED_LIBS" OFF)
-message("BUILD_SHARED_LIBS = ${BUILD_SHARED_LIBS}")
+set(GUI_TARGETS maingui display manualpick)
+
+#--Remove apps using X11 if no GUI--
+if(NOT GUI)
+	foreach(TARGET ${GUI_TARGETS})
+		list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/${TARGET}.cpp")
+	endforeach()
+endif(NOT GUI)
+
+#--Remove apps for testing--
+
+set(TEST_TARGETS movie_reconstruct double_reconstruct_openmp cs_fit ctf_nyquist_test free_aberration_plot split_stack defocus_stats double_bfac_fit interpolation_test motion_diff paper_data_synth Zernike_test vis_delocalisation vis_Ewald_weight mpi_tester)
+if(NOT RELION_TEST)
+	foreach(TARGET ${TEST_TARGETS})
+		list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/${TARGET}.cpp")
+	endforeach()
+endif(NOT RELION_TEST)
+
+# relion_lib is STATIC or SHARED type based on BUILD_SHARED_LIBS=ON/OFF
+# relion_lib only contains non-X11 parts
+# relion_gui_lib is where the X11 code is placed
 if(BUILD_SHARED_LIBS)
-    message(STATUS "Building shared libs (smaller build size and binaries)")
+	add_library(relion_lib SHARED
+		${REL_SRC} ${REL_SRC_H} ${REL_HP}
+		${REL_JAZ_MATH_SRC} ${REL_JAZ_MATH_H}
+		${REL_JAZ_IMG_PROC_SRC} ${REL_JAZ_IMG_PROC_H}
+		${REL_JAZ_MESH_PROC_SRC} ${REL_JAZ_MESH_PROC_H}
+		${REL_JAZ_UTIL_SRC} ${REL_JAZ_UTIL_H}
+		${REL_JAZ_TOMO_SRC} ${REL_JAZ_TOMO_H}
+		${REL_JAZ_TOMO_PROJ_SRC} ${REL_JAZ_TOMO_PROJ_H}
+		${REL_JAZ_TOMO_MEMBRANE_SRC} ${REL_JAZ_TOMO_MEMBRANE_H}
+		${REL_JAZ_TOMO_FILAMENT_SRC} ${REL_JAZ_TOMO_FILAMENT_H}
+		${REL_JAZ_TOMO_MOTION_SRC} ${REL_JAZ_TOMO_MOTION_H}
+		${REL_JAZ_TOMO_MOTION_MODULAR_ALIGNMENT_SRC} ${REL_JAZ_TOMO_MOTION_MODULAR_ALIGNMENT_H}
+		${REL_JAZ_TOMO_MANIFOLD_SRC} ${REL_JAZ_TOMO_MANIFOLD_H}
+		${REL_JAZ_TOMO_LATTICE_SRC} ${REL_JAZ_TOMO_LATTICE_H}
+		${REL_JAZ_OPTIM_SRC} ${REL_JAZ_OPTIM_H}
+		${REL_JAZ_OPTICS_SRC} ${REL_JAZ_OPTICS_H}
+		${REL_JAZ_OPTICS_DUAL_CONTRAST_SRC} ${REL_JAZ_OPTICS_DUAL_CONTRAST_H}
+		${REL_JAZ_SEGMENTATION_SRC} ${REL_JAZ_SEGMENTATION_H}
+		${REL_JAZ_ATOMIC_SRC} ${REL_JAZ_ATOMIC_H}
+		${REL_JAZ_PROGRAMS_SRC} ${REL_JAZ_PROGRAMS_H}
+		${REL_JAZ_DYNAMO_SRC} ${REL_JAZ_DYNAMO_H}
+		${REL_JAZ_SPA_SRC} ${REL_JAZ_SPA_H}
+		${REL_JAZ_SPA_OPT_SRC} ${REL_JAZ_SPA_OPT_H}
+		${REL_JAZ_SPA_CTF_SRC} ${REL_JAZ_SPA_CTF_H}
+		${REL_JAZ_SPA_MOTION_SRC} ${REL_JAZ_SPA_MOTION_H}
+		${REL_JAZ_SPA_MATH_SRC} ${REL_JAZ_SPA_MATH_H}
+		${REL_JAZ_SPA_IMG_PROC_SRC} ${REL_JAZ_SPA_IMG_PROC_H}
+		${REL_JAZ_SPA_TOMO_SRC} ${REL_JAZ_SPA_TOMO_H}
+		${REL_JAZ_SPA_IO_SRC} ${REL_JAZ_SPA_IO_H}
+		${REL_JAZ_SPA_PROGRAMS_SRC} ${REL_JAZ_SPA_PROGRAMS_H}
+		${REL_D3x3_SRC} ${REL_D3x3_H}
+		${REL_LBFGS_SRC} ${REL_LBFGS_H}
+		${REL_SPHERICAL_HARMONICS_SRC} ${REL_SPHERICAL_HARMONICS_H})
+
+	install(TARGETS relion_lib LIBRARY DESTINATION lib)
+	if(GUI)
+		add_library(relion_gui_lib SHARED ${REL_GUI_SRC} ${REL_SRC_H} ${REL_HP})
+		install(TARGETS relion_gui_lib LIBRARY DESTINATION lib)
+	endif(GUI)
 else()
-    message(STATUS "Building static libs (larger build size and binaries)")
+	add_library(relion_lib STATIC
+		${REL_SRC} ${REL_SRC_H} ${REL_HP}
+		${REL_JAZ_MATH_SRC} ${REL_JAZ_MATH_H}
+		${REL_JAZ_IMG_PROC_SRC} ${REL_JAZ_IMG_PROC_H}
+		${REL_JAZ_MESH_PROC_SRC} ${REL_JAZ_MESH_PROC_H}
+		${REL_JAZ_UTIL_SRC} ${REL_JAZ_UTIL_H}
+		${REL_JAZ_TOMO_SRC} ${REL_JAZ_TOMO_H}
+		${REL_JAZ_TOMO_PROJ_SRC} ${REL_JAZ_TOMO_PROJ_H}
+		${REL_JAZ_TOMO_MEMBRANE_SRC} ${REL_JAZ_TOMO_MEMBRANE_H}
+		${REL_JAZ_TOMO_FILAMENT_SRC} ${REL_JAZ_TOMO_FILAMENT_H}
+		${REL_JAZ_TOMO_MOTION_SRC} ${REL_JAZ_TOMO_MOTION_H}
+		${REL_JAZ_TOMO_MOTION_MODULAR_ALIGNMENT_SRC} ${REL_JAZ_TOMO_MOTION_MODULAR_ALIGNMENT_H}
+		${REL_JAZ_TOMO_MANIFOLD_SRC} ${REL_JAZ_TOMO_MANIFOLD_H}
+		${REL_JAZ_TOMO_LATTICE_SRC} ${REL_JAZ_TOMO_LATTICE_H}
+		${REL_JAZ_OPTIM_SRC} ${REL_JAZ_OPTIM_H}
+		${REL_JAZ_OPTICS_SRC} ${REL_JAZ_OPTICS_H}
+		${REL_JAZ_OPTICS_DUAL_CONTRAST_SRC} ${REL_JAZ_OPTICS_DUAL_CONTRAST_H}
+		${REL_JAZ_SEGMENTATION_SRC} ${REL_JAZ_SEGMENTATION_H}
+		${REL_JAZ_ATOMIC_SRC} ${REL_JAZ_ATOMIC_H}
+		${REL_JAZ_PROGRAMS_SRC} ${REL_JAZ_PROGRAMS_H}
+		${REL_JAZ_DYNAMO_SRC} ${REL_JAZ_DYNAMO_H}
+		${REL_JAZ_SPA_SRC} ${REL_JAZ_SPA_H}
+		${REL_JAZ_SPA_OPT_SRC} ${REL_JAZ_SPA_OPT_H}
+		${REL_JAZ_SPA_CTF_SRC} ${REL_JAZ_SPA_CTF_H}
+		${REL_JAZ_SPA_MOTION_SRC} ${REL_JAZ_SPA_MOTION_H}
+		${REL_JAZ_SPA_MATH_SRC} ${REL_JAZ_SPA_MATH_H}
+		${REL_JAZ_SPA_IMG_PROC_SRC} ${REL_JAZ_SPA_IMG_PROC_H}
+		${REL_JAZ_SPA_TOMO_SRC} ${REL_JAZ_SPA_TOMO_H}
+		${REL_JAZ_SPA_IO_SRC} ${REL_JAZ_SPA_IO_H}
+		${REL_JAZ_SPA_PROGRAMS_SRC} ${REL_JAZ_SPA_PROGRAMS_H}
+		${REL_D3x3_SRC} ${REL_D3x3_H}
+		${REL_LBFGS_SRC} ${REL_LBFGS_H}
+		${REL_SPHERICAL_HARMONICS_SRC} ${REL_SPHERICAL_HARMONICS_H})
+
+	if(GUI)
+		add_library(relion_gui_lib STATIC ${REL_GUI_SRC} ${REL_SRC_H} ${REL_HP})
+	endif(GUI)
 endif()
 
+# FFTW_LIBRARIES is used even with MKLFFT.
+# This is empty for ICC.
+# See https://github.com/3dem/relion/issues/958#issuecomment-1498521352.
+target_link_libraries(relion_lib ${FFTW_LIBRARIES})
+if(NOT MKLFFT)
+	if(BUILD_OWN_FFTW)
+		add_dependencies(relion_lib own_fftw_lib)
+	endif()
+	if(BUILD_OWN_FFTWF)
+		add_dependencies(relion_lib own_fftwf_lib)
+	endif()
+endif(NOT MKLFFT)
 
-ADD_SUBDIRECTORY(src/apps)
+if(GUI)
+	include_directories("${FLTK_INCLUDE_DIR}")
+	target_link_libraries(relion_gui_lib relion_lib ${FLTK_LIBRARIES})
+	if(BUILD_OWN_FLTK)
+		add_dependencies(relion_gui_lib OWN_FLTK)
+	endif()
+endif(GUI)
 
-#message(STATUS "CUDA option = ${CUDA}")
-#message(STATUS "ALTCPU option = ${ALTCPU}")
-#message(STATUS "HIP option = ${HIP}")
-#message(STATUS "DoublePrec_CPU option = ${DoublePrec_CPU}")
-#message(STATUS "DoublePrec_ACC option = ${DoublePrec_ACC}")
-#message(STATUS "MKLFFT option = ${MKLFFT}")
-#message(STATUS "DeviceTexture option = ${DeviceTexture}")
+if (CUDA_FOUND)
+	file(GLOB REL_CUDA_SRC "${CMAKE_SOURCE_DIR}/src/acc/cuda/*.cu" "${CMAKE_SOURCE_DIR}/src/acc/cuda/cuda_kernels/*.cu" )
+	cuda_add_library(relion_gpu_util ${REL_CUDA_SRC})
 
-#get_directory_property( DirDefs COMPILE_DEFINITIONS )
-#message(STATUS "COMPILE_DEFINITIONS = ${DirDefs}" )
-#message(STATUS "CMAKE_C_FLAGS : ${CMAKE_C_FLAGS}")
-#message(STATUS "CMAKE_CXX_FLAGS : ${CMAKE_CXX_FLAGS}")
-#message(STATUS "CMAKE_C_COMPILER : ${CMAKE_C_COMPILER}")
-#message(STATUS "CMAKE_CXX_COMPILER : ${CMAKE_CXX_COMPILER}")
-#message(STATUS "MPI_C_COMPILER : ${MPI_C_COMPILER}")
-#message(STATUS "MPI_CXX_COMPILER : ${MPI_CXX_COMPILER}")
-#message(STATUS "CMAKE_EXE_LINKER_FLAGS : ${CMAKE_EXE_LINKER_FLAGS}")
+	if (${CMAKE_BUILD_TYPE_LOWER} STREQUAL "profiling")
+		find_library(NV_TOOLS_LIBRARIES   NAMES nvToolsExt  PATHS ${CUDA_TOOLKIT_ROOT_DIR}/lib ${CUDA_TOOLKIT_ROOT_DIR}/lib64)
+		list(APPEND EXTRA_LIBS "${NV_TOOLS_LIBRARIES}")
+		target_link_libraries(relion_gpu_util ${NV_TOOLS_LIBRARIES})
+		message(STATUS "Adding extra library for NVIDIA profiling: ${NV_TOOLS_LIBRARIES}")
+	endif()
 
-# -----------------------------------------------------------------------------TESTS--
-# Include testing flag(s) as precomiler
-# definitions and include test directives
-#enable_testing()
-#include(${CMAKE_SOURCE_DIR}/tests/RelionTests.cmake)
+	# Presently we have a number of (bad) circular dependencies between the gpu util
+	# and relion libraries, which cause errors at least on OS X with clang. Tell the
+	# compiler to ignore them.
+	if(APPLE)
+		set(new_link_flags "-undefined suppress -flat_namespace")
+		get_target_property(existing_link_flags relion_gpu_util LINK_FLAGS)
+		if(existing_link_flags)
+			set(new_link_flags "${existing_link_flags} ${new_link_flags}")
+		endif()
+		set_target_properties(relion_gpu_util PROPERTIES LINK_FLAGS "${new_link_flags}")
+	endif()
 
-option(BUILD_TESTS "Build and configure tests" OFF)
-if(BUILD_TESTS)
-    include(CTest)
-    add_subdirectory(tests)
+	list(APPEND EXTRA_LIBS "${CUDA_CUFFT_LIBRARIES}")
+	if(BUILD_SHARED_LIBS)
+		install (TARGETS relion_gpu_util LIBRARY DESTINATION lib)
+	else()
+		target_link_libraries(relion_gpu_util relion_lib)
+		target_link_libraries(relion_gpu_util ${CUDA_CUFFT_LIBRARIES})
+	endif()
+
+	target_link_libraries(relion_lib relion_gpu_util ${CUDA_CUFFT_LIBRARIES})
+	target_link_libraries(relion_lib relion_gpu_util ${CUDA_CUFFT_LIBRARIES} ${CUDA_curand_LIBRARY})
+
+
+
+	file(GLOB REL_JAZ_CUDA_SRC "${CMAKE_SOURCE_DIR}/src/jaz/cuda/*.cu")
+	cuda_add_library(relion_jaz_gpu_util ${REL_JAZ_CUDA_SRC})
+
+	list(APPEND EXTRA_LIBS "${CUDA_CUFFT_LIBRARIES}")
+	if(BUILD_SHARED_LIBS)
+		install (TARGETS relion_jaz_gpu_util LIBRARY DESTINATION lib)
+	else()
+		target_link_libraries(relion_jaz_gpu_util relion_lib)
+		target_link_libraries(relion_jaz_gpu_util ${CUDA_CUFFT_LIBRARIES})
+	endif()
+
+	target_link_libraries(relion_lib relion_jaz_gpu_util ${CUDA_CUFFT_LIBRARIES})
+	target_link_libraries(relion_lib relion_jaz_gpu_util ${CUDA_CUFFT_LIBRARIES} ${CUDA_curand_LIBRARY})
+
+elseif (HIP_FOUND)
+	file(GLOB REL_HIP_SRC "${CMAKE_SOURCE_DIR}/src/acc/hip/*.cpp" "${CMAKE_SOURCE_DIR}/src/acc/hip/hip_kernels/*.cpp" )
+	hip_add_library(relion_gpu_util ${REL_HIP_SRC})
+
+	if (${CMAKE_BUILD_TYPE_LOWER} STREQUAL "profiling")
+		find_library(ROCM_TRACER_LIB NAMES roctx64 PATHS ${HIP_ROOT_DIR}/lib ${HIP_ROOT_DIR}/../lib REQUIRED)
+		list(APPEND EXTRA_LIBS "${ROCM_TRACER_LIB}")
+		target_link_libraries(relion_gpu_util ${ROCM_TRACER_LIB})
+		message(STATUS "Adding extra library for AMD profiling: ${ROCM_TRACER_LIB}")
+	endif()
+
+	# Presently we have a number of (bad) circular dependencies between the gpu util
+	# and relion libraries, which cause errors at least on OS X with clang. Tell the
+	# compiler to ignore them.
+	if(APPLE)
+		set(new_link_flags "-undefined suppress -flat_namespace")
+		get_target_property(existing_link_flags relion_gpu_util LINK_FLAGS)
+		if(existing_link_flags)
+			set(new_link_flags "${existing_link_flags} ${new_link_flags}")
+		endif()
+		set_target_properties(relion_gpu_util PROPERTIES LINK_FLAGS "${new_link_flags}")
+	endif()
+
+	list(APPEND EXTRA_LIBS "${HIPFFT_LIBRARIES}")
+	if(BUILD_SHARED_LIBS)
+		install (TARGETS relion_gpu_util LIBRARY DESTINATION lib)
+	else()
+		target_link_libraries(relion_gpu_util relion_lib)
+		target_link_libraries(relion_gpu_util ${HIPFFT_LIBRARIES})
+	endif()
+
+	target_link_libraries(relion_lib relion_gpu_util ${HIPFFT_LIBRARIES})
+	target_link_libraries(relion_lib relion_gpu_util ${HIPFFT_LIBRARIES} ${HIPRAND_LIBRARIES})
+	target_link_libraries(relion_lib relion_gpu_util ${HIPCUB_LIBRARIES})
+
+	file(GLOB REL_JAZ_HIP_SRC "${CMAKE_SOURCE_DIR}/src/jaz/hip/*.cpp" "${CMAKE_SOURCE_DIR}/src/jaz/hip/kernels/*.cpp" )
+	hip_add_library(relion_jaz_gpu_util ${REL_JAZ_HIP_SRC})
+
+	#list(APPEND EXTRA_LIBS "${HIPFFT_LIBRARIES}")
+	#if(BUILD_SHARED_LIBS)
+	#	install (TARGETS relion_jaz_gpu_util LIBRARY DESTINATION lib)
+	#else()
+	#	target_link_libraries(relion_jaz_gpu_util relion_lib)
+	#	target_link_libraries(relion_jaz_gpu_util ${HIPFFT_LIBRARIES})
+	#endif()
+
+	target_link_libraries(relion_lib relion_jaz_gpu_util ${HIPFFT_LIBRARIES})
+	target_link_libraries(relion_lib relion_jaz_gpu_util ${HIPFFT_LIBRARIES} ${HIPRAND_LIBRARIES})
+	target_link_libraries(relion_lib relion_gpu_util ${HIPCUB_LIBRARIES})
+
+elseif(SYCL)
+
+	set(SYCL_TARGETS refine refine_mpi)
+	file(GLOB REL_SYCL_SRC "${CMAKE_SOURCE_DIR}/src/acc/sycl/*.cpp" "${CMAKE_SOURCE_DIR}/src/acc/sycl/sycl_kernels/*.cpp")
+	set(REL_SYCL_NO_OMP "${CMAKE_SOURCE_DIR}/src/acc/sycl/sycl_ml_optimiser.cpp")
+	add_library(relion_sycl_util ${REL_SYCL_SRC})
+	if(SYCL_AOT_COMPILE)
+		target_compile_options(relion_sycl_util PRIVATE -DSYCL_USE_NATIVE_FP_ATOMICS -fsycl -fsycl-targets=spir64,spir64_gen)
+	elseif(SYCL_CUDA_COMPILE)
+		if(DEFINED SYCL_CUDA_ARCH)
+			target_compile_options(relion_sycl_util PRIVATE -fsycl -fsycl-targets=nvptx64-nvidia-cuda -Xsycl-target-backend=nvptx64-nvidia-cuda --cuda-gpu-arch=sm_${SYCL_CUDA_ARCH})
+		else(DEFINED SYCL_CUDA_ARCH)
+			target_compile_options(relion_sycl_util PRIVATE -fsycl -fsycl-targets=nvptx64-nvidia-cuda)
+		endif(DEFINED SYCL_CUDA_ARCH)
+	elseif(SYCL_HIP_COMPILE)
+		if(DEFINED SYCL_HIP_ARCH)
+			target_compile_options(relion_sycl_util PRIVATE -fsycl -fsycl-targets=amdgcn-amd-amdhsa -Xsycl-target-backend=amdgcn-amd-amdhsa --offload-arch=${SYCL_HIP_ARCH})
+		else(DEFINED SYCL_HIP_ARCH)
+			target_compile_options(relion_sycl_util PRIVATE -fsycl -fsycl-targets=amdgcn-amd-amdhsa)
+		endif(DEFINED SYCL_HIP_ARCH)
+	elseif(SYCL_ALL_COMPILE)
+		target_compile_options(relion_sycl_util PRIVATE -fsycl -fsycl-targets=x86_64,nvptx64-nvidia-cuda,amdgcn-amd-amdhsa,spir64,spir64_gen)
+#		target_compile_options(relion_sycl_util PRIVATE -fsycl -fsycl-targets=x86_64,nvptx64-nvidia-cuda,amdgcn-amd-amdhsa,spir64,spir64_gen -Xsycl-target-backend=nvptx64-nvidia-cuda --cuda-gpu-arch=sm_${SYCL_CUDA_ARCH} -Xsycl-target-backend=amdgcn-amd-amdhsa --offload-arch=${SYCL_HIP_ARCH})
+	else()
+		target_compile_options(relion_sycl_util PRIVATE -DSYCL_USE_NATIVE_FP_ATOMICS -fsycl)
+	endif()
+	foreach (_source ${REL_SYCL_SRC})
+		list(FIND REL_SYCL_NO_OMP ${_source} IS_SYCL_NO_OMP)
+		if(NOT ${IS_SYCL_NO_OMP} LESS 0)
+			set_source_files_properties(${_source} PROPERTIES COMPILE_FLAGS -qno-openmp)
+		endif()
+	endforeach()
+	target_link_libraries(relion_sycl_util sycl OpenCL relion_lib)
+
 endif()
 
-# ----------------------------------------------------------PRINT OUT ALL CMAKE VARS--
-#get_cmake_property(_variableNames VARIABLES)
-#foreach (_variableName ${_variableNames})
-#    message(STATUS "${_variableName}=${${_variableName}}")
-#endforeach()
+if(TIFF_FOUND)
+	include_directories(${TIFF_INCLUDE_DIRS})
+	target_link_libraries(relion_lib ${TIFF_LIBRARIES})
+endif()
+
+if(PNG_FOUND)
+	include_directories(${PNG_INCLUDE_DIRS})
+	target_link_libraries(relion_lib ${PNG_LIBRARY})
+else()
+	find_library(PNG_LIBRARY NAMES png PATHS /share/modules/libpng/1.6.37/lib/ /usr/local/lib)
+	if(PNG_LIBRARY)
+		message("Trying manual search for PNG")
+		add_definitions(-DHAVE_PNG)
+		message(STATUS "PNG_LIBRARY: ${PNG_LIBRARY}")
+		target_link_libraries(relion_lib ${PNG_LIBRARY})
+	endif()
+endif()
+
+if(JPEG_FOUND)
+	include_directories(${JPEG_INCLUDE_DIRS})
+	target_link_libraries(relion_lib ${JPEG_LIBRARY})
+else()
+	find_library(JPEG_LIBRARY NAMES jpeg PATHS /share/modules/libjpeg/62.2.0/lib64/ /usr/local/lib)
+	if(JPEG_LIBRARY)
+		message("Trying manual search for JPEG")
+		add_definitions(-DHAVE_JPEG)
+		message(STATUS "JPEG_LIBRARY: ${JPEG_LIBRARY}")
+		target_link_libraries(relion_lib ${JPEG_LIBRARY})
+	endif()
+endif()
+
+if(BUILD_OWN_TBB)
+	add_dependencies(relion_lib OWN_TBB)
+endif()
+
+foreach (_target ${RELION_TARGETS})
+	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)  #specify target name WE=WithoutExtension
+
+	if(${_target} STREQUAL "maingui") # We no longer want "relion_maingui"
+		set(_target "relion")
+		add_executable(${_target} maingui.cpp)
+	else()
+		add_executable(${_target} ${_target}.cpp )
+		set_target_properties(${_target} PROPERTIES PREFIX "relion_")
+	endif()
+
+	set(LIB relion_lib)
+
+ 	add_dependencies(${_target} relion_lib)
+
+	if(NOT MKLFFT)
+		target_link_libraries(${_target} ${LIB} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
+	else()
+		target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
+	endif(NOT MKLFFT)
+
+	if(CUDA_FOUND OR HIP_FOUND)
+		target_link_libraries(${_target} relion_gpu_util)
+	endif()
+
+	if(SYCL)
+		target_link_libraries(${_target} relion_sycl_util sycl OpenCL relion_lib)
+		list(FIND SYCL_TARGETS ${_target} IS_SYCL_TARGET)
+		if(NOT ${IS_SYCL_TARGET} LESS 0)
+			if(SYCL_AOT_COMPILE)
+				if(DEFINED SYCL_AOT_TARGET)
+					set_target_properties(${_target} PROPERTIES LINK_FLAGS "-fsycl -fsycl-targets=spir64_gen -Xsycl-target-backend \"-device ${SYCL_AOT_TARGET}\" -fsycl-device-code-split=per_kernel")
+				else(DEFINED SYCL_AOT_TARGET)
+					set_target_properties(${_target} PROPERTIES LINK_FLAGS "-fsycl -fsycl-targets=spir64_gen -Xsycl-target-backend \"-device pvc\" -fsycl-device-code-split=per_kernel")
+				endif(DEFINED SYCL_AOT_TARGET)
+			elseif(SYCL_CUDA_COMPILE)
+				set_target_properties(${_target} PROPERTIES LINK_FLAGS "-fsycl -fsycl-targets=nvptx64-nvidia-cuda -fsycl-device-code-split=per_kernel")
+			elseif(SYCL_HIP_COMPILE)
+				set_target_properties(${_target} PROPERTIES LINK_FLAGS "-fsycl -fsycl-targets=amdgcn-amd-amdhsa -fsycl-device-code-split=per_kernel")
+			elseif(SYCL_ALL_COMPILE)
+				set_target_properties(${_target} PROPERTIES LINK_FLAGS "-fsycl -fsycl-device-code-split=per_kernel")
+			else()
+				set_target_properties(${_target} PROPERTIES LINK_FLAGS "-fsycl -fsycl-device-code-split=per_kernel")
+			endif()
+#		else()
+#			set_target_properties(${_target} PROPERTIES LINK_FLAGS ${SYCL_HOST_FLAGS})
+		endif()
+	endif(SYCL)
+
+	if (ALTCPU)
+		target_link_libraries(${_target} ${TBB_LIBRARIES})
+	endif(ALTCPU)
+
+	set_target_properties(${_target} PROPERTIES
+	                      XX_EXTENSIONS OFF
+	)
+
+	list(FIND GUI_TARGETS ${_target} IS_GUI_TARGET)
+	if((NOT ${IS_GUI_TARGET} LESS 0) OR (${_target} STREQUAL "relion"))
+		add_dependencies(${_target} relion_gui_lib)
+		target_link_libraries(${_target} relion_gui_lib ${FLTK_LIBRARIES} ${X11})
+	endif()
+
+	if(TIFF_FOUND)
+		target_link_libraries(${_target} ${TIFF_LIBRARIES})
+	endif()
+
+	list(FIND RELION_MPI_TARGETS ${_target}.cpp IS_MPI_TARGET)
+	if(NOT ${IS_MPI_TARGET} LESS 0)
+		target_link_libraries(${_target} ${MPI_LIBRARIES})
+	endif()
+
+	install (TARGETS ${_target} RUNTIME DESTINATION bin)
+
+endforeach()
+
+foreach (_target ${RELION_JAZ_SPA_TARGETS})
+	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)
+	add_executable(${_target} ${CMAKE_SOURCE_DIR}/src/jaz/single_particle/apps/${_target}.cpp)
+	set(LIB relion_lib)
+ 	add_dependencies(${_target} relion_lib)
+	set_target_properties(${_target} PROPERTIES PREFIX "relion_")
+	target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
+	set_target_properties(${_target} PROPERTIES CXX_EXTENSIONS OFF	)
+
+	if(TIFF_FOUND)
+		target_link_libraries(${_target} ${TIFF_LIBRARIES})
+	endif()
+
+    if(SYCL)
+        target_link_libraries(${_target} sycl OpenCL relion_lib)
+    endif(SYCL)
+
+	if (ALTCPU)
+		target_link_libraries(${_target} ${TBB_LIBRARIES})
+	endif(ALTCPU)
+
+	install (TARGETS ${_target} RUNTIME DESTINATION bin)
+endforeach()
+
+# former Dynamite programs:
+foreach (_target ${RELION_JAZ_TOMO_TARGETS})
+	GET_FILENAME_COMPONENT(_target "relion_tomo_${_target}" NAME_WE)
+	add_executable(${_target} ${CMAKE_SOURCE_DIR}/src/jaz/tomography/apps/${_target}.cpp)
+	set(LIB relion_lib)
+ 	add_dependencies(${_target} relion_lib)
+	set_target_properties(${_target} PROPERTIES PREFIX "relion_tomo_")
+	target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
+	set_target_properties(${_target} PROPERTIES CXX_EXTENSIONS OFF	)
+
+	if(TIFF_FOUND)
+		target_link_libraries(${_target} ${TIFF_LIBRARIES})
+	endif()
+
+    if(SYCL)
+        target_link_libraries(${_target} sycl OpenCL relion_lib)
+    endif(SYCL)
+
+	install (TARGETS ${_target} RUNTIME DESTINATION bin)
+endforeach()
+
+foreach (_target ${RELION_JAZ_EXPERIMENTAL_TARGETS})
+	GET_FILENAME_COMPONENT(_target "relion_exp_${_target}" NAME_WE)
+	add_executable(${_target} ${CMAKE_SOURCE_DIR}/src/jaz/scripts/${_target}.cpp)
+	set(LIB relion_lib)
+ 	add_dependencies(${_target} relion_lib)
+	set_target_properties(${_target} PROPERTIES PREFIX "relion_exp_")
+	target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
+	set_target_properties(${_target} PROPERTIES CXX_EXTENSIONS OFF	)
+
+	if(TIFF_FOUND)
+		target_link_libraries(${_target} ${TIFF_LIBRARIES})
+	endif()
+
+    if(SYCL)
+        target_link_libraries(${_target} sycl OpenCL relion_lib)
+    endif(SYCL)
+
+	if (ALTCPU)
+		target_link_libraries(${_target} ${TBB_LIBRARIES})
+	endif(ALTCPU)
+
+	install (TARGETS ${_target} RUNTIME DESTINATION bin)
+endforeach()
+
+if(SYCL)    # Intel DPC++ specific
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fiopenmp")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fiopenmp")
+	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fiopenmp")
+
+	set(CMAKE_C_FLAGS "-std=c99 ${CMAKE_C_FLAGS}")
+	set(CMAKE_CXX_FLAGS "-fPIC -std=c++17 ${CMAKE_CXX_FLAGS}")
+else()
+	FIND_PACKAGE( OpenMP REQUIRED)
+	if(OPENMP_FOUND)
+		#message("OPENMP FOUND")
+		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+		set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+		target_link_libraries(relion_lib ${OpenMP_omp_LIBRARY})
+	endif()
+
+	set(CMAKE_C_FLAGS "-std=c99 ${CMAKE_C_FLAGS}")
+	set(CMAKE_CXX_FLAGS "-fPIC -std=c++14 ${CMAKE_CXX_FLAGS}")
+endif()
+
+# Set this flag to activate bounds checking in stl-vectors (incl. strings)
+# It is useful to do this periodically, as it catches
+# difficult-to-see and rare-to-manifest bugs
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_DEBUG")

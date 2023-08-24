@@ -84,6 +84,10 @@ cmake -DCMAKE_INSTALL_PREFIX=/where/to/install/ \
       -DAMDFFTW=on .. # only on AMD systems to build an optimized version of FFTW lib
 make -j
 ```
+## Building with SYCL
+
+For detailed information on RELION build with SYCL support, please read [README_sycl](README_sycl.md) file.
+
 
 ## Updating
 

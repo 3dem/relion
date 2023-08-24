@@ -50,8 +50,9 @@
 #elif _HIP_ENABLED
 #include "src/acc/hip/hip_ml_optimiser.h"
 #include <roctracer/roctx.h>
-#endif
-#ifdef ALTCPU
+#elif _SYCL_ENABLED
+    #include "src/acc/sycl/sycl_ml_optimiser.h"
+#elif ALTCPU
     #include <atomic>
     #include <tbb/tbb.h>
     #include <tbb/parallel_for.h>
@@ -78,6 +79,10 @@ void globalThreadExpectationSomeParticles(void *self, int thread_id)
         if (MLO->do_gpu)
             ((MlOptimiserAccGPU*) MLO->gpuOptimisers[thread_id])->doThreadExpectationSomeParticles(thread_id);
         else
+#elif _SYCL_ENABLED
+		if (MLO->do_sycl)
+			((MlOptimiserSYCL*) MLO->syclOptimisers[thread_id])->doThreadExpectationSomeParticles(thread_id);
+		else
 #endif
             MLO->doThreadExpectationSomeParticles(thread_id);
     }
@@ -89,6 +94,15 @@ void globalThreadExpectationSomeParticles(void *self, int thread_id)
     }
 }
 
+MlOptimiser::~MlOptimiser()
+{
+#ifdef _SYCL_ENABLED
+	for (int i = 0; i < syclDevices.size(); i++)
+		delete syclDevices[i];
+
+	syclDevices.clear();
+#endif
+}
 
 /** ========================== I/O operations  =========================== */
 
@@ -458,6 +472,22 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 #endif
 
     failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be drop, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
+
+#ifdef _SYCL_ENABLED
+	do_sycl = parser.checkOption("--sycl", "Use available SYCL resources for some calculations");
+	do_sycl_levelzero = parser.checkOption("--sycl-levelzero", "Use available SYCL Level-Zero GPU resources for some calculations");
+	do_sycl_cuda = parser.checkOption("--sycl-cuda", "Use available SYCL CUDA GPU resources for some calculations");
+	do_sycl_hip = parser.checkOption("--sycl-hip", "Use available SYCL HIP GPU resources for some calculations");
+	do_sycl_opencl = parser.checkOption("--sycl-opencl", "Use available SYCL OpenCL GPU resources for some calculations");
+	do_sycl_cpu = parser.checkOption("--sycl-cpu", "Use available SYCL OpenCL CPU resources for some calculations");
+	if (do_sycl)
+		do_sycl_levelzero = true;
+	if (do_sycl_levelzero || do_sycl_cuda || do_sycl_hip || do_sycl_opencl || do_sycl_cpu)
+		do_sycl = true;
+#else
+	do_sycl = false;
+	do_sycl_levelzero = do_sycl_cuda = do_sycl_hip = do_sycl_opencl = do_sycl_cpu = false;
+#endif
 
     do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
     gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
@@ -838,6 +868,22 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     do_cpu = parser.checkOption("--cpu", "Use intel vectorisation implementation for CPU");
 #else
     do_cpu = false;
+#endif
+
+#ifdef _SYCL_ENABLED
+	do_sycl = parser.checkOption("--sycl", "Use available SYCL resources for some calculations");
+	do_sycl_levelzero = parser.checkOption("--sycl-levelzero", "Use available SYCL Level-Zero GPU resources for some calculations");
+	do_sycl_cuda = parser.checkOption("--sycl-cuda", "Use available SYCL CUDA GPU resources for some calculations");
+	do_sycl_hip = parser.checkOption("--sycl-hip", "Use available SYCL HIP GPU resources for some calculations");
+	do_sycl_opencl = parser.checkOption("--sycl-opencl", "Use available SYCL OpenCL GPU resources for some calculations");
+	do_sycl_cpu = parser.checkOption("--sycl-cpu", "Use available SYCL OpenCL CPU resources for some calculations");
+	if (do_sycl)
+		do_sycl_levelzero = true;
+	if (do_sycl_levelzero || do_sycl_cuda || do_sycl_hip || do_sycl_opencl || do_sycl_cpu)
+		do_sycl = true;
+#else
+	do_sycl = false;
+	do_sycl_levelzero = do_sycl_cuda = do_sycl_hip = do_sycl_opencl = do_sycl_cpu = false;
 #endif
 
     do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
@@ -1526,6 +1572,38 @@ void MlOptimiser::initialise()
 #endif
     }
 
+	if (do_sycl)
+	{
+#ifdef _SYCL_ENABLED
+		// TODO: Need more investigation and setting for heterogeneous run
+		if (do_sycl_levelzero)
+			syclDevices = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::levelZero);
+		else if (do_sycl_cuda)
+			syclDevices = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::CUDA);
+		else if (do_sycl_hip)
+			syclDevices = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::HIP);
+		else if (do_sycl_opencl)
+			syclDevices = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::openCL);
+		else
+			syclDevices = MlOptimiserSYCL::getDevices(syclDeviceType::cpu);
+
+		auto devCount = syclDevices.size();
+		if (devCount == 0)
+			REPORT_ERROR("You have no SYCL device available");
+
+		std::cout << std::string(80, '*') << std::endl;
+		for (int i = 0; i < nr_threads; i++)
+		{
+			const int dev_id = i * devCount / nr_threads;
+			syclOptimiserDeviceMap.push_back(dev_id);
+			std::cout << " Thread " << i << " runs on " << syclDevices[dev_id]->getName() << std::endl;
+		}
+		std::cout << std::string(80, '*') << std::endl;
+#else
+		REPORT_ERROR("SYCL usage requested, but RELION was compiled without SYCL support");
+#endif
+	}
+
     grad_pseudo_halfsets = gradient_refine && !do_split_random_halves;
 
 #ifdef MKLFFT
@@ -1782,16 +1860,16 @@ void MlOptimiser::initialiseGeneral(int rank)
         REPORT_ERROR("ERROR: output directory does not exist!");
 
     // Just die if trying to use accelerators and skipping alignments
-    if ((do_skip_align || do_skip_rotate) && (do_gpu || do_cpu))
+    if ((do_skip_align || do_skip_rotate) && (do_gpu || do_sycl || do_cpu))
         REPORT_ERROR("ERROR: you cannot use accelerators when skipping alignments.");
 
     if (do_always_cc)
         do_calculate_initial_sigma_noise = false;
 
 
-    if (do_shifts_onthefly && (do_gpu || do_cpu))
+    if (do_shifts_onthefly && (do_gpu || do_sycl || do_cpu))
     {
-        std::cerr << "WARNING: --onthefly_shifts cannot be combined with --cpu or --gpu, setting do_shifts_onthefly to false" << std::endl;
+        std::cerr << "WARNING: --onthefly_shifts cannot be combined with --cpu, --sycl or --gpu, setting do_shifts_onthefly to false" << std::endl;
         do_shifts_onthefly = false;
     }
 
@@ -2070,7 +2148,7 @@ void MlOptimiser::initialiseGeneral(int rank)
         sampling.offset_range *= mymodel.pixel_size;
         sampling.offset_step *= mymodel.pixel_size;
     }
-    sampling.initialise(mymodel.ref_dim, (mymodel.data_dim == 3 || mydata.is_tomo), do_gpu, (verb>0),
+    sampling.initialise(mymodel.ref_dim, (mymodel.data_dim == 3 || mydata.is_tomo), do_gpu || do_sycl || do_cpu, (verb>0),
             do_local_searches_helical, (do_helical_refine) && (!ignore_helical_symmetry),
             helical_rise_initial, helical_twist_initial);
 
@@ -2170,7 +2248,7 @@ void MlOptimiser::initialiseGeneral(int rank)
         // Don't do norm correction for volume averaging at this stage....
         do_norm_correction = false;
 
-        if (!((do_helical_refine) && (!ignore_helical_symmetry)) && !(do_cpu || do_gpu)) // For 3D helical sub-tomogram averaging, either is OK, so let the user decide
+        if (!((do_helical_refine) && (!ignore_helical_symmetry)) && !(do_cpu || do_sycl || do_gpu)) // For 3D helical sub-tomogram averaging, either is OK, so let the user decide
             do_shifts_onthefly = true; // save RAM for volume data (storing all shifted versions would take a lot!)
 
         if (do_skip_align)
@@ -3347,6 +3425,24 @@ void MlOptimiser::expectation()
         }
     }
 #endif
+#ifdef _SYCL_ENABLED
+	if (do_sycl)
+	{
+		for (int i = 0; i < std::min(nr_threads, static_cast<int>(syclDevices.size())); i++)
+		{
+			accDataBundles.push_back((void*)(new MlSyclDataBundle(syclDevices[i])));
+			((MlSyclDataBundle*)accDataBundles[i])->setup(this);
+		}
+
+		for (int i = 0; i < nr_threads; i++)
+		{
+			MlOptimiserSYCL *b = new MlOptimiserSYCL(this, (MlSyclDataBundle*)(accDataBundles[syclOptimiserDeviceMap[i]]), "sycl_optimiser");
+			b->resetData();
+			b->threadID = i;
+			syclOptimisers.push_back((void*)b);
+		}
+	}
+#endif
 #ifdef ALTCPU
     if (do_cpu)
     {
@@ -3560,6 +3656,62 @@ void MlOptimiser::expectation()
 
         accDataBundles.clear();
     }
+#endif
+#ifdef _SYCL_ENABLED
+	if (do_sycl)
+	{
+		for (int i = 0; i < accDataBundles.size(); i++)
+		{
+			MlSyclDataBundle *b = (MlSyclDataBundle*)accDataBundles[i];
+			b->syncAllBackprojects();
+
+			for (int j = 0; j < b->backprojectors.size(); j++)
+			{
+				unsigned long s = wsum_model.BPref[j].data.nzyxdim;
+				deviceStream_t stream = b->backprojectors[j].stream;
+				XFLOAT *reals = (XFLOAT*)(stream->syclMalloc(s * sizeof(XFLOAT), syclMallocType::host));
+				XFLOAT *imags = (XFLOAT*)(stream->syclMalloc(s * sizeof(XFLOAT), syclMallocType::host));
+				XFLOAT *weights = (XFLOAT*)(stream->syclMalloc(s * sizeof(XFLOAT), syclMallocType::host));
+				if (nullptr == reals || nullptr == imags || nullptr == weights)
+				{
+					std::string str = "syclMalloc HOST error of size " + std::to_string(s * sizeof(XFLOAT)) + ".\n";
+					ACC_PTR_DEBUG_FATAL(str.c_str());
+					CRITICAL(RAMERR);
+				}
+
+				b->backprojectors[j].getMdlData(reals, imags, weights);
+
+				for (unsigned long n = 0; n < s; n++)
+				{
+					wsum_model.BPref[j].data.data[n].real += (RFLOAT) reals[n];
+					wsum_model.BPref[j].data.data[n].imag += (RFLOAT) imags[n];
+					wsum_model.BPref[j].weight.data[n] += (RFLOAT) weights[n];
+				}
+
+				stream->syclFree(reals);
+				stream->syclFree(imags);
+				stream->syclFree(weights);
+
+				b->backprojectors[j].clear();
+			}
+
+			for (int j = 0; j < b->projectors.size(); j++)
+				b->projectors[j].clear();
+
+			for (int j = 0; j < b->coarseProjectionPlans.size(); j++)
+				b->coarseProjectionPlans[j].clear();
+		}
+
+		for (int i = 0; i < syclOptimisers.size(); i++)
+			delete (MlOptimiserSYCL*)syclOptimisers[i];
+
+		syclOptimisers.clear();
+
+		for (int i = 0; i < accDataBundles.size(); i++)
+			delete (MlSyclDataBundle*)accDataBundles[i];
+
+		accDataBundles.clear();
+	}
 #endif
 #ifdef ALTCPU
     if (do_cpu)
@@ -6532,7 +6684,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
             }
         }
 
-        //Shifts are done on the fly on the gpu, if do_gpu || do_cpu, do_shifts_onthefly is always false!
+        //Shifts are done on the fly on the gpu, if do_gpu || do_sycl || do_cpu, do_shifts_onthefly is always false!
         if (do_shifts_onthefly)
         {
             // Store a single, down-sized version of exp_Fimg[img_id] in exp_local_Fimgs_shifted[img_id]
@@ -6544,7 +6696,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
             std::cerr << " MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(): do_shifts_onthefly && !do_gpu" << std::endl;
 #endif
         }
-        else if(!(do_gpu || do_cpu))
+        else if(!(do_gpu || do_sycl || do_cpu))
         {
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
             Image<RFLOAT> img_save_ori, img_save_mask, img_save_nomask;

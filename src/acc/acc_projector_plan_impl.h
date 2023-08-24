@@ -1,6 +1,10 @@
 #include "src/acc/acc_projector_plan.h"
 #include "src/acc/utilities.h"
 #include "src/time.h"
+#ifdef _SYCL_ENABLED
+#include "src/acc/sycl/sycl_virtual_dev.h"
+using deviceStream_t = virtualSYCL*;
+#endif
 
 //#define PP_TIMING
 #ifdef PP_TIMING
@@ -84,6 +88,13 @@ void getOrientations(HealpixSampling &sampling, long int idir, long int ipsi, in
 		}
 	}
 }
+
+#ifdef _SYCL_ENABLED
+void AccProjectorPlan::setSyclDevice(deviceStream_t dev)
+{
+	devAcc = dev;
+}
+#endif
 
 void AccProjectorPlan::setup(
 		HealpixSampling &sampling,
@@ -254,6 +265,9 @@ void AccProjectorPlan::setup(
 	TIMING_TOC(TIMING_SAMPLING);
 
 	iorientclasses.resizeHostCopy(orientation_num);
+#if defined(_SYCL_ENABLED) && defined(SYCL_OFFLOAD_SORT)
+	iorientclasses.setStreamAccType(devAcc);
+#endif
 	iorientclasses.putOnDevice();
 
 	eulers.resizeHostCopy(orientation_num * 9);
@@ -391,6 +405,11 @@ void AccProjectorPlan::setup(
 					~eulers,
 					orientation_num);
 	}
+#ifdef _SYCL_ENABLED
+	eulers.setStreamAccType(devAcc);
+	eulers.putOnDevice();
+	eulers.streamSync();
+#endif
 
 	TIMING_TOC(TIMING_TOP);
 }
