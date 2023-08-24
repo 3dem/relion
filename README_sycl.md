@@ -64,7 +64,7 @@ $ {Run 2D/3D/refinement application by replacing --gpu/--cpu with --sycl/--sycl-
 + For CMake configuration
 	+ `SYCL`(=ON/OFF): Enable SYCL based acceleration build
 	+ `SyclForceOneDPL`(=ON/OFF): Use oneDPL(https://github.com/oneapi-src/oneDPL) if it can be used. This has the same effect as setting "-DSYCL_OFFLOAD_SORT" for CMAKE_CXX_FLAGS below. (experimental)
-	+ `SYCL_AOT_COMPILE`(=ON/OFF): Enable AOT(Ahead-Of-Time) compilation for SPIR64 target. Default is pvc. (experimental)
+	+ `SYCL_AOT_COMPILE`(=ON/OFF): Enable AOT(Ahead-Of-Time) compilation for SPIR64 target. Default target is pvc. (experimental)
 	+ `SYCL_AOT_TARGET`(=ON/OFF): Specify AOT(Ahead-Of-Time) SPIR64 target. Possible list can be checked using "ocloc compile --help" command. (experimental)
 	+ `SYCL_CUDA_COMPILE`(=ON/OFF): Enable SYCL compilation for CUDA target (Not tested)
 	+ `SYCL_CUDA_ARCH`: SYCL CUDA arch target (Not tested)
@@ -76,11 +76,10 @@ $ {Run 2D/3D/refinement application by replacing --gpu/--cpu with --sycl/--sycl-
 	+ `SYCL_COMPILE_FLAGS`: Additional SYCL compile flags (for future use)
 	+ `SYCL_LINK_FLAGS`: SYCL link flags except "-lsycl -lOpenCL" if needed (for future use)
 
-+ Others (just defining with -D* is needed in cmake -DCMAKE_CXX_FLAGS)
++ Others for testing purpose (just defining with -D* is needed in cmake -DCMAKE_CXX_FLAGS)
 	+ `SYCL_OFFLOAD_SORT`: Use SYCL kernel for weight sorting routines. If this is set, oneDPL(https://github.com/oneapi-src/oneDPL) is used when it is beneficial. (experimental)
 		+ `USE_LESS_ONEDPL`: If this is set, oneDPL is used only when there is no other implementation.
 		+ `PREFER_ONEDPL`: If this is set, oneDPL is used everywhere when it is applicable. If this is set, you SHOULD NOT SET DisableIndirectAccess=1.
-		+ `CHECK_ONEDPL_CORRECT`: This will check correctness of oneDPL routines. This will be removed in the near future.
 	+ `SYCL_OFFLOAD_FFT`: Use SYCL kernel for the current FFTW routines. (Not implemented)
 	+ `INTEL_EXPLICIT_SIMD`: Use Explicit SIMD extension for SYCL kernels. (Not implemented)
 	+ `INTEL_SG_SIZE`: Used for Intel sub-group size in SYCL kernel. 32 is recommended for PVC and 16 is for ATS. (Not tested well)
