@@ -28,6 +28,13 @@ RedHat-like systems (CentOS, RHEL, Scientific Linux etc) use `yum` package manag
 sudo yum install cmake git gcc gcc-c++ openmpi-devel fftw-devel libtiff-devel libpng-devel ghostscript libXft-devel libX11-devel
 ```
 
+Now download RELION and checkout the verison you want, by running:
+```
+git clone https://github.com/3dem/relion.git
+cd relion
+git checkout master # or ver4.0; see below
+```
+
 To add support for Python modules (e.g. Blush, ModelAngelo and DynaMight) you will have to install a Python environment.
 We recommend installing miniconda3. You can find that here: [miniconda](https://docs.conda.io/en/latest/miniconda.html)
 
@@ -49,12 +56,9 @@ it's recommended to set the TORCH_HOME directory. To do this, include the follow
 Before installing RELION make sure Conda is not active. If it is, you can deactivate it by running:
 ```conda deactivate```
 
-RELION can now be installed through:
+You can not build RELION through:
 
 ```
-git clone https://github.com/3dem/relion.git
-cd relion
-git checkout master # or ver4.0; see below
 mkdir build
 cd build
 cmake ..
