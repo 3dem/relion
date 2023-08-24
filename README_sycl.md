@@ -7,8 +7,8 @@ This is SYCL/DPC++ version for [RELION](https://github.com/3dem/relion)
 + Additional requirements for RELION SYCL/DPC++ version
 	+ Intel(R) oneAPI Base Toolkit and HPC Toolkit (Installing all components are recommended. - https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html)
 	+ Intel(R) software for general purpose GPU capabilities (https://dgpu-docs.intel.com)
-	+ Intel(R) CPU Runtime for OpenCL(TM) Applications (optional - https://www.intel.com/content/www/us/en/developer/tools/opencl-cpu-runtime/overview.html)
-	+ Codeplay(R) oneAPI for NVIDIA(R) GPU (optional - https://codeplay.com/solutions/oneapi/nvidia/)
+	+ Intel(R) CPU Runtime for OpenCL(TM) Applications (optional - https://www.intel.com/content/www/us/en/developer/articles/technical/intel-cpu-runtime-for-opencl-applications-with-sycl-support.html)
+	+ Codeplay(R) oneAPI for NVIDIA(R) GPU (optional - https://developer.codeplay.com/products/oneapi/nvidia/)
 	+ Codeplay(R) oneAPI for AMD GPU (optional - https://developer.codeplay.com/products/oneapi/amd/)
 
 + SYCL specific command line arguments
