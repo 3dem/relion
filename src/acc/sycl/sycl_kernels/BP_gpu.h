@@ -31,7 +31,7 @@ void sycl_kernel_backproject2D(
 
 	const int img_y_half = img_y / 2;
 	const XFLOAT max_r2_out = sycl::floor(max_r2 * padding_factor * padding_factor);
-	const XFLOAT inv_weight_norm = 1.0 / weight_norm;
+	const XFLOAT inv_weight_norm = 1.0f / weight_norm;
 
 	if (tid == 0)
 		s_eulers[0] = g_eulers[img*9 + 0];
@@ -62,8 +62,8 @@ void sycl_kernel_backproject2D(
 		XFLOAT img_imag = g_img_imag[pixel];
 		XFLOAT ctf = g_ctfs[pixel];
 
-		XFLOAT ref_real = 0.0;
-		XFLOAT ref_imag = 0.0;
+		XFLOAT ref_real = 0.0f;
+		XFLOAT ref_imag = 0.0f;
 		if (SGD)
 		{
 			projector.project2Dmodel(x, y, s_eulers[0], s_eulers[1], s_eulers[2], s_eulers[3], ref_real, ref_imag);
@@ -71,9 +71,9 @@ void sycl_kernel_backproject2D(
 			ref_imag *= ctf;
 		}
 
-		XFLOAT Fweight = 0.0;
-		XFLOAT real = 0.0;
-		XFLOAT imag = 0.0;
+		XFLOAT Fweight = 0.0f;
+		XFLOAT real = 0.0f;
+		XFLOAT imag = 0.0f;
 		for (int itrans = 0; itrans < trans_num; itrans++)
 		{
 			XFLOAT weight = g_weights[img*trans_num + itrans];
@@ -103,7 +103,7 @@ void sycl_kernel_backproject2D(
 			}
 		}
 
-		if (Fweight > 0.0)
+		if (Fweight > 0.0f)
 		{
 			// Get logical coordinates in the 3D map
 			XFLOAT xp = (s_eulers[0]*x + s_eulers[1]*y) * padding_factor;
@@ -115,7 +115,7 @@ void sycl_kernel_backproject2D(
 				continue;
 
 			// Only asymmetric half is stored
-			if (xp < 0)
+			if (xp < 0.0f)
 			{
 				// Get complex conjugated hermitian symmetry pair
 				xp = -xp;
@@ -135,8 +135,8 @@ void sycl_kernel_backproject2D(
 			int offset3 = offset1 + mdl_x;
 			int offset4 = offset1 + mdl_x + 1;
 
-			XFLOAT mfx = 1.0 - fx;
-			XFLOAT mfy = 1.0 - fy;
+			XFLOAT mfx = 1.0f - fx;
+			XFLOAT mfy = 1.0f - fy;
 
 			XFLOAT dd00 = mfy * mfx;
 			XFLOAT dd01 = mfy *  fx;
@@ -182,7 +182,7 @@ void sycl_kernel_backproject3D(
 	const int img_y_half = img_y / 2;
 	const int img_z_half = img_z / 2;
 	const XFLOAT max_r2_vol = sycl::floor(max_r2 * padding_factor * padding_factor);
-	const XFLOAT inv_weight_norm = 1.0 / weight_norm;
+	const XFLOAT inv_weight_norm = 1.0f / weight_norm;
 
 	if (tid < 9)
 		s_eulers[tid] = g_eulers[img*9 + tid];
@@ -236,8 +236,8 @@ void sycl_kernel_backproject3D(
 		XFLOAT img_imag = g_img_imag[pixel];
 		XFLOAT ctf = g_ctfs[pixel];
 
-		XFLOAT ref_real = 0.0;
-		XFLOAT ref_imag = 0.0;
+		XFLOAT ref_real = 0.0f;
+		XFLOAT ref_imag = 0.0f;
 		if (SGD)
 		{
 			if (DATA3D)
@@ -259,9 +259,9 @@ void sycl_kernel_backproject3D(
 			ref_imag *= ctf;
 		}
 
-		XFLOAT Fweight = 0.0;
-		XFLOAT real = 0.0;
-		XFLOAT imag = 0.0;
+		XFLOAT Fweight = 0.0f;
+		XFLOAT real = 0.0f;
+		XFLOAT imag = 0.0f;
 		for (int itrans = 0; itrans < trans_num; itrans++)
 		{
 			XFLOAT weight = g_weights[img*trans_num + itrans];
@@ -295,7 +295,7 @@ void sycl_kernel_backproject3D(
 		}
 
         //BP
-		if (Fweight > 0.0)
+		if (Fweight > 0.0f)
 		{
 			// Get logical coordinates in the 3D map
 			XFLOAT xp, yp, zp;
@@ -318,7 +318,7 @@ void sycl_kernel_backproject3D(
 				continue;
 
 			// Only asymmetric half is stored
-			if (xp < 0.0)
+			if (xp < 0.0f)
 			{
 				// Get complex conjugated hermitian symmetry pair
 				xp = -xp;
@@ -347,9 +347,9 @@ void sycl_kernel_backproject3D(
 			int offset7 = offset1 + mdl_x*mdl_y + mdl_x;
 			int offset8 = offset1 + mdl_x*mdl_y + mdl_x + 1;
 
-			XFLOAT mfx = 1.0 - fx;
-			XFLOAT mfy = 1.0 - fy;
-			XFLOAT mfz = 1.0 - fz;
+			XFLOAT mfx = 1.0f - fx;
+			XFLOAT mfy = 1.0f - fy;
+			XFLOAT mfz = 1.0f - fz;
 
 			XFLOAT dd000 = mfz * mfy * mfx;
 

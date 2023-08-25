@@ -35,7 +35,7 @@ void sycl_kernel_wavg(
 	const int zSize = projector.imgZ;
 	const int maxR = projector.maxR;
 
-	const XFLOAT inv_weight_norm = 1.0 / weight_norm;
+	const XFLOAT inv_weight_norm = 1.0f / weight_norm;
 
     if (tid < 9)
 		s_eulers[tid] = g_eulers[bid*9+tid];
@@ -45,9 +45,9 @@ void sycl_kernel_wavg(
 	int pass_num {image_size/block_sz + 1};
 	for (int pass = 0; pass < pass_num; pass++) // finish a reference proj in each block
 	{
-		s_parts[tid] = 0.0;
-		s_sumXA[tid] = 0.0;
-		s_sumAA[tid] = 0.0;
+		s_parts[tid] = 0.0f;
+		s_sumXA[tid] = 0.0f;
+		s_sumAA[tid] = 0.0f;
 
 		int pixel = pass*block_sz + tid;
 		if (pixel < image_size)

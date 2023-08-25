@@ -43,7 +43,7 @@ void sycl_kernel_diff2_coarse(
 			s_eulers[i] = g_eulers[blockid*eulers_per_block*9 + i];
 
 
-	XFLOAT diff2s[eulers_per_block] {0.0};
+	XFLOAT diff2s[eulers_per_block] {0.0f};
 
 	const XFLOAT tx {trans_x[tid % trans_num]};
 	const XFLOAT ty {trans_y[tid % trans_num]};
@@ -113,7 +113,7 @@ void sycl_kernel_diff2_coarse(
 		{
 			s_real[tid] = g_real[init_pixel + tid];
 			s_imag[tid] = g_imag[init_pixel + tid];
-			s_corr[tid] = g_corr[init_pixel + tid] / 2.0;
+			s_corr[tid] = g_corr[init_pixel + tid] / 2.0f;
 		}
 		__group_barrier(nit);
 
@@ -199,7 +199,7 @@ void sycl_kernel_diff2_fine(
     {
 		int trans_num  = static_cast<int>(d_job_num[bid]); //how many transes we have for this rot
 		for (int itrans = 0; itrans < trans_num; itrans++)
-			s[itrans*block_sz + tid] = 0.0;
+			s[itrans*block_sz + tid] = 0.0f;
 
 		// index of comparison
 		int ix = static_cast<int>(d_rot_idx[d_job_idx[bid]]);
@@ -273,7 +273,7 @@ void sycl_kernel_diff2_fine(
 
 					XFLOAT diff_real =  ref_real - shifted_real;
 					XFLOAT diff_imag =  ref_imag - shifted_imag;
-					s[itrans*block_sz + tid] += (diff_real*diff_real + diff_imag*diff_imag) * 0.5 * g_corr_img[pixel];
+					s[itrans*block_sz + tid] += (diff_real*diff_real + diff_imag*diff_imag) * 0.5f * g_corr_img[pixel];
 				}
 			}
 		}
@@ -327,8 +327,8 @@ void sycl_kernel_diff2_CC_coarse(
 	const XFLOAT e7 = g_eulers[iorient * 9 + 7];
 	const XFLOAT e8 = g_eulers[iorient * 9 + 8];
 
-	s_weight[tid] = 0.0;
-	s_norm[tid] = 0.0;
+	s_weight[tid] = 0.0f;
+	s_norm[tid] = 0.0f;
 
 	const int pixel_pass_num {image_size/block_sz + 1};
 	for (int pass = 0; pass < pixel_pass_num; pass++)
@@ -423,8 +423,8 @@ void sycl_kernel_diff2_CC_fine(
 		int trans_num = static_cast<int>(d_job_num[bid]); //how many transes we have for this rot
 		for (int itrans = 0; itrans < trans_num; itrans++)
 		{
-			s[   itrans*block_sz + tid] = 0.0;
-			s_cc[itrans*block_sz + tid] = 0.0;
+			s[   itrans*block_sz + tid] = 0.0f;
+			s_cc[itrans*block_sz + tid] = 0.0f;
 		}
 
 		// index of comparison
