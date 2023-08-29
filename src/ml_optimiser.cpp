@@ -518,6 +518,8 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	do_blush = parser.checkOption("--blush", "Perform the reconstruction with the Blush algorithm.");
 	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
 
+	min_sigma2_offset = textToFloat(parser.getOption("--min_sigma2_offset", "Lower bound for sigma2 for offset", "2.", true));
+
     // We read input optimiser set to create the output one
     fn_OS = parser.getOption("--ios", "Input tomo optimiser set file. It is used to set --i, --ref or --solvent_mask if they are not provided. Updated output optimiser set is created.", "");
     if (fn_OS != "")
@@ -952,6 +954,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     skip_gridding = !parser.checkOption("--dont_skip_gridding", "Perform gridding in the reconstruction step (obsolete?)");
     debug_split_random_half = textToInteger(getParameter(argc, argv, "--debug_split_random_half", "0"));
     skip_realspace_helical_sym = parser.checkOption("--skip_realspace_helical_sym", "", "false", true);
+
+	min_sigma2_offset = textToFloat(parser.getOption("--min_sigma2_offset", "Lower bound for sigma2 for offset", "2.", true));
 
 #ifdef DEBUG_READ
     std::cerr<<"MlOptimiser::parseInitial Done"<<std::endl;
@@ -4852,6 +4856,10 @@ void MlOptimiser::maximizationOtherParameters()
             else
                 mymodel.sigma2_offset += (1. - my_mu) * (wsum_model.sigma2_offset) / (2. * sum_weight);
         }
+
+        // Impose lower bound for offset sigma square
+        if (mymodel.sigma2_offset < min_sigma2_offset)
+            mymodel.sigma2_offset = min_sigma2_offset;
     }
 
     // TODO: update estimates for sigma2_rot, sigma2_tilt and sigma2_psi!

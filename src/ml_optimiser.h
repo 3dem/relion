@@ -300,6 +300,9 @@ public:
 	// Flag to keep sigma2_noise fixed
 	bool fix_sigma_noise;
 
+	// Hidden flag as the lower bound for offset sampling
+	RFLOAT min_sigma2_offset;
+
 	//  Use images only up to a certain resolution in the expectation step (one for each optics_group)
 	// image_coarse_size is for first pass, image_current_size is for second pass, image_full_size is original image size
 	std::vector<int> image_coarse_size, image_current_size, image_full_size;
@@ -772,6 +775,7 @@ public:
             gridding_nr_iter(0),
             do_use_reconstruct_images(0),
             fix_sigma_noise(0),
+			min_sigma2_offset(2.),
             current_changes_optimal_offsets(0),
             smallest_changes_optimal_classes(0),
             do_print_metadata_labels(0),
