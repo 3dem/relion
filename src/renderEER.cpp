@@ -103,7 +103,7 @@ void EERRenderer::render2K_to_4K(MultidimArray<T> &image, std::vector<unsigned i
 {
 	for (int i = 0; i < n_electrons; i++)
 	{
-		int x = ((positions[i] & 2047) << 1) | (symbols[i] & 2); // 2047 = 11111111111b
+		int x = ((positions[i] & 2047) << 1) | (symbols[i] & 1); // 2047 = 11111111111b
 		int y = ((positions[i] >> 11) << 1) | (symbols[i] >> 1); //  2048 = 2^11
 		DIRECT_A2D_ELEM(image, y, x)++;
 	}
@@ -458,7 +458,9 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 
 			while (true)
 			{
-				// Fetch 32 bits and unpack up to 3 chunks of 7 + 2 bits.
+				// Fetch 32 bits and unpack up to 2 chunks of 7 + 2 bits.
+				// (Note: one cannot unpack 3 chunks because bit_offset_in_first_byte can be 7;
+				//  7 + 9 + 9 + 9 = 34 > 32 so the last subpixel symbol would be lost.)
 				// This is faster than unpack 7 and 2 bits sequentially.
 				// Since the size of buf is larger than the actual size by the TIFF header size,
 				// it is always safe to read ahead.
@@ -488,19 +490,6 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 				if (p == 127) continue;
 
 				s = (unsigned char)((chunk >> 16) & 3);
-				bit_pos += 2;
-				positions[n_electron] = n_pix;
-				symbols[n_electron] = s;
-				n_electron++;
-				n_pix++;
-
-				p = (unsigned char)((chunk >> 18) & 127);
-				bit_pos += 7;
-				n_pix += p;
-				if (n_pix >= total_pixels) break;
-				if (p == 127) continue;
-
-				s = (unsigned char)((chunk >> 25) & 3);
 				bit_pos += 2;
 				positions[n_electron] = n_pix;
 				symbols[n_electron] = s;
