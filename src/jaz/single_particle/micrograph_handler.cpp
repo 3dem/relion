@@ -414,7 +414,9 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 			{
 				if (eer_upsampling < 0)
 					eer_upsampling = micrograph.getEERUpsampling();
-				EERRenderer::loadEERGain(gainFn, lastGainRef(), eer_upsampling);
+				EERRenderer renderer;
+				renderer.read(movieFn, eer_upsampling);
+				renderer.loadEERGain(gainFn, lastGainRef());
 			}
 			else
 			{

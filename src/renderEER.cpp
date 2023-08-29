@@ -35,8 +35,9 @@ const unsigned int EERRenderer::EER_LEN_FOOTER = 24;
 const uint16_t EERRenderer::TIFF_COMPRESSION_EER8bit = 65000;
 const uint16_t EERRenderer::TIFF_COMPRESSION_EER7bit = 65001;
 const uint16_t EERRenderer::TIFF_COMPRESSION_EERDetailed = 65002;
-const ttag_t EERRenderer::TIFFTAG_EER_RLE_LENGTH = 65007;
-const ttag_t EERRenderer::TIFFTAG_EER_SUBPIXEL_COUNT = 65008;
+const ttag_t EERRenderer::TIFFTAG_EER_RLE_DEPTH = 65007;
+const ttag_t EERRenderer::TIFFTAG_EER_SUBPIXEL_H_DEPTH = 65008;
+const ttag_t EERRenderer::TIFFTAG_EER_SUBPIXEL_V_DEPTH = 65009;
 
 TIFFErrorHandler EERRenderer::prevTIFFWarningHandler = NULL;
 
@@ -138,7 +139,7 @@ EERRenderer::EERRenderer()
 	buf = NULL;
 	preread_start = -1;
 	preread_end = -1;
-	eer_upsampling = 2;
+	eer_upsampling = 1;
 }
 
 void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
@@ -203,18 +204,29 @@ void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
 		}
 		else if (compression == EERRenderer::TIFF_COMPRESSION_EERDetailed)
 		{
-			// See "Default Tag Auto-registration" in http://www.simplesystems.org/libtiff/addingtags.html.
+			// See https://stackoverflow.com/questions/33522589/how-to-read-custom-tiff-tags-w-o-tifffieldinfo
+			// and "AUTOREGISTERED TAGS" in https://manpages.debian.org/testing/libtiff-dev/TIFFGetField.3tiff.en.html.
 			uint32_t count;
-			uint16_t *val;
+			uint16_t *rle, *subpix_h, *subpix_v;
 
-			TIFFGetField(ftiff, EERRenderer::TIFFTAG_EER_RLE_LENGTH, &count, (void*)&val);
-			rle_bits = *val;
-			TIFFGetField(ftiff, EERRenderer::TIFFTAG_EER_SUBPIXEL_COUNT, &count, (void*)&val);
-			subpixel_bits = 1 << *val;
-			if (rle_bits != 7 || subpixel_bits != 2)
+			TIFFGetField(ftiff, EERRenderer::TIFFTAG_EER_RLE_DEPTH, &count, (void*)&rle);
+			rle_bits = *rle;
+			TIFFGetField(ftiff, EERRenderer::TIFFTAG_EER_SUBPIXEL_H_DEPTH, &count, (void*)&subpix_h);
+			// Prototype images apparently don't have TIFFTAG_EER_SUBPIXEL_V_DEPTH
+			if (TIFFGetField(ftiff, EERRenderer::TIFFTAG_EER_SUBPIXEL_V_DEPTH, &count, (void*)&subpix_v) == 0)
+				subpix_v = subpix_h;
+
+			if (rle_bits != 7 || *subpix_h != *subpix_v || *subpix_h != 1)
 			{
 				REPORT_ERROR("Unsupported compression scheme: type = " + integerToString(compression) +
-				             ", rle_bits = " + integerToString(rle_bits) + ", subpixel_bits = " + integerToString(subpixel_bits));
+				             ", rle_bits = " + integerToString(rle_bits) + ", subpix_h = " + integerToString(*subpix_h) +
+				             ", subpix_v = " + integerToString(*subpix_v));
+			}
+			subpixel_bits = 1 << *subpix_h;
+
+			if (subpixel_bits == 2 && (eer_upsampling == -1 || eer_upsampling >= 3))
+			{
+				REPORT_ERROR("For subpixel_bits = 2, eer_upsamling must be 1 or 2.");
 			}
 		}
 		else
@@ -475,8 +487,9 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 				if (n_pix >= total_pixels) break;
 				if (p == 127) continue; // this should be rare.
 
-				// TOOD: FIXME: do I need to flip bits?
-				s = (unsigned char)((chunk >> 7) & 3); // 3 = 00000011; 2 bits for symbol
+				// 3 = 00000011; 2 bits for symbol
+				// Note that we have to flip bits (see below).
+				s = (unsigned char)((chunk >> 7) & 3) ^ 3;
 				bit_pos += 2;
 				positions[n_electron] = n_pix;
 				symbols[n_electron] = s;
@@ -489,7 +502,7 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 				if (n_pix >= total_pixels) break;
 				if (p == 127) continue;
 
-				s = (unsigned char)((chunk >> 16) & 3);
+				s = (unsigned char)((chunk >> 16) & 3) ^ 3;
 				bit_pos += 2;
 				positions[n_electron] = n_pix;
 				symbols[n_electron] = s;
@@ -508,7 +521,13 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 			// Because there is a footer, it is safe to go beyond the limit by two bytes.
 			while (pos < pos_limit)
 			{
-				// symbol is bit tricky. 0000YyXx; Y and X must be flipped.
+				// Symbol is bit tricky: 0000YyXx, where Y and X must be flipped.
+				// In other words, the bits for shifts 0, 1, 2, 3 are 10, 11, 00, 01.
+				// This can be considered as 'signed 2 bit' representation of -2, -1, 0, 1.
+				// For 2 bit symbols (2K EER): 000000YX and Y and X must be flipped.
+				// That is, shifts 0 and 1 correspond to bits 1 and 0.
+				// This is "signed 1 bit" representation of -1 and 0..
+				// ref: Lingbo Yu, TFS (Email to Takanori on 10-11 May 2023)
 				p1 = buf[pos];
 				s1 = (buf[pos + 1] & 0x0F) ^ 0x0A; // 0x0F = 00001111, 0x0A = 00001010
 

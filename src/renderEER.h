@@ -18,7 +18,7 @@ class EERRenderer {
 	static const int EER_4K, EER_2K;
 	static const unsigned int EER_LEN_FOOTER;
 	static const uint16_t TIFF_COMPRESSION_EER8bit, TIFF_COMPRESSION_EER7bit, TIFF_COMPRESSION_EERDetailed;
-	static const ttag_t TIFFTAG_EER_RLE_LENGTH, TIFFTAG_EER_SUBPIXEL_COUNT;
+	static const ttag_t TIFFTAG_EER_RLE_DEPTH, TIFFTAG_EER_SUBPIXEL_H_DEPTH, TIFFTAG_EER_SUBPIXEL_V_DEPTH;
 
 	FileName fn_movie;
 
@@ -89,7 +89,7 @@ class EERRenderer {
 		preread_end = end - 1;
 	}
 
-	void read(FileName _fn_movie, int eer_upsampling=2);
+	void read(FileName _fn_movie, int eer_upsampling=1);
 
 	// Due to a limitation in libtiff (not TIFF specification!),
 	// the maximum number of frames is 65535.
@@ -107,9 +107,13 @@ class EERRenderer {
 
 	// The gain reference for EER is not multiplicative! So the inverse is taken here.
 	// 0 means defect.
+	// This reads the gain reference into the `gain` array but does NOT apply it to movies.
 	template <typename T>
-	static void loadEERGain(FileName fn_gain, MultidimArray<T> &gain, int eer_upsampling)
+	void loadEERGain(FileName fn_gain, MultidimArray<T> &gain)
 	{
+		if (!ready)
+			REPORT_ERROR("EERRenderer::loadEERGain called before ready.");
+
 		const bool is_multiplicative = (fn_gain.getExtension() == "gain");
 		if (is_multiplicative)
 		{
@@ -117,14 +121,14 @@ class EERRenderer {
 			fn_gain += ":tif";
 		}
 
-		// TODO: FIXME: support 2K
-		const int EER_IMAGE_WIDTH = 4096, EER_IMAGE_HEIGHT = 4096;
+		const int detector_width = width;
+		const int detector_height = height;
 
 		Image<T> original;
 		original.read(fn_gain, true, 0, false, true); // explicitly use the first page
 		const int nx_in = XSIZE(original());
 		const int ny_in = YSIZE(original());
-		const long long size_out = EER_IMAGE_WIDTH * eer_upsampling;
+		long long size_out = getWidth();
 
 		// Revert Y flip in TIFF reader
 		if (is_multiplicative)
@@ -142,18 +146,18 @@ class EERRenderer {
 			}
 		} 
 
-		if (eer_upsampling == 2 && nx_in == EER_IMAGE_WIDTH && ny_in == EER_IMAGE_HEIGHT) // gain = 4K and grid = 8K
+		if (eer_upsampling == 2 && nx_in == detector_width && ny_in == detector_height) // (gain=det=4K, grid=8K) or (gain=det=2K, grid=4K)
 		{
 			gain.initZeros(size_out, size_out);
 			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(gain)
 				DIRECT_A2D_ELEM(gain, i, j) = DIRECT_A2D_ELEM(original(), i / 2, j / 2);
 		}
-		else if ((eer_upsampling == 1 && nx_in == EER_IMAGE_WIDTH && ny_in == EER_IMAGE_HEIGHT) || // gain = 4K and grid = 4K
-		         (eer_upsampling == 2 && nx_in == EER_IMAGE_WIDTH * 2 && ny_in == EER_IMAGE_HEIGHT * 2)) // gain = 8K and grid = 8K
+		else if ((eer_upsampling == 1 && nx_in == detector_width && ny_in == detector_height) || // (gain=det=grid=4K) or (gain=det=grid=2K)
+		         (eer_upsampling == 2 && nx_in == size_out && ny_in == size_out)) // (det=4K, gain=grid=8K) or (det=2K, gain=grid=4K)
 		{
 			gain = original();
 		}
-		else if (eer_upsampling == 1 && nx_in == EER_IMAGE_WIDTH * 2 && ny_in == EER_IMAGE_HEIGHT * 2) // gain = 8K and grid = 4K
+		else if (eer_upsampling == 1 && nx_in == detector_width * 2 && ny_in == detector_height * 2) // (gain=8K, det=grid=4K) or (gain=4K, det=grid=2K)
 		{
 			gain.initZeros(size_out, size_out);
 			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(original())
@@ -162,7 +166,7 @@ class EERRenderer {
 		else
 		{
 			std::cerr << "Size of input gain: X = " << nx_in << " Y = " << ny_in << " Expected: X = " << size_out << " Y = " << size_out << std::endl;
-			REPORT_ERROR("Invalid gain size in EERRenderer::upsampleEERGain()");
+			REPORT_ERROR("Unsupported gain size in EERRenderer::loadEERGain()");
 		}
 		
 		if (!is_multiplicative)
