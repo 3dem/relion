@@ -2363,12 +2363,64 @@ void JobWindow::initialiseDynaMightWindow()
     tab1->label("I/O");
     resetHeight();
 
+    place("fn_star", TOGGLE_DEACTIVATE);
+    place("fn_map", TOGGLE_DEACTIVATE);
+    place("fn_mask", TOGGLE_DEACTIVATE);
+
+ 	current_y += STEPY /2 ;
+
+    place("nr_gaussians", TOGGLE_DEACTIVATE);
+    place("reg_factor", TOGGLE_DEACTIVATE);
+
+    current_y += STEPY /2 ;
+
+    place("gpu_id");
+    place("do_preload");
 
     tab1->end();
 
+
+
+
     tab2->begin();
-    tab2->label("TODO");
+    tab2->label("Tasks");
     resetHeight();
+
+    place("fn_checkpoint", TOGGLE_REACTIVATE);
+    current_y += STEPY /2 ;
+
+    group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group1->end();
+
+    place("do_visualize", TOGGLE_REACTIVATE, group1, false);
+    group1->begin();
+    place("halfset");
+    group1->end();
+
+    current_y += STEPY /2 ;
+
+    group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group2->end();
+
+    place("do_inverse", TOGGLE_REACTIVATE, group2, false);
+    group2->begin();
+    place("nr_epochs");
+    group2->end();
+
+    current_y += STEPY /2 ;
+
+    group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group3->end();
+    place("do_reconstruct",TOGGLE_REACTIVATE, group3, false);
+    group3->begin();
+    place("do_store_deform");
+    place("backproject_batchsize");
+    group3->end();
+
+    // Make defaults active
+    guientries["do_visualize"].cb_menu_i();
+    guientries["do_inverse"].cb_menu_i();
+    guientries["do_reconstruct"].cb_menu_i();
 
     tab2->end();
 }
