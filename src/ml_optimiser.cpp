@@ -515,10 +515,13 @@ void MlOptimiser::parseContinue(int argc, char **argv)
     nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
     debug_split_random_half = textToInteger(getParameter(argc, argv, "--debug_split_random_half", "0"));
     skip_realspace_helical_sym = parser.checkOption("--skip_realspace_helical_sym", "", "false", true);
-	do_blush = parser.checkOption("--blush", "Perform the reconstruction with the Blush algorithm.");
-	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
 
-	min_sigma2_offset = textToFloat(parser.getOption("--min_sigma2_offset", "Lower bound for sigma2 for offset", "2.", true));
+    do_blush = parser.checkOption("--blush", "Perform the reconstruction with the Blush algorithm.");
+    blush_args = parser.getOption("--blush", "Arguments to pass to the Blush call.", "");
+
+    do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
+
+    min_sigma2_offset = textToFloat(parser.getOption("--min_sigma2_offset", "Lower bound for sigma2 for offset", "2.", true));
 
     // We read input optimiser set to create the output one
     fn_OS = parser.getOption("--ios", "Input tomo optimiser set file. It is used to set --i, --ref or --solvent_mask if they are not provided. Updated output optimiser set is created.", "");
@@ -887,7 +890,10 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     do_phase_random_fsc = parser.checkOption("--solvent_correct_fsc", "Correct FSC curve for the effects of the solvent mask?");
     do_skip_maximization = parser.checkOption("--skip_maximize", "Skip maximization step (only write out data.star file)?");
     failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be handled by fail-safe mode, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
+
     do_blush = parser.checkOption("--blush", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
+    blush_args = parser.getOption("--blush", "Arguments to pass to the Blush call.", "");
+
     do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction with the Blush algorithm.");
     nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
     auto_ignore_angle_changes = parser.checkOption("--auto_ignore_angles", "In auto-refinement, update angular sampling regardless of changes in orientations for convergence. This makes convergence faster.");
@@ -2291,6 +2297,16 @@ void MlOptimiser::initialiseGeneral(int rank)
         subset_size = -1;
         mu = 0.;
     }
+
+	if (do_gpu)
+	{
+		blush_args += " --gpu ";
+		for (auto &d: gpuDevices)
+			blush_args += gpu_ids + ",";
+		blush_args += " ";
+	}
+	else
+		blush_args = blush_args + " --gpu -1 ";
 
 #ifdef DEBUG
     std::cerr << "Leaving initialiseGeneral" << std::endl;
@@ -4603,18 +4619,21 @@ void MlOptimiser::maximization()
                     if (iter > -1) fn_ext_root.compose(fn_out+"_it", iter, "", 3);
                     else fn_ext_root = fn_out;
                     fn_ext_root.compose(fn_ext_root+"_class", iclass+1, "", 3);
-                    (wsum_model.BPref[iclass]).externalReconstruct(mymodel.Iref[iclass],
+                    (wsum_model.BPref[iclass]).externalReconstruct(
+                            mymodel.Iref[iclass],
                             fn_ext_root,
                             mymodel.fsc_halves_class[iclass],
                             mymodel.tau2_class[iclass],
                             mymodel.sigma2_class[iclass],
                             mymodel.data_vs_prior_class[iclass],
-			    mymodel.pixel_size,
-			    particle_diameter,
+                            mymodel.pixel_size,
+                            particle_diameter,
                             (do_join_random_halves || do_always_join_random_halves),
-			    do_blush,
+                            do_blush,
+                            blush_args,
                             mymodel.tau2_fudge_factor,
-                            1); // verbose
+                            1
+                            ); // verbose
                 }
                 else
                 {

@@ -492,6 +492,9 @@ public:
 	/** Perform reconstruction using the Blush algorithm */
 	bool do_blush;
 
+	/** Argumetns to pass to the Blush call */
+	std::string blush_args;
+
 	/* Flag whether to use the Adaptive approach as by Tagare et al (2010) J. Struc. Biol.
 	 * where two passes through the integrations are made: a first one with a coarse angular sampling and
 	 * smaller images and a second one with finer angular sampling and larger images

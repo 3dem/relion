@@ -1207,12 +1207,13 @@ void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
                                         FileName &fn_out,
                                         MultidimArray<RFLOAT> &fsc_halves_io,
                                         MultidimArray<RFLOAT> &tau2_io,
-										MultidimArray<RFLOAT> &sigma2_ref,
-										MultidimArray<RFLOAT> &data_vs_prior,
-										RFLOAT pixel_size,
-										RFLOAT particle_diameter,
-										bool is_whole_instead_of_half,
-										bool do_blush,
+                                        MultidimArray<RFLOAT> &sigma2_ref,
+                                        MultidimArray<RFLOAT> &data_vs_prior,
+                                        RFLOAT pixel_size,
+                                        RFLOAT particle_diameter,
+                                        bool is_whole_instead_of_half,
+                                        bool do_blush,
+                                        std::string blush_args,
                                         RFLOAT tau2_fudge,
                                         int verb)
 {
@@ -1283,6 +1284,9 @@ void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
 	{
 		//run python wrapper command
 		std::string cmd = "relion_python_blush " + fn_star;
+
+		cmd += " " + blush_args;
+
 		FILE* pipe = popen(cmd.c_str(), "r");
 		if (!pipe)
 			throw std::runtime_error("Failed to dispatch command: " + cmd);
