@@ -32,7 +32,7 @@ Now download RELION and checkout the verison you want, by running:
 ```
 git clone https://github.com/3dem/relion.git
 cd relion
-git checkout master # or ver4.0; see below
+git checkout master # or ver5.0; see below
 ```
 
 To add support for Python modules (e.g. Blush, ModelAngelo and DynaMight) you will have to install a Python environment.
@@ -56,7 +56,7 @@ it's recommended to set the TORCH_HOME directory. To do this, include the follow
 Before installing RELION make sure Conda is not active. If it is, you can deactivate it by running:
 ```conda deactivate```
 
-You can not build RELION through:
+You can now build RELION through:
 
 ```
 mkdir build
