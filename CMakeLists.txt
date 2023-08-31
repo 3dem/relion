@@ -453,6 +453,7 @@ list(APPEND RELION_PYTHON_WRAPPERS
         python_classranker
         python_blush
         python_dynamight
+        python_topaz
 )
 
 foreach (SCRIPT_FILE ${RELION_PYTHON_WRAPPERS})

@@ -58,7 +58,7 @@
 //#define DEFAULTDENOISINGWRAPPERLOCATION "relion_tomo_denoise"
 #define DEFAULTMOTIONCOR2LOCATION "/public/EM/MOTIONCOR2/MotionCor2"
 #define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
-#define DEFAULTTOPAZLOCATION "/public/EM/RELION/topaz"
+#define DEFAULTTOPAZLOCATION "relion_python_topaz"
 #define DEFAULTRESMAPLOCATION "/public/EM/ResMap/ResMap-1.1.4-linux64"
 #define DEFAULTMODELANGELOLOCATION "/public/EM/model-angelo/model-angelo"
 #define DEFAULTPYTHONLOCATION "python"
