@@ -515,7 +515,11 @@ void MlOptimiser::parseContinue(int argc, char **argv)
     nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
     debug_split_random_half = textToInteger(getParameter(argc, argv, "--debug_split_random_half", "0"));
     skip_realspace_helical_sym = parser.checkOption("--skip_realspace_helical_sym", "", "false", true);
-    do_blush = parser.checkOption("--blush", "Perform the reconstruction with the Blush algorithm.");
+
+	do_blush = parser.checkOption("--blush", "Perform the reconstruction with the Blush algorithm.");
+	if (parser.checkOption("--blush_skip_spectral_trailing", "Skip spectral trailing during Blush reconstruction (WARNING: This could potentially lead to an exaggeration of resolution estimates.)"))
+		blush_args += " --skip-spectral-trailing ";
+
     do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
 
     min_sigma2_offset = textToFloat(parser.getOption("--min_sigma2_offset", "Lower bound for sigma2 for offset", "2.", true));
@@ -887,7 +891,11 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     do_phase_random_fsc = parser.checkOption("--solvent_correct_fsc", "Correct FSC curve for the effects of the solvent mask?");
     do_skip_maximization = parser.checkOption("--skip_maximize", "Skip maximization step (only write out data.star file)?");
     failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be handled by fail-safe mode, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
+
     do_blush = parser.checkOption("--blush", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
+	if (parser.checkOption("--blush_skip_spectral_trailing", "Skip spectral trailing during Blush reconstruction (WARNING: This may inflate resolution estimates)"))
+		blush_args += " --skip-spectral-trailing ";
+
     do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction with the Blush algorithm.");
     nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
     auto_ignore_angle_changes = parser.checkOption("--auto_ignore_angles", "In auto-refinement, update angular sampling regardless of changes in orientations for convergence. This makes convergence faster.");

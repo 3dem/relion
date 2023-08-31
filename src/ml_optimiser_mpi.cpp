@@ -2041,7 +2041,10 @@ void MlOptimiserMpi::maximization()
 
 	if (verb > 0)
 	{
-		std::cout << " Maximization ..."<< std::endl;
+		if (do_blush)
+			std::cout << " Maximization (with Blush regularization)..." << std::endl;
+		else
+			std::cout << " Maximization..." << std::endl;
 		init_progress_bar(mymodel.nr_classes);
 	}
 
