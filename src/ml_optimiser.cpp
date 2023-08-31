@@ -515,10 +515,10 @@ void MlOptimiser::parseContinue(int argc, char **argv)
     nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
     debug_split_random_half = textToInteger(getParameter(argc, argv, "--debug_split_random_half", "0"));
     skip_realspace_helical_sym = parser.checkOption("--skip_realspace_helical_sym", "", "false", true);
-	do_blush = parser.checkOption("--blush", "Perform the reconstruction with the Blush algorithm.");
-	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
+    do_blush = parser.checkOption("--blush", "Perform the reconstruction with the Blush algorithm.");
+    do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
 
-	min_sigma2_offset = textToFloat(parser.getOption("--min_sigma2_offset", "Lower bound for sigma2 for offset", "2.", true));
+    min_sigma2_offset = textToFloat(parser.getOption("--min_sigma2_offset", "Lower bound for sigma2 for offset", "2.", true));
 
     // We read input optimiser set to create the output one
     fn_OS = parser.getOption("--ios", "Input tomo optimiser set file. It is used to set --i, --ref or --solvent_mask if they are not provided. Updated output optimiser set is created.", "");
@@ -2291,6 +2291,20 @@ void MlOptimiser::initialiseGeneral(int rank)
         subset_size = -1;
         mu = 0.;
     }
+
+	char *env_blush_args = getenv("RELION_BLUSH_ARGS");
+	if (env_blush_args != nullptr)
+		blush_args += std::string(env_blush_args);
+
+	if (do_gpu)
+	{
+		blush_args += " --gpu ";
+		for (auto &d: gpuDevices)
+			blush_args += gpu_ids + ",";
+		blush_args += " ";
+	}
+	else
+		blush_args = blush_args + " --gpu -1 ";
 
 #ifdef DEBUG
     std::cerr << "Leaving initialiseGeneral" << std::endl;
@@ -4603,18 +4617,21 @@ void MlOptimiser::maximization()
                     if (iter > -1) fn_ext_root.compose(fn_out+"_it", iter, "", 3);
                     else fn_ext_root = fn_out;
                     fn_ext_root.compose(fn_ext_root+"_class", iclass+1, "", 3);
-                    (wsum_model.BPref[iclass]).externalReconstruct(mymodel.Iref[iclass],
+                    (wsum_model.BPref[iclass]).externalReconstruct(
+                            mymodel.Iref[iclass],
                             fn_ext_root,
                             mymodel.fsc_halves_class[iclass],
                             mymodel.tau2_class[iclass],
                             mymodel.sigma2_class[iclass],
                             mymodel.data_vs_prior_class[iclass],
-			    mymodel.pixel_size,
-			    particle_diameter,
+                            mymodel.pixel_size,
+                            particle_diameter,
                             (do_join_random_halves || do_always_join_random_halves),
-			    do_blush,
+                            do_blush,
+                            blush_args,
                             mymodel.tau2_fudge_factor,
-                            1); // verbose
+                            1
+                            ); // verbose
                 }
                 else
                 {

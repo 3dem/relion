@@ -2124,6 +2124,7 @@ void MlOptimiserMpi::maximization()
 									particle_diameter,
 									(do_join_random_halves || do_always_join_random_halves),
 									do_blush,
+									blush_args,
 									mymodel.tau2_fudge_factor,
 									node->rank==1); // only first followers is verbose
 						}
@@ -2263,6 +2264,7 @@ void MlOptimiserMpi::maximization()
 										particle_diameter,
 										(do_join_random_halves || do_always_join_random_halves),
 										do_blush,
+										blush_args,
 										mymodel.tau2_fudge_factor);
 							}
 							else
