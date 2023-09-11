@@ -132,7 +132,7 @@ public:
 	void syclPrefetch(void *ptr, const size_t bytes) override;
 	void syclPrefetchAfterWaitAll(void *ptr, const size_t bytes) override;
 
-	void printDeviceInfo(bool printAll = false) const override;
+	void printDeviceInfo(bool printAll = false) override;
 
 	void waitAll() override;
 
@@ -146,6 +146,7 @@ public:
 	sycl::event& getLastEvent()			{ return _event.back(); }
 	sycl::event& getPrevSubmission()	{ return _prev_submission; }
 	std::vector<sycl::event>& getEventList()	{ return _event; }
+	bool canSupportFP64()	{ return	isFP64Supported; }
 #ifdef SYCL_OFFLOAD_SORT
 	oneapi::dpl::execution::device_policy<>& getDevicePolicy()	{ return _devicePolicy; }
 #endif
@@ -166,6 +167,7 @@ private:
 	sycl::event _prev_submission;
 	std::string deviceName;
 	int deviceID;
+	bool isFP64Supported;
 #ifdef SYCL_OFFLOAD_SORT
 	oneapi::dpl::execution::device_policy<> _devicePolicy;
 #endif

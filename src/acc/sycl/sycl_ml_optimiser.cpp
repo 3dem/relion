@@ -189,7 +189,6 @@ MlOptimiserSYCL::MlOptimiserSYCL(MlOptimiser *baseMLOptimiser, MlSyclDataBundle 
 	generateProjectionPlanOnTheFly {bundle->generateProjectionPlanOnTheFly},
 	bundle {b}
 {
-
 	setupDevice();
 }
 
@@ -247,6 +246,25 @@ std::vector<virtualSYCL*> MlOptimiserSYCL::getDevices(const syclDeviceType selec
 					selectedDevices.push_back(new devSYCL(device, count++, verbose));
 			}
 		}
+#ifdef ACC_DOUBLE_PRECISION
+		bool isFP64 = true;
+		for (auto &select : selectedDevices)
+		{
+			if (! dynamic_cast<devSYCL*>(select)->canSupportFP64())
+			{
+				isFP64 = false;
+				break;
+			}
+		}
+		if (! isFP64)
+		{
+			for (auto select : selectedDevices)
+				delete dynamic_cast<devSYCL*>(select);
+
+			selectedDevices.clear();
+			std::cerr << "Double-Precision for Accelerator is requested but there is device which cannot support FP64.\n";
+		}
+#endif
 	}
 	else if (select == syclDeviceType::cpu)
 	{

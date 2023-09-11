@@ -631,7 +631,7 @@ void devSYCL::waitAll()
 	}
 }
 
-void devSYCL::printDeviceInfo(bool printAll) const
+void devSYCL::printDeviceInfo(bool printAll)
 {
 	auto d = _devQ->get_device();
 	PRINT_DEV_INFO(d, name);
@@ -807,5 +807,9 @@ void devSYCL::printDeviceInfo(bool printAll) const
 				break;
 		}
 	}
+	if (dconfigs.size() == 0)
+		isFP64Supported=false;
+	else
+		isFP64Supported=true;
 	std::cout << "\n\n";
 }

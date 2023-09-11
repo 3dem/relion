@@ -55,7 +55,7 @@ public:
 
 	virtual void waitAll() = 0;
 
-	virtual void printDeviceInfo(bool printAll) const = 0;
+	virtual void printDeviceInfo(bool printAll) = 0;
 };
 
 struct virtualSyclPtr
