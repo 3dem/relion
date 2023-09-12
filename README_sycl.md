@@ -37,15 +37,15 @@ $ cmake \
 -DSYCL=ON \
 -DCUDA=OFF \
 -DCMAKE_BUILD_TYPE=Release \
--DCMAKE_C_FLAGS="-O3" \
--DCMAKE_CXX_FLAGS="-O3 -march=native" \
+-DCMAKE_C_FLAGS="-O3 -fsigned-zeros" \
+-DCMAKE_CXX_FLAGS="-O3 -fsigned-zeros -march=native" \
 -DCMAKE_EXE_LINKER_FLAGS="-O3 -march=native" \
 ..
 
 $ #### This is Intel GPU Level Zero backend specific #####
-$ export ZE_AFFINITY_MASK=0			# Use only the first available Level Zero device
+$ export ZE_AFFINITY_MASK=0 # Use only the first available Level Zero device
 $ export ZEX_NUMBER_OF_CCS=0:4,1:4
-$ export SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=2
+$ export SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=2 # Don't use this with Intel Arc GPUs. Only for Max GPUs
 $ export SYCL_PI_LEVEL_ZERO_DEVICE_SCOPE_EVENTS=0
 $ export SYCL_PI_LEVEL_ZERO_USM_ALLOCATOR="1;4G;host:16M,512,64K;device:16M,1024,64K;shared:0,0,64K"
 $ export EnableDirectSubmission=1
@@ -55,6 +55,7 @@ $ export NEOReadDebugKeys=1
 $ #### End of Intel GPU Level Zero backend specific  #####
 $ # For finer control of SYCL devcices, please see the above descrpition on ONEAPI_DEVICE_SELECTOR
 $ 
+$ ulimit -n 512000 # this is necessary for multi-GPU jobs
 $ {Run 2D/3D/refinement application by replacing --gpu/--cpu with --sycl/--sycl-opencl/--sycl-cpu/--sycl-cuda/--sycl-hip}
 ```
 
