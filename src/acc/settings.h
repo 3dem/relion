@@ -47,6 +47,8 @@
 	#define accGPUMemGetInfo hipMemGetInfo
 	#define MlOptimiserAccGPU MlOptimiserHip
 	#define AutoPickerAccGPU AutoPickerHip
+#elif _SYCL_ENABLED
+	#define MlOptimiserAccGPU MlOptimiserSYCL
 #endif
 
 #endif /* ACC_SETTINGS_H_ */

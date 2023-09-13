@@ -436,6 +436,27 @@ public:
 			ACC_PTR_DEBUG_FATAL("Host double allocation.\n");
 #endif
 		doFreeHost = true;
+#ifdef _SYCL_ENABLED
+		if(accType == accSYCL)
+		{
+			hPtr = (T*)(stream->syclMalloc(size * sizeof(T), syclMallocType::host));
+			if(hPtr == nullptr)
+			{
+				std::string str = "devSYCL(" + std::to_string(reinterpret_cast<uintptr_t>(stream)) + " : " + stream->getName() + ")\n";
+				str += "syclMalloc HOST error of size " + std::to_string(size * sizeof(T)) + ".\n";
+
+				ACC_PTR_DEBUG_FATAL(str.c_str());
+				CRITICAL(RAMERR);
+			}
+			isHostSYCL = true;
+		}
+		else
+		{
+			if(posix_memalign((void **)&hPtr, MEM_ALIGN, sizeof(T) * size))
+				CRITICAL(RAMERR);
+			isHostSYCL = false;
+		}
+#else
 		// TODO - alternatively, this could be aligned std::vector
 		if(posix_memalign((void **)&hPtr, MEM_ALIGN, sizeof(T) * size))
 			CRITICAL(RAMERR);

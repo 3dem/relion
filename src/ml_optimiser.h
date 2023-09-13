@@ -104,6 +104,9 @@ public:
 	std::vector<int> gpuOptimiserDeviceMap;
 	std::vector<void*> gpuOptimisers;
 	std::vector<void*> accDataBundles;
+#if _SYCL_ENABLED
+	std::vector<deviceStream_t> syclDeviceList;
+#endif
 
 #ifdef ALTCPU
 	std::vector<void*> cpuOptimisers;

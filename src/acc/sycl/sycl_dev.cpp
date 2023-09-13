@@ -231,7 +231,7 @@ devSYCL::devSYCL(sycl::context &c, sycl::device &d, int id, const bool verbose)
 	if (verbose)
 	{
 		std::cout << std::string(80, '*') << std::endl;
-		std::cout << "Selected SYCL device is [" << id << "] " << deviceName << std::endl;
+		std::cout << "Selected SYCL device is " << deviceName << std::endl;
 		std::cout << "maxComputeUnit= " << maxUnit << ", maxWorkGroupSize= " << maxGroup << ", globalMemSize= " << globalMem << std::endl;
 		printDeviceInfo();
 	}
@@ -290,7 +290,7 @@ devSYCL::devSYCL(sycl::context &c, sycl::device &d, const syclQueueType qType, i
 	if (verbose)
 	{
 		std::cout << std::string(80, '*') << std::endl;
-		std::cout << "Selected SYCL device is [" << id << "] " << deviceName << std::endl;
+		std::cout << "Selected SYCL device is " << deviceName << std::endl;
 		std::cout << "maxComputeUnit= " << maxUnit << ", maxWorkGroupSize= " << maxGroup << ", globalMemSize= " << globalMem << std::endl;
 		printDeviceInfo();
 	}
@@ -351,6 +351,9 @@ devSYCL::devSYCL(const syclDeviceType dev, int id, const bool verbose)
 	localMem = d.get_info<sycl::info::device::local_mem_size>();
 	maxUnit = d.get_info<sycl::info::device::max_compute_units>();
 	deviceID = id;
+	std::stringstream ss;
+	ss << "[" << id << "] " << d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
+	deviceName = ss.str();
 	_prev_submission = sycl::event();
 	_event.push_back(sycl::event());
 
@@ -418,6 +421,9 @@ devSYCL::devSYCL(const syclBackendType be, const syclDeviceType dev, int id, con
 	localMem = d.get_info<sycl::info::device::local_mem_size>();
 	maxUnit = d.get_info<sycl::info::device::max_compute_units>();
 	deviceID = id;
+	std::stringstream ss;
+	ss << "[" << id << "] " << d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
+	deviceName = ss.str();
 	_prev_submission = sycl::event();
 	_event.push_back(sycl::event());
 
