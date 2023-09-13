@@ -110,6 +110,10 @@ cmake -DCMAKE_INSTALL_PREFIX=/where/to/install/ \
 make -j
 ```
 
+## Building with SYCL
+
+For detailed information on RELION build with SYCL support, please read [README_sycl](README_sycl.md) file.
+
 ## Updating
 
 RELION is intermittently updated, with both minor and major features.

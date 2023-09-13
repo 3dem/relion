@@ -461,9 +461,9 @@ void MlOptimiser::parseContinue(int argc, char **argv)
     keep_scratch = parser.checkOption("--keep_scratch", "Don't remove scratch after convergence. Following jobs that use EXACTLY the same particles should use --reuse_scratch.");
 
 #ifdef ALTCPU
-    do_cpu = parser.checkOption("--cpu", "Use intel vectorisation implementation for CPU");
+	do_cpu = parser.checkOption("--cpu", "Use intel vectorisation implementation for CPU");
 #else
-        do_cpu = false;
+	do_cpu = false;
 #endif
 
     failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be drop, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
@@ -567,6 +567,8 @@ void MlOptimiser::parseContinue(int argc, char **argv)
     do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
 
     min_sigma2_offset = textToFloat(parser.getOption("--min_sigma2_offset", "Lower bound for sigma2 for offset", "2.", true));
+
+	min_sigma2_offset = textToFloat(parser.getOption("--min_sigma2_offset", "Lower bound for sigma2 for offset", "2.", true));
 
     // We read input optimiser set to create the output one
     fn_OS = parser.getOption("--ios", "Input tomo optimiser set file. It is used to set --i, --ref or --solvent_mask if they are not provided. Updated output optimiser set is created.", "");
