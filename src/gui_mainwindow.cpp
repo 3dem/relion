@@ -601,7 +601,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 		nr_browse_tabs++;
 
         browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-        browser->add("Flexibility");
+        browser->add("Flexibility DynaMight");
         gui_jobwindows[nr_browse_tabs] = new JobWindow();
         gui_jobwindows[nr_browse_tabs]->initialise(PROC_DYNAMIGHT);
         browse_grp[nr_browse_tabs]->end();
@@ -647,7 +647,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
     if (!_do_tomo)
     {
         browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-        browser->add("Model building");
+        browser->add("ModelAngelo building");
         gui_jobwindows[nr_browse_tabs] = new JobWindow();
         gui_jobwindows[nr_browse_tabs]->initialise(PROC_MODELANGELO);
         browse_grp[nr_browse_tabs]->end();

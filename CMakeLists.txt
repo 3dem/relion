@@ -85,7 +85,7 @@ if(NOT (DEFINED CUDA_ARCH OR DEFINED HIP_ARCH))
   if (CUDA)
     message(STATUS "Setting fallback CUDA_ARCH=50")
     set(CUDARCH "-arch=sm_50")
-  elseif(HIP)
+  elseif (HIP)
     message(STATUS "Setting fallback HIP_ARCH=gfx906")
     set(AMDGPU_TARGETS "gfx906" CACHE STRING "Semicolon delimited list of AMD GPU targets to compile for (e.g gf908;gfx90a)")
   endif()
@@ -93,7 +93,7 @@ else(NOT (DEFINED CUDA_ARCH OR DEFINED HIP_ARCH))
 if (CUDA)
   message(STATUS "Using provided CUDA_ARCH=${CUDA_ARCH}")
   set(CUDARCH "-arch=sm_${CUDA_ARCH}")
-elseif(HIP)
+elseif (HIP)
   message(STATUS "Using provided HIP_ARCH=${HIP_ARCH}")
   set(AMDGPU_TARGETS "${HIP_ARCH}" CACHE STRING "Semicolon delimited list of AMD GPU targets to compile for (e.g gf908;gfx90a)")
   endif()
@@ -238,11 +238,11 @@ elseif(HIP)
     endif(HIP_FOUND)
 elseif(SYCL)
 	add_definitions(-D_SYCL_ENABLED=1 -DUSE_MPI_COLLECTIVE)
-    if("${CMAKE_CXX_COMPILER_ID}" MATCHES "IntelLLVM" OR "${CMAKE_CXX_COMPILER}" MATCHES "icpx")
-        add_definitions(-D_DPCPP_ENABLED=1)
-    endif()
+	if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "IntelLLVM" OR "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" OR "${CMAKE_CXX_COMPILER}" MATCHES "mpiicpx")
+		add_definitions(-D_DPCPP_ENABLED=1)
+	endif()
 elseif(ALTCPU)
-    add_definitions(-DALTCPU=1 -DUSE_MPI_COLLECTIVE)
+	add_definitions(-DALTCPU=1 -DUSE_MPI_COLLECTIVE)
 endif()
 
 # ----------------------------------------------------------INCLUDE ALL BUILD TYPES--
@@ -272,13 +272,13 @@ if (CUDA)
         add_definitions(-DCUDA_FORCESTL)
         message(STATUS "Building cuda files using stl-libs for sort, min and max.")
     endif(CudaForceSTL)
-elseif(HIP)
+elseif (HIP)
     option(HipForceSTL "HipForceSTL" OFF)
     if(HipForceSTL)
         add_definitions(-DHIP_FORCESTL)
         message(STATUS "Building hip files using stl-libs for sort, min and max.")
     endif(HipForceSTL)
-elseif(SYCL)
+elseif (SYCL)
 	option(SyclForceOneDPL "SyclForceOneDPL" OFF)
 	if(SyclForceOneDPL)
 		add_definitions(-DSYCL_OFFLOAD_SORT)
@@ -302,7 +302,6 @@ endif()
 option(FORCE_OWN_TBB "FORCE_OWN_TBB" OFF)
 
 if (ALTCPU)
-
 	if (FORCE_OWN_TBB)
 		message(STATUS "Will ignore any potentially installed system TBB lib, as per your request.")
 		include(${CMAKE_SOURCE_DIR}/cmake/BuildTBB.cmake)
@@ -349,10 +348,10 @@ if(HIP)
     set(CMAKE_CXX_COMPILER hipcc)
     message(STATUS "CMAKE_CXX_COMPILER : ${CMAKE_CXX_COMPILER}")
 elseif(SYCL)
-#    set(CMAKE_C_COMPILER icx)
-#    set(CMAKE_CXX_COMPILER icpx)
-    message(STATUS "CMAKE_C_COMPILER : ${CMAKE_C_COMPILER}")
-    message(STATUS "CMAKE_CXX_COMPILER : ${CMAKE_CXX_COMPILER}")
+#	set(CMAKE_C_COMPILER icx)
+#	set(CMAKE_CXX_COMPILER icpx)
+	message(STATUS "CMAKE_C_COMPILER : ${CMAKE_C_COMPILER}")
+	message(STATUS "CMAKE_CXX_COMPILER : ${CMAKE_CXX_COMPILER}")
 endif()
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -365,39 +364,39 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 message(STATUS "CMAKE_CXX_COMPILER_ID : ${CMAKE_CXX_COMPILER_ID}")
 
 if(MKLFFT)
-    if (NOT "$ENV{MKLROOT}" STREQUAL "")
-        include_directories("$ENV{MKLROOT}/include/fftw")
-        message(STATUS "MKL FFTW wrapper header files: $ENV{MKLROOT}/include/fftw")
-    else()
-        message(WARNING "COMPILATION MAY FAIL since no MKL FFTW wrapper header files could be found. Please make sure the MKLROOT environmental variable is set.")
-    endif()
-    add_definitions(-DMKLFFT)
+	if (NOT "$ENV{MKLROOT}" STREQUAL "")
+		include_directories("$ENV{MKLROOT}/include/fftw")
+		message(STATUS "MKL FFTW wrapper header files: $ENV{MKLROOT}/include/fftw")
+	else()
+		message(WARNING "COMPILATION MAY FAIL since no MKL FFTW wrapper header files could be found. Please make sure the MKLROOT environmental variable is set.")
+	endif()
+	add_definitions(-DMKLFFT)
 endif(MKLFFT)
 
-if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Intel" OR "${CMAKE_CXX_COMPILER}" MATCHES "icpx")
+if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Intel" OR "${CMAKE_CXX_COMPILER}" MATCHES "mpiicpx")
 # "Intel" is for classic Intel compiler and "IntelLLVM" is for oneAPI compiler which is supported from CMake 3.20
-    if(ALTCPU OR SYCL)
-        add_definitions(-DFAST_CENTERFFT)
-    endif()
+	if(ALTCPU OR SYCL)
+		add_definitions(-DFAST_CENTERFFT)
+	endif()
 
-    if(MKLFFT)
+	if(MKLFFT)
 		SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -qopenmp -qmkl=parallel -limf")
-    endif(MKLFFT)
+	endif(MKLFFT)
 
-    if(INTEL_IPP OR DEFINED ENV{IPPROOT})
-        if(EXISTS "$ENV{IPPROOT}/include/ipps.h" AND EXISTS "$ENV{IPPROOT}/lib/intel64/libipps.a")
-            add_definitions(-DUSE_IPP)
-            SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qipp")
-            SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -qipp -qipp-link=static")
-            message(STATUS "Using Intel IPP library: $ENV{IPPROOT}")
-        endif()
-    endif()
+	if(INTEL_IPP OR DEFINED ENV{IPPROOT})
+		if(EXISTS "$ENV{IPPROOT}/include/ipps.h" AND EXISTS "$ENV{IPPROOT}/lib/intel64/libipps.a")
+			add_definitions(-DUSE_IPP)
+			SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qipp")
+			SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -qipp -qipp-link=static")
+			message(STATUS "Using Intel IPP library: $ENV{IPPROOT}")
+		endif()
+	endif()
 else()
-    if(MKLFFT)
-        # For the time being, let's use the sequential version (as with FFTW)
-        link_directories("$ENV{MKLROOT}/lib/intel64")
-        SET(FFTW_LIBRARIES mkl_intel_lp64 mkl_sequential mkl_core)
-    endif(MKLFFT)
+	if(MKLFFT)
+		# For the time being, let's use the sequential version (as with FFTW)
+		link_directories("$ENV{MKLROOT}/lib/intel64")
+		SET(FFTW_LIBRARIES mkl_intel_lp64 mkl_sequential mkl_core)
+	endif(MKLFFT)
 endif()
 
 # ---------------------------------------------------------------USE TEXTURES OR NOT--
@@ -491,6 +490,27 @@ if(JPEG_FOUND)
 	add_definitions(-DHAVE_JPEG)
 endif(JPEG_FOUND)
 
+# -----------------------------------------------------------------PYTHON DEPENDENCIES--
+
+
+set(CONDA_ENV_NAME "relion-5.0" CACHE STRING "The Conda environment name")
+include(${CMAKE_SOURCE_DIR}/cmake/FindCondaPython.cmake)
+
+list(APPEND RELION_PYTHON_WRAPPERS
+        python_classranker
+        python_blush
+        python_dynamight
+        python_topaz
+)
+
+foreach (SCRIPT_FILE ${RELION_PYTHON_WRAPPERS})
+    configure_file(
+            ${CMAKE_SOURCE_DIR}/scripts/${SCRIPT_FILE}.in
+            ${CMAKE_BINARY_DIR}/bin/relion_${SCRIPT_FILE}
+            @ONLY
+    )
+endforeach()
+
 # ----------------------------------------------------------------------COPY SCRIPTS--
 
 if(FORCE_OWN_FFTW)
@@ -526,19 +546,6 @@ install( DIRECTORY ${CMAKE_BINARY_DIR}/bin
 # install fltk if we built our own version
 if(INSTALL_OWN_FLTK)
     install(DIRECTORY external/fltk/lib/ DESTINATION lib FILES_MATCHING PATTERN "*")
-endif()
-
-# -----------------------------------------------------------------PYTHON DEPENDENCIES--
-
-set(PYTHON_EXE_PATH "" CACHE PATH "Path to Python executable")
-if(NOT "${PYTHON_EXE_PATH}" STREQUAL "")
-    add_compile_definitions(PYTHON_EXE_PATH=${PYTHON_EXE_PATH})
-endif()
-
-set(TORCH_HOME_PATH "" CACHE PATH "Path to Torch home directory for storage of trained models.")
-
-if(NOT "${TORCH_HOME_PATH}" STREQUAL "")
-    add_compile_definitions(TORCH_HOME_PATH=${TORCH_HOME_PATH})
 endif()
 
 # -----------------------------------------------------------------RELION COMPONENTS--

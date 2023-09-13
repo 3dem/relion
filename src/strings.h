@@ -50,6 +50,8 @@
 #include <string>
 #include <iostream>
 #include <sstream>
+#include <algorithm>
+#include <cctype>
 #include <string.h>
 #include <stdio.h>
 #include "src/macros.h"
@@ -301,6 +303,9 @@ std::string simplify( const std::string& str );
 
 /** Remove trailing spaces */
 void trim(std::string& str);
+
+/** Remove trailing spaces and new lines */
+std::string trim2(const std::string& str);
 
 /** Remove consecutive spaces.
  *

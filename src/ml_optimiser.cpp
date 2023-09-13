@@ -462,9 +462,9 @@ void MlOptimiser::parseContinue(int argc, char **argv)
     keep_scratch = parser.checkOption("--keep_scratch", "Don't remove scratch after convergence. Following jobs that use EXACTLY the same particles should use --reuse_scratch.");
 
 #ifdef ALTCPU
-    do_cpu = parser.checkOption("--cpu", "Use intel vectorisation implementation for CPU");
+	do_cpu = parser.checkOption("--cpu", "Use intel vectorisation implementation for CPU");
 #else
-        do_cpu = false;
+	do_cpu = false;
 #endif
 
     failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be drop, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
@@ -560,7 +560,14 @@ void MlOptimiser::parseContinue(int argc, char **argv)
     nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
     debug_split_random_half = textToInteger(getParameter(argc, argv, "--debug_split_random_half", "0"));
     skip_realspace_helical_sym = parser.checkOption("--skip_realspace_helical_sym", "", "false", true);
+
+	do_blush = parser.checkOption("--blush", "Perform the reconstruction with the Blush algorithm.");
+	if (parser.checkOption("--blush_skip_spectral_trailing", "Skip spectral trailing during Blush reconstruction (WARNING: This could potentially lead to an exaggeration of resolution estimates.)"))
+		blush_args += " --skip-spectral-trailing ";
+
 	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
+
+	min_sigma2_offset = textToFloat(parser.getOption("--min_sigma2_offset", "Lower bound for sigma2 for offset", "2.", true));
 
     // We read input optimiser set to create the output one
     fn_OS = parser.getOption("--ios", "Input tomo optimiser set file. It is used to set --i, --ref or --solvent_mask if they are not provided. Updated output optimiser set is created.", "");
@@ -964,7 +971,12 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     do_phase_random_fsc = parser.checkOption("--solvent_correct_fsc", "Correct FSC curve for the effects of the solvent mask?");
     do_skip_maximization = parser.checkOption("--skip_maximize", "Skip maximization step (only write out data.star file)?");
     failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be handled by fail-safe mode, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
-    do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
+
+	do_blush = parser.checkOption("--blush", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
+	if (parser.checkOption("--blush_skip_spectral_trailing", "Skip spectral trailing during Blush reconstruction (WARNING: This may inflate resolution estimates)"))
+		blush_args += " --skip-spectral-trailing ";
+
+	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction with the Blush algorithm.");
     nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
     auto_ignore_angle_changes = parser.checkOption("--auto_ignore_angles", "In auto-refinement, update angular sampling regardless of changes in orientations for convergence. This makes convergence faster.");
     auto_resolution_based_angles= parser.checkOption("--auto_resol_angles", "In auto-refinement, update angular sampling based on resolution-based required sampling. This makes convergence faster.");
@@ -1030,6 +1042,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     skip_gridding = !parser.checkOption("--dont_skip_gridding", "Perform gridding in the reconstruction step (obsolete?)");
     debug_split_random_half = textToInteger(getParameter(argc, argv, "--debug_split_random_half", "0"));
     skip_realspace_helical_sym = parser.checkOption("--skip_realspace_helical_sym", "", "false", true);
+
+	min_sigma2_offset = textToFloat(parser.getOption("--min_sigma2_offset", "Lower bound for sigma2 for offset", "2.", true));
 
 #ifdef DEBUG_READ
     std::cerr<<"MlOptimiser::parseInitial Done"<<std::endl;
@@ -2456,6 +2470,20 @@ void MlOptimiser::initialiseGeneral(int rank)
         subset_size = -1;
         mu = 0.;
     }
+
+	char *env_blush_args = getenv("RELION_BLUSH_ARGS");
+	if (env_blush_args != nullptr)
+		blush_args += std::string(env_blush_args);
+
+	if (do_gpu)
+	{
+		blush_args += " --gpu ";
+		for (auto &d: gpuDevices)
+			blush_args += gpu_ids + ",";
+		blush_args += " ";
+	}
+	else
+		blush_args = blush_args + " --gpu -1 ";
 
 #ifdef DEBUG
     std::cerr << "Leaving initialiseGeneral" << std::endl;
@@ -4675,11 +4703,12 @@ void MlOptimiser::symmetriseReconstructions()
 
 void MlOptimiser::applyLocalSymmetryForEachRef()
 {
-    if ( (fn_local_symmetry_masks.size() < 1) || (fn_local_symmetry_operators.size() < 1) )
+
+    if ( (fn_local_symmetry_masks.size() == 0) || (fn_local_symmetry_operators.size() == 0) )
         return;
 
     if (verb > 0)
-        std::cout << " Applying local symmetry in real space according to " << fn_local_symmetry_operators.size() << " operators..." << std::endl;
+        std::cout << " Applying local symmetry in real space..." << std::endl;
 
     for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
     {
@@ -4799,8 +4828,11 @@ void MlOptimiser::maximization()
 
     if (verb > 0)
     {
-        std::cout << " Maximization ..." << std::endl;
-        init_progress_bar(mymodel.nr_classes);
+		if (do_blush)
+			std::cout << " Maximization (with Blush regularization)..." << std::endl;
+		else
+			std::cout << " Maximization..." << std::endl;
+		init_progress_bar(mymodel.nr_classes);
     }
 
     // When doing ctf_premultiplied, correct the tau2 estimates for the average CTF^2
@@ -4829,23 +4861,27 @@ void MlOptimiser::maximization()
                         false,
                         do_correct_tau2_by_avgctf2);
 
-                if (do_external_reconstruct)
+                if (do_external_reconstruct || do_blush)
                 {
                     FileName fn_ext_root;
                     if (iter > -1) fn_ext_root.compose(fn_out+"_it", iter, "", 3);
                     else fn_ext_root = fn_out;
                     fn_ext_root.compose(fn_ext_root+"_class", iclass+1, "", 3);
-                    (wsum_model.BPref[iclass]).externalReconstruct(mymodel.Iref[iclass],
+                    (wsum_model.BPref[iclass]).externalReconstruct(
+                            mymodel.Iref[iclass],
                             fn_ext_root,
                             mymodel.fsc_halves_class[iclass],
                             mymodel.tau2_class[iclass],
                             mymodel.sigma2_class[iclass],
                             mymodel.data_vs_prior_class[iclass],
-			    mymodel.pixel_size,
-			    particle_diameter,
+                            mymodel.pixel_size,
+                            particle_diameter,
                             (do_join_random_halves || do_always_join_random_halves),
+                            do_blush,
+                            blush_args,
                             mymodel.tau2_fudge_factor,
-                            1); // verbose
+                            1
+                            ); // verbose
                 }
                 else
                 {
@@ -5088,6 +5124,10 @@ void MlOptimiser::maximizationOtherParameters()
             else
                 mymodel.sigma2_offset += (1. - my_mu) * (wsum_model.sigma2_offset) / (2. * sum_weight);
         }
+
+        // Impose lower bound for offset sigma square
+        if (mymodel.sigma2_offset < min_sigma2_offset)
+            mymodel.sigma2_offset = min_sigma2_offset;
     }
 
     // TODO: update estimates for sigma2_rot, sigma2_tilt and sigma2_psi!

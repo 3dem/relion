@@ -2335,7 +2335,10 @@ void MlOptimiserMpi::maximization()
 
 	if (verb > 0)
 	{
-		std::cout << " Maximization ..."<< std::endl;
+		if (do_blush)
+			std::cout << " Maximization (with Blush regularization)..." << std::endl;
+		else
+			std::cout << " Maximization..." << std::endl;
 		init_progress_bar(mymodel.nr_classes);
 	}
 
@@ -2400,7 +2403,7 @@ void MlOptimiserMpi::maximization()
 								(do_join_random_halves || do_always_join_random_halves),
                                 do_correct_tau2_by_avgctf2);
 
-						if (do_external_reconstruct)
+						if (do_external_reconstruct || do_blush)
 						{
 							FileName fn_ext_root;
 							if (iter > -1) fn_ext_root.compose(fn_out+"_it", iter, "", 3);
@@ -2417,6 +2420,8 @@ void MlOptimiserMpi::maximization()
 									mymodel.pixel_size,
 									particle_diameter,
 									(do_join_random_halves || do_always_join_random_halves),
+									do_blush,
+									blush_args,
 									mymodel.tau2_fudge_factor,
 									node->rank==1); // only first followers is verbose
 						}
@@ -2467,7 +2472,7 @@ void MlOptimiserMpi::maximization()
 					}
 
 					// Apply local symmetry according to a list of masks and their operators
-					if ( (fn_local_symmetry_masks.size() >= 1) && (fn_local_symmetry_operators.size() >= 1) && (!has_converged) )
+					if ( (fn_local_symmetry_masks.size() != 0) && (fn_local_symmetry_operators.size() != 0) && (!has_converged) )
 						applyLocalSymmetry(mymodel.Iref[ith_recons], fn_local_symmetry_masks, fn_local_symmetry_operators);
 
 					// Shaoda Jul26,2015 - Helical symmetry local refinement
@@ -2538,7 +2543,7 @@ void MlOptimiserMpi::maximization()
 									(do_join_random_halves || do_always_join_random_halves),
                                     do_correct_tau2_by_avgctf2);
 
-							if (do_external_reconstruct)
+							if (do_external_reconstruct || do_blush)
 							{
 								FileName fn_ext_root;
 								if (iter > -1) fn_ext_root.compose(fn_out+"_it", iter, "", 3);
@@ -2555,6 +2560,8 @@ void MlOptimiserMpi::maximization()
 										mymodel.pixel_size,
 										particle_diameter,
 										(do_join_random_halves || do_always_join_random_halves),
+										do_blush,
+										blush_args,
 										mymodel.tau2_fudge_factor);
 							}
 							else
@@ -2599,7 +2606,7 @@ void MlOptimiserMpi::maximization()
 							}
 
 							// Apply local symmetry according to a list of masks and their operators
-							if ( (fn_local_symmetry_masks.size() >= 1) && (fn_local_symmetry_operators.size() >= 1) && (!has_converged) )
+							if ( (fn_local_symmetry_masks.size() != 0) && (fn_local_symmetry_operators.size() != 0) && (!has_converged) )
 								applyLocalSymmetry(mymodel.Iref[ith_recons], fn_local_symmetry_masks, fn_local_symmetry_operators);
 
 							// Shaoda Jul26,2015 - Helical symmetry local refinement
@@ -3939,7 +3946,7 @@ void MlOptimiserMpi::iterate()
 		}
 		symmetriseReconstructions();
 
-		if ( (verb > 0) && (node->isLeader()) && (fn_local_symmetry_masks.size() >= 1) && (fn_local_symmetry_operators.size() >= 1) )
+		if ( (verb > 0) && (node->isLeader()) && (fn_local_symmetry_masks.size() != 0) && (fn_local_symmetry_operators.size() != 0) )
 			std::cout << " Applying local symmetry in real space according to " << fn_local_symmetry_operators.size() << " operators..." << std::endl;
 
 		// Write out data and weight arrays to disc in order to also do an unregularized reconstruction

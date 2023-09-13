@@ -58,9 +58,8 @@
 //#define DEFAULTDENOISINGWRAPPERLOCATION "relion_tomo_denoise"
 #define DEFAULTMOTIONCOR2LOCATION "/public/EM/MOTIONCOR2/MotionCor2"
 #define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
-#define DEFAULTTOPAZLOCATION "/public/EM/RELION/topaz"
+#define DEFAULTTOPAZLOCATION "relion_python_topaz"
 #define DEFAULTRESMAPLOCATION "/public/EM/ResMap/ResMap-1.1.4-linux64"
-#define DEFAULTDYNAMIGHTLOCATION "/public/EM/DynaMight/dynamight"
 #define DEFAULTMODELANGELOLOCATION "/public/EM/model-angelo/model-angelo"
 #define DEFAULTPYTHONLOCATION "python"
 #define DEFAULTMODELANGELOLOCATION "/public/EM/model-angelo/model-angelo"
@@ -423,6 +422,7 @@ static bool do_allow_change_minimum_dedicated;
 #define LABEL_MULTIBODY_OPT            "ProcessData.star.relion.optimiser.multibody"
 #define LABEL_MULTIBODY_FLEXLOG        "LogFile.pdf.relion.flexanalysis"
 #define LABEL_MULTIBODY_SEL_PARTS      "ParticlesData.star.relion.flexanalysis.eigenselected"
+#define LABEL_DYNAMIGHT_HALFMAP        "DensityMap.mrc.relion.halfmap.dynamight"
 #define LABEL_MASK3D_MASK              "Mask3D.mrc.relion"
 #define LABEL_SUBTRACT_SUBTRACTED      "ParticlesData.star.relion.subtracted"
 #define LABEL_SUBTRACT_REVERTED        "ParticlesData.star.relion"
@@ -1216,7 +1216,7 @@ public:
 	// Prepare the final (job submission or combined (mpi) command of possibly multiple lines)
 	// Returns true to go ahead, and false to cancel
 	bool prepareFinalCommand(std::string &outputname, std::vector<std::string> &commands, std::string &final_command,
-			bool do_makedir, std::string &warning_message);
+			bool do_makedir, std::string &warning_message, bool do_dash_for_python = false);
 
 	// Initialise the generic RelionJob
 	void initialise(int job_type);

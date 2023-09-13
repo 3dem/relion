@@ -306,6 +306,9 @@ public:
 	// Flag to keep sigma2_noise fixed
 	bool fix_sigma_noise;
 
+	// Hidden flag as the lower bound for offset sampling
+	RFLOAT min_sigma2_offset;
+
 	//  Use images only up to a certain resolution in the expectation step (one for each optics_group)
 	// image_coarse_size is for first pass, image_current_size is for second pass, image_full_size is original image size
 	std::vector<int> image_coarse_size, image_current_size, image_full_size;
@@ -499,6 +502,12 @@ public:
 
 	/** Perform reconstruction outside of relion_refine, e.g. for learned priors */
 	bool do_external_reconstruct;
+
+	/** Perform reconstruction using the Blush algorithm */
+	bool do_blush;
+
+	/** Argumetns to pass to the Blush call */
+	std::string blush_args;
 
 	/* Flag whether to use the Adaptive approach as by Tagare et al (2010) J. Struc. Biol.
 	 * where two passes through the integrations are made: a first one with a coarse angular sampling and
@@ -783,6 +792,7 @@ public:
             gridding_nr_iter(0),
             do_use_reconstruct_images(0),
             fix_sigma_noise(0),
+			min_sigma2_offset(2.),
             current_changes_optimal_offsets(0),
             smallest_changes_optimal_classes(0),
             do_print_metadata_labels(0),
@@ -810,6 +820,9 @@ public:
             do_scale_correction(0),
             ctf_phase_flipped(0),
             nr_iter_wo_large_hidden_variable_changes(0),
+			do_external_reconstruct(false),
+			do_blush(false),
+			blush_args(""),
             adaptive_oversampling(0),
             nr_iter(0),
             intact_ctf_first_peak(0),

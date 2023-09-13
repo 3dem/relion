@@ -21,7 +21,6 @@
 
 #include "src/npy.hpp"
 #include "src/class_ranker.h"
-#include "src/python_dependencies.h"
 
 const static int IMGSIZE = 64;
 const static int NR_FEAT = 24;
@@ -1882,9 +1881,21 @@ void ClassRanker::deployTorchModel(std::vector<float> &features, std::vector<flo
 	const long unsigned image_shape [] = {count, IMGSIZE, IMGSIZE};
 	npy::SaveArrayAsNumpy(fn_out + "images.npy", false, 3, image_shape, subimages);
 
-	std::string python_cmd = "-c \"from relion_classranker import main; exit(main())\" " + fn_out;
-	std::string cmd = python_dependencies::get_full_cmd(python_cmd);
-	std::string result = python_dependencies::execute(python_cmd);
+	//run python wrapper command
+	std::string cmd = "relion_python_classranker" + fn_out;
+	FILE* pipe = popen(cmd.c_str(), "r");
+	if (!pipe)
+		throw std::runtime_error("Failed to dispatch command: " + cmd);
+
+	char buffer[128];
+	std::string result;
+
+	// read till end of process
+	while (!feof(pipe))
+		if (fgets(buffer, 128, pipe) != nullptr)
+			result += buffer;
+
+	pclose(pipe);
 
 	try
 	{
@@ -1899,14 +1910,17 @@ void ClassRanker::deployTorchModel(std::vector<float> &features, std::vector<flo
 			scores.push_back(std::stof(token, &sz));
 			s.erase(0, pos + delimiter.length());
 		}
-		if (scores.size() != count){
+		if (scores.size() != count)
+		{
+			std::cerr << std::endl << "Something went wrong in the external Python call..." << std::endl;
+			std::cerr << "Command: " << cmd << std::endl;
 			std::cerr << result << std::endl;
-			throw python_dependencies::InterpreterException(cmd);
+			exit(1);
 		}
 	}
 	catch (const std::invalid_argument& ia) {
 		std::cerr << result << std::endl;
-		throw python_dependencies::InterpreterException(cmd);
+		exit(1);
 	}
 }
 

@@ -3,9 +3,9 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - conda-forge::python=3.10
-  - conda-forge::setuptools=59.5.0
-  - conda-forge::pip
+  - pip
+  - python=3.10
+  - setuptools=59.5.0
   - pip:
       - torch==2.0.1
       - torchvision==0.15.2
@@ -22,6 +22,9 @@ dependencies:
       - PyQt5==5.15.9
       - typer==0.9.0
       - biopython==1.81
-      - git+https://github.com/3dem/relion-classranker@c8d6cab57615cf7550b2dcceb7a4e89cb10f6f54
+      - git+https://github.com/3dem/relion-classranker@b6e751e5cb4205d8e9b36d0ae38c3687b3395acb
       - git+https://github.com/3dem/relion-blush
       - git+https://github.com/schwabjohannes/DynaMight
+      - git+https://github.com/3dem/topaz
+      
+      
