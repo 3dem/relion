@@ -75,14 +75,10 @@ void globalThreadExpectationSomeParticles(void *self, int thread_id)
 
     try
     {
-#if defined _CUDA_ENABLED || defined _HIP_ENABLED
-        if (MLO->do_gpu)
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED || defined _SYCL_ENABLED
+        if (MLO->do_gpu || MLO->do_sycl)
             ((MlOptimiserAccGPU*) MLO->gpuOptimisers[thread_id])->doThreadExpectationSomeParticles(thread_id);
         else
-#elif _SYCL_ENABLED
-		if (MLO->do_sycl)
-			((MlOptimiserSYCL*) MLO->syclOptimisers[thread_id])->doThreadExpectationSomeParticles(thread_id);
-		else
 #endif
             MLO->doThreadExpectationSomeParticles(thread_id);
     }
@@ -97,10 +93,10 @@ void globalThreadExpectationSomeParticles(void *self, int thread_id)
 MlOptimiser::~MlOptimiser()
 {
 #ifdef _SYCL_ENABLED
-	for (int i = 0; i < syclDevices.size(); i++)
-		delete syclDevices[i];
+	for (int i = 0; i < syclDeviceList.size(); i++)
+		delete syclDeviceList[i];
 
-	syclDevices.clear();
+	syclDeviceList.clear();
 #endif
 }
 
@@ -474,12 +470,31 @@ void MlOptimiser::parseContinue(int argc, char **argv)
     failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be drop, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
 
 #ifdef _SYCL_ENABLED
-	do_sycl = parser.checkOption("--sycl", "Use available SYCL resources for some calculations");
-	do_sycl_levelzero = parser.checkOption("--sycl-levelzero", "Use available SYCL Level-Zero GPU resources for some calculations");
+	do_sycl = parser.checkOption("--gpu", "Use available SYCL Level Zero GPU resources for some calculations");
+	if(! do_sycl) do_sycl = parser.checkOption("--sycl", "Use available SYCL Level Zero GPU resources for some calculations");
+	do_sycl_levelzero = parser.checkOption("--sycl-levelzero", "Use available SYCL Level Zero GPU resources for some calculations");
 	do_sycl_cuda = parser.checkOption("--sycl-cuda", "Use available SYCL CUDA GPU resources for some calculations");
 	do_sycl_hip = parser.checkOption("--sycl-hip", "Use available SYCL HIP GPU resources for some calculations");
 	do_sycl_opencl = parser.checkOption("--sycl-opencl", "Use available SYCL OpenCL GPU resources for some calculations");
 	do_sycl_cpu = parser.checkOption("--sycl-cpu", "Use available SYCL OpenCL CPU resources for some calculations");
+
+	if(do_sycl_levelzero)
+		gpu_ids = parser.getOption("--sycl-levelzero", "Device ids for each MPI-thread","default");
+	else if(do_sycl_cuda)
+		gpu_ids = parser.getOption("--sycl-cuda", "Device ids for each MPI-thread","default");
+	else if(do_sycl_hip)
+		gpu_ids = parser.getOption("--sycl-hip", "Device ids for each MPI-thread","default");
+	else if(do_sycl_opencl)
+		gpu_ids = parser.getOption("--sycl-opencl", "Device ids for each MPI-thread","default");
+	else if(do_sycl_cpu)
+		gpu_ids = parser.getOption("--sycl-cpu", "Device ids for each MPI-thread","default");
+	else if (do_sycl)
+	{
+		gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
+		if (gpu_ids == "default")
+			gpu_ids = parser.getOption("--sycl", "Device ids for each MPI-thread","default");
+	}
+
 	if (do_sycl)
 		do_sycl_levelzero = true;
 	if (do_sycl_levelzero || do_sycl_cuda || do_sycl_hip || do_sycl_opencl || do_sycl_cpu)
@@ -487,10 +502,10 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 #else
 	do_sycl = false;
 	do_sycl_levelzero = do_sycl_cuda = do_sycl_hip = do_sycl_opencl = do_sycl_cpu = false;
-#endif
 
     do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
     gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
+#endif
 #if !defined _CUDA_ENABLED && !defined _HIP_ENABLED
     if(do_gpu)
     {
@@ -871,12 +886,31 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 #endif
 
 #ifdef _SYCL_ENABLED
-	do_sycl = parser.checkOption("--sycl", "Use available SYCL resources for some calculations");
-	do_sycl_levelzero = parser.checkOption("--sycl-levelzero", "Use available SYCL Level-Zero GPU resources for some calculations");
+	do_sycl = parser.checkOption("--gpu", "Use available SYCL Level Zero GPU resources for some calculations");
+	if(! do_sycl) do_sycl = parser.checkOption("--sycl", "Use available SYCL Level Zero GPU resources for some calculations");
+	do_sycl_levelzero = parser.checkOption("--sycl-levelzero", "Use available SYCL Level Zero GPU resources for some calculations");
 	do_sycl_cuda = parser.checkOption("--sycl-cuda", "Use available SYCL CUDA GPU resources for some calculations");
 	do_sycl_hip = parser.checkOption("--sycl-hip", "Use available SYCL HIP GPU resources for some calculations");
 	do_sycl_opencl = parser.checkOption("--sycl-opencl", "Use available SYCL OpenCL GPU resources for some calculations");
 	do_sycl_cpu = parser.checkOption("--sycl-cpu", "Use available SYCL OpenCL CPU resources for some calculations");
+
+	if(do_sycl_levelzero)
+		gpu_ids = parser.getOption("--sycl-levelzero", "Device ids for each MPI-thread","default");
+	else if(do_sycl_cuda)
+		gpu_ids = parser.getOption("--sycl-cuda", "Device ids for each MPI-thread","default");
+	else if(do_sycl_hip)
+		gpu_ids = parser.getOption("--sycl-hip", "Device ids for each MPI-thread","default");
+	else if(do_sycl_opencl)
+		gpu_ids = parser.getOption("--sycl-opencl", "Device ids for each MPI-thread","default");
+	else if(do_sycl_cpu)
+		gpu_ids = parser.getOption("--sycl-cpu", "Device ids for each MPI-thread","default");
+	else if (do_sycl)
+	{
+		gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
+		if (gpu_ids == "default")
+			gpu_ids = parser.getOption("--sycl", "Device ids for each MPI-thread","default");
+	}
+
 	if (do_sycl)
 		do_sycl_levelzero = true;
 	if (do_sycl_levelzero || do_sycl_cuda || do_sycl_hip || do_sycl_opencl || do_sycl_cpu)
@@ -884,10 +918,10 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 #else
 	do_sycl = false;
 	do_sycl_levelzero = do_sycl_cuda = do_sycl_hip = do_sycl_opencl = do_sycl_cpu = false;
-#endif
 
     do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
     gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
+#endif
 #if !defined _CUDA_ENABLED && !defined _HIP_ENABLED
     if(do_gpu)
     {
@@ -1577,27 +1611,86 @@ void MlOptimiser::initialise()
 #ifdef _SYCL_ENABLED
 		// TODO: Need more investigation and setting for heterogeneous run
 		if (do_sycl_levelzero)
-			syclDevices = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::levelZero);
+			syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::levelZero);
 		else if (do_sycl_cuda)
-			syclDevices = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::CUDA);
+			syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::CUDA);
 		else if (do_sycl_hip)
-			syclDevices = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::HIP);
+			syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::HIP);
 		else if (do_sycl_opencl)
-			syclDevices = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::openCL);
+			syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::openCL);
 		else
-			syclDevices = MlOptimiserSYCL::getDevices(syclDeviceType::cpu);
+			syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::cpu);
 
-		auto devCount = syclDevices.size();
+		auto devCount = syclDeviceList.size();
 		if (devCount == 0)
 			REPORT_ERROR("You have no SYCL device available");
 
 		std::cout << std::string(80, '*') << std::endl;
+
+		std::vector <std::vector<std::string>> allThreadIDs;
+		untangleDeviceIDs(gpu_ids, allThreadIDs);
+
+		bool fullAutomaticMapping;
+		bool semiAutomaticMapping;
+		if (allThreadIDs[0].size()==0 || ! std::isdigit(*gpu_ids.begin()) )
+		{
+			fullAutomaticMapping = true;
+			semiAutomaticMapping = true;
+			std::cout << "GPU-ids not specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
+		}
+		else
+		{
+			fullAutomaticMapping = false;
+			if(allThreadIDs[0].size() != nr_threads)
+			{
+				semiAutomaticMapping = true;
+				std::cout << " Will distribute threads over devices: ";
+				for (int j = 0; j < allThreadIDs[0].size(); j++)
+					std::cout << " "  << allThreadIDs[0][j];
+				std::cout  << std::endl;
+			}
+			else
+			{
+				semiAutomaticMapping = false;
+				std::cout << " Using explicit indexing to assign devices: ";
+				for (int j = 0; j < allThreadIDs[0].size(); j++)
+					std::cout << " "  << allThreadIDs[0][j];
+				std::cout  << std::endl;
+			}
+		}
+
 		for (int i = 0; i < nr_threads; i++)
 		{
-			const int dev_id = i * devCount / nr_threads;
-			syclOptimiserDeviceMap.push_back(dev_id);
-			std::cout << " Thread " << i << " runs on " << syclDevices[dev_id]->getName() << std::endl;
+			int dev_id;
+			if (semiAutomaticMapping)
+			{
+				if (fullAutomaticMapping)
+					dev_id = devCount*i / nr_threads;
+				else
+					dev_id = textToInteger(allThreadIDs[0][i % (allThreadIDs[0]).size()].c_str());
+			}
+			else // not semiAutomatic => explicit
+				dev_id = textToInteger(allThreadIDs[0][i].c_str());
+
+			if (dev_id < 0 || dev_id > devCount-1)
+				REPORT_ERROR("You have specified SYCL device which is not available");
+
+			std::cout << " Thread " << i << " mapped to device " << syclDeviceList[dev_id]->getName() << std::endl;
+
+			int bundleId(-1);
+
+			for (int j = 0; j < gpuDevices.size(); j++)
+				if (gpuDevices[j] == dev_id)
+					bundleId = j;
+
+			if (bundleId == -1)
+			{
+				bundleId = gpuDevices.size();
+				gpuDevices.push_back(dev_id);
+			}
+			gpuOptimiserDeviceMap.push_back(bundleId);
 		}
+
 		std::cout << std::string(80, '*') << std::endl;
 #else
 		REPORT_ERROR("SYCL usage requested, but RELION was compiled without SYCL support");
@@ -3428,18 +3521,18 @@ void MlOptimiser::expectation()
 #ifdef _SYCL_ENABLED
 	if (do_sycl)
 	{
-		for (int i = 0; i < std::min(nr_threads, static_cast<int>(syclDevices.size())); i++)
+		for (int i = 0; i < gpuDevices.size(); i++)
 		{
-			accDataBundles.push_back((void*)(new MlSyclDataBundle(syclDevices[i])));
+			accDataBundles.push_back((void*)(new MlSyclDataBundle(syclDeviceList[gpuDevices[i]])));
 			((MlSyclDataBundle*)accDataBundles[i])->setup(this);
 		}
 
-		for (int i = 0; i < nr_threads; i++)
+		for (int i = 0; i < gpuOptimiserDeviceMap.size(); i++)
 		{
-			MlOptimiserSYCL *b = new MlOptimiserSYCL(this, (MlSyclDataBundle*)(accDataBundles[syclOptimiserDeviceMap[i]]), "sycl_optimiser");
+			MlOptimiserSYCL *b = new MlOptimiserSYCL(this, (MlSyclDataBundle*)(accDataBundles[gpuOptimiserDeviceMap[i]]), "sycl_optimiser");
 			b->resetData();
 			b->threadID = i;
-			syclOptimisers.push_back((void*)b);
+			gpuOptimisers.push_back((void*)b);
 		}
 	}
 #endif
@@ -3672,12 +3765,6 @@ void MlOptimiser::expectation()
 				XFLOAT *reals = (XFLOAT*)(stream->syclMalloc(s * sizeof(XFLOAT), syclMallocType::host));
 				XFLOAT *imags = (XFLOAT*)(stream->syclMalloc(s * sizeof(XFLOAT), syclMallocType::host));
 				XFLOAT *weights = (XFLOAT*)(stream->syclMalloc(s * sizeof(XFLOAT), syclMallocType::host));
-				if (nullptr == reals || nullptr == imags || nullptr == weights)
-				{
-					std::string str = "syclMalloc HOST error of size " + std::to_string(s * sizeof(XFLOAT)) + ".\n";
-					ACC_PTR_DEBUG_FATAL(str.c_str());
-					CRITICAL(RAMERR);
-				}
 
 				b->backprojectors[j].getMdlData(reals, imags, weights);
 
@@ -3702,10 +3789,10 @@ void MlOptimiser::expectation()
 				b->coarseProjectionPlans[j].clear();
 		}
 
-		for (int i = 0; i < syclOptimisers.size(); i++)
-			delete (MlOptimiserSYCL*)syclOptimisers[i];
+		for (int i = 0; i < gpuOptimisers.size(); i++)
+			delete (MlOptimiserSYCL*)gpuOptimisers[i];
 
-		syclOptimisers.clear();
+		gpuOptimisers.clear();
 
 		for (int i = 0; i < accDataBundles.size(); i++)
 			delete (MlSyclDataBundle*)accDataBundles[i];

@@ -479,7 +479,8 @@ public:
 			hPtr = (T*)(stream->syclMalloc(size * sizeof(T), syclMallocType::host));
 			if(hPtr == nullptr)
 			{
-				std::string str = "syclMalloc HOST error of size " + std::to_string(size * sizeof(T)) + ".\n";
+				std::string str = "devSYCL(" + std::to_string(reinterpret_cast<uintptr_t>(stream)) + " : " + stream->getName() + ")\n";
+				str += "syclMalloc HOST error of size " + std::to_string(size * sizeof(T)) + ".\n";
 
 				ACC_PTR_DEBUG_FATAL(str.c_str());
 				CRITICAL(RAMERR);

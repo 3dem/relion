@@ -12,7 +12,7 @@ This is SYCL/DPC++ version for [RELION](https://github.com/3dem/relion)
 	+ Codeplay(R) oneAPI for AMD GPU (optional - https://developer.codeplay.com/products/oneapi/amd/)
 
 + SYCL specific command line arguments
-	+ `--sycl` or `--sycl-levelzero`: This is for Intel(R) GPU specific Level Zero backend (Recommended for Intel GPU)
+	+ `--gpu`, `--sycl` or `--sycl-levelzero`: This is for Intel(R) GPU specific Level Zero backend (Recommended for Intel GPU)
 	+ `--sycl-opencl`: This is for OpenCL(TM) GPU backend
 	+ `--sycl-cpu`: This is for OpenCL(TM) CPU backend
 	+ `--sycl-cuda`: This is for CUDA(R) backend over SYCL (Not tested)
@@ -20,19 +20,16 @@ This is SYCL/DPC++ version for [RELION](https://github.com/3dem/relion)
 	+ If you need finer control of SYCL devices, you can set `ONEAPI_DEVICE_SELECTOR` environment variable. For detailed description, please look at https://intel.github.io/llvm-docs/EnvironmentVariables.html#oneapi-device-selector
 
 
-
 ```bash
 $ git clone https://github.com/3dem/relion-devel.git relion_sycl -b sycl-merge
 $ cd relion_sycl; mkdir build_sycl; cd build_sycl
 $ {Load Intel oneAPI toolkit and SYCL/Level Zero/OpenCL runtime environment}
 $ sycl-ls					# This will display available SYCL devices
-$ export I_MPI_CC=icx
-$ export I_MPI_CXX=icpx
 $ cmake \
--DCMAKE_C_COMPILER=mpiicc \
--DCMAKE_CXX_COMPILER=mpiicpc \
--DMPI_C_COMPILER=mpiicc \
--DMPI_CXX_COMPILER=mpiicpc \
+-DCMAKE_C_COMPILER=mpiicx \
+-DCMAKE_CXX_COMPILER=mpiicpx \
+-DMPI_C_COMPILER=mpiicx \
+-DMPI_CXX_COMPILER=mpiicpx \
 -DMKLFFT=ON \
 -DSYCL=ON \
 -DCUDA=OFF \
@@ -48,15 +45,11 @@ $ export ZEX_NUMBER_OF_CCS=0:4,1:4
 $ export SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=2 # Don't use this with Intel Arc GPUs. Only for Max GPUs
 $ export SYCL_PI_LEVEL_ZERO_DEVICE_SCOPE_EVENTS=0
 $ export SYCL_PI_LEVEL_ZERO_USM_ALLOCATOR="1;4G;host:16M,512,64K;device:16M,1024,64K;shared:0,0,64K"
-$ export EnableDirectSubmission=1
-$ export DisableIndirectAccess=1
-$ export EnableRecoverablePageFaults=0
-$ export NEOReadDebugKeys=1
 $ #### End of Intel GPU Level Zero backend specific  #####
 $ # For finer control of SYCL devcices, please see the above descrpition on ONEAPI_DEVICE_SELECTOR
 $ 
 $ ulimit -n 512000 # this is necessary for multi-GPU jobs
-$ {Run 2D/3D/refinement application by replacing --gpu/--cpu with --sycl/--sycl-opencl/--sycl-cpu/--sycl-cuda/--sycl-hip}
+$ {Run 2D/3D/refinement application by replacing --gpu/--cpu with --gpu/--sycl/--sycl-opencl/--sycl-cpu/--sycl-cuda/--sycl-hip}
 ```
 
 

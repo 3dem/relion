@@ -107,6 +107,9 @@ public:
 	std::vector<int> gpuOptimiserDeviceMap;
 	std::vector<void*> gpuOptimisers;
 	std::vector<void*> accDataBundles;
+#if _SYCL_ENABLED
+	std::vector<deviceStream_t> syclDeviceList;
+#endif
 
 #ifdef ALTCPU
 	std::vector<void*> cpuOptimisers;
@@ -117,10 +120,6 @@ public:
 	CpuOptimiserType   tbbCpuOptimiser;
 
 	std::complex<XFLOAT> **mdlClassComplex __attribute__((aligned(64)));
-#elif _SYCL_ENABLED
-	std::vector<deviceStream_t> syclDevices;
-	std::vector<int> syclOptimiserDeviceMap;
-	std::vector<void*> syclOptimisers;
 #endif
 
 

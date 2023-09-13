@@ -483,40 +483,79 @@ will still yield good performance and possibly a more stable execution. \n" << s
 	{
 		if (node->isLeader())
 		{
+			if (! std::isdigit(*gpu_ids.begin()))
+			{
+				std::cout << std::string(80, '*') << std::endl;
+				std::cout << "GPU-ids not specified and MPI/threads will automatically be mapped to available devices."<< std::endl;
+			}
+
+			std::vector<std::vector<std::string>> allThreadIDs;
+			untangleDeviceIDs(gpu_ids, allThreadIDs);
+			if( allThreadIDs.size()>0 && allThreadIDs.size()<(node->size-1) ) // if one or more devices are specified, but not for all ranks, extend selection to all ranks by modulus
+			{
+				const int N = allThreadIDs.size();
+				allThreadIDs.resize(node->size-1);
+				for (int rank = 1; rank<(node->size-1); rank++)
+					allThreadIDs[rank] = allThreadIDs[rank%N];
+			}
+
 			MPI_Status status;
 			int nHead, cSize, nodeSize, devCount;
 			std::cout << std::string(80, '*') << std::endl;
 			for (int follower = 1; follower < node->size; follower++)
 			{
+				if (allThreadIDs[follower-1].size() == 0)
+				{
+					std::cout << std::string(80, '*') << std::endl;
+					std::cout << "GPU-ids not specified for this rank, threads will automatically be mapped to available devices."<< std::endl;
+				}
+
 				MPI_Probe(follower, MPITAG_IDENTIFIER, MPI_COMM_WORLD, &status);
 				MPI_Get_count(&status, MPI_CHAR, &cSize);
 				char *hName = (char*)malloc((cSize+1) * sizeof(char));
 				MPI_Recv(hName, cSize, MPI_CHAR, follower, MPITAG_IDENTIFIER, MPI_COMM_WORLD, &status);
 				hName[cSize] = '\0';
 
-				MPI_Recv(&nHead, 1, MPI_INT, follower, MPITAG_INT, MPI_COMM_WORLD, &status);
+				MPI_Recv(&nHead, 1, MPI_INT, follower, MPITAG_INT+100, MPI_COMM_WORLD, &status);
 				if (nHead == 1)
 				{
-					MPI_Recv(&nodeSize, 1, MPI_INT, follower, MPITAG_INT, MPI_COMM_WORLD, &status);
-					std::cout << "Host " << hName << " has " << nodeSize << " ranks.\n";
+					MPI_Recv(&nodeSize, 1, MPI_INT, follower, MPITAG_INT+200, MPI_COMM_WORLD, &status);
+					std::cout << "Host " << hName << " has " << nodeSize << " rank(s).\n";
+				}
 
-					MPI_Recv(&devCount, 1, MPI_INT, follower, MPITAG_INT, MPI_COMM_WORLD, &status);
-					for (int k = 0; k < devCount; k++)
-					{
-						int nSplit;
-						MPI_Recv(&nSplit, 1, MPI_INT, follower, MPITAG_INT, MPI_COMM_WORLD, &status);
-						std::cout << "Device " << k << " on " << hName << " is split between " << nSplit << " followers.\n";
-					}
+				if(allThreadIDs[follower-1].size() != nr_threads)
+				{
+					std::cout << " Follower " << follower << " @ " << hName << " will distribute threads over devices: ";
+					for (int j = 0; j < allThreadIDs[follower-1].size(); j++)
+						std::cout << " "  << allThreadIDs[follower-1][j];
+					std::cout  << std::endl;
+				}
+				else
+				{
+					std::cout << " Follower " << follower << " @ " << hName << " will use explicit mapping to assign devices: ";
+					for (int j = 0; j < allThreadIDs[follower-1].size(); j++)
+						std::cout << " "  << allThreadIDs[follower-1][j];
+					std::cout  << std::endl;
+				}
+
+				MPI_Recv(&devCount, 1, MPI_INT, follower, MPITAG_INT+300, MPI_COMM_WORLD, &status);
+				for (int k = 0; k < devCount; k++)
+				{
+					int devIndex;
+					MPI_Recv(&devIndex, 1, MPI_INT, follower, MPITAG_INT+400, MPI_COMM_WORLD, &status);
+					int nSplit;
+					MPI_Recv(&nSplit, 1, MPI_INT, follower, MPITAG_INT+500, MPI_COMM_WORLD, &status);
+					std::cout << "  Device " << devIndex << " on follower " << follower << " is split between " << nSplit << " thread(s).\n";
 				}
 				for (int j = 0; j < nr_threads; j++)
 				{
-					MPI_Probe(follower, MPITAG_IDENTIFIER, MPI_COMM_WORLD, &status);
+					MPI_Probe(follower, MPITAG_IDENTIFIER+100, MPI_COMM_WORLD, &status);
 					MPI_Get_count(&status, MPI_CHAR, &cSize);
 					char *dName = (char*)malloc((cSize+1) * sizeof(char));
-					MPI_Recv(dName, cSize, MPI_CHAR, follower, MPITAG_IDENTIFIER, MPI_COMM_WORLD, &status);
+					MPI_Recv(dName, cSize, MPI_CHAR, follower, MPITAG_IDENTIFIER+100, MPI_COMM_WORLD, &status);
 					dName[cSize] = '\0';
 
-					std::cout << " Thread " << j << " of follower " << follower << " runs on " << dName << " @ " << hName << std::endl;
+					std::cout << "   Thread " << j << " on follower " << follower << " mapped to device " << dName << std::endl;
 					free(dName);
 				}
 				free(hName);
@@ -527,35 +566,61 @@ will still yield good performance and possibly a more stable execution. \n" << s
 		{
 			// TODO: Need more investigation and setting for heterogeneous run
 			if (node->rank == 1)
-			{
+			{	// Only MPI rank 1 prints SYCL device information
 				if (do_sycl_levelzero)
-					syclDevices = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::levelZero);
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::levelZero);
 				else if (do_sycl_cuda)
-					syclDevices = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::CUDA);
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::CUDA);
 				else if (do_sycl_hip)
-					syclDevices = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::HIP);
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::HIP);
 				else if (do_sycl_opencl)
-					syclDevices = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::openCL);
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::openCL);
 				else
-					syclDevices = MlOptimiserSYCL::getDevices(syclDeviceType::cpu);
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::cpu);
 			}
 			else
 			{
 				if (do_sycl_levelzero)
-					syclDevices = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::levelZero, false);
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::levelZero, false);
 				else if (do_sycl_cuda)
-					syclDevices = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::CUDA, false);
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::CUDA, false);
 				else if (do_sycl_hip)
-					syclDevices = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::HIP, false);
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::HIP, false);
 				else if (do_sycl_opencl)
-					syclDevices = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::openCL, false);
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::openCL, false);
 				else
-					syclDevices = MlOptimiserSYCL::getDevices(syclDeviceType::cpu, syclBackendType::openCL, false);
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::cpu, syclBackendType::openCL, false);
 			}
 
-			int devCount = syclDevices.size();
+			const int devCount = syclDeviceList.size();
 			if (devCount == 0)
 				REPORT_ERROR("You have no SYCL device available");
+
+			std::vector<std::vector<std::string>> allThreadIDs;
+			untangleDeviceIDs(gpu_ids, allThreadIDs);
+			if( allThreadIDs.size()>0 && allThreadIDs.size()<(node->size-1) ) // if one or more devices are specified, but not for all ranks, extend selection to all ranks by modulus
+			{
+				const int N = allThreadIDs.size();
+				allThreadIDs.resize(node->size-1);
+				for (int rank = 1; rank<(node->size-1); rank++)
+					allThreadIDs[rank] = allThreadIDs[rank%N];
+			}
+
+			bool fullAutomaticMapping;
+			bool semiAutomaticMapping;
+			if (allThreadIDs[node->rank-1].size()==0 || ! std::isdigit(*gpu_ids.begin()) )
+			{
+				fullAutomaticMapping = true;
+				semiAutomaticMapping = true;
+			}
+			else
+			{
+				fullAutomaticMapping=false;
+				if(allThreadIDs[node->rank-1].size() != nr_threads)
+					semiAutomaticMapping = true;
+				else
+					semiAutomaticMapping = false;
+			}
 
 			// MPI-3 standard support this MPI_COMM_TYPE_SHARED type
 			MPI_Comm nodeComm;
@@ -565,59 +630,69 @@ will still yield good performance and possibly a more stable execution. \n" << s
 			MPI_Comm_rank(nodeComm, &nodeRank);
 			MPI_Comm_size(nodeComm, &nodeSize);
 
-			std::vector<std::vector<int>> syclDeviceID;
-			syclDevicePerRank = (devCount-1) / nodeSize + 1;
-			for (int n = 0; n < nodeSize; n++)
+			for (int i = 0; i < nr_threads; i ++)
 			{
-				const int devIdOffset = n * devCount / nodeSize;
-				std::vector<int> mpiDevIDs;
+				int dev_id;
+				if (semiAutomaticMapping)
+				{
+					if (fullAutomaticMapping)
+					{
+						if(nodeSize > 1)
+							dev_id = (devCount*( ((node->rank-1)%nodeSize)*nr_threads + i )) / (nodeSize*nr_threads);
+						else
+							dev_id = devCount*i / nr_threads;
+					}
+					else
+						dev_id = textToInteger(allThreadIDs[node->rank-1][i % (allThreadIDs[node->rank-1]).size()].c_str());
+				}
+				else
+					dev_id = textToInteger(allThreadIDs[node->rank-1][i].c_str());
 
-				for (int m = 0; m < syclDevicePerRank; m++)
-					if (devIdOffset + m < devCount)
-						mpiDevIDs.push_back(devIdOffset + m);
+				if (dev_id < 0 || dev_id > devCount-1)
+					REPORT_ERROR("You have specified SYCL device number which is not available");
 
-				syclDeviceID.push_back(mpiDevIDs);
-			}
+				//Only make a new bundle of not existing on device
+				int bundleId(-1);
 
-			for (int j = 0; j < nr_threads; j++)
-			{
-				const int nodeDevID = j * syclDeviceID[nodeRank].size() / nr_threads;
-				const int dev_id = syclDeviceID[nodeRank][nodeDevID];
-				syclOptimiserDeviceMap.push_back(dev_id);
+				for (int j = 0; j < gpuDevices.size(); j++)
+					if (gpuDevices[j] == dev_id)
+						bundleId = j;
+
+				if (bundleId == -1)
+				{
+					bundleId = gpuDevices.size();
+					gpuDevices.push_back(dev_id);
+				}
+				gpuOptimiserDeviceMap.push_back(bundleId);
 			}
 
 			std::string hostName = node->getHostName();
 			MPI_Send(hostName.c_str(), hostName.size(), MPI_CHAR, 0, MPITAG_IDENTIFIER, MPI_COMM_WORLD);
 			if (nodeRank == 0)  // Print only once per node
 			{
-				int nHead = 1;
-				MPI_Send(&nHead, 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
-
-				MPI_Send(&nodeSize, 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
-				MPI_Send(&devCount, 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
-				for (int k = 0; k < devCount; k++)
-				{
-					int nSplit = 0;
-					for (auto &devID : syclDeviceID)
-					{
-						auto found = std::find(devID.begin(), devID.end(), k);
-						if (found != devID.end())
-							nSplit++;
-					}
-
-					MPI_Send(&nSplit, 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
-				}
+				const int nHead = 1;
+				MPI_Send(&nHead, 1, MPI_INT, 0, MPITAG_INT+100, MPI_COMM_WORLD);
+				MPI_Send(&nodeSize, 1, MPI_INT, 0, MPITAG_INT+200, MPI_COMM_WORLD);
 			}
 			else
 			{
-				int nHead = 0;
-				MPI_Send(&nHead, 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
+				const int nHead = 0;
+				MPI_Send(&nHead, 1, MPI_INT, 0, MPITAG_INT+100, MPI_COMM_WORLD);
+			}
+
+			const int usedDeviceCount = gpuDevices.size();
+			MPI_Send(&usedDeviceCount, 1, MPI_INT, 0, MPITAG_INT+300, MPI_COMM_WORLD);
+			for (int k = 0; k < usedDeviceCount; k++)
+			{
+				MPI_Send(&gpuDevices[k], 1, MPI_INT, 0, MPITAG_INT+400, MPI_COMM_WORLD);
+				const int nSplit = std::count(gpuOptimiserDeviceMap.cbegin(), gpuOptimiserDeviceMap.cend(), k);
+				MPI_Send(&nSplit, 1, MPI_INT, 0, MPITAG_INT+500, MPI_COMM_WORLD);
 			}
 
 			for (int j = 0; j < nr_threads; j++)
 			{
-				std::string devName = syclDevices[syclOptimiserDeviceMap[j]]->getName();
-				MPI_Send(devName.c_str(), devName.size(), MPI_INT, 0, MPITAG_IDENTIFIER, MPI_COMM_WORLD);
+				std::string devName = syclDeviceList[gpuDevices[gpuOptimiserDeviceMap[j]]]->getName();
+				MPI_Send(devName.c_str(), devName.size(), MPI_CHAR, 0, MPITAG_IDENTIFIER+100, MPI_COMM_WORLD);
 			}
 		}
 		node->barrierWait();
@@ -732,42 +807,42 @@ void MlOptimiserMpi::initialiseWorkLoad()
 	}
 
 	// Set the number of particles per group, but only Leader has full data.star in memory!
-        // Pre-relion-4-onesigma-branch, mymodel.nr_particles_per_group was set in initial noise estimation, but this is no longer the case...
-        if (do_split_random_halves)
-        {
-            // First do half-set 1
-            if (node->isLeader()) mydata.getNumberOfParticlesPerGroup(mymodel.nr_particles_per_group, 1);
+	// Pre-relion-4-onesigma-branch, mymodel.nr_particles_per_group was set in initial noise estimation, but this is no longer the case...
+	if (do_split_random_halves)
+	{
+		// First do half-set 1
+		if (node->isLeader()) mydata.getNumberOfParticlesPerGroup(mymodel.nr_particles_per_group, 1);
 #ifdef USE_MPI_COLLECTIVE
-			if (node->myRandomSubset() != 2)
-				node->relion_MPI_Bcast(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, node->root_oddC);
+		if (node->myRandomSubset() != 2)
+			node->relion_MPI_Bcast(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, node->root_oddC);
 #else
-            for (int follower = 1; follower < node->size; follower+=2)
-            {
-                MPI_Status status;
-                if (node->isLeader()) node->relion_MPI_Send(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, follower, MPITAG_METADATA, MPI_COMM_WORLD);
-                else if (node->rank == follower) node->relion_MPI_Recv(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
-            }
+		for (int follower = 1; follower < node->size; follower+=2)
+		{
+			MPI_Status status;
+			if (node->isLeader()) node->relion_MPI_Send(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, follower, MPITAG_METADATA, MPI_COMM_WORLD);
+			else if (node->rank == follower) node->relion_MPI_Recv(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
+		}
 #endif
 
-            // Then do half-set 2
-            if (node->isLeader()) mydata.getNumberOfParticlesPerGroup(mymodel.nr_particles_per_group, 2);
+		// Then do half-set 2
+		if (node->isLeader()) mydata.getNumberOfParticlesPerGroup(mymodel.nr_particles_per_group, 2);
 #ifdef USE_MPI_COLLECTIVE
-			if (node->myRandomSubset() != 1)
-				node->relion_MPI_Bcast(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, node->root_evenC);
+		if (node->myRandomSubset() != 1)
+			node->relion_MPI_Bcast(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, node->root_evenC);
 #else
-            for (int follower = 2; follower < node->size; follower+=2)
-            {
-                MPI_Status status;
-                if (node->isLeader()) node->relion_MPI_Send(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, follower, MPITAG_METADATA, MPI_COMM_WORLD);
-                else if (node->rank == follower) node->relion_MPI_Recv(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
-            }
+		for (int follower = 2; follower < node->size; follower+=2)
+		{
+			MPI_Status status;
+			if (node->isLeader()) node->relion_MPI_Send(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, follower, MPITAG_METADATA, MPI_COMM_WORLD);
+			else if (node->rank == follower) node->relion_MPI_Recv(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
+		}
 #endif
-        }
-        else
-        {
-            if (node->isLeader()) mydata.getNumberOfParticlesPerGroup(mymodel.nr_particles_per_group);
-            node->relion_MPI_Bcast(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPI_COMM_WORLD);
-        }
+	}
+	else
+	{
+		if (node->isLeader()) mydata.getNumberOfParticlesPerGroup(mymodel.nr_particles_per_group);
+		node->relion_MPI_Bcast(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPI_COMM_WORLD);
+	}
 
 	if (node->isLeader())
 	{
@@ -1165,17 +1240,18 @@ void MlOptimiserMpi::expectation()
 #ifdef _SYCL_ENABLED
 	if (do_sycl && ! node->isLeader())
 	{
-		for (int i = 0; i < std::min(nr_threads, syclDevicePerRank); i++)
+		for (int i = 0; i < gpuDevices.size(); i++)
 		{
-			accDataBundles.push_back((void*)(new MlSyclDataBundle(syclDevices[syclOptimiserDeviceMap[i]])));
+			accDataBundles.push_back((void*)(new MlSyclDataBundle(syclDeviceList[gpuDevices[i]])));
 			((MlSyclDataBundle*)accDataBundles[i])->setup(this);
 		}
 
-		for (int i = 0; i < nr_threads; i++)
+		for (int i = 0; i < gpuOptimiserDeviceMap.size(); i++)
 		{
-			MlOptimiserSYCL *b = new MlOptimiserSYCL(this, (MlSyclDataBundle*)accDataBundles[syclOptimiserDeviceMap[i] - syclOptimiserDeviceMap[0]], "sycl_optimiser");
+			MlOptimiserSYCL *b = new MlOptimiserSYCL(this, (MlSyclDataBundle*)accDataBundles[gpuOptimiserDeviceMap[i]], "sycl_optimiser");
 			b->resetData();
-			syclOptimisers.push_back((void*)b);
+			b->threadID = i;
+			gpuOptimisers.push_back((void*)b);
 		}
 	}
 #endif
@@ -1668,7 +1744,6 @@ void MlOptimiserMpi::expectation()
 #endif // DEBUG_CUDA or DEBUG_HIP
 #ifdef _SYCL_ENABLED
 			/************************************************************************/
-			// SYCL memory clear
 			if (do_sycl)
 			{
 				for (int i = 0; i < accDataBundles.size(); i++)
@@ -1686,12 +1761,6 @@ void MlOptimiserMpi::expectation()
 						XFLOAT *reals = (XFLOAT*)(stream->syclMalloc(s * sizeof(XFLOAT), syclMallocType::host));
 						XFLOAT *imags = (XFLOAT*)(stream->syclMalloc(s * sizeof(XFLOAT), syclMallocType::host));
 						XFLOAT *weights = (XFLOAT*)(stream->syclMalloc(s * sizeof(XFLOAT), syclMallocType::host));
-						if (nullptr == reals || nullptr == imags || nullptr == weights)
-						{
-							std::string str = "syclMalloc HOST error of size " + std::to_string(s * sizeof(XFLOAT)) + ".\n";
-							ACC_PTR_DEBUG_FATAL(str.c_str());
-							CRITICAL(RAMERR);
-						}
 
 						b->backprojectors[j].getMdlData(reals, imags, weights);
 
@@ -1713,10 +1782,10 @@ void MlOptimiserMpi::expectation()
 						b->coarseProjectionPlans[j].clear();
 				}
 
-				for (int i = 0; i < syclOptimisers.size(); i++)
-					delete (MlOptimiserSYCL*)syclOptimisers[i];
+				for (int i = 0; i < gpuOptimisers.size(); i++)
+					delete (MlOptimiserSYCL*)gpuOptimisers[i];
 
-				syclOptimisers.clear();
+				gpuOptimisers.clear();
 
 				for (int i = 0; i < accDataBundles.size(); i++)
 					delete (MlSyclDataBundle*)accDataBundles[i];
