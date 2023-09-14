@@ -49,9 +49,17 @@ public:
 	virtual void syclPrefetch(void *ptr, const size_t bytes) = 0;
 	virtual void syclPrefetchAfterWaitAll(void *ptr, const size_t bytes) = 0;
 
-	virtual std::string getName() const = 0;
-	virtual int getID() const = 0;
-	virtual void setID(int id) = 0;
+	virtual std::string getName() = 0;
+	virtual int getCardID() const = 0;
+	virtual void setCardID(int id) = 0;
+	virtual int getDeviceID() const = 0;
+	virtual void setDeviceID(int id) = 0;
+	virtual int getStackID() const = 0;
+	virtual void setStackID(int id) = 0;
+	virtual int getCcsID() const = 0;
+	virtual void setCcsID(int id) = 0;
+	virtual int getNumCCS() const = 0;
+	virtual void setNumCCS(int id) = 0;
 
 	virtual void waitAll() = 0;
 
