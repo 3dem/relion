@@ -27,7 +27,7 @@ sycl::async_handler exceptionHandler = [](sycl::exception_list exceptions)
 	}
 };
 
-devSYCL::devSYCL(const bool verbose)
+devSYCL::devSYCL()
 {
 	_exHandler = exceptionHandler;
 
@@ -63,20 +63,16 @@ devSYCL::devSYCL(const bool verbose)
 	globalMem = d.get_info<sycl::info::device::global_mem_size>();
 	localMem = d.get_info<sycl::info::device::local_mem_size>();
 	maxUnit = d.get_info<sycl::info::device::max_compute_units>();
+	cardID = -1;
 	deviceID = -1;
+	stackID = -1;
+	ccsID = -1;
+	nCCS = -1;
 	_prev_submission = sycl::event();
 	_event.push_back(sycl::event());
-
-	if (verbose)
-	{
-		std::cout << std::string(80, '*') << std::endl;
-		std::cout << "Selected SYCL device is " << deviceName << std::endl;
-		std::cout << "maxComputeUnit= " << maxUnit << ", maxWorkGroupSize= " << maxGroup << ", globalMemSize= " << globalMem << std::endl;
-		printDeviceInfo();
-	}
 }
 
-devSYCL::devSYCL(sycl::device &d, int id, const bool verbose)
+devSYCL::devSYCL(sycl::device &d, int id)
 {
 	_exHandler = exceptionHandler;
 
@@ -112,22 +108,12 @@ devSYCL::devSYCL(sycl::device &d, int id, const bool verbose)
 	maxUnit = d.get_info<sycl::info::device::max_compute_units>();
 	deviceID = id;
 	auto pf = d.get_platform();
-	std::stringstream ss;
-	ss << "[" << id << "] " << d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
-	deviceName = ss.str();
+	deviceName = d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
 	_prev_submission = sycl::event();
 	_event.push_back(sycl::event());
-
-	if (verbose)
-	{
-		std::cout << std::string(80, '*') << std::endl;
-		std::cout << "Selected SYCL device is " << deviceName << std::endl;
-		std::cout << "maxComputeUnit= " << maxUnit << ", maxWorkGroupSize= " << maxGroup << ", globalMemSize= " << globalMem << std::endl;
-		printDeviceInfo();
-	}
 }
 
-devSYCL::devSYCL(sycl::device &d, const syclQueueType qType, int id, const bool verbose)
+devSYCL::devSYCL(sycl::device &d, const syclQueueType qType, int id)
 {
 	_exHandler = exceptionHandler;
 
@@ -172,22 +158,12 @@ devSYCL::devSYCL(sycl::device &d, const syclQueueType qType, int id, const bool 
 	maxUnit = d.get_info<sycl::info::device::max_compute_units>();
 	deviceID = id;
 	auto pf = d.get_platform();
-	std::stringstream ss;
-	ss << "[" << id << "] " << d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
-	deviceName = ss.str();
+	deviceName = d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
 	_prev_submission = sycl::event();
 	_event.push_back(sycl::event());
-
-	if (verbose)
-	{
-		std::cout << std::string(80, '*') << std::endl;
-		std::cout << "Selected SYCL device is " << deviceName << std::endl;
-		std::cout << "maxComputeUnit= " << maxUnit << ", maxWorkGroupSize= " << maxGroup << ", globalMemSize= " << globalMem << std::endl;
-		printDeviceInfo();
-	}
 }
 
-devSYCL::devSYCL(sycl::context &c, sycl::device &d, int id, const bool verbose)
+devSYCL::devSYCL(sycl::context &c, sycl::device &d, int id)
 {
 	_exHandler = exceptionHandler;
 
@@ -222,22 +198,12 @@ devSYCL::devSYCL(sycl::context &c, sycl::device &d, int id, const bool verbose)
 	maxUnit = d.get_info<sycl::info::device::max_compute_units>();
 	deviceID = id;
 	auto pf = d.get_platform();
-	std::stringstream ss;
-	ss << "[" << id << "] " << d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
-	deviceName = ss.str();
+	deviceName = d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
 	_prev_submission = sycl::event();
 	_event.push_back(sycl::event());
-
-	if (verbose)
-	{
-		std::cout << std::string(80, '*') << std::endl;
-		std::cout << "Selected SYCL device is " << deviceName << std::endl;
-		std::cout << "maxComputeUnit= " << maxUnit << ", maxWorkGroupSize= " << maxGroup << ", globalMemSize= " << globalMem << std::endl;
-		printDeviceInfo();
-	}
 }
 
-devSYCL::devSYCL(sycl::context &c, sycl::device &d, const syclQueueType qType, int id, const bool verbose)
+devSYCL::devSYCL(sycl::context &c, sycl::device &d, const syclQueueType qType, int id)
 {
 	_exHandler = exceptionHandler;
 
@@ -281,22 +247,12 @@ devSYCL::devSYCL(sycl::context &c, sycl::device &d, const syclQueueType qType, i
 	maxUnit = d.get_info<sycl::info::device::max_compute_units>();
 	deviceID = id;
 	auto pf = d.get_platform();
-	std::stringstream ss;
-	ss << "[" << id << "] " << d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
-	deviceName = ss.str();
+	deviceName = d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
 	_prev_submission = sycl::event();
 	_event.push_back(sycl::event());
-
-	if (verbose)
-	{
-		std::cout << std::string(80, '*') << std::endl;
-		std::cout << "Selected SYCL device is " << deviceName << std::endl;
-		std::cout << "maxComputeUnit= " << maxUnit << ", maxWorkGroupSize= " << maxGroup << ", globalMemSize= " << globalMem << std::endl;
-		printDeviceInfo();
-	}
 }
 
-devSYCL::devSYCL(const syclDeviceType dev, int id, const bool verbose)
+devSYCL::devSYCL(const syclDeviceType dev, int id)
 {
 	_exHandler = exceptionHandler;
 
@@ -341,7 +297,6 @@ devSYCL::devSYCL(const syclDeviceType dev, int id, const bool verbose)
 
 	auto d = _devD;
 	auto pf = d.get_platform();
-	deviceName = d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
 	const auto isizes = d.get_info<sycl::info::device::max_work_item_sizes<3>>();
 	maxItem[0] = isizes[0];
 	maxItem[1] = isizes[1];
@@ -351,22 +306,12 @@ devSYCL::devSYCL(const syclDeviceType dev, int id, const bool verbose)
 	localMem = d.get_info<sycl::info::device::local_mem_size>();
 	maxUnit = d.get_info<sycl::info::device::max_compute_units>();
 	deviceID = id;
-	std::stringstream ss;
-	ss << "[" << id << "] " << d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
-	deviceName = ss.str();
+	deviceName = d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
 	_prev_submission = sycl::event();
 	_event.push_back(sycl::event());
-
-	if (verbose)
-	{
-		std::cout << std::string(80, '*') << std::endl;
-		std::cout << "Selected SYCL device is " << deviceName << std::endl;
-		std::cout << "maxComputeUnit= " << maxUnit << ", maxWorkGroupSize= " << maxGroup << ", globalMemSize= " << globalMem << std::endl;
-		printDeviceInfo();
-	}
 }
 
-devSYCL::devSYCL(const syclBackendType be, const syclDeviceType dev, int id, const bool verbose)
+devSYCL::devSYCL(const syclBackendType be, const syclDeviceType dev, int id)
 {
 	_exHandler = exceptionHandler;
 
@@ -411,7 +356,6 @@ devSYCL::devSYCL(const syclBackendType be, const syclDeviceType dev, int id, con
 
 	auto d = _devD;
 	auto pf = d.get_platform();
-	deviceName = d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
 	const auto isizes = d.get_info<sycl::info::device::max_work_item_sizes<3>>();
 	maxItem[0] = isizes[0];
 	maxItem[1] = isizes[1];
@@ -421,23 +365,14 @@ devSYCL::devSYCL(const syclBackendType be, const syclDeviceType dev, int id, con
 	localMem = d.get_info<sycl::info::device::local_mem_size>();
 	maxUnit = d.get_info<sycl::info::device::max_compute_units>();
 	deviceID = id;
-	std::stringstream ss;
-	ss << "[" << id << "] " << d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
-	deviceName = ss.str();
+	deviceName = d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
 	_prev_submission = sycl::event();
 	_event.push_back(sycl::event());
-
-	if (verbose)
-	{
-		std::cout << std::string(80, '*') << std::endl;
-		std::cout << "Selected SYCL device is " << deviceName << std::endl;
-		std::cout << "maxComputeUnit= " << maxUnit << ", maxWorkGroupSize= " << maxGroup << ", globalMemSize= " << globalMem << std::endl;
-		printDeviceInfo();
-	}
 }
 
 devSYCL::devSYCL(const devSYCL &q)
-:	_devQ {q._devQ}, _devD {q._devD}, _devC {q._devC}, deviceName {q.deviceName}, deviceID {q.deviceID},
+:	_devQ {q._devQ}, _devD {q._devD}, _devC {q._devC}, deviceName {q.deviceName},
+	cardID {q.cardID}, deviceID {q.deviceID}, stackID {q.stackID}, ccsID {q.ccsID}, nCCS {q.nCCS},
 	_queueType {q._queueType}, maxItem {q.maxItem}, maxGroup {q.maxGroup}, maxUnit {q.maxUnit},
 	globalMem {q.globalMem}, localMem {q.localMem}, _prev_submission {sycl::event()}, _event {sycl::event()}
 #ifdef SYCL_OFFLOAD_SORT
@@ -446,7 +381,8 @@ devSYCL::devSYCL(const devSYCL &q)
 {}
 
 devSYCL::devSYCL(const devSYCL *q)
-:	_devQ {q->_devQ}, _devD {q->_devD}, _devC {q->_devC}, deviceName {q->deviceName}, deviceID {q->deviceID},
+:	_devQ {q->_devQ}, _devD {q->_devD}, _devC {q->_devC}, deviceName {q->deviceName},
+	cardID {q->cardID}, deviceID {q->deviceID}, stackID {q->stackID}, ccsID {q->ccsID}, nCCS {q->nCCS},
 	_queueType {q->_queueType}, maxItem {q->maxItem}, maxGroup {q->maxGroup}, maxUnit {q->maxUnit},
 	globalMem {q->globalMem}, localMem {q->localMem}, _prev_submission {sycl::event()}, _event {sycl::event()}
 #ifdef SYCL_OFFLOAD_SORT
@@ -637,6 +573,21 @@ void devSYCL::waitAll()
 	}
 }
 
+std::string devSYCL::getName()
+{
+	std::stringstream ss;
+	if (cardID < 0)
+		ss << "[" << deviceID << "] " << deviceName;
+	else if (ccsID >= 0)
+		ss << "[" << deviceID << "] Card[" << cardID << "]Stack[" << stackID << "]{" << ccsID << "} / " << deviceName;
+	else if (ccsID < 0 && nCCS > 1)
+		ss << "[" << deviceID << "] Card[" << cardID << "]Stack[" << stackID << "]{0-" << nCCS-1 << "} / " << deviceName;
+	else
+		ss << "[" << deviceID << "] Card[" << cardID << "]Stack[" << stackID << "] / " << deviceName;
+
+	return ss.str();
+}
+
 void devSYCL::printDeviceInfo(bool printAll)
 {
 	auto d = _devQ->get_device();
@@ -817,5 +768,5 @@ void devSYCL::printDeviceInfo(bool printAll)
 		isFP64Supported=false;
 	else
 		isFP64Supported=true;
-	std::cout << "\n\n";
+	std::cout << "\n";
 }

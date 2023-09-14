@@ -21,15 +21,15 @@
 class devSYCL : public virtualSYCL
 {
 public:
-	devSYCL(const bool verbose = true);
+	devSYCL();
 	devSYCL(const devSYCL &q);
 	devSYCL(const devSYCL *q);
-	devSYCL(sycl::device &d, int id, const bool verbose = true);
-	devSYCL(sycl::device &d, const syclQueueType qType, int id, const bool verbose = true);
-	devSYCL(sycl::context &c, sycl::device &d, int id, const bool verbose = true);
-	devSYCL(sycl::context &c, sycl::device &d, const syclQueueType qType, int id, const bool verbose = true);
-	devSYCL(const syclDeviceType dev, int id, const bool verbose = true);
-	devSYCL(const syclBackendType be, const syclDeviceType dev, int id, const bool verbose = true);
+	devSYCL(sycl::device &d, int id);
+	devSYCL(sycl::device &d, const syclQueueType qType, int id);
+	devSYCL(sycl::context &c, sycl::device &d, int id);
+	devSYCL(sycl::context &c, sycl::device &d, const syclQueueType qType, int id);
+	devSYCL(const syclDeviceType dev, int id);
+	devSYCL(const syclBackendType be, const syclDeviceType dev, int id);
 	~devSYCL();
 
 	void pushEvent(const sycl::event &evt)
@@ -136,9 +136,17 @@ public:
 
 	void waitAll() override;
 
-	std::string getName() const override	{ return deviceName; }
-	int getID() const override	{ return deviceID; }
-	void setID(int id) override	{ deviceID = id; }
+	std::string getName() override;
+	int getCardID() const override	{ return cardID; }
+	void setCardID(int id) override	{ cardID = id; }
+	int getDeviceID() const override	{ return deviceID; }
+	void setDeviceID(int id) override	{ deviceID = id; }
+	int getStackID() const override	{ return stackID; }
+	void setStackID(int id) override	{ stackID = id; }
+	int getCcsID() const override	{ return ccsID; }
+	void setCcsID(int id) override	{ ccsID = id; }
+	int getNumCCS() const override	{ return nCCS; }
+	void setNumCCS(int n) override	{ nCCS = n; }
 
 	sycl::queue* getQueue()		{ return _devQ; }
 	sycl::device& getDevice()		{ return _devD; }
@@ -166,7 +174,11 @@ private:
 	std::vector<sycl::event> _event;
 	sycl::event _prev_submission;
 	std::string deviceName;
+	int cardID;
 	int deviceID;
+	int stackID;
+	int ccsID;
+	int nCCS;
 	bool isFP64Supported;
 #ifdef SYCL_OFFLOAD_SORT
 	oneapi::dpl::execution::device_policy<> _devicePolicy;
