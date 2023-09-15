@@ -143,10 +143,10 @@ public:
 	void setDeviceID(int id) override	{ deviceID = id; }
 	int getStackID() const override	{ return stackID; }
 	void setStackID(int id) override	{ stackID = id; }
-	int getCcsID() const override	{ return ccsID; }
-	void setCcsID(int id) override	{ ccsID = id; }
-	int getNumCCS() const override	{ return nCCS; }
-	void setNumCCS(int n) override	{ nCCS = n; }
+	int getSliceID() const override	{ return sliceID; }
+	void setSliceID(int id) override	{ sliceID = id; }
+	int getNumSlice() const override	{ return nSlice; }
+	void setNumSlice(int n) override	{ nSlice = n; }
 
 	sycl::queue* getQueue()		{ return _devQ; }
 	sycl::device& getDevice()		{ return _devD; }
@@ -177,8 +177,8 @@ private:
 	int cardID;
 	int deviceID;
 	int stackID;
-	int ccsID;
-	int nCCS;
+	int sliceID;
+	int nSlice;
 	bool isFP64Supported;
 #ifdef SYCL_OFFLOAD_SORT
 	oneapi::dpl::execution::device_policy<> _devicePolicy;

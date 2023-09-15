@@ -8,6 +8,11 @@
 
 #include <algorithm>
 #include "src/acc/sycl/sycl_dev.h"
+#ifdef USE_BOOST_LIBRARY
+// #define BOOST_STACKTRACE_USE_BACKTRACE
+ #define BOOST_STACKTRACE_USE_ADDR2LINE
+ #include "boost/stacktrace.hpp"
+#endif
 
 #define PRINT_DEV_INFO(sd, x) std::cout << "  "#x": " << sd.get_info<sycl::info::device::x>() << std::endl
 #define PRINT_DEV_INFO2020(sd, x) std::cout << "  "#x": " << sd.has(sycl::aspect::x) << std::endl
@@ -22,6 +27,9 @@ sycl::async_handler exceptionHandler = [](sycl::exception_list exceptions)
 		}
 		catch (const sycl::exception &e)
 		{
+#ifdef USE_BOOST_LIBRARY
+            std::cerr << boost::stacktrace::stacktrace() << "\n" << std::flush;
+#endif
 			std::cerr << "Caught asynchronous SYCL exception:\n" << e.what() << "\n" << std::flush;
 		}
 	}
@@ -66,8 +74,8 @@ devSYCL::devSYCL()
 	cardID = -1;
 	deviceID = -1;
 	stackID = -1;
-	ccsID = -1;
-	nCCS = -1;
+	sliceID = -1;
+	nSlice = -1;
 	_prev_submission = sycl::event();
 	_event.push_back(sycl::event());
 }
@@ -372,7 +380,7 @@ devSYCL::devSYCL(const syclBackendType be, const syclDeviceType dev, int id)
 
 devSYCL::devSYCL(const devSYCL &q)
 :	_devQ {q._devQ}, _devD {q._devD}, _devC {q._devC}, deviceName {q.deviceName},
-	cardID {q.cardID}, deviceID {q.deviceID}, stackID {q.stackID}, ccsID {q.ccsID}, nCCS {q.nCCS},
+	cardID {q.cardID}, deviceID {q.deviceID}, stackID {q.stackID}, sliceID {q.sliceID}, nSlice {q.nSlice},
 	_queueType {q._queueType}, maxItem {q.maxItem}, maxGroup {q.maxGroup}, maxUnit {q.maxUnit},
 	globalMem {q.globalMem}, localMem {q.localMem}, _prev_submission {sycl::event()}, _event {sycl::event()}
 #ifdef SYCL_OFFLOAD_SORT
@@ -382,7 +390,7 @@ devSYCL::devSYCL(const devSYCL &q)
 
 devSYCL::devSYCL(const devSYCL *q)
 :	_devQ {q->_devQ}, _devD {q->_devD}, _devC {q->_devC}, deviceName {q->deviceName},
-	cardID {q->cardID}, deviceID {q->deviceID}, stackID {q->stackID}, ccsID {q->ccsID}, nCCS {q->nCCS},
+	cardID {q->cardID}, deviceID {q->deviceID}, stackID {q->stackID}, sliceID {q->sliceID}, nSlice {q->nSlice},
 	_queueType {q->_queueType}, maxItem {q->maxItem}, maxGroup {q->maxGroup}, maxUnit {q->maxUnit},
 	globalMem {q->globalMem}, localMem {q->localMem}, _prev_submission {sycl::event()}, _event {sycl::event()}
 #ifdef SYCL_OFFLOAD_SORT
@@ -578,10 +586,10 @@ std::string devSYCL::getName()
 	std::stringstream ss;
 	if (cardID < 0)
 		ss << "[" << deviceID << "] " << deviceName;
-	else if (ccsID >= 0)
-		ss << "[" << deviceID << "] Card[" << cardID << "]Stack[" << stackID << "]{" << ccsID << "} / " << deviceName;
-	else if (ccsID < 0 && nCCS > 1)
-		ss << "[" << deviceID << "] Card[" << cardID << "]Stack[" << stackID << "]{0-" << nCCS-1 << "} / " << deviceName;
+	else if (sliceID >= 0)
+		ss << "[" << deviceID << "] Card[" << cardID << "]Stack[" << stackID << "]{" << sliceID << "} / " << deviceName;
+	else if (sliceID < 0 && nSlice > 1)
+		ss << "[" << deviceID << "] Card[" << cardID << "]Stack[" << stackID << "]{0-" << nSlice-1 << "} / " << deviceName;
 	else
 		ss << "[" << deviceID << "] Card[" << cardID << "]Stack[" << stackID << "] / " << deviceName;
 

@@ -56,10 +56,10 @@ public:
 	virtual void setDeviceID(int id) = 0;
 	virtual int getStackID() const = 0;
 	virtual void setStackID(int id) = 0;
-	virtual int getCcsID() const = 0;
-	virtual void setCcsID(int id) = 0;
-	virtual int getNumCCS() const = 0;
-	virtual void setNumCCS(int id) = 0;
+	virtual int getSliceID() const = 0;
+	virtual void setSliceID(int id) = 0;
+	virtual int getNumSlice() const = 0;
+	virtual void setNumSlice(int id) = 0;
 
 	virtual void waitAll() = 0;
 
