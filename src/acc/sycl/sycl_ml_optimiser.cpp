@@ -233,19 +233,19 @@ std::vector<virtualSYCL*> MlOptimiserSYCL::getDevices(const syclDeviceType selec
 							auto subsubs = sub.create_sub_devices<sycl::info::partition_property::ext_intel_partition_by_cslice>();
 #ifdef USE_SUBSUB_DEVICE
 							auto ctxctx = sycl::context(subsubs);
-							int nCCS = 0;
+							int nSlice = 0;
 							for (auto &subsub : subsubs)
 							{
 								selectedDevices.push_back(new devSYCL(ctxctx, subsub, nDevice++));
 								auto addedDevice = dynamic_cast<devSYCL*>(selectedDevices.back());
 								addedDevice->setCardID(nCard);
 								addedDevice->setStackID(nStack);
-								addedDevice->setCcsID(nCCS++);
-								addedDevice->setNumCCS(1);
+								addedDevice->setSliceID(nSlice++);
+								addedDevice->setNumSlice(1);
 								if (verbose)
 								{
 									std::cout << std::string(80, '*') << std::endl;
-									std::cout << "Selected SYCL device is " << addedDevice->getName() << std::endl;
+									std::cout << "Created SYCL device is " << addedDevice->getName() << std::endl;
 									std::cout << "maxComputeUnit= " << addedDevice->maxUnit << ", maxWorkGroupSize= " << addedDevice->maxGroup << ", globalMemSize= " << addedDevice->globalMem << std::endl;
 									addedDevice->printDeviceInfo();
 									std::cout << "\n";
@@ -256,15 +256,15 @@ std::vector<virtualSYCL*> MlOptimiserSYCL::getDevices(const syclDeviceType selec
 							auto addedDevice = dynamic_cast<devSYCL*>(selectedDevices.back());
 							addedDevice->setCardID(nCard);
 							addedDevice->setStackID(nStack);
-							addedDevice->setCcsID(-1);
-							addedDevice->setNumCCS(subsubs.size());
+							addedDevice->setSliceID(-1);
+							addedDevice->setNumSlice(subsubs.size());
 							if (verbose)
 							{
 								std::cout << std::string(80, '*') << std::endl;
-								std::cout << "Selected SYCL device is " << addedDevice->getName() << std::endl;
+								std::cout << "Created SYCL device is " << addedDevice->getName() << std::endl;
 								std::cout << "maxComputeUnit= " << addedDevice->maxUnit << ", maxWorkGroupSize= " << addedDevice->maxGroup << ", globalMemSize= " << addedDevice->globalMem << std::endl;
 								addedDevice->printDeviceInfo();
-								std::cout << "  Number of CCS: " << subsubs.size() << "\n\n";
+								std::cout << "  Number of Slice: " << subsubs.size() << "\n\n";
 							}
 #endif
 						}
@@ -274,12 +274,12 @@ std::vector<virtualSYCL*> MlOptimiserSYCL::getDevices(const syclDeviceType selec
 							auto addedDevice = dynamic_cast<devSYCL*>(selectedDevices.back());
 							addedDevice->setCardID(nCard);
 							addedDevice->setStackID(nStack);
-							addedDevice->setCcsID(-1);
-							addedDevice->setNumCCS(1);
+							addedDevice->setSliceID(-1);
+							addedDevice->setNumSlice(1);
 							if (verbose)
 							{
 								std::cout << std::string(80, '*') << std::endl;
-								std::cout << "Selected SYCL device is " << addedDevice->getName() << std::endl;
+								std::cout << "Created SYCL device is " << addedDevice->getName() << std::endl;
 								std::cout << "maxComputeUnit= " << addedDevice->maxUnit << ", maxWorkGroupSize= " << addedDevice->maxGroup << ", globalMemSize= " << addedDevice->globalMem << std::endl;
 								addedDevice->printDeviceInfo();
 								std::cout << "\n";
@@ -295,19 +295,19 @@ std::vector<virtualSYCL*> MlOptimiserSYCL::getDevices(const syclDeviceType selec
 						auto subsubs = device.create_sub_devices<sycl::info::partition_property::ext_intel_partition_by_cslice>();
 #ifdef USE_SUBSUB_DEVICE
 						auto ctxctx = sycl::context(subsubs);
-						int nCCS = 0;
+						int nSlice = 0;
 						for (auto &subsub : subsubs)
 						{
 							selectedDevices.push_back(new devSYCL(ctxctx, subsub, nDevice++));
 							auto addedDevice = dynamic_cast<devSYCL*>(selectedDevices.back());
 							addedDevice->setCardID(nCard);
 							addedDevice->setStackID(0);
-							addedDevice->setCcsID(nCCS++);
-							addedDevice->setNumCCS(1);
+							addedDevice->setSliceID(nSlice++);
+							addedDevice->setNumSlice(1);
 							if (verbose)
 							{
 								std::cout << std::string(80, '*') << std::endl;
-								std::cout << "Selected SYCL device is " << addedDevice->getName() << std::endl;
+								std::cout << "Created SYCL device is " << addedDevice->getName() << std::endl;
 								std::cout << "maxComputeUnit= " << addedDevice->maxUnit << ", maxWorkGroupSize= " << addedDevice->maxGroup << ", globalMemSize= " << addedDevice->globalMem << std::endl;
 								addedDevice->printDeviceInfo();
 								std::cout << "\n";
@@ -318,15 +318,15 @@ std::vector<virtualSYCL*> MlOptimiserSYCL::getDevices(const syclDeviceType selec
 						auto addedDevice = dynamic_cast<devSYCL*>(selectedDevices.back());
 						addedDevice->setCardID(nCard);
 						addedDevice->setStackID(0);
-						addedDevice->setCcsID(-1);
-						addedDevice->setNumCCS(subsubs.size());
+						addedDevice->setSliceID(-1);
+						addedDevice->setNumSlice(subsubs.size());
 						if (verbose)
 						{
 							std::cout << std::string(80, '*') << std::endl;
-							std::cout << "Selected SYCL device is " << addedDevice->getName() << std::endl;
+							std::cout << "Created SYCL device is " << addedDevice->getName() << std::endl;
 							std::cout << "maxComputeUnit= " << addedDevice->maxUnit << ", maxWorkGroupSize= " << addedDevice->maxGroup << ", globalMemSize= " << addedDevice->globalMem << std::endl;
 							addedDevice->printDeviceInfo();
-							std::cout << "  Number of CCS: " << subsubs.size() << "\n\n";
+							std::cout << "  Number of Slice: " << subsubs.size() << "\n\n";
 						}
 #endif
 					}
@@ -336,12 +336,12 @@ std::vector<virtualSYCL*> MlOptimiserSYCL::getDevices(const syclDeviceType selec
 						auto addedDevice = dynamic_cast<devSYCL*>(selectedDevices.back());
 						addedDevice->setCardID(nCard);
 						addedDevice->setStackID(0);
-						addedDevice->setCcsID(-1);
-						addedDevice->setNumCCS(1);
+						addedDevice->setSliceID(-1);
+						addedDevice->setNumSlice(1);
 						if (verbose)
 						{
 							std::cout << std::string(80, '*') << std::endl;
-							std::cout << "Selected SYCL device is " << addedDevice->getName() << std::endl;
+							std::cout << "Created SYCL device is " << addedDevice->getName() << std::endl;
 							std::cout << "maxComputeUnit= " << addedDevice->maxUnit << ", maxWorkGroupSize= " << addedDevice->maxGroup << ", globalMemSize= " << addedDevice->globalMem << std::endl;
 							addedDevice->printDeviceInfo();
 							std::cout << "\n";
@@ -392,12 +392,12 @@ std::vector<virtualSYCL*> MlOptimiserSYCL::getDevices(const syclDeviceType selec
 				auto addedDevice = dynamic_cast<devSYCL*>(selectedDevices.back());
 				addedDevice->setCardID(-1);
 				addedDevice->setStackID(-1);
-				addedDevice->setCcsID(-1);
-				addedDevice->setNumCCS(-1);
+				addedDevice->setSliceID(-1);
+				addedDevice->setNumSlice(-1);
 				if (verbose)
 				{
 					std::cout << std::string(80, '*') << std::endl;
-					std::cout << "Selected SYCL device is " << addedDevice->getName() << std::endl;
+					std::cout << "Created SYCL device is " << addedDevice->getName() << std::endl;
 					std::cout << "maxComputeUnit= " << addedDevice->maxUnit << ", maxWorkGroupSize= " << addedDevice->maxGroup << ", globalMemSize= " << addedDevice->globalMem << std::endl;
 					addedDevice->printDeviceInfo();
 					std::cout << "\n";
@@ -612,8 +612,8 @@ void MlOptimiserSYCL::setupDevice()
 	_devAcc = new devSYCL(c, d, bundle->getSyclDevice()->getDeviceID());
 	_devAcc->setCardID(bundle->getSyclDevice()->getCardID());
 	_devAcc->setStackID(bundle->getSyclDevice()->getStackID());
-	_devAcc->setCcsID(bundle->getSyclDevice()->getCcsID());
-	_devAcc->setNumCCS(bundle->getSyclDevice()->getNumCCS());
+	_devAcc->setSliceID(bundle->getSyclDevice()->getSliceID());
+	_devAcc->setNumSlice(bundle->getSyclDevice()->getNumSlice());
 //	_devAcc->printDeviceInfo();
 #endif
 }
@@ -631,8 +631,8 @@ void MlOptimiserSYCL::resetData()
 		classStreams.push_back(new devSYCL(c, d, syclQueueType::inOrder, i));
 		classStreams.back()->setCardID(dynamic_cast<devSYCL*>(_devAcc)->getCardID());
 		classStreams.back()->setStackID(dynamic_cast<devSYCL*>(_devAcc)->getStackID());
-		classStreams.back()->setCcsID(dynamic_cast<devSYCL*>(_devAcc)->getCcsID());
-		classStreams.back()->setNumCCS(dynamic_cast<devSYCL*>(_devAcc)->getNumCCS());
+		classStreams.back()->setSliceID(dynamic_cast<devSYCL*>(_devAcc)->getSliceID());
+		classStreams.back()->setNumSlice(dynamic_cast<devSYCL*>(_devAcc)->getNumSlice());
 #else
 		classStreams.push_back(_devAcc);
 #endif
