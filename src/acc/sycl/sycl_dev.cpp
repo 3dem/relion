@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cassert>
 #include <exception>
+#include <limits>
 
 #include <algorithm>
 #include "src/acc/sycl/sycl_dev.h"
@@ -60,6 +61,15 @@ devSYCL::devSYCL()
 	maxItem[1] = isizes[1];
 	maxItem[2] = isizes[2];
 	maxGroup = d.get_info<sycl::info::device::max_work_group_size>();
+#ifdef SYCL_EXT_ONEAPI_MAX_WORK_GROUP_QUERY
+	auto groups = d.get_info<sycl::ext::oneapi::experimental::info::device::max_work_groups<3>>();
+	maxWorkGroup[0] = groups[0];
+	maxWorkGroup[1] = groups[1];
+	maxWorkGroup[2] = groups[2];
+	maxGlobalWorkGroup = d.get_info<sycl::ext::oneapi::experimental::info::device::max_global_work_groups>();
+#else
+	maxWorkGroup[0] = maxWorkGroup[1] = maxWorkGroup[2] = maxGlobalWorkGroup = std::numeric_limits<int>::max;
+#endif
 	globalMem = d.get_info<sycl::info::device::global_mem_size>();
 	localMem = d.get_info<sycl::info::device::local_mem_size>();
 	maxUnit = d.get_info<sycl::info::device::max_compute_units>();
@@ -103,6 +113,15 @@ devSYCL::devSYCL(sycl::device &d, int id)
 	maxItem[1] = isizes[1];
 	maxItem[2] = isizes[2];
 	maxGroup = d.get_info<sycl::info::device::max_work_group_size>();
+#ifdef SYCL_EXT_ONEAPI_MAX_WORK_GROUP_QUERY
+	auto groups = d.get_info<sycl::ext::oneapi::experimental::info::device::max_work_groups<3>>();
+	maxWorkGroup[0] = groups[0];
+	maxWorkGroup[1] = groups[1];
+	maxWorkGroup[2] = groups[2];
+	maxGlobalWorkGroup = d.get_info<sycl::ext::oneapi::experimental::info::device::max_global_work_groups>();
+#else
+	maxWorkGroup[0] = maxWorkGroup[1] = maxWorkGroup[2] = maxGlobalWorkGroup = std::numeric_limits<int>::max;
+#endif
 	globalMem = d.get_info<sycl::info::device::global_mem_size>();
 	localMem = d.get_info<sycl::info::device::local_mem_size>();
 	maxUnit = d.get_info<sycl::info::device::max_compute_units>();
@@ -153,6 +172,15 @@ devSYCL::devSYCL(sycl::device &d, const syclQueueType qType, int id)
 	maxItem[1] = isizes[1];
 	maxItem[2] = isizes[2];
 	maxGroup = d.get_info<sycl::info::device::max_work_group_size>();
+#ifdef SYCL_EXT_ONEAPI_MAX_WORK_GROUP_QUERY
+	auto groups = d.get_info<sycl::ext::oneapi::experimental::info::device::max_work_groups<3>>();
+	maxWorkGroup[0] = groups[0];
+	maxWorkGroup[1] = groups[1];
+	maxWorkGroup[2] = groups[2];
+	maxGlobalWorkGroup = d.get_info<sycl::ext::oneapi::experimental::info::device::max_global_work_groups>();
+#else
+	maxWorkGroup[0] = maxWorkGroup[1] = maxWorkGroup[2] = maxGlobalWorkGroup = std::numeric_limits<int>::max;
+#endif
 	globalMem = d.get_info<sycl::info::device::global_mem_size>();
 	localMem = d.get_info<sycl::info::device::local_mem_size>();
 	maxUnit = d.get_info<sycl::info::device::max_compute_units>();
@@ -193,6 +221,15 @@ devSYCL::devSYCL(sycl::context &c, sycl::device &d, int id)
 	maxItem[1] = isizes[1];
 	maxItem[2] = isizes[2];
 	maxGroup = d.get_info<sycl::info::device::max_work_group_size>();
+#ifdef SYCL_EXT_ONEAPI_MAX_WORK_GROUP_QUERY
+	auto groups = d.get_info<sycl::ext::oneapi::experimental::info::device::max_work_groups<3>>();
+	maxWorkGroup[0] = groups[0];
+	maxWorkGroup[1] = groups[1];
+	maxWorkGroup[2] = groups[2];
+	maxGlobalWorkGroup = d.get_info<sycl::ext::oneapi::experimental::info::device::max_global_work_groups>();
+#else
+	maxWorkGroup[0] = maxWorkGroup[1] = maxWorkGroup[2] = maxGlobalWorkGroup = std::numeric_limits<int>::max;
+#endif
 	globalMem = d.get_info<sycl::info::device::global_mem_size>();
 	localMem = d.get_info<sycl::info::device::local_mem_size>();
 	maxUnit = d.get_info<sycl::info::device::max_compute_units>();
@@ -242,6 +279,15 @@ devSYCL::devSYCL(sycl::context &c, sycl::device &d, const syclQueueType qType, i
 	maxItem[1] = isizes[1];
 	maxItem[2] = isizes[2];
 	maxGroup = d.get_info<sycl::info::device::max_work_group_size>();
+#ifdef SYCL_EXT_ONEAPI_MAX_WORK_GROUP_QUERY
+	auto groups = d.get_info<sycl::ext::oneapi::experimental::info::device::max_work_groups<3>>();
+	maxWorkGroup[0] = groups[0];
+	maxWorkGroup[1] = groups[1];
+	maxWorkGroup[2] = groups[2];
+	maxGlobalWorkGroup = d.get_info<sycl::ext::oneapi::experimental::info::device::max_global_work_groups>();
+#else
+	maxWorkGroup[0] = maxWorkGroup[1] = maxWorkGroup[2] = maxGlobalWorkGroup = std::numeric_limits<int>::max;
+#endif
 	globalMem = d.get_info<sycl::info::device::global_mem_size>();
 	localMem = d.get_info<sycl::info::device::local_mem_size>();
 	maxUnit = d.get_info<sycl::info::device::max_compute_units>();
@@ -302,6 +348,15 @@ devSYCL::devSYCL(const syclDeviceType dev, int id)
 	maxItem[1] = isizes[1];
 	maxItem[2] = isizes[2];
 	maxGroup = d.get_info<sycl::info::device::max_work_group_size>();
+#ifdef SYCL_EXT_ONEAPI_MAX_WORK_GROUP_QUERY
+	auto groups = d.get_info<sycl::ext::oneapi::experimental::info::device::max_work_groups<3>>();
+	maxWorkGroup[0] = groups[0];
+	maxWorkGroup[1] = groups[1];
+	maxWorkGroup[2] = groups[2];
+	maxGlobalWorkGroup = d.get_info<sycl::ext::oneapi::experimental::info::device::max_global_work_groups>();
+#else
+	maxWorkGroup[0] = maxWorkGroup[1] = maxWorkGroup[2] = maxGlobalWorkGroup = std::numeric_limits<int>::max;
+#endif
 	globalMem = d.get_info<sycl::info::device::global_mem_size>();
 	localMem = d.get_info<sycl::info::device::local_mem_size>();
 	maxUnit = d.get_info<sycl::info::device::max_compute_units>();
@@ -361,6 +416,15 @@ devSYCL::devSYCL(const syclBackendType be, const syclDeviceType dev, int id)
 	maxItem[1] = isizes[1];
 	maxItem[2] = isizes[2];
 	maxGroup = d.get_info<sycl::info::device::max_work_group_size>();
+#ifdef SYCL_EXT_ONEAPI_MAX_WORK_GROUP_QUERY
+	auto groups = d.get_info<sycl::ext::oneapi::experimental::info::device::max_work_groups<3>>();
+	maxWorkGroup[0] = groups[0];
+	maxWorkGroup[1] = groups[1];
+	maxWorkGroup[2] = groups[2];
+	maxGlobalWorkGroup = d.get_info<sycl::ext::oneapi::experimental::info::device::max_global_work_groups>();
+#else
+	maxWorkGroup[0] = maxWorkGroup[1] = maxWorkGroup[2] = maxGlobalWorkGroup = std::numeric_limits<int>::max;
+#endif
 	globalMem = d.get_info<sycl::info::device::global_mem_size>();
 	localMem = d.get_info<sycl::info::device::local_mem_size>();
 	maxUnit = d.get_info<sycl::info::device::max_compute_units>();
@@ -373,7 +437,7 @@ devSYCL::devSYCL(const syclBackendType be, const syclDeviceType dev, int id)
 devSYCL::devSYCL(const devSYCL &q)
 :	_devQ {q._devQ}, _devD {q._devD}, _devC {q._devC}, deviceName {q.deviceName},
 	cardID {q.cardID}, deviceID {q.deviceID}, stackID {q.stackID}, sliceID {q.sliceID}, nSlice {q.nSlice},
-	_queueType {q._queueType}, maxItem {q.maxItem}, maxGroup {q.maxGroup}, maxUnit {q.maxUnit},
+	_queueType {q._queueType}, maxItem {q.maxItem}, maxGroup {q.maxGroup}, maxWorkGroup {q.maxWorkGroup}, maxGlobalWorkGroup {q.maxGlobalWorkGroup}, maxUnit {q.maxUnit},
 	globalMem {q.globalMem}, localMem {q.localMem}, _prev_submission {sycl::event()}, _event {sycl::event()}
 #ifdef SYCL_OFFLOAD_SORT
 	, _devicePolicy {q._devicePolicy}
@@ -383,7 +447,7 @@ devSYCL::devSYCL(const devSYCL &q)
 devSYCL::devSYCL(const devSYCL *q)
 :	_devQ {q->_devQ}, _devD {q->_devD}, _devC {q->_devC}, deviceName {q->deviceName},
 	cardID {q->cardID}, deviceID {q->deviceID}, stackID {q->stackID}, sliceID {q->sliceID}, nSlice {q->nSlice},
-	_queueType {q->_queueType}, maxItem {q->maxItem}, maxGroup {q->maxGroup}, maxUnit {q->maxUnit},
+	_queueType {q->_queueType}, maxItem {q->maxItem}, maxGroup {q->maxGroup}, maxWorkGroup {q->maxWorkGroup}, maxGlobalWorkGroup {q->maxGlobalWorkGroup}, maxUnit {q->maxUnit},
 	globalMem {q->globalMem}, localMem {q->localMem}, _prev_submission {sycl::event()}, _event {sycl::event()}
 #ifdef SYCL_OFFLOAD_SORT
 	, _devicePolicy {q->_devicePolicy}
@@ -605,8 +669,11 @@ void devSYCL::printDeviceInfo(bool printAll)
 		std::cout << subg << " ";
 	std::cout << std::endl;
 	PRINT_DEV_INFO(d, max_work_item_dimensions);
-	const auto isizes = d.get_info<sycl::info::device::max_work_item_sizes<3>>();
-	std::cout << "  max_work_item_sizes: " << isizes[0] << " x " << isizes[1] << " x " << isizes[2] << std::endl;
+	std::cout << "  max_work_item_sizes: " << maxItem[0] << " x " << maxItem[1] << " x " << maxItem[2] << std::endl;
+#ifdef SYCL_EXT_ONEAPI_MAX_WORK_GROUP_QUERY
+	std::cout << "  Max global number of work-groups: " << maxGlobalWorkGroup << std::endl;
+	std::cout << "  Max number of work-groups: " << maxWorkGroup[0] << " x " << maxWorkGroup[1] << " x " << maxWorkGroup[2] << std::endl;
+#endif
 
 	PRINT_DEV_INFO(d, max_mem_alloc_size);
 	PRINT_DEV_INFO(d, global_mem_cache_line_size);

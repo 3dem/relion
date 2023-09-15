@@ -36,7 +36,8 @@ namespace syclKernels
         assert(    trans_num  <= std::numeric_limits<int>::max());
         assert(    image_size <= std::numeric_limits<int>::max());
 		assert(    orient_num <= std::numeric_limits<int>::max());
-		assert(      block_sz <= dGPU->maxItem[1]);
+		assert(    orient_num <= dGPU->maxWorkGroup[1]);
+		assert(      block_sz <= dGPU->maxItem[2]);
 		assert(block_sz*3 + 9 <= dGPU->localMem);
 
         auto event = dGPU->syclSubmit

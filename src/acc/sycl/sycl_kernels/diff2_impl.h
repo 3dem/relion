@@ -33,7 +33,8 @@ namespace syclKernels
 		assert( trans_num <= std::numeric_limits<int>::max());
 		assert(image_size <= std::numeric_limits<int>::max());
 		assert( grid_size <= std::numeric_limits<int>::max());
-		assert(  block_sz <= dGPU->maxItem[1]);
+		assert( grid_size <= dGPU->maxWorkGroup[1]);
+		assert(  block_sz <= dGPU->maxItem[2]);
 		assert(eulers_per_block*9 + 2*(block_sz/prefetch_fraction*eulers_per_block) + 3*block_sz <= dGPU->localMem);
 
 		auto event = dGPU->syclSubmit
@@ -99,7 +100,8 @@ namespace syclKernels
 		assert(image_size <= std::numeric_limits<int>::max());
 		assert(  num_jobs <= std::numeric_limits<int>::max());
 		assert( grid_size <= std::numeric_limits<int>::max());
-		assert(  block_sz <= dGPU->maxItem[1]);
+		assert( grid_size <= dGPU->maxWorkGroup[1]);
+		assert(  block_sz <= dGPU->maxItem[2]);
 		assert(block_sz * chunk_sz <= dGPU->localMem);
 
         auto event = dGPU->syclSubmit
@@ -156,6 +158,8 @@ namespace syclKernels
 		devSYCL *dGPU = dynamic_cast<devSYCL*>(devAcc);
 		assert(grid_size*trans_num <= std::numeric_limits<int>::max());
 		assert(image_size <= std::numeric_limits<int>::max());
+		assert( grid_size <= dGPU->maxWorkGroup[0]);
+		assert( trans_num <= dGPU->maxWorkGroup[1]);
 		assert(  block_sz <= dGPU->maxItem[2]);
 		assert(2*block_sz <= dGPU->localMem);
 
@@ -214,7 +218,8 @@ namespace syclKernels
 		assert(image_size <= std::numeric_limits<int>::max());
 		assert(  num_jobs <= std::numeric_limits<int>::max());
 		assert( grid_size <= std::numeric_limits<int>::max());
-		assert(  block_sz <= dGPU->maxItem[1]);
+		assert( grid_size <= dGPU->maxWorkGroup[1]);
+		assert(  block_sz <= dGPU->maxItem[2]);
 		assert(2 * block_sz * chunk_sz <= dGPU->localMem);
 
         auto event = dGPU->syclSubmit

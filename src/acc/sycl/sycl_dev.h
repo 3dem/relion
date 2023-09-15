@@ -164,6 +164,8 @@ public:
 	uint64_t localMem;	// Maximum local memory size per group
 	uint64_t globalMem;	// Maximum device memory size per queue
 	uint32_t maxUnit;	// Maximum compute units
+	std::array<long, 3> maxWorkGroup;	// Maximum number of work-groups that can be submitted in each dimension
+	size_t maxGlobalWorkGroup;			// Maximum number of work-groups that can be submitted across all the dimensions
 
 private:
 	syclQueueType _queueType;

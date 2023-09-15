@@ -39,7 +39,8 @@ void backproject2D(
 	assert(     img_xy <= std::numeric_limits<int>::max());
 	assert(mdl_x*mdl_y <= std::numeric_limits<int>::max());
 	assert( imageCount <= std::numeric_limits<int>::max());
-	assert( block_size <= dGPU->maxItem[1]);
+	assert( imageCount <= dGPU->maxWorkGroup[1]);
+	assert( block_size <= dGPU->maxItem[2]);
 
 	auto event = dGPU->syclSubmit
 	(
@@ -98,7 +99,8 @@ void backproject3D(
 	assert(   img_xyz <= std::numeric_limits<int>::max());
 	assert(   mdl_xyz <= std::numeric_limits<int>::max());
 	assert(imageCount <= std::numeric_limits<int>::max());
-	assert(block_size <= dGPU->maxItem[1]);
+	assert(imageCount <= dGPU->maxWorkGroup[1]);
+	assert(block_size <= dGPU->maxItem[2]);
 
     auto event = dGPU->syclSubmit
     (
