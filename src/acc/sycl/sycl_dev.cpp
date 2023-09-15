@@ -8,11 +8,6 @@
 
 #include <algorithm>
 #include "src/acc/sycl/sycl_dev.h"
-#ifdef USE_BOOST_LIBRARY
-// #define BOOST_STACKTRACE_USE_BACKTRACE
- #define BOOST_STACKTRACE_USE_ADDR2LINE
- #include "boost/stacktrace.hpp"
-#endif
 
 #define PRINT_DEV_INFO(sd, x) std::cout << "  "#x": " << sd.get_info<sycl::info::device::x>() << std::endl
 #define PRINT_DEV_INFO2020(sd, x) std::cout << "  "#x": " << sd.has(sycl::aspect::x) << std::endl
@@ -27,9 +22,6 @@ sycl::async_handler exceptionHandler = [](sycl::exception_list exceptions)
 		}
 		catch (const sycl::exception &e)
 		{
-#ifdef USE_BOOST_LIBRARY
-            std::cerr << boost::stacktrace::stacktrace() << "\n" << std::flush;
-#endif
 			std::cerr << "Caught asynchronous SYCL exception:\n" << e.what() << "\n" << std::flush;
 		}
 	}
