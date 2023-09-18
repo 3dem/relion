@@ -6606,7 +6606,7 @@ bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<st
     if (do_tiltseries)
     {
         // TODO: rename command to relion_tomo_import_tiltseries?
-        command = "relion_tomo_import SerialEM ";
+        command = "relion_python_tomo_import SerialEM ";
         command += " --tilt-image-movie-pattern \"" + joboptions["movie_files"].getString() + "\"";
         command += " --mdoc-file-pattern \"" + joboptions["mdoc_files"].getString() + "\"";
         command += " --nominal-tilt-axis-angle " + joboptions["tilt_axis_angle"].getString();
@@ -6642,7 +6642,7 @@ bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<st
 		}
 
 		// TODO: insert call to relion_tomo_import_tomograms here
-		command = "relion_tomo_import_tomograms ";
+		command = "relion_python_tomo_import_tomograms ";
 
 		command += " --i " + joboptions["tomo_star"].getString();
 		command += " --o " + outputname+"tomograms.star";
@@ -6827,7 +6827,7 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
     if (error_message != "") return false;
 
 
-    command="`which relion_tomo_align_tilt_series` ";
+    command="`which relion_python_tomo_align_tilt_series` ";
 
     // Make sure the methods are the first argument to the program!
     if (joboptions["do_imod_fiducials"].getBoolean())
@@ -7029,7 +7029,7 @@ bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std:
 	return false;
     } 
 
-    command="`which relion_tomo_denoise` ";
+    command="`which relion_python_tomo_denoise` ";
     
     if (error_message != "") return false;
 
@@ -7118,7 +7118,7 @@ bool RelionJob::getCommandsTomoPickTomogramsJob(std::string &outputname, std::ve
 
     if (error_message != "") return false;
 
-    command="`which relion_tomo_pick` ";
+    command="`which relion_python_tomo_pick` ";
 
     if (joboptions["in_tomoset"].getString() == "")
     {
@@ -7147,7 +7147,7 @@ bool RelionJob::getCommandsTomoPickTomogramsJob(std::string &outputname, std::ve
     command += " " + joboptions["other_args"].getString();
     commands.push_back(command);
 
-    command2 = "`which relion_tomo_get_particle_poses`";
+    command2 = "`which relion_python_tomo_get_particle_poses`";
     command2 += " " + joboptions["pick_mode"].getString();
     command2 += " --tilt-series-star-file " + joboptions["in_tomoset"].getString();
     command2 += " --annotations-directory " + outputname + "annotations";
@@ -7186,7 +7186,7 @@ bool RelionJob::getCommandsTomoExcludeTiltImagesJob(std::string &outputname, std
 
     if (error_message != "") return false;
 
-    command="`which relion_tomo_exclude_tilt_images` ";
+    command="`which relion_python_tomo_exclude_tilt_images` ";
     
     if (joboptions["in_tiltseries"].getString() == "")
     {
