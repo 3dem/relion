@@ -454,6 +454,14 @@ list(APPEND RELION_PYTHON_WRAPPERS
         python_blush
         python_dynamight
         python_topaz
+	python_tomo_import
+	python_tomo_exclude_tilt_images
+	python_tomo_align_tilt_series
+	python_tomo_view
+	python_tomo_pick
+	python_tomo_get_particle_poses
+	python_tomo_denoise
+	
 )
 
 foreach (SCRIPT_FILE ${RELION_PYTHON_WRAPPERS})
