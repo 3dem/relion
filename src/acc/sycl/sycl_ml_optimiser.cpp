@@ -51,14 +51,20 @@
 
 #define PRINT_SYCL_INFO(x) std::cout << "  "#x": " << device.get_info<sycl::info::device::x>() << std::endl
 
+#ifdef SYCL_EXT_INTEL_CSLICE
 template <typename RangeTy, typename ElemTy>
 bool contains(RangeTy &&Range, const ElemTy &Elem) {
-    return std::find(Range.begin(), Range.end(), Elem) != Range.end();
+	return std::find(Range.begin(), Range.end(), Elem) != Range.end();
 }
 
 bool isPartitionableByCSlice(sycl::device &Dev) {
-    return contains(Dev.get_info<sycl::info::device::partition_properties>(), sycl::info::partition_property::ext_intel_partition_by_cslice);
+	return contains(Dev.get_info<sycl::info::device::partition_properties>(), sycl::info::partition_property::ext_intel_partition_by_cslice);
 }
+#else
+bool isPartitionableByCSlice(sycl::device &Dev) {
+	return false;
+}
+#endif
 
 std::mutex	fft_mutex;
 
