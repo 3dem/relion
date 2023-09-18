@@ -661,19 +661,19 @@ void devSYCL::printDeviceInfo(bool printAll)
 	PRINT_DEV_INFO(d, partition_max_sub_devices);
 
 	PRINT_DEV_INFO(d, max_compute_units);
+#ifdef SYCL_EXT_ONEAPI_MAX_WORK_GROUP_QUERY
+	std::cout << "  Max global number of work-groups: " << maxGlobalWorkGroup << std::endl;
+	std::cout << "  Max number of work-groups: " << maxWorkGroup[0] << " x " << maxWorkGroup[1] << " x " << maxWorkGroup[2] << std::endl;
+#endif
 	PRINT_DEV_INFO(d, max_work_group_size);
+	PRINT_DEV_INFO(d, max_work_item_dimensions);
+	std::cout << "  max_work_item_sizes: " << maxItem[0] << " x " << maxItem[1] << " x " << maxItem[2] << std::endl;
 	PRINT_DEV_INFO(d, max_num_sub_groups);
 	const auto subGroups = d.get_info<sycl::info::device::sub_group_sizes>();
 	std::cout << "  sub_group_sizes: ";
 	for (auto &subg : subGroups)
 		std::cout << subg << " ";
 	std::cout << std::endl;
-	PRINT_DEV_INFO(d, max_work_item_dimensions);
-	std::cout << "  max_work_item_sizes: " << maxItem[0] << " x " << maxItem[1] << " x " << maxItem[2] << std::endl;
-#ifdef SYCL_EXT_ONEAPI_MAX_WORK_GROUP_QUERY
-	std::cout << "  Max global number of work-groups: " << maxGlobalWorkGroup << std::endl;
-	std::cout << "  Max number of work-groups: " << maxWorkGroup[0] << " x " << maxWorkGroup[1] << " x " << maxWorkGroup[2] << std::endl;
-#endif
 
 	PRINT_DEV_INFO(d, max_mem_alloc_size);
 	PRINT_DEV_INFO(d, global_mem_cache_line_size);
