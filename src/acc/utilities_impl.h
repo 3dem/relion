@@ -777,6 +777,39 @@ void kernel_exponentiate_weights_fine(	XFLOAT *g_pdf_orientation,
 		d_job_idx,
 		d_job_num,
 		job_num);
+#elif _SYCL_ENABLED
+ #ifdef USE_ONEDPL
+	syclGpuKernels::sycl_kernel_exponentiate_weights_fine(
+		g_pdf_orientation,
+		g_pdf_orientation_zeros,
+		g_pdf_offset,
+		g_pdf_offset_zeros,
+		g_weights,
+		min_diff2,
+		oversamples_orient,
+		oversamples_trans,
+		d_rot_id,
+		d_trans_idx,
+		d_job_idx,
+		d_job_num,
+		job_num,
+		stream);
+ #else
+	syclKernels::exponentiate_weights_fine(
+		g_pdf_orientation,
+		g_pdf_orientation_zeros,
+		g_pdf_offset,
+		g_pdf_offset_zeros,
+		g_weights,
+		min_diff2,
+		oversamples_orient,
+		oversamples_trans,
+		d_rot_id,
+		d_trans_idx,
+		d_job_idx,
+		d_job_num,
+		job_num);
+ #endif
 #else
 	CpuKernels::exponentiate_weights_fine(
 		g_pdf_orientation,

@@ -222,6 +222,8 @@ size_t findThresholdIdxInCumulativeSum(AccPtr<T> &data, T threshold)
 		idx.cpToHost();
 		DEBUG_HANDLE_ERROR(hipStreamSynchronize(data.getStream()));
 		return idx[0];
+#elif defined(_SYCL_ENABLED) && defined(USE_ONEDPL)
+		return AccUtilities::findThresholdIdxInCumulativeSum(data, threshold);
 #else
 		size_t idx = 0;
 		size_t size_m1 = data.getSize()-1;

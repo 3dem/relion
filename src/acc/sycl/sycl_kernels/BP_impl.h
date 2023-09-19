@@ -42,6 +42,9 @@ void backproject2D(
 	assert( imageCount <= dGPU->maxWorkGroup[1]);
 	assert( block_size <= dGPU->maxItem[2]);
 
+	sycl::range<3> wi (1,1,block_size);
+	sycl::range<3> wg (1,imageCount,block_size);
+	dGPU->reCalculateRange(wg, wi);
 	auto event = dGPU->syclSubmit
 	(
 		[&](sycl::handler &cgh) //
@@ -52,8 +55,7 @@ void backproject2D(
 
 			cgh.parallel_for
 			(
-				nd_range<2>( range<2>(imageCount, block_size), range<2>(1, block_size) ),
-				[=](nd_item<2> nit)
+				nd_range<3>(wg, wi), [=](nd_item<3> nit)
  #if defined(__INTEL_LLVM_COMPILER) && defined(INTEL_SG_SIZE)
 				[[intel::reqd_sub_group_size(INTEL_SG_SIZE)]]
  #endif
@@ -102,18 +104,20 @@ void backproject3D(
 	assert(imageCount <= dGPU->maxWorkGroup[1]);
 	assert(block_size <= dGPU->maxItem[2]);
 
-    auto event = dGPU->syclSubmit
-    (
-        [&](sycl::handler &cgh) //
-        {
-            using namespace sycl;
+	sycl::range<3> wi (1,1,block_size);
+	sycl::range<3> wg (1,imageCount,block_size);
+	dGPU->reCalculateRange(wg, wi);
+	auto event = dGPU->syclSubmit
+	(
+		[&](sycl::handler &cgh) //
+		{
+			using namespace sycl;
 			// accessors to device memory
 			local_accessor<XFLOAT, 1> s_eulers_acc(range<1>(9), cgh);
 
 			cgh.parallel_for
 			(
-				nd_range<2>( range<2>(imageCount, block_size), range<2>(1, block_size) ),
-				[=](nd_item<2> nit)
+				nd_range<3>(wg, wi), [=](nd_item<3> nit)
  #if defined(__INTEL_LLVM_COMPILER) && defined(INTEL_SG_SIZE)
 				[[intel::reqd_sub_group_size(INTEL_SG_SIZE)]]
  #endif

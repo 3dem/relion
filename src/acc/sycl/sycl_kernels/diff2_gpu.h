@@ -21,7 +21,7 @@ namespace syclGpuKernels
  */
 template<bool REF3D, bool DATA3D, int block_sz, int eulers_per_block, int prefetch_fraction>
 void sycl_kernel_diff2_coarse(
-		sycl::nd_item<2> nit, AccProjectorKernel &projector,
+		sycl::nd_item<3> nit, AccProjectorKernel &projector,
 		XFLOAT *g_eulers, XFLOAT *trans_x, XFLOAT *trans_y, XFLOAT *trans_z,
 		XFLOAT *g_real,	XFLOAT *g_imag, XFLOAT *g_corr, XFLOAT *g_diff2s,
 		int trans_num, int image_size,
@@ -29,8 +29,8 @@ void sycl_kernel_diff2_coarse(
 		XFLOAT *s_real, XFLOAT *s_imag, XFLOAT *s_corr
 		)
 {
-	const int tid = nit.get_local_id(1);
-	const int blockid = nit.get_group(0);
+	const int tid = nit.get_local_id(2);
+	const int blockid = nit.get_group_linear_id();
 
 	const int xSize = projector.imgX;
 	const int ySize = projector.imgY;
@@ -146,8 +146,8 @@ void sycl_kernel_diff2_coarse(
 				{
 //					translatePixel(x, y, z, tx, ty, tz, s_real[pix+init_pixel%block_sz], s_imag[pix+init_pixel%block_sz], real, imag);
 					XFLOAT val {x*tx + y*ty + z*tz};
-					XFLOAT s {sycl::sin(val)};
-					XFLOAT c {sycl::cos(val)};
+					XFLOAT s {sycl::native::sin(val)};
+					XFLOAT c {sycl::native::cos(val)};
 					real = c * s_real[pix + init_pixel%block_sz] - s * s_imag[pix + init_pixel%block_sz];
 					imag = c * s_imag[pix + init_pixel%block_sz] + s * s_real[pix + init_pixel%block_sz];
 				}
@@ -155,8 +155,8 @@ void sycl_kernel_diff2_coarse(
 				{
 //					translatePixel(x, y,    tx, ty,     s_real[pix+init_pixel%block_sz], s_imag[pix+init_pixel%block_sz], real, imag);
 					XFLOAT val {x*tx + y*ty};
-					XFLOAT s {sycl::sin(val)};
-					XFLOAT c {sycl::cos(val)};
+					XFLOAT s {sycl::native::sin(val)};
+					XFLOAT c {sycl::native::cos(val)};
 					real = c*s_real[pix + init_pixel%block_sz] - s*s_imag[pix + init_pixel%block_sz];
 					imag = c*s_imag[pix + init_pixel%block_sz] + s*s_real[pix + init_pixel%block_sz];
 				}
@@ -178,7 +178,7 @@ void sycl_kernel_diff2_coarse(
 
 template <bool REF3D, bool DATA3D, int block_sz>
 void sycl_kernel_diff2_fine(
-		sycl::nd_item<2> nit, AccProjectorKernel &projector,
+		sycl::nd_item<3> nit, AccProjectorKernel &projector,
 		XFLOAT *g_eulers, XFLOAT *g_imgs_real, XFLOAT *g_imgs_imag,
 		XFLOAT *trans_x, XFLOAT *trans_y, XFLOAT *trans_z,
 		XFLOAT *g_corr_img, XFLOAT *g_diff2s,
@@ -187,8 +187,8 @@ void sycl_kernel_diff2_fine(
 		unsigned long *d_job_idx, unsigned long *d_job_num,
 		XFLOAT *s)
 {
-	const int bid = nit.get_group(0);
-	const int tid = nit.get_local_id(1);
+	const int bid = nit.get_group_linear_id();
+	const int tid = nit.get_local_id(2);
 
 	const int xSize = projector.imgX;
 	const int ySize = projector.imgY;
@@ -396,12 +396,12 @@ void sycl_kernel_diff2_CC_coarse(
 	}
 
 	if (tid == 0)
-		g_diff2[iorient*trans_num + itrans] += -s_weight[0] / sycl::sqrt(s_norm[0]);
+		g_diff2[iorient*trans_num + itrans] += -s_weight[0] / sycl::native::sqrt(s_norm[0]);
 }
 
 template<bool REF3D, bool DATA3D, int block_sz>
 void sycl_kernel_diff2_CC_fine(
-		sycl::nd_item<2> nit, AccProjectorKernel &projector,
+		sycl::nd_item<3> nit, AccProjectorKernel &projector,
 		XFLOAT *g_eulers, XFLOAT *g_imgs_real, XFLOAT *g_imgs_imag,
 		XFLOAT *g_trans_x, XFLOAT *g_trans_y, XFLOAT *g_trans_z,
 		XFLOAT *g_corr_img, XFLOAT *g_diff2s,
@@ -410,8 +410,8 @@ void sycl_kernel_diff2_CC_fine(
 		unsigned long *d_job_idx, unsigned long *d_job_num,
 		XFLOAT *s, XFLOAT *s_cc)
 {
-	const int bid = nit.get_group(0);
-	const int tid = nit.get_local_id(1);
+	const int bid = nit.get_group_linear_id();
+	const int tid = nit.get_local_id(2);
 
 	const int xSize = projector.imgX;
 	const int ySize = projector.imgY;
@@ -517,7 +517,7 @@ void sycl_kernel_diff2_CC_fine(
 		}
 
         if (tid < trans_num)
-            g_diff2s[d_job_idx[bid] + tid] += -s[tid * block_sz] / sycl::sqrt(s_cc[tid * block_sz]);
+            g_diff2s[d_job_idx[bid] + tid] += -s[tid * block_sz] / sycl::native::sqrt(s_cc[tid * block_sz]);
     }
 }
 

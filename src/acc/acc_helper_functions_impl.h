@@ -984,6 +984,14 @@ void mapAllWeightsToMweights(
 			translation_num,
 			WEIGHT_MAP_BLOCK_SIZE);
 	LAUNCH_HANDLE_ERROR(hipGetLastError());
+#elif defined(_SYCL_ENABLED) && defined(USE_ONEDPL)
+	syclGpuKernels::sycl_kernel_allweights_to_mweights(
+			d_iorient,
+			d_allweights,
+			d_mweights,
+			orientation_num,
+			translation_num,
+			WEIGHT_MAP_BLOCK_SIZE, stream);
 #else
 	for (size_t i=0; i < combinations; i++)
 		d_mweights[d_iorient[i/translation_num] * translation_num + i%translation_num] =

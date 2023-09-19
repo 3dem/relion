@@ -10,7 +10,7 @@
 #include <cstdint>
 #include <sycl/sycl.hpp>
 #include <sycl/backend.hpp>
-#ifdef SYCL_OFFLOAD_SORT
+#ifdef USE_ONEDPL
  #include <oneapi/dpl/algorithm>
  #include <oneapi/dpl/execution>
  #include <oneapi/dpl/iterator>
@@ -148,6 +148,8 @@ public:
 	int getNumSlice() const override	{ return nSlice; }
 	void setNumSlice(int n) override	{ nSlice = n; }
 
+	void reCalculateRange(sycl::range<3> &wg, const sycl::range<3> &wi);
+
 	sycl::queue* getQueue()		{ return _devQ; }
 	sycl::device& getDevice()		{ return _devD; }
 	sycl::context& getContext()		{ return _devC; }
@@ -155,7 +157,7 @@ public:
 	sycl::event& getPrevSubmission()	{ return _prev_submission; }
 	std::vector<sycl::event>& getEventList()	{ return _event; }
 	bool canSupportFP64()	{ return	isFP64Supported; }
-#ifdef SYCL_OFFLOAD_SORT
+#ifdef USE_ONEDPL
 	oneapi::dpl::execution::device_policy<>& getDevicePolicy()	{ return _devicePolicy; }
 #endif
 
@@ -182,7 +184,7 @@ private:
 	int sliceID;
 	int nSlice;
 	bool isFP64Supported;
-#ifdef SYCL_OFFLOAD_SORT
+#ifdef USE_ONEDPL
 	oneapi::dpl::execution::device_policy<> _devicePolicy;
 #endif
 };
