@@ -26,5 +26,6 @@ dependencies:
       - git+https://github.com/3dem/relion-blush
       - git+https://github.com/schwabjohannes/DynaMight
       - git+https://github.com/3dem/topaz
+      - ".[vis]"
       
       
