@@ -361,6 +361,10 @@ void TIFFConverter::initialise(int _rank, int _total_ranks)
 		fn_first = fn_in;
 	}
 
+	// Shuffle the input list so that (almost) all MPI processes get new movies
+	if (do_estimate || total_ranks > 1)
+		MD.randomiseOrder();
+
 	if (fn_first.getExtension() != "mrc" && fn_first.getExtension() != "mrcs" && !EERRenderer::isEER(fn_first))
 		REPORT_ERROR(fn_first + ": the input must be MRC, MRCS or EER files");
 
@@ -392,9 +396,6 @@ void TIFFConverter::initialise(int _rank, int _total_ranks)
 	}
 	else
 	{
-		if (do_estimate)
-			MD.randomiseOrder();	
-
 		// Check type and mode of the input
 		Image<RFLOAT> Ihead;
 		Ihead.read(fn_first, false, -1, false, true); // select_img -1, mmap false, is_2D true
