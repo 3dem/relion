@@ -2549,10 +2549,6 @@ void JobWindow::initialiseTomoImportWindow()
 	place("kV", TOGGLE_DEACTIVATE);
 	place("Cs", TOGGLE_DEACTIVATE);
 	place("Q0", TOGGLE_DEACTIVATE);
-	// Add a little spacer
-	current_y += STEPY/2;
-	place("dose_per_tilt_image", TOGGLE_DEACTIVATE);
-	place("dose_per_movie_frame", TOGGLE_DEACTIVATE);
 
     tab1->end();
 
@@ -2568,6 +2564,11 @@ void JobWindow::initialiseTomoImportWindow()
     place("movie_files", TOGGLE_DEACTIVATE);
     place("mdoc_files", TOGGLE_DEACTIVATE);
     place("prefix", TOGGLE_DEACTIVATE);
+
+    // Add a little spacer
+    current_y += STEPY/2;
+    place("dose_rate", TOGGLE_DEACTIVATE);
+    place("dose_is_per_movie_frame", TOGGLE_DEACTIVATE);
 
     current_y += STEPY/2;
     place("tilt_axis_angle", TOGGLE_DEACTIVATE);

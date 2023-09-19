@@ -6523,12 +6523,12 @@ void RelionJob::initialiseTomoImportJob()
 {
         hidden_name = ".gui_tomo_import";
 
-        joboptions["angpix"] = JobOption("Pixel size (Angstrom):", 1.35, 0.5, 10.0, 0.1, "Pixel size in Angstroms. ");
+        joboptions["angpix"] = JobOption("Pixel size (Angstrom):", 0.675, 0.5, 10.0, 0.1, "Pixel size in Angstroms. ");
         joboptions["kV"] = JobOption("Voltage (kV):", 300, 80, 300, 10, "Voltage the microscope was operated on (in kV; default=300).");
         joboptions["Cs"] = JobOption("Spherical aberration (mm):", 2.7, 0.01, 4, 0.1 , "Spherical aberration of the microscope used to collect these images (in mm). Typical values are 2.7 (FEI Titan & Talos, most JEOL CRYO-ARM), 2.0 (FEI Polara), 1.4 (some JEOL CRYO-ARM) and 0.01 (microscopes with a Cs corrector).");
         joboptions["Q0"] = JobOption("Amplitude contrast:", 0.1, 0.05, 1, 0.01, "Fraction of amplitude contrast (default=0.1). Often values around 10% work better than theoretically more accurate lower values. ");
-        joboptions["dose_per_tilt_image"] = JobOption("(Optional) dose per tilt-image:", (std::string)"", "Electron dose (in e/A^2) per image in the tilt series. This is optional and will override values from the mdoc file. Only one of the two dose options should be set.");
-        joboptions["dose_per_movie_frame"] = JobOption("(Optional) dose per movie frame:", (std::string)"", "Electron dose (in e/A^2) per frame in the tilt series. This is optional and will override values from the mdoc file. Only one of the two dose options should be set.");
+        joboptions["dose_rate"] = JobOption("Dose rate per tilt-image:", 3, 0, 20, 1, "Electron dose (in e/A^2) per image in the tilt series. If the option below is set to true, then you can provide the dose rate per movie frame here.");
+        joboptions["dose_is_per_movie_frame"] = JobOption("Is dose rate per movie frame?", false, "If set to true, the dose tate above is taken per movie frame, otherwise the dose rate is assumed to be per tilt image.");
 
         joboptions["do_tiltseries"]= JobOption("Import tilt-series?", true, "Set this to Yes for importing tilt movies from SerialEM  mdoc format metadata.");
         joboptions["movie_files"] = JobOption("Tilt image files:", (std::string)"frames/*.mrc","File pattern matching all tilt image files. These can be multi-frame micrographs or single 2D images.");
@@ -6537,7 +6537,7 @@ void RelionJob::initialiseTomoImportJob()
         joboptions["tilt_axis_angle"] = JobOption("Tilt axis angle (deg):", 85.0, 0.0, 180.0, 1.0 , "Nominal value for the tilt-axis rotation angle (positive is CCW from Y)");
         joboptions["mtf_file"] = JobOption("MTF file:", (std::string)"","MTF file for the detector");
         joboptions["flip_tiltseries_hand"] = JobOption("Invert defocus handedness?", false, "Specify Yes to flip the handedness of the defocus geometry (default = 1, the same as the tutorial dataset: EMPIAR-10164)");
-	joboptions["images_are_motion_corrected"] = JobOption("Movies already motion corrected?", false, "Select Yes if your input images in 'Tilt image movie files' have already been motion corrected and/or are summed single frame images. Make sure the image file names match the corresponding image file names under SubFramePath in the mdoc files");
+        joboptions["images_are_motion_corrected"] = JobOption("Movies already motion corrected?", false, "Select Yes if your input images in 'Tilt image movie files' have already been motion corrected and/or are summed single frame images. Make sure the image file names match the corresponding image file names under SubFramePath in the mdoc files");
 
        	joboptions["do_tomo"] = JobOption("Import tomograms?", false, "Set this to Yes for importing tomogram directories from IMOD.");
         joboptions["io_tomos"] = JobOption("Append to tomograms set: ", OUTNODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "The imported tomograms will be output into this tomogram set. If any tomograms were already in this tomogram set, then the newly imported ones will be added to those.");
@@ -6615,10 +6615,10 @@ bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<st
         command += " --spherical-aberration " + joboptions["Cs"].getString();
         command += " --amplitude-contrast " + joboptions["Q0"].getString();
 
-        if (joboptions["dose_per_tilt_image"].getString() != "")
-            command += " --dose-per-tilt-image " + joboptions["dose_per_tilt_image"].getString();
-        if (joboptions["dose_per_movie_frame"].getString() != "")
-            command += " --dose-per-movie-frame " + joboptions["dose_per_movie_frame"].getString();
+        if (joboptions["dose_is_per_movie_frame"].getBoolean())
+            command += " --dose-per-movie-frame " + joboptions["dose_rate"].getString();
+        else
+            command += " --dose-per-tilt-image " + joboptions["dose_rate"].getString();
         if (joboptions["prefix"].getString() != "")
             command += " --prefix " + joboptions["prefix"].getString();
         if (joboptions["mtf_file"].getString() != "")
