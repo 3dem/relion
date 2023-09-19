@@ -839,7 +839,7 @@ void kernel_exponentiate_weights_fine(	XFLOAT *g_pdf_orientation,
 		d_job_num,
 		job_num);
 #elif _SYCL_ENABLED
- #ifdef SYCL_OFFLOAD_SORT
+ #ifdef USE_ONEDPL
 	syclGpuKernels::sycl_kernel_exponentiate_weights_fine(
 		g_pdf_orientation,
 		g_pdf_orientation_zeros,

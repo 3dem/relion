@@ -50,7 +50,7 @@ devSYCL::devSYCL()
 
 	_devD = _devQ->get_device();
 	_devC = _devQ->get_context();
-#ifdef SYCL_OFFLOAD_SORT
+#ifdef USE_ONEDPL
 	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
 #endif
 	auto d = _devD;
@@ -104,7 +104,7 @@ devSYCL::devSYCL(sycl::device &d, int id)
 
 	_devD = d;
 	_devC = _devQ->get_context();
-#ifdef SYCL_OFFLOAD_SORT
+#ifdef USE_ONEDPL
 	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
 #endif
 
@@ -163,7 +163,7 @@ devSYCL::devSYCL(sycl::device &d, const syclQueueType qType, int id)
 	_devD = d;
 	_devC = _devQ->get_context();
 	_queueType = qType;
-#ifdef SYCL_OFFLOAD_SORT
+#ifdef USE_ONEDPL
 	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
 #endif
 
@@ -212,7 +212,7 @@ devSYCL::devSYCL(sycl::context &c, sycl::device &d, int id)
 	}
 	_devD = d;
 	_devC = c;
-#ifdef SYCL_OFFLOAD_SORT
+#ifdef USE_ONEDPL
 	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
 #endif
 
@@ -270,7 +270,7 @@ devSYCL::devSYCL(sycl::context &c, sycl::device &d, const syclQueueType qType, i
 	_devD = d;
 	_devC = c;
 	_queueType = qType;
-#ifdef SYCL_OFFLOAD_SORT
+#ifdef USE_ONEDPL
 	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
 #endif
 
@@ -337,7 +337,7 @@ devSYCL::devSYCL(const syclDeviceType dev, int id)
 
 	_devD = _devQ->get_device();
 	_devC = _devQ->get_context();
-#ifdef SYCL_OFFLOAD_SORT
+#ifdef USE_ONEDPL
 	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
 #endif
 
@@ -405,7 +405,7 @@ devSYCL::devSYCL(const syclBackendType be, const syclDeviceType dev, int id)
 
 	_devD = _devQ->get_device();
 	_devC = _devQ->get_context();
-#ifdef SYCL_OFFLOAD_SORT
+#ifdef USE_ONEDPL
 	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
 #endif
 
@@ -439,7 +439,7 @@ devSYCL::devSYCL(const devSYCL &q)
 	cardID {q.cardID}, deviceID {q.deviceID}, stackID {q.stackID}, sliceID {q.sliceID}, nSlice {q.nSlice},
 	_queueType {q._queueType}, maxItem {q.maxItem}, maxGroup {q.maxGroup}, maxWorkGroup {q.maxWorkGroup}, maxGlobalWorkGroup {q.maxGlobalWorkGroup}, maxUnit {q.maxUnit},
 	globalMem {q.globalMem}, localMem {q.localMem}, _prev_submission {sycl::event()}, _event {sycl::event()}
-#ifdef SYCL_OFFLOAD_SORT
+#ifdef USE_ONEDPL
 	, _devicePolicy {q._devicePolicy}
 #endif
 {}
@@ -449,7 +449,7 @@ devSYCL::devSYCL(const devSYCL *q)
 	cardID {q->cardID}, deviceID {q->deviceID}, stackID {q->stackID}, sliceID {q->sliceID}, nSlice {q->nSlice},
 	_queueType {q->_queueType}, maxItem {q->maxItem}, maxGroup {q->maxGroup}, maxWorkGroup {q->maxWorkGroup}, maxGlobalWorkGroup {q->maxGlobalWorkGroup}, maxUnit {q->maxUnit},
 	globalMem {q->globalMem}, localMem {q->localMem}, _prev_submission {sycl::event()}, _event {sycl::event()}
-#ifdef SYCL_OFFLOAD_SORT
+#ifdef USE_ONEDPL
 	, _devicePolicy {q->_devicePolicy}
 #endif
 {}
@@ -635,6 +635,28 @@ void devSYCL::waitAll()
 		_event.clear();
 		_event.push_back(sycl::event());
 	}
+}
+
+void devSYCL::reCalculateRange(sycl::range<3> &wg, const sycl::range<3> &wi)
+{
+	if (wg[2] > wi[2]*maxWorkGroup[2])
+	{
+		auto wg12 = wg[1]*wg[2];
+		wg[2] = wi[2] * maxWorkGroup[2];
+        wg[1] = wg12 % wg[2] == 0 ? wg12 / wg[2] : wg12 / wg[2] + 1;
+	}
+	if (wg[1] > wi[1]*maxWorkGroup[1])
+	{
+		auto wg01 = wg[0]*wg[1];
+		wg[1] = wi[1] * maxWorkGroup[1];
+		wg[0] = wg01 % wg[1] == 0 ?  wg01 / wg[1] : wg01 / wg[1] + 1;
+	}
+#if 0
+	if (wg[0] > wi[0]*maxWorkGroup[0])
+	{
+		std::cerr << "The number of work-groups are too big. Please increase work-item.\n";
+    }
+#endif
 }
 
 std::string devSYCL::getName()

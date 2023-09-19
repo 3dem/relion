@@ -1155,7 +1155,7 @@ void getAllSquaredDifferencesCoarse(
 
 #ifdef _SYCL_ENABLED
 	allWeights.setStreamAccType(devAcc);
- #ifdef SYCL_OFFLOAD_SORT
+ #ifdef USE_ONEDPL
 	allWeights.accAlloc();
  #else
 	allWeights.allAlloc();
@@ -1343,7 +1343,7 @@ void getAllSquaredDifferencesCoarse(
 						accMLO->classStreams[iclass],
 						do_CC,
 						accMLO->dataIs3D);
-#if !defined(_SYCL_ENABLED) || defined(SYCL_OFFLOAD_SORT)
+#if !defined(_SYCL_ENABLED) || defined(USE_ONEDPL)
 				if (img_id == sp.nr_images - 1)
                     mapAllWeightsToMweights(
 						~projectorPlans[iclass*sp.nr_images + img_id].iorientclasses,
@@ -1376,7 +1376,7 @@ void getAllSquaredDifferencesCoarse(
 		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			(accMLO->classStreams[exp_iclass])->waitAll();
 	 #endif
-	 #ifdef SYCL_OFFLOAD_SORT
+	 #ifdef USE_ONEDPL
 		devAcc->waitAll();
 	 #else
 		allWeights.cpToHost();
@@ -1402,7 +1402,7 @@ void getAllSquaredDifferencesCoarse(
 
 	} // end loop img_id
 
-#if defined(_SYCL_ENABLED) && ! defined(SYCL_OFFLOAD_SORT)
+#if defined(_SYCL_ENABLED) && ! defined(USE_ONEDPL)
 	allWeights.setAccType(accCPU);
 #endif
     op.min_diff2 = AccUtilities::getMinOnDevice<XFLOAT>(allWeights);
@@ -1827,7 +1827,7 @@ void getAllSquaredDifferencesFine(
 				CTOC(accMLO->timer,"Diff2CALL");
 
 			} // end if class significant
-#if defined(_SYCL_ENABLED) && !defined(SYCL_OFFLOAD_SORT)
+#if defined(_SYCL_ENABLED) && !defined(USE_ONEDPL)
 			FPCMasks[iclass].jobOrigin.freeDeviceIfSet();
 			FPCMasks[iclass].jobOrigin.setAccType(accCPU);
 			FPCMasks[iclass].jobExtent.freeDeviceIfSet();
@@ -1849,7 +1849,7 @@ void getAllSquaredDifferencesFine(
 			(accMLO->classStreams[exp_iclass])->waitAll();
 	 #endif
 		devAcc->waitAll();
-	 #ifndef SYCL_OFFLOAD_SORT
+	 #ifndef USE_ONEDPL
 		FinePassWeights.rot_id.freeDeviceIfSet();
 		FinePassWeights.rot_id.setAccType(accCPU);
 
@@ -1924,7 +1924,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			baseMLO->mymodel.sigma_offset_bodies[ibody]*baseMLO->mymodel.sigma_offset_bodies[ibody] : baseMLO->mymodel.sigma2_offset;
     }
 
-#if defined(_SYCL_ENABLED) && defined(SYCL_OFFLOAD_SORT)
+#if defined(_SYCL_ENABLED) && defined(USE_ONEDPL)
 	deviceStream_t devAcc = accMLO->getSyclDevice();
 #endif
 	// Ready the "prior-containers" for all classes (remake every img_id)
@@ -1933,7 +1933,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	AccPtr<XFLOAT>  pdf_offset            = ptrFactory.make<XFLOAT>((size_t)((sp.iclass_max-sp.iclass_min+1)*sp.nr_trans));
 	AccPtr<bool>    pdf_offset_zeros      = ptrFactory.make<bool>(pdf_offset.getSize());
 
-#if defined(_SYCL_ENABLED) && defined(SYCL_OFFLOAD_SORT)
+#if defined(_SYCL_ENABLED) && defined(USE_ONEDPL)
 	pdf_orientation.setStreamAccType(devAcc);
 	pdf_orientation_zeros.setStreamAccType(devAcc);
 
@@ -1974,7 +1974,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 	pdfs.cpToDevice();
 	AccUtilities::initOrientations(pdfs, pdf_orientation, pdf_orientation_zeros);
-#if defined(_SYCL_ENABLED) && defined(SYCL_OFFLOAD_SORT)
+#if defined(_SYCL_ENABLED) && defined(USE_ONEDPL)
 	pdf_orientation.cpToDevice();
 	pdf_orientation_zeros.cpToDevice();
 #endif
@@ -2013,7 +2013,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
         if(exp_ipass==0)
         {
             int nr_coarse_weights = (sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans;
-#if defined(_SYCL_ENABLED) && defined(SYCL_OFFLOAD_SORT)
+#if defined(_SYCL_ENABLED) && defined(USE_ONEDPL)
 			PassWeights.weights.setStreamAccType(devAcc);
 #endif
             PassWeights.weights.setAccPtr(&(~Mweight)[0]);
@@ -2052,7 +2052,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
         PassWeights.weights.cpToHost();
         DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
-#elif defined(_SYCL_ENABLED) && defined(SYCL_OFFLOAD_SORT)
+#elif defined(_SYCL_ENABLED) && defined(USE_ONEDPL)
 		deviceInitValue<XFLOAT>(PassWeights.weights, (XFLOAT)0.0);
 		PassWeights.weights.setAccValueAt((XFLOAT)1.0, min_pair.first);
 		PassWeights.weights.cpToHost();
@@ -2224,7 +2224,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
                         ipart_length);
 
                 AccPtr<XFLOAT> filtered = ptrFactory.make<XFLOAT>((size_t)unsorted_ipart.getSize());
-#if defined(_SYCL_ENABLED) && defined(SYCL_OFFLOAD_SORT)
+#if defined(_SYCL_ENABLED) && defined(USE_ONEDPL)
 				filtered.setStreamAccType(devAcc);
 #endif
 
@@ -2257,7 +2257,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
                 AccPtr<XFLOAT> sorted =         ptrFactory.make<XFLOAT>((size_t)filteredSize);
                 AccPtr<XFLOAT> cumulative_sum = ptrFactory.make<XFLOAT>((size_t)filteredSize);
-#if defined(_SYCL_ENABLED) && defined(SYCL_OFFLOAD_SORT)
+#if defined(_SYCL_ENABLED) && defined(USE_ONEDPL)
 				sorted.setStreamAccType(devAcc);
 				cumulative_sum.setStreamAccType(devAcc);
 #endif
@@ -2334,7 +2334,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
                 arrayOverThreshold<XFLOAT>(unsorted_ipart, Mcoarse_significant, significant_weight);
                 Mcoarse_significant.cpToHost();
                 DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-#elif defined(_SYCL_ENABLED) && defined(SYCL_OFFLOAD_SORT)
+#elif defined(_SYCL_ENABLED) && defined(USE_ONEDPL)
 				unsorted_ipart.cpToHost();
 				unsorted_ipart.streamSync();
 				unsorted_ipart.setAccType(accCPU);
@@ -2361,7 +2361,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
             for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
                 DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
             DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-#elif defined(_SYCL_ENABLED) && defined(SYCL_OFFLOAD_SORT)
+#elif defined(_SYCL_ENABLED) && defined(USE_ONEDPL)
  #ifdef USE_SYCL_STREAM
             for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 				(accMLO->classStreams[exp_iclass])->waitAll();
@@ -2386,7 +2386,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
                                    pdf_offset_class =            ptrFactory.make<XFLOAT>(sp.nr_trans);
                     AccPtr<bool>   pdf_orientation_zeros_class = ptrFactory.make<bool>(sp.nr_dir*sp.nr_psi),
                                    pdf_offset_zeros_class =      ptrFactory.make<bool>(sp.nr_trans);
-#if defined(_SYCL_ENABLED) && defined(SYCL_OFFLOAD_SORT)
+#if defined(_SYCL_ENABLED) && defined(USE_ONEDPL)
 					pdf_orientation_class.setStreamAccType(devAcc);
 					pdf_offset_class.setStreamAccType(devAcc);
 					pdf_orientation_zeros_class.setStreamAccType(devAcc);
@@ -2450,7 +2450,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
             for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
                 DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
             DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-#elif defined(_SYCL_ENABLED) && defined(SYCL_OFFLOAD_SORT)
+#elif defined(_SYCL_ENABLED) && defined(USE_ONEDPL)
  #ifdef USE_SYCL_STREAM
             for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 				(accMLO->classStreams[exp_iclass])->waitAll();
@@ -2479,13 +2479,13 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
             DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
 #elif _CUDA_ENABLED
             DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-#elif defined(_SYCL_ENABLED) && defined(SYCL_OFFLOAD_SORT)
+#elif defined(_SYCL_ENABLED) && defined(USE_ONEDPL)
 			devAcc->waitAll();
 #endif
             size_t weightSize = PassWeights.weights.getSize();
             AccPtr<XFLOAT> sorted =         ptrFactory.make<XFLOAT>((size_t)weightSize);
             AccPtr<XFLOAT> cumulative_sum = ptrFactory.make<XFLOAT>((size_t)weightSize);
-#if defined(_SYCL_ENABLED) && defined(SYCL_OFFLOAD_SORT)
+#if defined(_SYCL_ENABLED) && defined(USE_ONEDPL)
 			sorted.setStreamAccType(devAcc);
 			cumulative_sum.setStreamAccType(devAcc);
 #endif
@@ -3836,7 +3836,7 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_B);
 
 				Mweight.setSize(weightsPerPart);
 				Mweight.setHostPtr(op.Mweight.data);
-#if defined(_SYCL_ENABLED) && defined(SYCL_OFFLOAD_SORT)
+#if defined(_SYCL_ENABLED) && defined(USE_ONEDPL)
 				Mweight.setStreamAccType(myInstance->getSyclDevice());
 #endif
 				Mweight.deviceAlloc();
@@ -3931,7 +3931,7 @@ baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_E);
         bundleSWS.setSize(2*(FineProjectionData.orientationNumAllClasses)*sizeof(unsigned long));
         bundleSWS.allAlloc();
 
-#if defined(_SYCL_ENABLED) && defined(SYCL_OFFLOAD_SORT)
+#if defined(_SYCL_ENABLED) && defined(USE_ONEDPL)
 		FinePassWeights.setAccType_all(accCPU);
 		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{

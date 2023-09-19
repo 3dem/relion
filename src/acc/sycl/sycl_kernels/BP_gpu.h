@@ -15,7 +15,7 @@ namespace syclGpuKernels
 
 template <bool CTF_PREMULTIPLIED, bool SGD>
 void sycl_kernel_backproject2D(
-		sycl::nd_item<2> nit, AccProjectorKernel &projector,
+		sycl::nd_item<3> nit, AccProjectorKernel &projector,
 		XFLOAT *g_img_real, XFLOAT *g_img_imag,
 		XFLOAT *g_trans_x, XFLOAT *g_trans_y,
 		XFLOAT *g_weights, XFLOAT *g_Minvsigma2s, XFLOAT *g_ctfs,
@@ -26,8 +26,8 @@ void sycl_kernel_backproject2D(
 		int img_x, int img_y, int img_xy, int mdl_x, int mdl_inity,
 		XFLOAT *s_eulers)
 {
-	const int tid = nit.get_local_id(1);
-	const int img = nit.get_group(0);
+	const int tid = nit.get_local_id(2);
+	const int img = nit.get_group_linear_id();
 
 	const int img_y_half = img_y / 2;
 	const XFLOAT max_r2_out = sycl::floor(max_r2 * padding_factor * padding_factor);
@@ -164,7 +164,7 @@ void sycl_kernel_backproject2D(
 
 template <bool DATA3D, bool CTF_PREMULTIPLIED, bool SGD>
 void sycl_kernel_backproject3D(
-		sycl::nd_item<2> nit, AccProjectorKernel &projector,
+		sycl::nd_item<3> nit, AccProjectorKernel &projector,
 		XFLOAT *g_img_real, XFLOAT *g_img_imag,
 		XFLOAT *g_trans_x, XFLOAT *g_trans_y, XFLOAT *g_trans_z,
 		XFLOAT *g_weights, XFLOAT *g_Minvsigma2s, XFLOAT *g_ctfs,
@@ -176,8 +176,8 @@ void sycl_kernel_backproject3D(
 		int mdl_y, int mdl_inity, int mdl_initz,
 		XFLOAT *s_eulers)
 {
-	const int tid = nit.get_local_id(1);
-	const int img = nit.get_group(0);
+	const int tid = nit.get_local_id(2);
+	const int img = nit.get_group_linear_id();
 
 	const int img_y_half = img_y / 2;
 	const int img_z_half = img_z / 2;

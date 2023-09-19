@@ -37,6 +37,9 @@ namespace syclKernels
 		assert(  block_sz <= dGPU->maxItem[2]);
 		assert(eulers_per_block*9 + 2*(block_sz/prefetch_fraction*eulers_per_block) + 3*block_sz <= dGPU->localMem);
 
+		sycl::range<3> wi (1,1,block_sz);
+		sycl::range<3> wg (1,grid_size,block_sz);
+		dGPU->reCalculateRange(wg, wi);
 		auto event = dGPU->syclSubmit
 		(
 			[&](sycl::handler &cgh) //
@@ -52,8 +55,7 @@ namespace syclKernels
 
 				cgh.parallel_for
 				(
-					nd_range<2>( range<2>(grid_size, block_sz), range<2>(1, block_sz) ),
-					[=](nd_item<2> nit)
+					nd_range<3>(wg, wi), [=](nd_item<3> nit)
  #if defined(__INTEL_LLVM_COMPILER) && defined(INTEL_SG_SIZE)
 					[[intel::reqd_sub_group_size(INTEL_SG_SIZE)]]
  #endif
@@ -104,18 +106,20 @@ namespace syclKernels
 		assert(  block_sz <= dGPU->maxItem[2]);
 		assert(block_sz * chunk_sz <= dGPU->localMem);
 
-        auto event = dGPU->syclSubmit
-        (
-            [&](sycl::handler &cgh) //
-            {
+		sycl::range<3> wi (1,1,block_sz);
+		sycl::range<3> wg (1,grid_size,block_sz);
+		dGPU->reCalculateRange(wg, wi);
+		auto event = dGPU->syclSubmit
+		(
+			[&](sycl::handler &cgh) //
+			{
 				using namespace sycl;
 				// accessors to device memory
 				local_accessor<XFLOAT, 1> s_acc(range<1>(block_sz * chunk_sz), cgh);
 
 				cgh.parallel_for
 				(
-					nd_range<2>( range<2>(grid_size, block_sz), range<2>(1, block_sz) ),
-					[=](nd_item<2> nit)
+					nd_range<3>(wg, wi), [=](nd_item<3> nit)
  #if defined(__INTEL_LLVM_COMPILER) && defined(INTEL_SG_SIZE)
 					[[intel::reqd_sub_group_size(INTEL_SG_SIZE)]]
  #endif
@@ -163,6 +167,8 @@ namespace syclKernels
 		assert(  block_sz <= dGPU->maxItem[2]);
 		assert(2*block_sz <= dGPU->localMem);
 
+		sycl::range<3> wi {1,1,block_sz};
+		sycl::range<3> wg {grid_size,trans_num,block_sz};
         auto event = dGPU->syclSubmit
         (
             [&](sycl::handler &cgh) //
@@ -174,8 +180,7 @@ namespace syclKernels
 
 				cgh.parallel_for
 				(
-					nd_range<3>( range<3>(grid_size, trans_num, block_sz), range<3>(1, 1, block_sz) ),
-					[=](nd_item<3> nit)
+					nd_range<3>(wg, wi), [=](nd_item<3> nit)
  #if defined(__INTEL_LLVM_COMPILER) && defined(INTEL_SG_SIZE)
 					[[intel::reqd_sub_group_size(INTEL_SG_SIZE)]]
  #endif
@@ -222,10 +227,13 @@ namespace syclKernels
 		assert(  block_sz <= dGPU->maxItem[2]);
 		assert(2 * block_sz * chunk_sz <= dGPU->localMem);
 
-        auto event = dGPU->syclSubmit
-        (
-            [&](sycl::handler &cgh) //
-            {
+		sycl::range<3> wi (1,1,block_sz);
+		sycl::range<3> wg (1,grid_size,block_sz);
+		dGPU->reCalculateRange(wg, wi);
+		auto event = dGPU->syclSubmit
+		(
+			[&](sycl::handler &cgh) //
+			{
 				using namespace sycl;
 				// accessors to device memory
 				local_accessor<XFLOAT, 1> s_acc(range<1>(block_sz * chunk_sz), cgh);
@@ -233,8 +241,7 @@ namespace syclKernels
 
 				cgh.parallel_for
 				(
-					nd_range<2>( range<2>(grid_size, block_sz), range<2>(1, block_sz) ),
-					[=](nd_item<2> nit)
+					nd_range<3>(wg, wi), [=](nd_item<3> nit)
  #if defined(__INTEL_LLVM_COMPILER) && defined(INTEL_SG_SIZE)
 					[[intel::reqd_sub_group_size(INTEL_SG_SIZE)]]
  #endif

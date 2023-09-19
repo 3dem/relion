@@ -1120,7 +1120,7 @@ void mapAllWeightsToMweights(
 			translation_num,
 			WEIGHT_MAP_BLOCK_SIZE);
 	LAUNCH_HANDLE_ERROR(hipGetLastError());
-#elif defined(_SYCL_ENABLED) && defined(SYCL_OFFLOAD_SORT)
+#elif defined(_SYCL_ENABLED) && defined(USE_ONEDPL)
 	syclGpuKernels::sycl_kernel_allweights_to_mweights(
 			d_iorient,
 			d_allweights,

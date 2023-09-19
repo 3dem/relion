@@ -9,7 +9,7 @@
 #include <tuple>
 #include <cassert>
 #include <sycl/sycl.hpp>
-#ifdef SYCL_OFFLOAD_SORT
+#ifdef USE_ONEDPL
 // Needs oneDPL (https://github.com/oneapi-src/oneDPL)
  #include <oneapi/dpl/algorithm>
  #include <oneapi/dpl/execution>
@@ -56,7 +56,7 @@ static T getSumOnDevice(T *data, const size_t count, virtualSYCL *devAcc)
 	assert(count <= std::numeric_limits<int>::max());
 	sycl::queue *Q = dynamic_cast<devSYCL*>(devAcc)->getQueue();
 	T ret;
- #if defined(SYCL_OFFLOAD_SORT) && !defined(USE_LESS_ONEDPL)
+ #if defined(USE_ONEDPL) && !defined(USE_LESS_ONEDPL)
 	ret = dpl::reduce(dynamic_cast<devSYCL*>(devAcc)->getDevicePolicy(), data, data+count, static_cast<T>(0));
  #else
 	{
@@ -81,7 +81,7 @@ static T getMinOnDevice(T *data, const size_t count, virtualSYCL *devAcc)
 	assert(count <= std::numeric_limits<int>::max());
 	sycl::queue *Q = dynamic_cast<devSYCL*>(devAcc)->getQueue();
 	T val;
- #if defined(SYCL_OFFLOAD_SORT) && !defined(USE_LESS_ONEDPL)
+ #if defined(USE_ONEDPL) && !defined(USE_LESS_ONEDPL)
 	auto iter = dpl::min_element(dynamic_cast<devSYCL*>(devAcc)->getDevicePolicy(), data, data+count);
 	auto dist = dpl::distance(data, iter);
 
@@ -110,7 +110,7 @@ static T getMaxOnDevice(T *data, const size_t count, virtualSYCL *devAcc)
 	assert(count <= std::numeric_limits<int>::max());
 	sycl::queue *Q = dynamic_cast<devSYCL*>(devAcc)->getQueue();
 	T val;
- #if defined(SYCL_OFFLOAD_SORT) && !defined(USE_LESS_ONEDPL)
+ #if defined(USE_ONEDPL) && !defined(USE_LESS_ONEDPL)
 	auto iter = dpl::max_element(dynamic_cast<devSYCL*>(devAcc)->getDevicePolicy(), data, data+count);
 	auto dist = dpl::distance(data, iter);
 
@@ -142,7 +142,7 @@ static std::pair<size_t, T> getArgMinOnDevice(T *data, const size_t count, virtu
 	assert(count <= std::numeric_limits<int>::max());
 	sycl::queue *Q = dynamic_cast<devSYCL*>(devAcc)->getQueue();
 	std::pair<size_t, T> pair;
- #if defined(SYCL_OFFLOAD_SORT) && !defined(USE_LESS_ONEDPL)
+ #if defined(USE_ONEDPL) && !defined(USE_LESS_ONEDPL)
 	auto iter = dpl::min_element(dynamic_cast<devSYCL*>(devAcc)->getDevicePolicy(), data, data+count);
 	auto dist = dpl::distance(data, iter);
 
@@ -180,7 +180,7 @@ static std::pair<size_t, T> getArgMaxOnDevice(T *data, const size_t count, virtu
 	assert(count <= std::numeric_limits<int>::max());
 	sycl::queue *Q = dynamic_cast<devSYCL*>(devAcc)->getQueue();
 	std::pair<size_t, T> pair;
- #if defined(SYCL_OFFLOAD_SORT) && !defined(USE_LESS_ONEDPL)
+ #if defined(USE_ONEDPL) && !defined(USE_LESS_ONEDPL)
 	auto iter = dpl::max_element(dynamic_cast<devSYCL*>(devAcc)->getDevicePolicy(), data, data+count);
 	auto dist = dpl::distance(data, iter);
 
@@ -215,7 +215,7 @@ static size_t filterGreaterZeroOnDevice(T *in, const size_t count, T *out, virtu
 	assert(count <= std::numeric_limits<int>::max());
 	sycl::queue *Q = dynamic_cast<devSYCL*>(devAcc)->getQueue();
 	size_t dist;
- #if defined(SYCL_OFFLOAD_SORT) && !defined(USE_LESS_ONEDPL)
+ #if defined(USE_ONEDPL) && !defined(USE_LESS_ONEDPL)
 	auto iter = dpl::copy_if(dynamic_cast<devSYCL*>(devAcc)->getDevicePolicy(), in, in+count, out, [=](T &v){return (v>static_cast<T>(0));});
 	dist = dpl::distance(out, iter);
  #else
@@ -248,7 +248,7 @@ static void sortOnDevice(T *in, const size_t count, T *out, virtualSYCL *devAcc)
 {
 	assert(count <= std::numeric_limits<int>::max());
 	sycl::queue *Q = dynamic_cast<devSYCL*>(devAcc)->getQueue();
- #ifdef SYCL_OFFLOAD_SORT
+ #ifdef USE_ONEDPL
 	Q->memcpy(out, in, count *sizeof(T)).wait_and_throw();
 	dpl::sort(dynamic_cast<devSYCL*>(devAcc)->getDevicePolicy(), out, out+count);
  #endif
@@ -259,7 +259,7 @@ static void scanOnDevice(T *in, const size_t count, T *out, virtualSYCL *devAcc)
 {
 	assert(count <= std::numeric_limits<int>::max());
 	sycl::queue *Q = dynamic_cast<devSYCL*>(devAcc)->getQueue();
- #ifdef PREFER_ONEDPL
+ #ifdef USE_MORE_ONEDPL
 // This has conflict with DisableIndirectAccess=1
 // DisableIndirectAccess=1 will cause incorrecxt result
 	dpl::inclusive_scan(dynamic_cast<devSYCL*>(devAcc)->getDevicePolicy(), in, in+count, out);
@@ -344,8 +344,8 @@ static void sycl_kernel_exponentiate(
 {
 	assert(count <= std::numeric_limits<int>::max());
 	sycl::queue *Q = dynamic_cast<devSYCL*>(devAcc)->getQueue();
- #ifdef PREFER_ONEDPL
-	dpl::transform(dynamic_cast<devSYCL*>(devAcc)->getDevicePolicy(), g_array, g_array+count, g_array, [=](T v) { v+=add; v = (v<KERNEL_EXP_VALUE) ? static_cast<T>(0) : sycl::exp(v); return v;});
+ #ifdef USE_MORE_ONEDPL
+	dpl::transform(dynamic_cast<devSYCL*>(devAcc)->getDevicePolicy(), g_array, g_array+count, g_array, [=](T v) { v+=add; v = (v<KERNEL_EXP_VALUE) ? static_cast<T>(0) : sycl::native::exp(v); return v;});
  #else
 	Q->submit([&](sycl::handler &cgh)
 	{
@@ -757,7 +757,7 @@ inline void kernel_frequencyPass( int grid_size, int block_size,
 					}
 					else if (res < edge_high) //highpass => medium lows are almost dead
 					{
-						XFLOAT mul = 0.5 - 0.5 * sycl::cos( PI * (res-edge_low)/edge_width);
+						XFLOAT mul = 0.5 - 0.5 * std::cos( PI * (res-edge_low)/edge_width);
 						A[texel].x *= mul;
 						A[texel].y *= mul;
 					}
@@ -771,7 +771,7 @@ inline void kernel_frequencyPass( int grid_size, int block_size,
 					}
 					else if (res > edge_low) //lowpass => medium highs are almost dead
 					{
-						XFLOAT mul = 0.5 + 0.5 * sycl::cos( PI * (res-edge_low)/edge_width);
+						XFLOAT mul = 0.5 + 0.5 * std::cos( PI * (res-edge_low)/edge_width);
 						A[texel].x *= mul;
 						A[texel].y *= mul;
 					}
@@ -832,7 +832,7 @@ inline void powerClass(int          gridSize,
 					coords_in_range = !(x==0 && y<0.f);
 				}
 
-				size_t ires = static_cast<size_t>(sycl::sqrt(static_cast<XFLOAT>(d)) + 0.5);
+				size_t ires = static_cast<size_t>(std::sqrt(static_cast<XFLOAT>(d)) + 0.5);
 				if((ires<spectrum_size) && coords_in_range)
 				{
 					normFaux = g_image[voxel].x*g_image[voxel].x + g_image[voxel].y*g_image[voxel].y;
@@ -852,7 +852,7 @@ inline void powerClass(int          gridSize,
 
 inline std::pair<XFLOAT, XFLOAT> sycl_sincos(XFLOAT val)
 {
-	return std::make_pair(sycl::sin(val), sycl::cos(val));
+	return std::make_pair(sycl::native::sin(val), sycl::native::cos(val));
 }
 
 inline void translatePixel(
@@ -866,8 +866,8 @@ inline void translatePixel(
 		XFLOAT &tImag)
 {
 	XFLOAT v = x * tx + y * ty;
-	XFLOAT s = sycl::sin(v);
-	XFLOAT c = sycl::cos(v);
+	XFLOAT s = sycl::native::sin(v);
+	XFLOAT c = sycl::native::cos(v);
 
 	tReal = c * real - s * imag;
 	tImag = c * imag + s * real;
@@ -886,8 +886,8 @@ inline void translatePixel(
 		XFLOAT &tImag)
 {
 	XFLOAT v = x * tx + y * ty + z * tz;
-	XFLOAT s = sycl::sin(v);
-	XFLOAT c = sycl::cos(v);
+	XFLOAT s = sycl::native::sin(v);
+	XFLOAT c = sycl::native::cos(v);
 
 	tReal = c * real - s * imag;
 	tImag = c * imag + s * real;
@@ -916,15 +916,15 @@ inline void  computeSincosLookupTable2D(unsigned long  trans_num,
 		for(int x=0; x<xSize; x++) {
 			unsigned long index = i * xSize + x;
 			XFLOAT v = x * tx;
-			sin_x[index] = sycl::sin(v);
-			cos_x[index] = sycl::cos(v);
+			sin_x[index] = sycl::native::sin(v);
+			cos_x[index] = sycl::native::cos(v);
 		}
 		
 		for(int y=0; y<ySize; y++) {
             unsigned long index = i * ySize + y;
 			XFLOAT v = y * ty;
-			sin_y[index] = sycl::sin(v);
-			cos_y[index] = sycl::cos(v);
+			sin_y[index] = sycl::native::sin(v);
+			cos_y[index] = sycl::native::cos(v);
 		}        
 	}
 }	                                    
@@ -951,22 +951,22 @@ inline void  computeSincosLookupTable3D(unsigned long  trans_num,
 		for(int x=0; x<xSize; x++) {
 			unsigned long index = i * xSize + x;
 			XFLOAT v = x * tx;
-			sin_x[index] = sycl::sin(v);
-			cos_x[index] = sycl::cos(v);
+			sin_x[index] = sycl::native::sin(v);
+			cos_x[index] = sycl::native::cos(v);
 		}
 		
 		for(int y=0; y<ySize; y++) {
             unsigned long index = i * ySize + y;
 			XFLOAT v = y * ty;
-			sin_y[index] = sycl::sin(v);
-			cos_y[index] = sycl::cos(v);
+			sin_y[index] = sycl::native::sin(v);
+			cos_y[index] = sycl::native::cos(v);
 		}           
 		
 		for(int z=0; z<zSize; z++) {
 			unsigned long index = i * zSize + z;
 			XFLOAT v = z * tz;
-			sin_z[index] = sycl::sin(v);
-			cos_z[index] = sycl::cos(v);
+			sin_z[index] = sycl::native::sin(v);
+			cos_z[index] = sycl::native::cos(v);
 		}        		
 	}
 }
@@ -993,7 +993,7 @@ size_t findThresholdIdxInCumulativeSum(T *data, const size_t count, T threshold,
 	assert(count <= std::numeric_limits<int>::max());
 	sycl::queue *Q = dynamic_cast<devSYCL*>(devAcc)->getQueue();
 	size_t dist;
- #ifdef PREFER_ONEDPL
+ #ifdef USE_MORE_ONEDPL
 	auto iter = dpl::find_if(dynamic_cast<devSYCL*>(devAcc)->getDevicePolicy(), data, data+count, [=](T &v){return (v>threshold);});
 	dist = dpl::distance(data, iter);
  #else

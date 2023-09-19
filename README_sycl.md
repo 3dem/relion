@@ -34,15 +34,15 @@ $ cmake \
 -DSYCL=ON \
 -DCUDA=OFF \
 -DCMAKE_BUILD_TYPE=Release \
--DCMAKE_C_FLAGS="-O3 -fsigned-zeros" \
--DCMAKE_CXX_FLAGS="-O3 -fsigned-zeros -march=native" \
+-DCMAKE_C_FLAGS="-O3" \
+-DCMAKE_CXX_FLAGS="-O3 -march=native" \
 -DCMAKE_EXE_LINKER_FLAGS="-O3 -march=native" \
 ..
 
 $ #### This is Intel GPU Level Zero backend specific #####
-$ export ZE_AFFINITY_MASK=0 # Use only the first available Level Zero device
+$ export ZE_AFFINITY_MASK=0 # Use only the first available Level Zero device. This can be replaced by --gpu 0 syntax.
 $ export ZEX_NUMBER_OF_CCS=0:4,1:4
-$ export SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=2 # Don't use this with Intel Arc GPUs. Only for Max GPUs
+$ export SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=2 # Don't use this with Intel Arc GPUs. Only for Intel Data Center GPUs
 $ export SYCL_PI_LEVEL_ZERO_DEVICE_SCOPE_EVENTS=0
 $ export SYCL_PI_LEVEL_ZERO_USM_ALLOCATOR="1;4G;host:16M,512,64K;device:16M,1024,64K;shared:0,0,64K"
 $ #### End of Intel GPU Level Zero backend specific  #####
@@ -57,7 +57,7 @@ $ {Run 2D/3D/refinement application by replacing --gpu/--cpu with --gpu/--sycl/-
 
 + For CMake configuration
 	+ `SYCL`(=ON/OFF): Enable SYCL based acceleration build
-	+ `SyclForceOneDPL`(=ON/OFF): Use oneDPL(https://github.com/oneapi-src/oneDPL) if it can be used. This has the same effect as setting "-DSYCL_OFFLOAD_SORT" for CMAKE_CXX_FLAGS below. (experimental)
+	+ `SyclForceOneDPL`(=ON/OFF): Use oneDPL(https://github.com/oneapi-src/oneDPL) if it can be used. This has the same effect as setting "-DUSE_ONEDPL" for CMAKE_CXX_FLAGS below. (experimental)
 	+ `SYCL_AOT_COMPILE`(=ON/OFF): Enable AOT(Ahead-Of-Time) compilation for SPIR64 target. Default target is pvc. (experimental)
 	+ `SYCL_AOT_TARGET`(=ON/OFF): Specify AOT(Ahead-Of-Time) SPIR64 target. Possible list can be checked using "ocloc compile --help" command. (experimental)
 	+ `SYCL_CUDA_COMPILE`(=ON/OFF): Enable SYCL compilation for CUDA target (Not tested)
@@ -71,7 +71,7 @@ $ {Run 2D/3D/refinement application by replacing --gpu/--cpu with --gpu/--sycl/-
 	+ `SYCL_LINK_FLAGS`: SYCL link flags except "-lsycl -lOpenCL" if needed (for future use)
 
 + Others for testing purpose (just defining with -D* is needed in cmake -DCMAKE_CXX_FLAGS)
-	+ `SYCL_OFFLOAD_SORT`: Use SYCL kernel for weight sorting routines. If this is set, oneDPL(https://github.com/oneapi-src/oneDPL) is used when it is beneficial. (experimental)
+	+ `USE_ONEDPL`: Use SYCL kernel for weight sorting routines. If this is set, oneDPL(https://github.com/oneapi-src/oneDPL) is used when it is beneficial. (experimental)
 		+ `USE_LESS_ONEDPL`: If this is set, oneDPL is used only when there is no other implementation.
 		+ `PREFER_ONEDPL`: If this is set, oneDPL is used everywhere when it is applicable. If this is set, you SHOULD NOT SET DisableIndirectAccess=1.
 	+ `SYCL_OFFLOAD_FFT`: Use SYCL kernel for the current FFTW routines. (Not implemented)

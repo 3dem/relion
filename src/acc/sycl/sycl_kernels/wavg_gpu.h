@@ -17,7 +17,7 @@ namespace syclGpuKernels
 
 template <bool REFCTF, bool REF3D, bool DATA3D, int block_sz>
 void sycl_kernel_wavg(
-		sycl::nd_item<2> nit, AccProjectorKernel &projector,
+		sycl::nd_item<3> nit, AccProjectorKernel &projector,
 		XFLOAT *g_eulers, int image_size, int orientation_num,
 		XFLOAT *g_img_real, XFLOAT *g_img_imag,
 		XFLOAT *g_trans_x, XFLOAT *g_trans_y, XFLOAT *g_trans_z,
@@ -27,8 +27,8 @@ void sycl_kernel_wavg(
 		XFLOAT *s_parts, XFLOAT *s_sumAA, XFLOAT *s_sumXA, XFLOAT *s_eulers
 		)
 {
-	const int bid = nit.get_group(0); // block ID
-	const int tid = nit.get_local_id(1);
+	const int bid = nit.get_group_linear_id();
+	const int tid = nit.get_local_id(2);
 
 	const int xSize = projector.imgX;
 	const int ySize = projector.imgY;

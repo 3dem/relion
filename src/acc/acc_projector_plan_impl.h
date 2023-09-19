@@ -265,7 +265,7 @@ void AccProjectorPlan::setup(
 	TIMING_TOC(TIMING_SAMPLING);
 
 	iorientclasses.resizeHostCopy(orientation_num);
-#if defined(_SYCL_ENABLED) && defined(SYCL_OFFLOAD_SORT)
+#if defined(_SYCL_ENABLED) && defined(USE_ONEDPL)
 	iorientclasses.setStreamAccType(devAcc);
 #endif
 	iorientclasses.putOnDevice();
