@@ -4446,11 +4446,11 @@ void MlOptimiser::symmetriseReconstructions()
 
 void MlOptimiser::applyLocalSymmetryForEachRef()
 {
-	if ( (fn_local_symmetry_masks.size() < 1) || (fn_local_symmetry_operators.size() < 1) )
+	if ( (fn_local_symmetry_masks.size() == 0) || (fn_local_symmetry_operators.size() == 0) )
 		return;
 
 	if (verb > 0)
-		std::cout << " Applying local symmetry in real space according to " << fn_local_symmetry_operators.size() << " operators..." << std::endl;
+		std::cout << " Applying local symmetry in real space..." << std::endl;
 
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
