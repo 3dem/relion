@@ -1102,7 +1102,7 @@ Pixels values higher than this many times the image stddev will be replaced with
 
 void JobWindow::initialiseSelectWindow()
 {
-	setupTabs(4);
+	setupTabs(5);
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -1201,6 +1201,21 @@ void JobWindow::initialiseSelectWindow()
 	group2->end();
 	guientries["do_remove_duplicates"].cb_menu_i();
 	tab4->end();
+
+    tab5->begin();
+	tab5->label("Filaments");
+	resetHeight();
+
+	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group3->end();
+	place("do_filaments", TOGGLE_DEACTIVATE, group3);
+	group3->begin();
+	place("dendrogram_threshold", TOGGLE_LEAVE_ACTIVE);
+	place("dendrogram_minclass", TOGGLE_LEAVE_ACTIVE);
+	group3->end();
+	guientries["do_filaments"].cb_menu_i();
+	tab5->end();
+
 
 	// Always deactivate the queue option
 	guientries["do_queue"].deactivate_option = TOGGLE_ALWAYS_DEACTIVATE;

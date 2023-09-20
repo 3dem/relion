@@ -2725,6 +2725,10 @@ void RelionJob::initialiseSelectJob()
 	joboptions["do_remove_duplicates"] = JobOption("OR: remove duplicates?", false, "If set to Yes, duplicated particles that are within a given distance are removed leaving only one. Duplicated particles are sometimes generated when particles drift into the same position during alignment. They inflate and invalidate gold-standard FSC calculation.");
 	joboptions["duplicate_threshold"] = JobOption("Minimum inter-particle distance (A)", 30, 0, 1000, 1, "Particles within this distance are removed leaving only one.");
 	joboptions["image_angpix"] = JobOption("Pixel size before extraction (A)", -1, -1, 10, 0.01, "The pixel size of particles (relevant to rlnOriginX/Y) is read from the STAR file. When the pixel size of the original micrograph used for auto-picking and extraction (relevant to rlnCoordinateX/Y) is different, specify it here. In other words, this is the pixel size after binning during motion correction, but before down-sampling during extraction.");
+
+    joboptions["do_filaments"] = JobOption("OR: select filaments by dendrogram?", false, "If set to Yes, then the FilamentTools program by David Li will be used to perform a hierarchical clustering of the filaments, based on 2D class average assignments of their individual segments.");
+    joboptions["dendrogram_threshold"] = JobOption("Dendrogram threshold: ", 0.85, 0, 1, 0.05, "Lower thresholds will produce more clusters; After the dendrogram has been calculated in the initial running of this job, subsequent continuation jobs can quickly test other threshold values. The output logfile.pdf can be visualised to follow the process until a good threshold has been achieved.");
+    joboptions["dendrogram_minclass"] = JobOption("Dendrogram threshold: ", -1000, -1000, 50000, 1000, "If set to a positive value, then particle star files with clusters that have at least this number of particles will be written out. Keep th default negative value for faster testing of the threshold.");
 }
 
 bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::string> &commands,
@@ -2746,14 +2750,48 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 	if (joboptions["do_select_values"].getBoolean()) c++;
 	if (joboptions["do_discard"].getBoolean()) c++;
 	if (joboptions["do_split"].getBoolean()) c++;
-	if (joboptions["do_remove_duplicates"].getBoolean()) c++;
+    if (joboptions["do_remove_duplicates"].getBoolean()) c++;
+    if (joboptions["do_filaments"].getBoolean()) c++;
 	if (c > 1)
 	{
 		error_message = "You cannot do many tasks simultaneously...";
 		return false;
 	}
 
-	if (joboptions["do_remove_duplicates"].getBoolean())
+    if (joboptions["do_filaments"].getBoolean())
+    {
+        label += ".filamentsdendrogram";
+        command="`which relion_filament_selection`";
+
+        if (joboptions["fn_mic"].getString() != "" || joboptions["fn_data"].getString() != "")
+		{
+			error_message = "ERROR: Filament selection by dendrogram analysis is only possible for optimiser STAR files...";
+			return false;
+		}
+
+		if (joboptions["fn_model"].getString() == "")
+		{
+			error_message = "ERROR: Filament selection by dendrogram analysis needs an optimiser STAR file...";
+			return false;
+		}
+
+ 		Node node(joboptions["fn_model"].getString(), joboptions["fn_model"].node_type);
+		inputNodes.push_back(node);
+
+        FileName fn_out = outputname + "run_optimiser.star";
+		Node node2(fn_out, LABEL_SELECT_OPT);
+		outputNodes.push_back(node2);
+
+        Node node3(outputname + "logfile.pdf", LABEL_SELECT_LOG);
+        outputNodes.push_back(node3);
+
+        command += " -i " + joboptions["fn_model"].getString();
+		command += " -o " + outputname;
+        command += " -t " + joboptions["dendrogram_threshold"].getString();
+        command += " -c " + joboptions["dendrogram_minclass"].getString();
+
+    }
+	else if (joboptions["do_remove_duplicates"].getBoolean())
 	{
 
 		label += ".removeduplicates";

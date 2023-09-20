@@ -461,7 +461,7 @@ list(APPEND RELION_PYTHON_WRAPPERS
 	python_tomo_pick
 	python_tomo_get_particle_poses
 	python_tomo_denoise
-	
+	filament_selection
 )
 
 foreach (SCRIPT_FILE ${RELION_PYTHON_WRAPPERS})
