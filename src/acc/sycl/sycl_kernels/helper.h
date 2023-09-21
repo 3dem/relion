@@ -57,14 +57,12 @@ void exponentiate(
 #ifdef ACC_DOUBLE_PRECISION
 		if (a < -700.)
 			g_array[idx] = 0.;
-		else
-			g_array[idx] = exp(a);
 #else
 		if (a < -88.f)
 			g_array[idx] = 0.f;
-		else
-			g_array[idx] = expf(a);
 #endif
+		else
+			g_array[idx] = std::exp(a);
 	}
 }
 

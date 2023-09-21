@@ -359,7 +359,7 @@ static void sycl_kernel_exponentiate(
 				if (a < KERNEL_EXP_VALUE)
 					g_array[idx] = static_cast<T>(0);
 				else
-					g_array[idx] = exp(a);
+					g_array[idx] = sycl::native::exp(a);
 			}
 		});
 	}).wait_and_throw();

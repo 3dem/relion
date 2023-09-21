@@ -64,7 +64,6 @@ $ {Run 2D/3D/refinement application by replacing --gpu/--cpu with --gpu/--sycl/-
 	+ `SYCL_CUDA_TARGET`: SYCL CUDA arch target (Not tested)
 	+ `SYCL_HIP_COMPILE`(=ON/OFF): Enable SYCL compilation for HIP target (Not tested)
 	+ `SYCL_HIP_TARGET`: SYCL HIP arch target (Not tested)
-	+ `SYCL_ALL_COMPILE`(=ON/OFF): Enable SYCL compilation for SPIR64, CUDA, and HIP target (Not tested)
 	+ `SYCL_HOST_FLAGS`(=list of flags with space as separator): Additional flags for host compiler (for future use)
 	+ `SYCL_COMPILER_NAME`: SYCL compiler command name (for future use)
 	+ `SYCL_COMPILE_FLAGS`: Additional SYCL compile flags (for future use)
@@ -73,7 +72,7 @@ $ {Run 2D/3D/refinement application by replacing --gpu/--cpu with --gpu/--sycl/-
 + Others for testing purpose (just defining with -D* is needed in cmake -DCMAKE_CXX_FLAGS)
 	+ `USE_ONEDPL`: Use SYCL kernel for weight sorting routines. If this is set, oneDPL(https://github.com/oneapi-src/oneDPL) is used when it is beneficial. (experimental)
 		+ `USE_LESS_ONEDPL`: If this is set, oneDPL is used only when there is no other implementation.
-		+ `PREFER_ONEDPL`: If this is set, oneDPL is used everywhere when it is applicable. If this is set, you SHOULD NOT SET DisableIndirectAccess=1.
+		+ `USE_MORE_ONEDPL`: If this is set, oneDPL is used everywhere when it is applicable. If this is set, you SHOULD NOT SET DisableIndirectAccess=1.
 	+ `SYCL_OFFLOAD_FFT`: Use SYCL kernel for the current FFTW routines. (Not implemented)
 	+ `INTEL_EXPLICIT_SIMD`: Use Explicit SIMD extension for SYCL kernels. (Not implemented)
 	+ `INTEL_SG_SIZE`: Used for Intel sub-group size in SYCL kernel. 32 is recommended for PVC and 16 is for ATS. (Not tested well)
