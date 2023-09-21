@@ -2891,7 +2891,6 @@ int Displayer::runGui()
 		img.read(fn_in, false);
 		win.is_multi = (ZSIZE(img()) * NSIZE(img()) > 1);
 	}
-
 	return win.fill(fn_in);
 }
 
@@ -2968,7 +2967,7 @@ void Displayer::run()
 			REPORT_ERROR("Cannot find metadata label in input STAR file");
 
 		// Store class number in metadata table
-		if (do_class)
+		if (do_class && !MDin.containsLabel(EMDL_PARTICLE_CLASS))
 		{
 			int iclass = 0;
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
