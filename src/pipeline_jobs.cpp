@@ -5691,12 +5691,12 @@ bool RelionJob::getCommandsDynaMightJob(std::string &outputname, std::vector<std
         command += " --initial-model " + joboptions["fn_map"].getString();
         command += " --n-gaussians " + joboptions["nr_gaussians"].getString();
         if (joboptions["initial_threshold"].getString() != "")
-            command += " --initial_threshold " + joboptions["initial_threshold"].getString();
+            command += " --initial-threshold " + joboptions["initial_threshold"].getString();
         command += " --regularization-factor "  + joboptions["reg_factor"].getString();
         command += " --n-threads " + joboptions["nr_threads"].getString();
 
         if (joboptions["do_preload"].getBoolean())
-            command += " --preload_images ";
+            command += " --preload-images ";
 
         if (joboptions["fn_mask"].getString() != "")
             command += " --mask-file " + joboptions["fn_mask"].getString();
