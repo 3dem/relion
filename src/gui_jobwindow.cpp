@@ -2385,6 +2385,7 @@ void JobWindow::initialiseDynaMightWindow()
  	current_y += STEPY /2 ;
 
     place("nr_gaussians", TOGGLE_DEACTIVATE);
+    place("initial_threshold", TOGGLE_DEACTIVATE);
     place("reg_factor", TOGGLE_DEACTIVATE);
 
     current_y += STEPY /2 ;
@@ -2420,6 +2421,7 @@ void JobWindow::initialiseDynaMightWindow()
     place("do_inverse", TOGGLE_REACTIVATE, group2, false);
     group2->begin();
     place("nr_epochs");
+    place("do_store_deform");
     group2->end();
 
     current_y += STEPY /2 ;
@@ -2428,7 +2430,6 @@ void JobWindow::initialiseDynaMightWindow()
     group3->end();
     place("do_reconstruct",TOGGLE_REACTIVATE, group3, false);
     group3->begin();
-    place("do_store_deform");
     place("backproject_batchsize");
     group3->end();
 

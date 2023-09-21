@@ -5621,6 +5621,7 @@ void RelionJob::initialiseDynaMightJob()
     joboptions["do_preload"] = JobOption("Preload images in RAM?", false, "If set to Yes, dynamight will preload images into memory for learning the forward or inverse deformations and for deformed backprojection. This will speed up the calculations, but you need to make sure you have enough RAM to do so.");
 
     joboptions["nr_gaussians"] = JobOption("Number of Gaussians: ", 30000, 10000, 50000, 1000, "Number of Gaussian basis function to describe the consensus map with. Larger structures that one wishes to describe at higher resolutions will need more Gaussians.");
+    joboptions["initial_threshold"] = JobOption("Initial map threshold (optional): ",std::string("") , "If provided, this threshold will be used to position initial Gaussians in the consensus map. If left empty, an automated procedure will be used to estimate the appropriate threshold.");
     joboptions["reg_factor"] = JobOption("Regularization factor: ", 1, 0.2, 5, 0.1, "This regularization factor defines the relative weights between the data over the restraints. Values higher than one will put more weights on the restraints.");
 
     joboptions["fn_checkpoint"] = JobOption("Checkpoint file:", std::string(""), "Checkpoint files (*.pth)", "CURRENT_ODIR/forward_deformations/checkpoints", "Select the checkpoint file to use for visualization, inverse deformation estimation or deformed backprojection. If left empty, the last available checkpoint file will be used");
@@ -5689,19 +5690,36 @@ bool RelionJob::getCommandsDynaMightJob(std::string &outputname, std::vector<std
         command += " --output-directory " + outputname;
         command += " --initial-model " + joboptions["fn_map"].getString();
         command += " --n-gaussians " + joboptions["nr_gaussians"].getString();
+        if (joboptions["initial_threshold"].getString() != "")
+            command += " --initial_threshold " + joboptions["initial_threshold"].getString();
         command += " --regularization-factor "  + joboptions["reg_factor"].getString();
         command += " --n-threads " + joboptions["nr_threads"].getString();
+
+        if (joboptions["do_preload"].getBoolean())
+            command += " --preload_images ";
+
+        if (joboptions["fn_mask"].getString() != "")
+            command += " --mask-file " + joboptions["fn_mask"].getString();
 
     }
     else if (joboptions["do_visualize"].getBoolean())
     {
+
+        if (joboptions["fn_checkpoint"].getString() != "")
+            command += " --checkpoint-file " + joboptions["fn_checkpoint"].getString();
+
         command += " explore-latent-space " + outputname;
         command += " --half-set " + joboptions["halfset"].getString();
 
+        if (joboptions["fn_mask"].getString() != "")
+            command += " --mask-file " + joboptions["fn_mask"].getString();
 
     }
     else if (joboptions["do_inverse"].getBoolean())
     {
+        if (joboptions["fn_checkpoint"].getString() != "")
+            command += " --checkpoint-file " + joboptions["fn_checkpoint"].getString();
+
         command += " optimize-inverse-deformations " + outputname;
         command += " --n-epochs " + joboptions["nr_epochs"].getString();
 
@@ -5711,14 +5729,27 @@ bool RelionJob::getCommandsDynaMightJob(std::string &outputname, std::vector<std
         if (joboptions["do_store_deform"].getBoolean())
             command += " --save-deformations ";
 
+        if (joboptions["do_preload"].getBoolean())
+             command += " --preload-images";
+
+
     }
     else if (joboptions["do_reconstruct"].getBoolean())
     {
+        if (joboptions["fn_checkpoint"].getString() != "")
+            command += " --checkpoint-file " + joboptions["fn_checkpoint"].getString();
+
         command += " deformable-backprojection " + outputname;
         command += " --batch-size " + joboptions["backproject_batchsize"].getString();
 
         if (joboptions["fn_checkpoint"].getString() != "")
             command += " --checkpoint-file " + joboptions["fn_checkpoint"].getString();
+
+        if (joboptions["do_preload"].getBoolean())
+            command += " --preload-images";
+
+        if (joboptions["fn_mask"].getString() != "")
+            command += " --mask-file " + joboptions["fn_mask"].getString();
 
         Node onode(outputname + "backprojection/map_half1.mrc", LABEL_DYNAMIGHT_HALFMAP);
         outputNodes.push_back(onode);
@@ -5726,15 +5757,6 @@ bool RelionJob::getCommandsDynaMightJob(std::string &outputname, std::vector<std
         outputNodes.push_back(onode2);
 
     }
-
-    if (joboptions["do_preload"].getBoolean() && !joboptions["do_visualize"].getBoolean())
-        command += " --preload-images";
-
-    if (joboptions["fn_mask"].getString() != "" && !joboptions["do_inverse"].getBoolean())
-        command += " --mask-file " + joboptions["fn_mask"].getString();
-
-    if (joboptions["fn_checkpoint"].getString() != "")
-        command += " --checkpoint-file " + joboptions["fn_checkpoint"].getString();
 
     if (joboptions["gpu_id"].getString() != "")
         command += " --gpu-id " + joboptions["gpu_id"].getString();
