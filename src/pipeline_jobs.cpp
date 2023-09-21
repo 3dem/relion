@@ -5705,11 +5705,11 @@ bool RelionJob::getCommandsDynaMightJob(std::string &outputname, std::vector<std
     else if (joboptions["do_visualize"].getBoolean())
     {
 
-        if (joboptions["fn_checkpoint"].getString() != "")
-            command += " --checkpoint-file " + joboptions["fn_checkpoint"].getString();
-
         command += " explore-latent-space " + outputname;
         command += " --half-set " + joboptions["halfset"].getString();
+
+        if (joboptions["fn_checkpoint"].getString() != "")
+            command += " --checkpoint-file " + joboptions["fn_checkpoint"].getString();
 
         if (joboptions["fn_mask"].getString() != "")
             command += " --mask-file " + joboptions["fn_mask"].getString();
@@ -5717,8 +5717,6 @@ bool RelionJob::getCommandsDynaMightJob(std::string &outputname, std::vector<std
     }
     else if (joboptions["do_inverse"].getBoolean())
     {
-        if (joboptions["fn_checkpoint"].getString() != "")
-            command += " --checkpoint-file " + joboptions["fn_checkpoint"].getString();
 
         command += " optimize-inverse-deformations " + outputname;
         command += " --n-epochs " + joboptions["nr_epochs"].getString();
@@ -5736,8 +5734,6 @@ bool RelionJob::getCommandsDynaMightJob(std::string &outputname, std::vector<std
     }
     else if (joboptions["do_reconstruct"].getBoolean())
     {
-        if (joboptions["fn_checkpoint"].getString() != "")
-            command += " --checkpoint-file " + joboptions["fn_checkpoint"].getString();
 
         command += " deformable-backprojection " + outputname;
         command += " --batch-size " + joboptions["backproject_batchsize"].getString();
