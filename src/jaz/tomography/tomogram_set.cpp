@@ -29,14 +29,14 @@ bool TomogramSet::read(FileName filename, bool verbose)
     globalTable.read(filename, "global");
     globalTable.setName("global");
 
+    const int tc = globalTable.numberOfObjects();
+    tomogramTables.resize(tc);
+    if (tc == 0) return false;
+
     if (!globalTable.containsLabel(EMDL_TOMO_NAME))
     {
         REPORT_ERROR("ERROR: input starfile for TomogramSet " + filename + " does not contain rlnTomoName label ");
     }
-
-    const int tc = globalTable.numberOfObjects();
-    tomogramTables.resize(tc);
-    if (tc == 0) return false;
 
     if (!globalTable.containsLabel(EMDL_TOMO_TILT_SERIES_STARFILE))
     {
