@@ -454,6 +454,8 @@ list(APPEND RELION_PYTHON_WRAPPERS
         python_blush
         python_dynamight
         python_topaz
+        python_modelangelo
+        python_fetch_weights
 	python_tomo_import
 	python_tomo_exclude_tilt_images
 	python_tomo_align_tilt_series
@@ -471,6 +473,21 @@ foreach (SCRIPT_FILE ${RELION_PYTHON_WRAPPERS})
             @ONLY
     )
 endforeach()
+
+message(STATUS "Will attempts to download model weights for dependent packages...")
+
+execute_process(
+        COMMAND bash ${CMAKE_BINARY_DIR}/bin/relion_python_fetch_weights
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        RESULT_VARIABLE SCRIPT_RESULT
+)
+
+# Check the result of the script execution
+if(SCRIPT_RESULT EQUAL 0)
+    message(STATUS "Successfully downloaded model weights")
+else()
+    message(WARNING "Failed to download model weights: ${SCRIPT_RESULT}")
+endif()
 
 # ----------------------------------------------------------------------COPY SCRIPTS--
 
