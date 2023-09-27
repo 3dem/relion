@@ -60,10 +60,9 @@
 #define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
 #define DEFAULTTOPAZLOCATION "relion_python_topaz"
 #define DEFAULTRESMAPLOCATION "/public/EM/ResMap/ResMap-1.1.4-linux64"
-#define DEFAULTMODELANGELOLOCATION "/public/EM/model-angelo/model-angelo"
+#define DEFAULTMODELANGELOLOCATION "relion_python_modelangelo"
 #define DEFAULTPYTHONLOCATION "python"
-#define DEFAULTMODELANGELOLOCATION "/public/EM/model-angelo/model-angelo"
-#define DEFAULTQSUBCOMMAND "qsub"
+#define DEFAULTQSUBCOMMAND "sbatch"
 #define DEFAULTQUEUENAME "openmpi"
 #define DEFAULTMININIMUMDEDICATED 1
 #define DEFAULTWARNINGLOCALMPI 32
