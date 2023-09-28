@@ -1880,13 +1880,6 @@ to the average PLUS this value times the standard deviation. Use zero to set the
 	joboptions["highpass"] = JobOption("Highpass filter (A)", -1, 100, 1000, 100, "Highpass filter that will be applied to the micrographs. This may be useful to get rid of background ramps due to uneven ice distributions. Give a negative value to skip the highpass filter. Useful values are often in the range of 200-400 Angstroms.");
 	joboptions["angpix"] = JobOption("Pixel size (A)", -1, 0.3, 5, 0.1, "Pixel size in Angstroms. This will be used to calculate the filters and the particle diameter in pixels. If a CTF-containing STAR file is input, then the value given here will be ignored, and the pixel size will be calculated from the values in the STAR file. A negative value can then be given here.");
 	joboptions["do_topaz_denoise"] = JobOption("OR: use Topaz denoising?", false, "If set to true, Topaz denoising will be performed instead of lowpass filtering.");
-	char *default_location = getenv ("RELION_TOPAZ_EXECUTABLE");
-	char default_topaz[] = DEFAULTTOPAZLOCATION;
-	if (default_location == NULL)
-	{
-		default_location = default_topaz;
-	}
-	joboptions["fn_topaz_exec"] = JobOption("Topaz executable", std::string(default_location), "The location of the Topaz executable. If you need to activate conda environment, please make a wrapper shell script to do so and specify it. You can control the default of this field by setting environment variable RELION_TOPAZ_EXECUTABLE.");
 
 	joboptions["do_startend"] = JobOption("Pick start-end coordinates helices?", false, "If set to true, start and end coordinates are picked subsequently and a line will be drawn between each pair");
 
@@ -1939,7 +1932,6 @@ bool RelionJob::getCommandsManualpickJob(std::string &outputname, std::vector<st
 	if (joboptions["do_topaz_denoise"].getBoolean())
 	{
 		command += " --topaz_denoise";
-		command += " --topaz_exe " + joboptions["fn_topaz_exec"].getString();
 	}
 	else
 	{
@@ -2015,13 +2007,6 @@ void RelionJob::initialiseAutopickJob()
 	joboptions["log_upper_thr"] = JobOption("Upper threshold (stddev):", 999., 0., 10., 0.5, "Use this to discard picks with LoG thresholds that are this many standard deviations above the average, e.g. to avoid high contrast contamination like ice and ethane droplets. Good values depend on the contrast of micrographs and need to be interactively explored; for low contrast micrographs, values of ~ 1.5 may be reasonable, but the same value will be too low for high-contrast micrographs.");
 
 	joboptions["do_topaz"] = JobOption("OR: use Topaz?", false, "If set to Yes, topaz will be used for autopicking. Run 2 separate jobs from the Topaz tab: one for training the model and for the actual picking.");
-	char *default_location = getenv ("RELION_TOPAZ_EXECUTABLE");
-	char default_topaz[] = DEFAULTTOPAZLOCATION;
-	if (default_location == NULL)
-	{
-		default_location = default_topaz;
-	}
-	joboptions["fn_topaz_exec"] = JobOption("Topaz executable", std::string(default_location), "The location of the Topaz executable. If you need to activate conda environment, please make a wrapper shell script to do so and specify it. You can control the default of this field by setting environment variable RELION_TOPAZ_EXECUTABLE.");
 	joboptions["do_topaz_train"] = JobOption("Perform topaz training?", false, "Set this option to Yes if you want to train a topaz model.");
 	joboptions["topaz_train_picks"] = JobOption("Input picked coordinates for training:", NODE_COORDS_CPIPE, "", "Input micrographs (*.{star})", "Input STAR file (preferably with CTF information) with all micrographs to pick from.");
 	joboptions["do_topaz_train_parts"] = JobOption("OR train on a set of particles? ", false, "If set to Yes, the input Coordinates above will be ignored. Instead, one uses a _data.star file from a previous 2D or 3D refinement or selection to use those particle positions for training.");
@@ -2131,7 +2116,7 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 			}
 			if (manualpickjob.joboptions["do_topaz_denoise"].getBoolean())
 			{
-				command += " --topaz_denoise --topaz_exe " + manualpickjob.joboptions["fn_topaz_exec"].getString();
+                            command += " --topaz_denoise ";
 			}
 			else
 			{
@@ -2233,8 +2218,6 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 				error_message = "ERROR: On the Topaz tab specify (only) one of two methods: training or picking...";
 				return false;
 			}
-
-			command += " --topaz_exe " + joboptions["fn_topaz_exec"].getString();
 
 			if (joboptions["topaz_particle_diameter"].getNumber(error_message) > 0.)
 				command += " --particle_diameter " + joboptions["topaz_particle_diameter"].getString();
@@ -5766,15 +5749,6 @@ void RelionJob::initialiseModelAngeloJob()
     joboptions["r_seq"] = JobOption("FASTA sequence for RNA:", NODE_SEQUENCE_CPIPE, "", "FASTA sequence files (*.{fasta,txt})",  "Provide a FASTA file with sequences for all RNA chains to be built in the map.");
     joboptions["gpu_id"] = JobOption("Which GPUs to use:", std::string("0"), "Provide a number for the GPU to be used (e.g. 0, 1 etc). Use comman-separated values to use multiple GPUs, e.g. 0,1,2");
 
-    // Check for environment variable RELION_MODELANGELO_EXECUTABLE
-	char *default_location = getenv("RELION_MODELANGELO_EXECUTABLE");
-	char default_modelangelo[] = DEFAULTMODELANGELOLOCATION;
-	if (default_location == NULL)
-	{
-		default_location = default_modelangelo;
-	}
-	joboptions["exe_modelangelo"] = JobOption("ModelAngelo executable:", std::string(default_location), "*", ".", "Location of the ModelAngelo executable. You can control the default of this field by setting environment variable RELION_MODELANGELO_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
-
     joboptions["do_hhmer"] = JobOption("Perform HMMer search?", false ,"If set to Yes, model-angelo will perform a HMM search using HHMer in the output directory of the model-angelo run (without sequence). You can continue an old run with this option switched on, and the model building step will be skipped if the output .cif exists. This way, you can try multiple HHMer runs.");
     joboptions["fn_lib"] = JobOption("Library with sequences for HMMer search:", NODE_SEQUENCE_CPIPE, "", "FASTA sequence files (*.{mrc,txt})", "FASTA file with library with all sequences for HMMer search. This is often an entire proteome.");
     joboptions["alphabet"] = JobOption("Alphabet for the HMMer search:", job_modelangelo_alphabet_options, 0, "Type of Alphabet for HMM searches.");
@@ -5804,7 +5778,7 @@ bool RelionJob::getCommandsModelAngeloJob(std::string &outputname, std::vector<s
         Node node(joboptions["fn_map"].getString(), joboptions["fn_map"].node_type);
         inputNodes.push_back(node);
 
-        std::string command=joboptions["exe_modelangelo"].getString();
+        std::string command="relion_python_modelangelo";
         if (joboptions["p_seq"].getString() != "" || joboptions["d_seq"].getString() != "" || joboptions["r_seq"].getString() != "" )
         {
             command += " build ";
@@ -5862,7 +5836,7 @@ bool RelionJob::getCommandsModelAngeloJob(std::string &outputname, std::vector<s
             return false;
         }
 
-        std::string command2 = joboptions["exe_modelangelo"].getString();
+        std::string command2 = "relion_python_modelangelo";
 
         command2 += " hmm_search ";
         command2 += " -i " + outputname;

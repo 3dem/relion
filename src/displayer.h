@@ -648,9 +648,6 @@ public:
 	// Only show a limited number of images
 	long int max_nr_images;
 
-	// Topaz executable (for denoising of micrographs in picking mode)
-	FileName fn_topaz_exe;
-
 	// Shell for calling Topaz
 	FileName fn_shell;
 

@@ -42,7 +42,6 @@ RFLOAT global_coord_scale;
 RFLOAT global_lowpass;
 RFLOAT global_highpass;
 bool global_do_topaz_denoise;
-FileName global_topaz_exe;
 RFLOAT global_particle_diameter;
 RFLOAT global_sigma_contrast;
 RFLOAT global_black_val;
@@ -137,7 +136,7 @@ void cb_viewmic(Fl_Widget* w, void* data)
 		command += " --particle_radius " + floatToString(rad);
 		if (global_do_topaz_denoise)
 		{
-			command += " --topaz_denoise --topaz_exe " + global_topaz_exe;
+                    command += " --topaz_denoise ";
 		}
 		command += " --lowpass " + floatToString(global_lowpass);
 		command += " --highpass " + floatToString(global_highpass);
@@ -698,7 +697,6 @@ void ManualPicker::read(int argc, char **argv)
 	global_lowpass = textToFloat(parser.getOption("--lowpass", "Lowpass filter in Angstroms for the micrograph (0 for no filtering)","0"));
 	global_highpass = textToFloat(parser.getOption("--highpass", "Highpass filter in Angstroms for the micrograph (0 for no filtering)","0"));
 	global_do_topaz_denoise = parser.checkOption("--topaz_denoise", "Or instead of filtering, use Topaz denoising before picking (on GPU 0)");
-	global_topaz_exe = parser.getOption("--topaz_exe", "Name of topaz executable", "topaz");
 	global_ctfscale = textToFloat(parser.getOption("--ctf_scale", "Relative scale for the CTF-image display", "1"));
 	global_ctfsigma = textToFloat(parser.getOption("--ctf_sigma_contrast", "Sigma-contrast for the CTF-image display", "3"));
 	global_minimum_fom = textToFloat(parser.getOption("--minimum_pick_fom", "Minimum value for rlnAutopickFigureOfMerit to display picks", "-9999."));

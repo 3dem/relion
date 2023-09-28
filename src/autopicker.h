@@ -197,9 +197,6 @@ public:
 	// Number of topaz workers for training
 	int topaz_workers;
 
-	// Topaz command executable
-	FileName fn_topaz_exe;
-
 	// sh executable
 	FileName fn_shell;
 

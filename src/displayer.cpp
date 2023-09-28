@@ -2568,7 +2568,7 @@ void Displayer::topazDenoiseMap(FileName fn_in, FileName fn_odir, Image<RFLOAT> 
 	fh << "#!" << fn_shell  << std::endl;
 
 	// Call Topaz to train the network
-	fh << fn_topaz_exe << " denoise ";
+	fh << "relion_python_topaz denoise ";
 	fh << fn_in;
 	fh << " --output " << fn_odir;
 	fh << " --device 0"; // pyTorch threads
@@ -2650,7 +2650,6 @@ void Displayer::read(int argc, char **argv)
 	particle_radius = textToFloat(parser.getOption("--particle_radius", "Particle radius in pixels", "100"));
 	particle_radius *= coord_scale;
 	do_topaz_denoise = parser.checkOption("--topaz_denoise", "Use Topaz denoising before picking (on GPU 0)");
-	fn_topaz_exe = parser.getOption("--topaz_exe", "Name of topaz executable", "topaz");
         fn_shell = parser.getOption("--bash_exe", "Name of bash shell executable", "/bin/bash");
 	lowpass = textToFloat(parser.getOption("--lowpass", "Lowpass filter (in A) to filter micrograph before displaying", "0"));
 	highpass = textToFloat(parser.getOption("--highpass", "Highpass filter (in A) to filter micrograph before displaying", "0"));

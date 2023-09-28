@@ -58,9 +58,7 @@
 //#define DEFAULTDENOISINGWRAPPERLOCATION "relion_tomo_denoise"
 #define DEFAULTMOTIONCOR2LOCATION "/public/EM/MOTIONCOR2/MotionCor2"
 #define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
-#define DEFAULTTOPAZLOCATION "relion_python_topaz"
 #define DEFAULTRESMAPLOCATION "/public/EM/ResMap/ResMap-1.1.4-linux64"
-#define DEFAULTMODELANGELOLOCATION "relion_python_modelangelo"
 #define DEFAULTQSUBCOMMAND "sbatch"
 #define DEFAULTQUEUENAME "openmpi"
 #define DEFAULTMININIMUMDEDICATED 1

@@ -157,7 +157,6 @@ if(do_gpu)
 	topaz_downscale = textToInteger(parser.getOption("--topaz_downscale", "Downscale factor for topaz", "-1"));
 	topaz_model = parser.getOption("--topaz_model", "Saved model model from topaz train for topaz extract. Leave this empty to use the default (general) model.", "");
 	topaz_radius = textToInteger(parser.getOption("--topaz_radius", "Particle radius (in pix) for topaz extract (default is from particle diameter)", "-1"));
-	fn_topaz_exe = parser.getOption("--topaz_exe", "Name of topaz executable", "topaz");
 	topaz_additional_args = parser.getOption("--topaz_args", "Additional arguments to be passed to topaz", "");
 	topaz_workers = textToInteger(parser.getOption("--topaz_workers", "Number of topaz workers for parallelized training", "1"));
 	do_topaz_plot = parser.checkOption("--topaz_plot", "Plot intermediate information for helical picking in topaz (developmental)");
@@ -2968,7 +2967,7 @@ void AutoPicker::trainTopaz()
 	fh << "#!" << fn_shell  << std::endl;
 
 	// Call Topaz to train the network
-	fh << fn_topaz_exe << " train ";
+	fh << "relion_python_topaz " << " train ";
 	fh << " -n " << integerToString(topaz_nr_particles);
 	// Let's use 25% of particle_radius (set in initialise()) for training...
 	fh << " -r " << integerToString(topaz_radius);
@@ -3019,7 +3018,7 @@ void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 	 REPORT_ERROR( (std::string)"AutoPicker::autoPickTopazOneMicrograph cannot create file: " + fn_script);
 
 	fh << "#!" << fn_shell  << std::endl;
-	fh << fn_topaz_exe << " extract ";
+	fh << "relion_python_topaz " << " extract ";
 	if (autopick_helical_segments)
 	{
 		fh << " --filaments ";

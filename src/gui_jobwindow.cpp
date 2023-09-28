@@ -750,13 +750,7 @@ void JobWindow::initialiseManualpickWindow()
 	place("highpass");
 	place("angpix");
 
-	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group2->end();
-	place("do_topaz_denoise", TOGGLE_DEACTIVATE, group2);
-	group2->begin();
-	place("fn_topaz_exec", TOGGLE_DEACTIVATE);
-	group2->end();
-	guientries["do_topaz_denoise"].cb_menu_i();
+	place("do_topaz_denoise", TOGGLE_DEACTIVATE);
 
 	tab2->end();
 	tab3->begin();
@@ -821,7 +815,6 @@ void JobWindow::initialiseAutopickWindow()
 	tab3->label("Topaz");
 	resetHeight();
 
-	place("fn_topaz_exec");
 	place("topaz_particle_diameter", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
@@ -2455,7 +2448,6 @@ void JobWindow::initialiseModelAngeloWindow()
     place("r_seq", TOGGLE_DEACTIVATE);
 
  	current_y += STEPY /2 ;
-    place("exe_modelangelo", TOGGLE_DEACTIVATE);
     place("gpu_id", TOGGLE_DEACTIVATE);
 
     tab1->end();
