@@ -1882,7 +1882,7 @@ void ClassRanker::deployTorchModel(std::vector<float> &features, std::vector<flo
 	npy::SaveArrayAsNumpy(fn_out + "images.npy", false, 3, image_shape, subimages);
 
 	//run python wrapper command
-	std::string cmd = "relion_python_classranker" + fn_out;
+	std::string cmd = "relion_python_classranker " + fn_out;
 	FILE* pipe = popen(cmd.c_str(), "r");
 	if (!pipe)
 		throw std::runtime_error("Failed to dispatch command: " + cmd);
