@@ -292,7 +292,8 @@ void PipeLine::deleteTemporaryNodeFile(Node &node)
 
     //FileName fn_type = get_node_label(node.type) + "/";
 	// PIPELINER
-    FileName fn_type = node.type + "/";
+    FileName fn_type = node.type;
+    fn_type = fn_type.beforeFirstOf(".") + "/";
 	FileName fn = fn_dir + fn_type + fnt;
 	int res = remove(fn.c_str());
 
