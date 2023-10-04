@@ -2154,6 +2154,7 @@ void ClassRanker::performRanking()
 		// Maintain the original image ordering and obsModel in mydata too
 		MDselected_particles.sort(EMDL_SORTED_IDX);
 		mydata.MDimg = MDselected_particles;
+        mydata.MDimg.setName("particles");
 		mydata.write(fn_out+fn_sel_parts);
 
 		// Also write out class_averages.star with the selected classes
