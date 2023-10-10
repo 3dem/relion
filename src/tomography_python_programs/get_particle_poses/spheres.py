@@ -63,7 +63,7 @@ def derive_poses_on_spheres(
                 'rlnTomoSubtomogramTilt': eulers[:, 1],
                 'rlnTomoSubtomogramPsi': eulers[:, 2],
             }
-        dfs.append(pd.DataFrame(data))
+            dfs.append(pd.DataFrame(data))
     df = pd.concat(dfs)
     rot_prior, tilt_prior, psi_prior = R.from_matrix(rotated_basis).as_euler(
         seq='ZYZ', degrees=True
