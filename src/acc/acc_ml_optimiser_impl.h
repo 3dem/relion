@@ -1304,10 +1304,9 @@ void getAllSquaredDifferencesCoarse(
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 	#elif _SYCL_ENABLED
-	 #ifdef USE_SYCL_STREAM
-		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-			(accMLO->classStreams[exp_iclass])->waitAll();
-	 #endif
+		if (accMLO->useStream())
+			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+				(accMLO->classStreams[exp_iclass])->waitAll();
 		devAcc->waitAll();
     #endif
 
@@ -1372,10 +1371,9 @@ void getAllSquaredDifferencesCoarse(
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread)); // does not appear to be NEEDED FOR NON-BLOCKING CLASS STREAMS in tests, but should be to sync against classStreams
 	#elif _SYCL_ENABLED
-	 #ifdef USE_SYCL_STREAM
-		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-			(accMLO->classStreams[exp_iclass])->waitAll();
-	 #endif
+		if (accMLO->useStream())
+			for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+				(accMLO->classStreams[exp_iclass])->waitAll();
 	 #ifdef USE_ONEDPL
 		devAcc->waitAll();
 	 #else
@@ -1754,10 +1752,9 @@ void getAllSquaredDifferencesFine(
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 	#elif _SYCL_ENABLED
-	 #ifdef USE_SYCL_STREAM
-		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-			(accMLO->classStreams[exp_iclass])->waitAll();
-	 #endif
+		if (accMLO->useStream())
+			for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+				(accMLO->classStreams[exp_iclass])->waitAll();
         devAcc->waitAll();
 	#endif
 
@@ -1844,10 +1841,9 @@ void getAllSquaredDifferencesFine(
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 	#elif _SYCL_ENABLED
-	 #ifdef USE_SYCL_STREAM
-		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-			(accMLO->classStreams[exp_iclass])->waitAll();
-	 #endif
+		if (accMLO->useStream())
+			for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+				(accMLO->classStreams[exp_iclass])->waitAll();
 		devAcc->waitAll();
 	 #ifndef USE_ONEDPL
 		FinePassWeights.rot_id.freeDeviceIfSet();
@@ -2362,10 +2358,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
                 DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
             DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 #elif defined(_SYCL_ENABLED) && defined(USE_ONEDPL)
- #ifdef USE_SYCL_STREAM
-            for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-				(accMLO->classStreams[exp_iclass])->waitAll();
- #endif
+			if (accMLO->useStream())
+				for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+					(accMLO->classStreams[exp_iclass])->waitAll();
 			devAcc->waitAll();
 #endif
 
@@ -2451,10 +2446,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
                 DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
             DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 #elif defined(_SYCL_ENABLED) && defined(USE_ONEDPL)
- #ifdef USE_SYCL_STREAM
-            for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-				(accMLO->classStreams[exp_iclass])->waitAll();
- #endif
+			if (accMLO->useStream())
+				for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+					(accMLO->classStreams[exp_iclass])->waitAll();
 			devAcc->waitAll();
 #endif
 
@@ -3152,10 +3146,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 		#elif _SYCL_ENABLED
-		 #ifdef USE_SYCL_STREAM
-			for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-				(accMLO->classStreams[exp_iclass])->waitAll();
-		 #endif
+			if (accMLO->useStream())
+				for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+					(accMLO->classStreams[exp_iclass])->waitAll();
 			devAcc->waitAll();
 		#endif
 
@@ -3263,10 +3256,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[iclass]));
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 		#elif _SYCL_ENABLED
-		 #ifdef USE_SYCL_STREAM
-			for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
-				(accMLO->classStreams[iclass])->waitAll();
-		 #endif
+			if (accMLO->useStream())
+				for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
+					(accMLO->classStreams[iclass])->waitAll();
 			devAcc->waitAll();
 		#endif
 
@@ -3451,10 +3443,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			wdiff2s.cpToHost();
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 	#elif _SYCL_ENABLED
-	 #ifdef USE_SYCL_STREAM
-			for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-				(accMLO->classStreams[exp_iclass])->waitAll();
-	 #endif
+			if (accMLO->useStream())
+				for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+					(accMLO->classStreams[exp_iclass])->waitAll();
 			devAcc->waitAll();
 
 			wdiff2s.cpToHost();

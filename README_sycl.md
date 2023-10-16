@@ -24,7 +24,7 @@ This is SYCL/DPC++ version for [RELION](https://github.com/3dem/relion)
 $ git clone https://github.com/3dem/relion-devel.git relion_sycl -b sycl-merge
 $ cd relion_sycl; mkdir build_sycl; cd build_sycl
 $ {Load Intel oneAPI toolkit and SYCL/Level Zero/OpenCL runtime environment}
-$ sycl-ls					# This will display available SYCL devices
+$ sycl-ls                        # This will display available SYCL devices
 $ cmake \
 -DCMAKE_C_COMPILER=mpiicx \
 -DCMAKE_CXX_COMPILER=mpiicpx \
@@ -40,9 +40,9 @@ $ cmake \
 ..
 
 $ #### This is Intel GPU Level Zero backend specific #####
-$ export ZE_AFFINITY_MASK=0 # Use only the first available Level Zero device. This can be replaced by --gpu 0 syntax.
-$ export ZEX_NUMBER_OF_CCS=0:4,1:4
-$ export SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=2 # Don't use this with Intel Arc GPUs. Only for Intel Data Center GPUs
+$ export ZE_AFFINITY_MASK=0         # Use only the first available Level Zero device. This can be replaced by --gpu 0 syntax.
+$ export ZEX_NUMBER_OF_CCS=0:4,1:4  # Set this only if you are putting more than one MPI ranks per GPU. 0:4 means 4 MPI ranks running on card 0
+$ export SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=2
 $ export SYCL_PI_LEVEL_ZERO_DEVICE_SCOPE_EVENTS=0
 $ export SYCL_PI_LEVEL_ZERO_USM_ALLOCATOR="1;4G;host:16M,512,64K;device:16M,1024,64K;shared:0,0,64K"
 $ #### End of Intel GPU Level Zero backend specific  #####
@@ -52,14 +52,24 @@ $ ulimit -n 512000 # this is necessary for multi-GPU jobs
 $ {Run 2D/3D/refinement application by replacing --gpu/--cpu with --gpu/--sycl/--sycl-opencl/--sycl-cpu/--sycl-cuda/--sycl-hip}
 ```
 
+## Optional runtime environment variables
+
++ The below shell environment variables can be tested for more potential SYCL specific tuning. Setting it to "1" or "on" will enable these features.
+	+ `relionSyclUseCuda`: --sycl-cuda will be used even if --gpu/--sycl is specified in command lines
+	+ `relionSyclUseHip`: --sycl-hip will be used even if --gpu/--sycl is specified in command lines
+	+ `relionSyclUseInOrderQueue`: Use in-order SYCL queue. Without this, out-of-order SYCL queue is used by default. (experimental)
+	+ `relionSyclUseAsyncSubmission`: Remove wait() for each SYCL kernel submission. (experimental)
+	+ `relionSyclUseStream`: Create new in-order SYCL queue for each cudaStream. (experimental)
+	+ `relionSyclUseSubSubDevice`: Create separate SYCL queue for each CCS. (experimental)
+
 
 ## Added macros
 
 + For CMake configuration
 	+ `SYCL`(=ON/OFF): Enable SYCL based acceleration build
 	+ `SyclForceOneDPL`(=ON/OFF): Use oneDPL(https://github.com/oneapi-src/oneDPL) if it can be used. This has the same effect as setting "-DUSE_ONEDPL" for CMAKE_CXX_FLAGS below. (experimental)
-	+ `SYCL_AOT_COMPILE`(=ON/OFF): Enable AOT(Ahead-Of-Time) compilation for SPIR64 target. Default target is pvc. (experimental)
-	+ `SYCL_AOT_TARGET`(=ON/OFF): Specify AOT(Ahead-Of-Time) SPIR64 target. Possible list can be checked using "ocloc compile --help" command. (experimental)
+	+ `SYCL_AOT_COMPILE`(=ON/OFF): Enable AOT(Ahead-Of-Time) compilation for SPIR64 target. Default target is pvc. (for future use)
+	+ `SYCL_AOT_TARGET`(=ON/OFF): Specify AOT(Ahead-Of-Time) SPIR64 target. Possible list can be checked using "ocloc compile --help" command. (for future use)
 	+ `SYCL_CUDA_COMPILE`(=ON/OFF): Enable SYCL compilation for CUDA target (Not tested)
 	+ `SYCL_CUDA_TARGET`: SYCL CUDA arch target (Not tested)
 	+ `SYCL_HIP_COMPILE`(=ON/OFF): Enable SYCL compilation for HIP target (Not tested)
@@ -78,10 +88,6 @@ $ {Run 2D/3D/refinement application by replacing --gpu/--cpu with --gpu/--sycl/-
 	+ `INTEL_SG_SIZE`: Used for Intel sub-group size in SYCL kernel. 32 is recommended for PVC and 16 is for ATS. (Not tested well)
 	+ `USE_IPP`: Use Intel IPP library's RadixSort for sortOnDevice instead of std::sort. Enabled by default if IPP library exists.
 	+ `USE_MPI_COLLECTIVE`: Use MPI collective whenever possible. Enabled by default for ALTCPU and SYCL.
-	+ `USE_INORDER_QUEUE`: Use in-order SYCL queue. Without this, out-of-order SYCL queue is used by default. (experimental)
-	+ `USE_ASYNC_SYCL_SUBMIT`: Remove wait() for each SYCL kernel submission. (experimental)
-	+ `USE_SYCL_STREAM`: Create new in-order SYCL queue for each cudaStream. (experimental)
-	+ `USE_SUBSUB_DEVICE`: Create separate SYCL queue for each CCS. (experimental)
 	+ `USE_EXISTING_SYCL_DEVICE`: This will copy and use created SYCL device pointer instead of creating new SYCL device for each thread. Not recommended.
 	+ `USE_SINCOS_TABLE`: Pre-calculate sine/cosine table before main loop in some kernels (Not implemented)
 

@@ -1020,16 +1020,16 @@ static void sycl_kernel_allweights_to_mweights(unsigned long *d_iorient, XFLOAT 
 {
 	assert(orientation_num*translation_num <= std::numeric_limits<int>::max());
 	auto dev = dynamic_cast<devSYCL*>(devAcc);
+	sycl::event prev;
+	bool isAsync = dev->isAsyncQueue();
+	if (isAsync)
+		prev = dev->getLastEvent();
 
- #ifdef USE_ASYNC_SYCL_SUBMIT
-	auto prev = dev->getLastEvent();
- #endif
 	auto ev = dev->syclSubmit([&](sycl::handler &cgh)
 	{
 		using namespace sycl;
- #ifdef USE_ASYNC_SYCL_SUBMIT
-		cgh.depends_on(prev);
- #endif
+		if (isAsync)
+			cgh.depends_on(prev);
 
 		cgh.parallel_for(range<1>(orientation_num*translation_num), [=](id<1> idx)
 		{

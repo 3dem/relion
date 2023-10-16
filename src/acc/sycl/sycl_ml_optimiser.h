@@ -8,6 +8,7 @@
 
 #include <stack>
 #include <vector>
+#include <tuple>
 #include <typeinfo>
 
 #include "src/mpi.h"
@@ -68,8 +69,10 @@ public:
 	std::vector<virtualSYCL*> classStreams;
 
 	static void checkDevices();
-	static std::vector<virtualSYCL*> getDevices(const syclDeviceType select, const syclBackendType BE = syclBackendType::levelZero, const bool verbose = true);
+	static std::vector<virtualSYCL*> getDevices(const syclDeviceType select, const std::tuple<bool,bool,bool> syclOpt, const syclBackendType BE = syclBackendType::levelZero, const bool verbose = true);
+
 	virtualSYCL* getSyclDevice()	{ return _devAcc; }
+	bool useStream() const	{ return _useStream; }
 
 	//Used for precalculations of projection setup
 	bool generateProjectionPlanOnTheFly;
@@ -86,11 +89,12 @@ public:
 		return nullptr;
 	};
 
-	MlOptimiserSYCL(MlOptimiser *baseMLOptimiser, MlSyclDataBundle *b, const char *timing_fnm);
+	MlOptimiserSYCL(MlOptimiser *baseMLOptimiser, MlSyclDataBundle *b, const bool isStream, const char *timing_fnm);
 
 	~MlOptimiserSYCL();
 
 private:
 	virtualSYCL *_devAcc;
+	bool _useStream;
 };
 #endif

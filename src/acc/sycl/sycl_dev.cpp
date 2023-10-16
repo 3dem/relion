@@ -28,19 +28,22 @@ sycl::async_handler exceptionHandler = [](sycl::exception_list exceptions)
 	}
 };
 
-devSYCL::devSYCL()
+devSYCL::devSYCL(const bool isInOrder, const bool isAsync)
 {
 	_exHandler = exceptionHandler;
 
 	try
 	{
-#ifdef USE_INORDER_QUEUE
-		_devQ = new sycl::queue(sycl::default_selector_v, _exHandler, sycl::property::queue::in_order());
-		_queueType = syclQueueType::inOrder;
-#else
-		_devQ = new sycl::queue(sycl::default_selector_v, _exHandler);
-		_queueType = syclQueueType::outOfOrder;
-#endif
+		if (isInOrder)
+		{
+			_devQ = new sycl::queue(sycl::default_selector_v, _exHandler, sycl::property::queue::in_order{});
+			_queueType = syclQueueType::inOrder;
+		}
+		else
+		{
+			_devQ = new sycl::queue(sycl::default_selector_v, _exHandler);
+			_queueType = syclQueueType::outOfOrder;
+		}
 	}
 	catch (const sycl::exception &e)
 	{
@@ -56,6 +59,8 @@ devSYCL::devSYCL()
 	auto d = _devD;
 	auto pf = d.get_platform();
 	deviceName = d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
+	_isFP64Supported = d.has(sycl::aspect::fp64);
+	_isAsyncQueue = isAsync;
 	const auto isizes = d.get_info<sycl::info::device::max_work_item_sizes<3>>();
 	maxItem[0] = isizes[0];
 	maxItem[1] = isizes[1];
@@ -76,25 +81,30 @@ devSYCL::devSYCL()
 	cardID = -1;
 	deviceID = -1;
 	stackID = -1;
+	nStack = -1;
 	sliceID = -1;
 	nSlice = -1;
+	_computeIndex = -1;
 	_prev_submission = sycl::event();
 	_event.push_back(sycl::event());
 }
 
-devSYCL::devSYCL(sycl::device &d, int id)
+devSYCL::devSYCL(sycl::device &d, int id, const bool isInOrder, const bool isAsync)
 {
 	_exHandler = exceptionHandler;
 
 	try
 	{
-#ifdef USE_INORDER_QUEUE
-		_devQ = new sycl::queue(d, _exHandler, sycl::property::queue::in_order());
-		_queueType = syclQueueType::inOrder;
-#else
-		_devQ = new sycl::queue(d, _exHandler);
-		_queueType = syclQueueType::outOfOrder;
-#endif
+		if (isInOrder)
+		{
+			_devQ = new sycl::queue(d, _exHandler, sycl::property::queue::in_order{});
+			_queueType = syclQueueType::inOrder;
+		}
+		else
+		{
+			_devQ = new sycl::queue(d, _exHandler);
+			_queueType = syclQueueType::outOfOrder;
+		}
 	}
 	catch (const sycl::exception &e)
 	{
@@ -107,6 +117,8 @@ devSYCL::devSYCL(sycl::device &d, int id)
 #ifdef USE_ONEDPL
 	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
 #endif
+	_isFP64Supported = d.has(sycl::aspect::fp64);
+	_isAsyncQueue = isAsync;
 
 	const auto isizes = d.get_info<sycl::info::device::max_work_item_sizes<3>>();
 	maxItem[0] = isizes[0];
@@ -126,13 +138,14 @@ devSYCL::devSYCL(sycl::device &d, int id)
 	localMem = d.get_info<sycl::info::device::local_mem_size>();
 	maxUnit = d.get_info<sycl::info::device::max_compute_units>();
 	deviceID = id;
+	_computeIndex = -1;
 	auto pf = d.get_platform();
 	deviceName = d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
 	_prev_submission = sycl::event();
 	_event.push_back(sycl::event());
 }
 
-devSYCL::devSYCL(sycl::device &d, const syclQueueType qType, int id)
+devSYCL::devSYCL(sycl::device &d, const syclQueueType qType, int id, const bool isAsync)
 {
 	_exHandler = exceptionHandler;
 
@@ -141,11 +154,11 @@ devSYCL::devSYCL(sycl::device &d, const syclQueueType qType, int id)
 		switch (qType)
 		{
 			case syclQueueType::inOrder :
-				_devQ = new sycl::queue(d, _exHandler, sycl::property::queue::in_order());
+				_devQ = new sycl::queue(d, _exHandler, sycl::property::queue::in_order{});
 				break;
 
 			case syclQueueType::enableProfiling :
-				_devQ = new sycl::queue(d, _exHandler, sycl::property::queue::enable_profiling());
+				_devQ = new sycl::queue(d, _exHandler, sycl::property::queue::enable_profiling{});
 				break;
 
 			case syclQueueType::outOfOrder :
@@ -166,6 +179,8 @@ devSYCL::devSYCL(sycl::device &d, const syclQueueType qType, int id)
 #ifdef USE_ONEDPL
 	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
 #endif
+	_isFP64Supported = d.has(sycl::aspect::fp64);
+	_isAsyncQueue = isAsync;
 
 	const auto isizes = d.get_info<sycl::info::device::max_work_item_sizes<3>>();
 	maxItem[0] = isizes[0];
@@ -185,25 +200,29 @@ devSYCL::devSYCL(sycl::device &d, const syclQueueType qType, int id)
 	localMem = d.get_info<sycl::info::device::local_mem_size>();
 	maxUnit = d.get_info<sycl::info::device::max_compute_units>();
 	deviceID = id;
+	_computeIndex = -1;
 	auto pf = d.get_platform();
 	deviceName = d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
 	_prev_submission = sycl::event();
 	_event.push_back(sycl::event());
 }
 
-devSYCL::devSYCL(sycl::context &c, sycl::device &d, int id)
+devSYCL::devSYCL(sycl::context &c, sycl::device &d, int id, const bool isInOrder, const bool isAsync)
 {
 	_exHandler = exceptionHandler;
 
 	try
 	{
-#ifdef USE_INORDER_QUEUE
-		_devQ = new sycl::queue(c, d, _exHandler, sycl::property::queue::in_order());
-		_queueType = syclQueueType::inOrder;
-#else
-		_devQ = new sycl::queue(c, d, _exHandler);
-		_queueType = syclQueueType::outOfOrder;
-#endif
+		if (isInOrder)
+		{
+			_devQ = new sycl::queue(c, d, _exHandler, sycl::property::queue::in_order{});
+			_queueType = syclQueueType::inOrder;
+		}
+		else
+		{
+			_devQ = new sycl::queue(c, d, _exHandler);
+			_queueType = syclQueueType::outOfOrder;
+		}
 	}
 	catch (const sycl::exception &e)
 	{
@@ -215,6 +234,8 @@ devSYCL::devSYCL(sycl::context &c, sycl::device &d, int id)
 #ifdef USE_ONEDPL
 	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
 #endif
+	_isFP64Supported = d.has(sycl::aspect::fp64);
+	_isAsyncQueue = isAsync;
 
 	const auto isizes = d.get_info<sycl::info::device::max_work_item_sizes<3>>();
 	maxItem[0] = isizes[0];
@@ -234,13 +255,14 @@ devSYCL::devSYCL(sycl::context &c, sycl::device &d, int id)
 	localMem = d.get_info<sycl::info::device::local_mem_size>();
 	maxUnit = d.get_info<sycl::info::device::max_compute_units>();
 	deviceID = id;
+	_computeIndex = -1;
 	auto pf = d.get_platform();
 	deviceName = d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
 	_prev_submission = sycl::event();
 	_event.push_back(sycl::event());
 }
 
-devSYCL::devSYCL(sycl::context &c, sycl::device &d, const syclQueueType qType, int id)
+devSYCL::devSYCL(sycl::context &c, sycl::device &d, const syclQueueType qType, int id, const bool isAsync)
 {
 	_exHandler = exceptionHandler;
 
@@ -249,11 +271,11 @@ devSYCL::devSYCL(sycl::context &c, sycl::device &d, const syclQueueType qType, i
 		switch (qType)
 		{
 			case syclQueueType::inOrder :
-				_devQ = new sycl::queue(c, d, _exHandler, sycl::property::queue::in_order());
+				_devQ = new sycl::queue(c, d, _exHandler, sycl::property::queue::in_order{});
 				break;
 
 			case syclQueueType::enableProfiling :
-				_devQ = new sycl::queue(c, d, _exHandler, sycl::property::queue::enable_profiling());
+				_devQ = new sycl::queue(c, d, _exHandler, sycl::property::queue::enable_profiling{});
 				break;
 
 			case syclQueueType::outOfOrder :
@@ -273,6 +295,68 @@ devSYCL::devSYCL(sycl::context &c, sycl::device &d, const syclQueueType qType, i
 #ifdef USE_ONEDPL
 	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
 #endif
+	_isFP64Supported = d.has(sycl::aspect::fp64);
+	_isAsyncQueue = isAsync;
+
+	const auto isizes = d.get_info<sycl::info::device::max_work_item_sizes<3>>();
+	maxItem[0] = isizes[0];
+	maxItem[1] = isizes[1];
+	maxItem[2] = isizes[2];
+	maxGroup = d.get_info<sycl::info::device::max_work_group_size>();
+#ifdef SYCL_EXT_ONEAPI_MAX_WORK_GROUP_QUERY
+	auto groups = d.get_info<sycl::ext::oneapi::experimental::info::device::max_work_groups<3>>();
+	maxWorkGroup[0] = groups[0];
+	maxWorkGroup[1] = groups[1];
+	maxWorkGroup[2] = groups[2];
+	maxGlobalWorkGroup = d.get_info<sycl::ext::oneapi::experimental::info::device::max_global_work_groups>();
+#else
+	maxWorkGroup[0] = maxWorkGroup[1] = maxWorkGroup[2] = maxGlobalWorkGroup = std::numeric_limits<int>::max;
+#endif
+	globalMem = d.get_info<sycl::info::device::global_mem_size>();
+	localMem = d.get_info<sycl::info::device::local_mem_size>();
+	maxUnit = d.get_info<sycl::info::device::max_compute_units>();
+	deviceID = id;
+	_computeIndex = -1;
+	auto pf = d.get_platform();
+	deviceName = d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
+	_prev_submission = sycl::event();
+	_event.push_back(sycl::event());
+}
+
+#ifdef SYCL_EXT_INTEL_QUEUE_INDEX
+devSYCL::devSYCL(sycl::device &d, const int qIndex, int id, const bool isInOrder, const bool isAsync)
+{
+	_exHandler = exceptionHandler;
+
+	try
+	{
+		if (isInOrder)
+		{
+			sycl::property_list q_prop {sycl::property::queue::in_order{}, sycl::ext::intel::property::queue::compute_index{qIndex}};
+			_devQ = new sycl::queue(d, _exHandler, q_prop);
+			_queueType = syclQueueType::inOrder;
+		}
+		else
+		{
+			sycl::property_list q_prop {sycl::ext::intel::property::queue::compute_index{qIndex}};
+			_devQ = new sycl::queue(d, _exHandler, q_prop);
+			_queueType = syclQueueType::outOfOrder;
+		}
+	}
+	catch (const sycl::exception &e)
+	{
+		std::cerr << "Provided SYCL device failed\n" << e.what() << std::endl;
+		std::terminate();
+	}
+
+	_devD = d;
+	_devC = _devQ->get_context();
+#ifdef USE_ONEDPL
+	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
+#endif
+	_isFP64Supported = d.has(sycl::aspect::fp64);
+	_isAsyncQueue = isAsync;
+	_computeIndex = qIndex;
 
 	const auto isizes = d.get_info<sycl::info::device::max_work_item_sizes<3>>();
 	maxItem[0] = isizes[0];
@@ -298,7 +382,135 @@ devSYCL::devSYCL(sycl::context &c, sycl::device &d, const syclQueueType qType, i
 	_event.push_back(sycl::event());
 }
 
-devSYCL::devSYCL(const syclDeviceType dev, int id)
+devSYCL::devSYCL(sycl::context &c, sycl::device &d, const int qIndex, int id, const bool isInOrder, const bool isAsync)
+{
+	_exHandler = exceptionHandler;
+
+	try
+	{
+		if (isInOrder)
+		{
+			sycl::property_list q_prop {sycl::property::queue::in_order{}, sycl::ext::intel::property::queue::compute_index{qIndex}};
+			_devQ = new sycl::queue(c, d, _exHandler, q_prop);
+			_queueType = syclQueueType::inOrder;
+		}
+		else
+		{
+			sycl::property_list q_prop {sycl::ext::intel::property::queue::compute_index{qIndex}};
+			_devQ = new sycl::queue(c, d, _exHandler, q_prop);
+			_queueType = syclQueueType::outOfOrder;
+		}
+	}
+	catch (const sycl::exception &e)
+	{
+		std::cerr << "Provided SYCL device failed\n" << e.what() << std::endl;
+		std::terminate();
+	}
+	_devD = d;
+	_devC = c;
+#ifdef USE_ONEDPL
+	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
+#endif
+	_isFP64Supported = d.has(sycl::aspect::fp64);
+	_isAsyncQueue = isAsync;
+	_computeIndex = qIndex;
+
+	const auto isizes = d.get_info<sycl::info::device::max_work_item_sizes<3>>();
+	maxItem[0] = isizes[0];
+	maxItem[1] = isizes[1];
+	maxItem[2] = isizes[2];
+	maxGroup = d.get_info<sycl::info::device::max_work_group_size>();
+#ifdef SYCL_EXT_ONEAPI_MAX_WORK_GROUP_QUERY
+	auto groups = d.get_info<sycl::ext::oneapi::experimental::info::device::max_work_groups<3>>();
+	maxWorkGroup[0] = groups[0];
+	maxWorkGroup[1] = groups[1];
+	maxWorkGroup[2] = groups[2];
+	maxGlobalWorkGroup = d.get_info<sycl::ext::oneapi::experimental::info::device::max_global_work_groups>();
+#else
+	maxWorkGroup[0] = maxWorkGroup[1] = maxWorkGroup[2] = maxGlobalWorkGroup = std::numeric_limits<int>::max;
+#endif
+	globalMem = d.get_info<sycl::info::device::global_mem_size>();
+	localMem = d.get_info<sycl::info::device::local_mem_size>();
+	maxUnit = d.get_info<sycl::info::device::max_compute_units>();
+	deviceID = id;
+	auto pf = d.get_platform();
+	deviceName = d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
+	_prev_submission = sycl::event();
+	_event.push_back(sycl::event());
+}
+
+devSYCL::devSYCL(sycl::context &c, sycl::device &d, const int qIndex, const syclQueueType qType, int id, const bool isAsync)
+{
+	_exHandler = exceptionHandler;
+
+	try
+	{
+		switch (qType)
+		{
+			case syclQueueType::inOrder :
+			{
+				sycl::property_list q_prop {sycl::property::queue::in_order{}, sycl::ext::intel::property::queue::compute_index{qIndex}};
+				_devQ = new sycl::queue(c, d, _exHandler, q_prop);
+			}
+				break;
+
+			case syclQueueType::enableProfiling :
+			{
+				sycl::property_list q_prop {sycl::property::queue::enable_profiling{}, sycl::ext::intel::property::queue::compute_index{qIndex}};
+				_devQ = new sycl::queue(c, d, _exHandler, q_prop);
+			}
+				break;
+
+			case syclQueueType::outOfOrder :
+			default :
+			{
+				sycl::property_list q_prop {sycl::ext::intel::property::queue::compute_index{qIndex}};
+				_devQ = new sycl::queue(c, d, _exHandler, q_prop);
+			}
+				break;
+		}
+	}
+	catch (const sycl::exception &e)
+	{
+		std::cerr << "Provided SYCL device failed\n" << e.what() << std::endl;
+		std::terminate();
+	}
+	_devD = d;
+	_devC = c;
+	_queueType = qType;
+#ifdef USE_ONEDPL
+	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
+#endif
+	_isFP64Supported = d.has(sycl::aspect::fp64);
+	_isAsyncQueue = isAsync;
+	_computeIndex = qIndex;
+
+	const auto isizes = d.get_info<sycl::info::device::max_work_item_sizes<3>>();
+	maxItem[0] = isizes[0];
+	maxItem[1] = isizes[1];
+	maxItem[2] = isizes[2];
+	maxGroup = d.get_info<sycl::info::device::max_work_group_size>();
+#ifdef SYCL_EXT_ONEAPI_MAX_WORK_GROUP_QUERY
+	auto groups = d.get_info<sycl::ext::oneapi::experimental::info::device::max_work_groups<3>>();
+	maxWorkGroup[0] = groups[0];
+	maxWorkGroup[1] = groups[1];
+	maxWorkGroup[2] = groups[2];
+	maxGlobalWorkGroup = d.get_info<sycl::ext::oneapi::experimental::info::device::max_global_work_groups>();
+#else
+	maxWorkGroup[0] = maxWorkGroup[1] = maxWorkGroup[2] = maxGlobalWorkGroup = std::numeric_limits<int>::max;
+#endif
+	globalMem = d.get_info<sycl::info::device::global_mem_size>();
+	localMem = d.get_info<sycl::info::device::local_mem_size>();
+	maxUnit = d.get_info<sycl::info::device::max_compute_units>();
+	deviceID = id;
+	auto pf = d.get_platform();
+	deviceName = d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
+	_prev_submission = sycl::event();
+	_event.push_back(sycl::event());
+}
+#endif
+
+devSYCL::devSYCL(const syclDeviceType dev, int id, const bool isInOrder, const bool isAsync)
 {
 	_exHandler = exceptionHandler;
 
@@ -307,13 +519,16 @@ devSYCL::devSYCL(const syclDeviceType dev, int id)
 		switch (dev)
 		{
 			case syclDeviceType::gpu :
-#ifdef USE_INORDER_QUEUE
-				_devQ = new sycl::queue(sycl::gpu_selector_v, _exHandler, sycl::property::queue::in_order());
-				_queueType = syclQueueType::inOrder;
-#else
-				_devQ = new sycl::queue(sycl::gpu_selector_v, _exHandler);
-				_queueType = syclQueueType::outOfOrder;
-#endif
+				if (isInOrder)
+				{
+					_devQ = new sycl::queue(sycl::gpu_selector_v, _exHandler, sycl::property::queue::in_order{});
+					_queueType = syclQueueType::inOrder;
+				}
+				else
+				{
+					_devQ = new sycl::queue(sycl::gpu_selector_v, _exHandler);
+					_queueType = syclQueueType::outOfOrder;
+				}
 				break;
 
 			case syclDeviceType::cpu :
@@ -340,6 +555,9 @@ devSYCL::devSYCL(const syclDeviceType dev, int id)
 #ifdef USE_ONEDPL
 	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
 #endif
+	_isFP64Supported = _devD.has(sycl::aspect::fp64);
+	_isAsyncQueue = isAsync;
+	_computeIndex = -1;
 
 	auto d = _devD;
 	auto pf = d.get_platform();
@@ -366,7 +584,7 @@ devSYCL::devSYCL(const syclDeviceType dev, int id)
 	_event.push_back(sycl::event());
 }
 
-devSYCL::devSYCL(const syclBackendType be, const syclDeviceType dev, int id)
+devSYCL::devSYCL(const syclBackendType be, const syclDeviceType dev, int id, const bool isInOrder, const bool isAsync)
 {
 	_exHandler = exceptionHandler;
 
@@ -375,13 +593,16 @@ devSYCL::devSYCL(const syclBackendType be, const syclDeviceType dev, int id)
 		switch (dev)
 		{
 			case syclDeviceType::gpu :
-#ifdef USE_INORDER_QUEUE
-				_devQ = new sycl::queue(sycl::gpu_selector_v, _exHandler, sycl::property::queue::in_order());
-				_queueType = syclQueueType::inOrder;
-#else
-				_devQ = new sycl::queue(sycl::gpu_selector_v, _exHandler);
-				_queueType = syclQueueType::outOfOrder;
-#endif
+				if (isInOrder)
+				{
+					_devQ = new sycl::queue(sycl::gpu_selector_v, _exHandler, sycl::property::queue::in_order{});
+					_queueType = syclQueueType::inOrder;
+				}
+				else
+				{
+					_devQ = new sycl::queue(sycl::gpu_selector_v, _exHandler);
+					_queueType = syclQueueType::outOfOrder;
+				}
 				break;
 
 			case syclDeviceType::cpu :
@@ -408,6 +629,9 @@ devSYCL::devSYCL(const syclBackendType be, const syclDeviceType dev, int id)
 #ifdef USE_ONEDPL
 	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
 #endif
+	_isFP64Supported = _devD.has(sycl::aspect::fp64);
+	_isAsyncQueue = isAsync;
+	_computeIndex = -1;
 
 	auto d = _devD;
 	auto pf = d.get_platform();
@@ -436,7 +660,8 @@ devSYCL::devSYCL(const syclBackendType be, const syclDeviceType dev, int id)
 
 devSYCL::devSYCL(const devSYCL &q)
 :	_devQ {q._devQ}, _devD {q._devD}, _devC {q._devC}, deviceName {q.deviceName},
-	cardID {q.cardID}, deviceID {q.deviceID}, stackID {q.stackID}, sliceID {q.sliceID}, nSlice {q.nSlice},
+	_isAsyncQueue {q._isAsyncQueue}, _isFP64Supported {q._isFP64Supported}, _computeIndex {q._computeIndex},
+	cardID {q.cardID}, deviceID {q.deviceID}, stackID {q.stackID}, nStack {q.nStack}, sliceID {q.sliceID}, nSlice {q.nSlice},
 	_queueType {q._queueType}, maxItem {q.maxItem}, maxGroup {q.maxGroup}, maxWorkGroup {q.maxWorkGroup}, maxGlobalWorkGroup {q.maxGlobalWorkGroup}, maxUnit {q.maxUnit},
 	globalMem {q.globalMem}, localMem {q.localMem}, _prev_submission {sycl::event()}, _event {sycl::event()}
 #ifdef USE_ONEDPL
@@ -446,7 +671,8 @@ devSYCL::devSYCL(const devSYCL &q)
 
 devSYCL::devSYCL(const devSYCL *q)
 :	_devQ {q->_devQ}, _devD {q->_devD}, _devC {q->_devC}, deviceName {q->deviceName},
-	cardID {q->cardID}, deviceID {q->deviceID}, stackID {q->stackID}, sliceID {q->sliceID}, nSlice {q->nSlice},
+	_isAsyncQueue {q->_isAsyncQueue}, _isFP64Supported {q->_isFP64Supported}, _computeIndex {q->_computeIndex},
+	cardID {q->cardID}, deviceID {q->deviceID}, stackID {q->stackID}, nStack {q->nStack}, sliceID {q->sliceID}, nSlice {q->nSlice},
 	_queueType {q->_queueType}, maxItem {q->maxItem}, maxGroup {q->maxGroup}, maxWorkGroup {q->maxWorkGroup}, maxGlobalWorkGroup {q->maxGlobalWorkGroup}, maxUnit {q->maxUnit},
 	globalMem {q->globalMem}, localMem {q->localMem}, _prev_submission {sycl::event()}, _event {sycl::event()}
 #ifdef USE_ONEDPL
@@ -662,14 +888,27 @@ void devSYCL::reCalculateRange(sycl::range<3> &wg, const sycl::range<3> &wi)
 std::string devSYCL::getName()
 {
 	std::stringstream ss;
+
 	if (cardID < 0)
 		ss << "[" << deviceID << "] " << deviceName;
-	else if (sliceID >= 0)
-		ss << "[" << deviceID << "] Card[" << cardID << "]Stack[" << stackID << "]{" << sliceID << "} / " << deviceName;
-	else if (sliceID < 0 && nSlice > 1)
-		ss << "[" << deviceID << "] Card[" << cardID << "]Stack[" << stackID << "]{0-" << nSlice-1 << "} / " << deviceName;
+	else if (nStack > 1)
+	{
+		if (nSlice < 0)
+			ss << "[" << deviceID << "] Card[" << cardID << "]Stack[" << stackID << "] / " << deviceName;
+		else if (sliceID >= 0)
+			ss << "[" << deviceID << "] Card[" << cardID << "]Stack[" << stackID << "]{" << sliceID << "} / " << deviceName;
+		else if (sliceID < 0)
+			ss << "[" << deviceID << "] Card[" << cardID << "]Stack[" << stackID << "]{0-" << nSlice-1 << "} / " << deviceName;
+	}
 	else
-		ss << "[" << deviceID << "] Card[" << cardID << "]Stack[" << stackID << "] / " << deviceName;
+	{
+		if (nSlice < 0)
+			ss << "[" << deviceID << "] Card[" << cardID << "] / " << deviceName;
+		else if (sliceID >= 0)
+			ss << "[" << deviceID << "] Card[" << cardID << "]{" << sliceID << "} / " << deviceName;
+		else if (sliceID < 0)
+			ss << "[" << deviceID << "] Card[" << cardID << "]{0-" << nSlice-1 << "} / " << deviceName;
+	}
 
 	return ss.str();
 }
@@ -853,9 +1092,5 @@ void devSYCL::printDeviceInfo(bool printAll)
 				break;
 		}
 	}
-	if (dconfigs.size() == 0)
-		isFP64Supported=false;
-	else
-		isFP64Supported=true;
 	std::cout << "\n";
 }

@@ -49,13 +49,19 @@ public:
 	virtual void syclPrefetch(void *ptr, const size_t bytes) = 0;
 	virtual void syclPrefetchAfterWaitAll(void *ptr, const size_t bytes) = 0;
 
+	virtual bool isAsyncQueue() const = 0;
+	virtual bool canSupportFP64() const = 0;
+	virtual syclQueueType getSyclQueueType() const = 0;
+
 	virtual std::string getName() = 0;
-	virtual int getCardID() const = 0;
-	virtual void setCardID(int id) = 0;
 	virtual int getDeviceID() const = 0;
 	virtual void setDeviceID(int id) = 0;
+	virtual int getCardID() const = 0;
+	virtual void setCardID(int id) = 0;
 	virtual int getStackID() const = 0;
 	virtual void setStackID(int id) = 0;
+	virtual int getNumStack() const = 0;
+	virtual void setNumStack(int id) = 0;
 	virtual int getSliceID() const = 0;
 	virtual void setSliceID(int id) = 0;
 	virtual int getNumSlice() const = 0;
