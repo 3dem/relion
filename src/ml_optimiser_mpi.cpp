@@ -22,9 +22,14 @@
 #ifdef _CUDA_ENABLED
 #include "src/acc/cuda/cuda_ml_optimiser.h"
 #elif _HIP_ENABLED
-#include "src/acc/hip/hip_ml_optimiser.h"
-#endif
-#ifdef ALTCPU
+	#include "src/acc/hip/hip_ml_optimiser.h"
+#elif _SYCL_ENABLED
+    #include <vector>
+	#include <cstring>
+	#include <tuple>
+    #include <algorithm>
+    #include "src/acc/sycl/sycl_ml_optimiser.h"
+#elif ALTCPU
 	#include <tbb/tbb.h>
 	#include "src/acc/cpu/cpu_ml_optimiser.h"
 #endif
@@ -562,32 +567,48 @@ will still yield good performance and possibly a more stable execution. \n" << s
 		}
 		else
 		{
-			// TODO: Need more investigation and setting for heterogeneous run
+			char* pEnvSubSub = std::getenv("relionSyclUseSubSubDevice");
+			char* pEnvInOrderQueue = std::getenv("relionSyclUseInOrderQueue");
+			char* pEnvAsyncSubmission = std::getenv("relionSyclUseAsyncSubmission");
+
+			std::string strSubSub = (pEnvSubSub == nullptr) ? "0" : pEnvSubSub;
+			std::string strInOrderQueue = (pEnvInOrderQueue == nullptr) ? "0" : pEnvInOrderQueue;
+			std::string strAsyncSubmission = (pEnvAsyncSubmission == nullptr) ? "0" : pEnvAsyncSubmission;
+
+			std::transform(strSubSub.begin(), strSubSub.end(), strSubSub.begin(), [](unsigned char c){return static_cast<char>(std::tolower(c));});
+			std::transform(strInOrderQueue.begin(), strInOrderQueue.end(), strInOrderQueue.begin(), [](unsigned char c){return static_cast<char>(std::tolower(c));});
+			std::transform(strAsyncSubmission.begin(), strAsyncSubmission.end(), strAsyncSubmission.begin(), [](unsigned char c){return static_cast<char>(std::tolower(c));});
+
+			const bool isSubSub = (strSubSub == "1" || strSubSub == "on") ? true : false;
+			const bool isInOrderQueue = (strInOrderQueue == "1" || strInOrderQueue == "on") ? true : false;
+			const bool isAsyncSubmission = (strAsyncSubmission == "1" || strAsyncSubmission == "on") ? true : false;
+			const auto syclOpt = std::make_tuple(isSubSub, isInOrderQueue, isAsyncSubmission);
+
 			if (node->rank == 1)
 			{	// Only MPI rank 1 prints SYCL device information
 				if (do_sycl_levelzero)
-					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::levelZero);
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclOpt, syclBackendType::levelZero, true);
 				else if (do_sycl_cuda)
-					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::CUDA);
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclOpt, syclBackendType::CUDA, true);
 				else if (do_sycl_hip)
-					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::HIP);
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclOpt, syclBackendType::HIP, true);
 				else if (do_sycl_opencl)
-					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::openCL);
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclOpt, syclBackendType::openCL, true);
 				else
-					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::cpu);
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::cpu, syclOpt, syclBackendType::openCL, true);
 			}
 			else
 			{
 				if (do_sycl_levelzero)
-					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::levelZero, false);
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclOpt, syclBackendType::levelZero, false);
 				else if (do_sycl_cuda)
-					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::CUDA, false);
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclOpt, syclBackendType::CUDA, false);
 				else if (do_sycl_hip)
-					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::HIP, false);
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclOpt, syclBackendType::HIP, false);
 				else if (do_sycl_opencl)
-					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::openCL, false);
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclOpt, syclBackendType::openCL, false);
 				else
-					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::cpu, syclBackendType::openCL, false);
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::cpu, syclOpt, syclBackendType::openCL, false);
 			}
 
 			const int devCount = syclDeviceList.size();
@@ -1239,6 +1260,11 @@ void MlOptimiserMpi::expectation()
 #ifdef _SYCL_ENABLED
 	if (do_sycl && ! node->isLeader())
 	{
+		char* pEnvStream = std::getenv("relionSyclUseStream");
+		std::string strStream = (pEnvStream == nullptr) ? "0" : pEnvStream;
+		std::transform(strStream.begin(), strStream.end(), strStream.begin(), [](unsigned char c){return static_cast<char>(std::tolower(c));});
+		const bool isStream = (strStream == "1" || strStream == "on") ? true : false;
+
 		for (int i = 0; i < gpuDevices.size(); i++)
 		{
 			accDataBundles.push_back((void*)(new MlSyclDataBundle(syclDeviceList[gpuDevices[i]])));
@@ -1247,7 +1273,7 @@ void MlOptimiserMpi::expectation()
 
 		for (int i = 0; i < gpuOptimiserDeviceMap.size(); i++)
 		{
-			MlOptimiserSYCL *b = new MlOptimiserSYCL(this, (MlSyclDataBundle*)accDataBundles[gpuOptimiserDeviceMap[i]], "sycl_optimiser");
+			MlOptimiserSYCL *b = new MlOptimiserSYCL(this, (MlSyclDataBundle*)accDataBundles[gpuOptimiserDeviceMap[i]], isStream, "sycl_optimiser");
 			b->resetData();
 			b->threadID = i;
 			gpuOptimisers.push_back((void*)b);

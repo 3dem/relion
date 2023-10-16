@@ -50,8 +50,13 @@
 #elif _HIP_ENABLED
 #include "src/acc/hip/hip_ml_optimiser.h"
 #include <roctracer/roctx.h>
-#endif
-#ifdef ALTCPU
+#elif _SYCL_ENABLED
+	#include <cstdlib>
+	#include <cstring>
+	#include <tuple>
+	#include <algorithm>
+    #include "src/acc/sycl/sycl_ml_optimiser.h"
+#elif ALTCPU
     #include <atomic>
     #include <tbb/tbb.h>
     #include <tbb/parallel_for.h>
@@ -469,6 +474,16 @@ void MlOptimiser::parseContinue(int argc, char **argv)
     failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be drop, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
 
 #ifdef _SYCL_ENABLED
+	char* pEnvSyclCuda = std::getenv("relionSyclUseCuda");
+	std::string strSyclCuda = (pEnvSyclCuda == nullptr) ? "0" : pEnvSyclCuda;
+	std::transform(strSyclCuda.begin(), strSyclCuda.end(), strSyclCuda.begin(), [](unsigned char c){return static_cast<char>(std::tolower(c));});
+	const bool isSyclCuda = (strSyclCuda == "1" || strSyclCuda == "on") ? true : false;
+
+	char* pEnvSyclHip = std::getenv("relionSyclUseHip");
+	std::string strSyclHip = (pEnvSyclHip == nullptr) ? "0" : pEnvSyclHip;
+	std::transform(strSyclHip.begin(), strSyclHip.end(), strSyclHip.begin(), [](unsigned char c){return static_cast<char>(std::tolower(c));});
+	const bool isSyclHip = (strSyclHip == "1" || strSyclHip == "on") ? true : false;
+
 	do_sycl = parser.checkOption("--gpu", "Use available SYCL Level Zero GPU resources for some calculations");
 	if(! do_sycl) do_sycl = parser.checkOption("--sycl", "Use available SYCL Level Zero GPU resources for some calculations");
 	do_sycl_levelzero = parser.checkOption("--sycl-levelzero", "Use available SYCL Level Zero GPU resources for some calculations");
@@ -494,7 +509,11 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 			gpu_ids = parser.getOption("--sycl", "Device ids for each MPI-thread","default");
 	}
 
-	if (do_sycl)
+	if (isSyclCuda && do_sycl)
+		do_sycl_cuda = true;
+	else if (isSyclHip && do_sycl)
+		do_sycl_hip = true;
+	else if (do_sycl)
 		do_sycl_levelzero = true;
 	if (do_sycl_levelzero || do_sycl_cuda || do_sycl_hip || do_sycl_opencl || do_sycl_cpu)
 		do_sycl = true;
@@ -894,6 +913,16 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 #endif
 
 #ifdef _SYCL_ENABLED
+	char* pEnvSyclCuda = std::getenv("relionSyclUseCuda");
+	std::string strSyclCuda = (pEnvSyclCuda == nullptr) ? "0" : pEnvSyclCuda;
+	std::transform(strSyclCuda.begin(), strSyclCuda.end(), strSyclCuda.begin(), [](unsigned char c){return static_cast<char>(std::tolower(c));});
+	const bool isSyclCuda = (strSyclCuda == "1" || strSyclCuda == "on") ? true : false;
+
+	char* pEnvSyclHip = std::getenv("relionSyclUseHip");
+	std::string strSyclHip = (pEnvSyclHip == nullptr) ? "0" : pEnvSyclHip;
+	std::transform(strSyclHip.begin(), strSyclHip.end(), strSyclHip.begin(), [](unsigned char c){return static_cast<char>(std::tolower(c));});
+	const bool isSyclHip = (strSyclHip == "1" || strSyclHip == "on") ? true : false;
+
 	do_sycl = parser.checkOption("--gpu", "Use available SYCL Level Zero GPU resources for some calculations");
 	if(! do_sycl) do_sycl = parser.checkOption("--sycl", "Use available SYCL Level Zero GPU resources for some calculations");
 	do_sycl_levelzero = parser.checkOption("--sycl-levelzero", "Use available SYCL Level Zero GPU resources for some calculations");
@@ -919,7 +948,11 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 			gpu_ids = parser.getOption("--sycl", "Device ids for each MPI-thread","default");
 	}
 
-	if (do_sycl)
+	if (isSyclCuda && do_sycl)
+		do_sycl_cuda = true;
+	else if (isSyclHip && do_sycl)
+		do_sycl_hip = true;
+	else if (do_sycl)
 		do_sycl_levelzero = true;
 	if (do_sycl_levelzero || do_sycl_cuda || do_sycl_hip || do_sycl_opencl || do_sycl_cpu)
 		do_sycl = true;
@@ -1624,17 +1657,33 @@ void MlOptimiser::initialise()
 	if (do_sycl)
 	{
 #ifdef _SYCL_ENABLED
-		// TODO: Need more investigation and setting for heterogeneous run
+		char* pEnvSubSub = std::getenv("relionSyclUseSubSubDevice");
+		char* pEnvInOrderQueue = std::getenv("relionSyclUseInOrderQueue");
+		char* pEnvAsyncSubmission = std::getenv("relionSyclUseAsyncSubmission");
+
+		std::string strSubSub = (pEnvSubSub == nullptr) ? "0" : pEnvSubSub;
+		std::string strInOrderQueue = (pEnvInOrderQueue == nullptr) ? "0" : pEnvInOrderQueue;
+		std::string strAsyncSubmission = (pEnvAsyncSubmission == nullptr) ? "0" : pEnvAsyncSubmission;
+
+		std::transform(strSubSub.begin(), strSubSub.end(), strSubSub.begin(), [](unsigned char c){return static_cast<char>(std::tolower(c));});
+		std::transform(strInOrderQueue.begin(), strInOrderQueue.end(), strInOrderQueue.begin(), [](unsigned char c){return static_cast<char>(std::tolower(c));});
+		std::transform(strAsyncSubmission.begin(), strAsyncSubmission.end(), strAsyncSubmission.begin(), [](unsigned char c){return static_cast<char>(std::tolower(c));});
+
+		const bool isSubSub = (strSubSub == "1" || strSubSub == "on") ? true : false;
+		const bool isInOrderQueue = (strInOrderQueue == "1" || strInOrderQueue == "on") ? true : false;
+		const bool isAsyncSubmission = (strAsyncSubmission == "1" || strAsyncSubmission == "on") ? true : false;
+		const auto syclOpt = std::make_tuple(isSubSub, isInOrderQueue, isAsyncSubmission);
+
 		if (do_sycl_levelzero)
-			syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::levelZero);
+			syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclOpt, syclBackendType::levelZero);
 		else if (do_sycl_cuda)
-			syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::CUDA);
+			syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclOpt, syclBackendType::CUDA);
 		else if (do_sycl_hip)
-			syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::HIP);
+			syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclOpt, syclBackendType::HIP);
 		else if (do_sycl_opencl)
-			syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclBackendType::openCL);
+			syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclOpt, syclBackendType::openCL);
 		else
-			syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::cpu);
+			syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::cpu, syclOpt, syclBackendType::openCL);
 
 		auto devCount = syclDeviceList.size();
 		if (devCount == 0)
@@ -3558,6 +3607,11 @@ void MlOptimiser::expectation()
 #ifdef _SYCL_ENABLED
 	if (do_sycl)
 	{
+		char* pEnvStream = std::getenv("relionSyclUseStream");
+		std::string strStream = (pEnvStream == nullptr) ? "0" : pEnvStream;
+		std::transform(strStream.begin(), strStream.end(), strStream.begin(), [](unsigned char c){return static_cast<char>(std::tolower(c));});
+		const bool isStream = (strStream == "1" || strStream == "on") ? true : false;
+
 		for (int i = 0; i < gpuDevices.size(); i++)
 		{
 			accDataBundles.push_back((void*)(new MlSyclDataBundle(syclDeviceList[gpuDevices[i]])));
@@ -3566,7 +3620,7 @@ void MlOptimiser::expectation()
 
 		for (int i = 0; i < gpuOptimiserDeviceMap.size(); i++)
 		{
-			MlOptimiserSYCL *b = new MlOptimiserSYCL(this, (MlSyclDataBundle*)(accDataBundles[gpuOptimiserDeviceMap[i]]), "sycl_optimiser");
+			MlOptimiserSYCL *b = new MlOptimiserSYCL(this, (MlSyclDataBundle*)(accDataBundles[gpuOptimiserDeviceMap[i]]), isStream, "sycl_optimiser");
 			b->resetData();
 			b->threadID = i;
 			gpuOptimisers.push_back((void*)b);

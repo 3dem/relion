@@ -21,15 +21,21 @@
 class devSYCL : public virtualSYCL
 {
 public:
-	devSYCL();
 	devSYCL(const devSYCL &q);
 	devSYCL(const devSYCL *q);
-	devSYCL(sycl::device &d, int id);
-	devSYCL(sycl::device &d, const syclQueueType qType, int id);
-	devSYCL(sycl::context &c, sycl::device &d, int id);
-	devSYCL(sycl::context &c, sycl::device &d, const syclQueueType qType, int id);
-	devSYCL(const syclDeviceType dev, int id);
-	devSYCL(const syclBackendType be, const syclDeviceType dev, int id);
+
+	devSYCL(const bool isInOrder = false, const bool isAsync = false);
+	devSYCL(sycl::device &d, int id, const bool isInOrder = false, const bool isAsync = false);
+	devSYCL(sycl::device &d, const syclQueueType qType, int id, const bool isAsync = false);
+	devSYCL(sycl::context &c, sycl::device &d, int id, const bool isInOrder = false, const bool isAsync = false);
+	devSYCL(sycl::context &c, sycl::device &d, const syclQueueType qType, int id, const bool isAsync = false);
+	devSYCL(const syclDeviceType dev, int id, const bool isInOrder = false, const bool isAsync = false);
+	devSYCL(const syclBackendType be, const syclDeviceType dev, int id, const bool isInOrder = false, const bool isAsync = false);
+#ifdef SYCL_EXT_INTEL_QUEUE_INDEX
+	devSYCL(sycl::device &d, const int qIndex, int id, const bool isInOrder = false, const bool isAsync = false);
+	devSYCL(sycl::context &c, sycl::device &d, const int qIndex, int id, const bool isInOrder = false, const bool isAsync = false);
+	devSYCL(sycl::context &c, sycl::device &d, const int qIndex, const syclQueueType qType, int id, const bool isAsync = false);
+#endif
 	~devSYCL();
 
 	void pushEvent(const sycl::event &evt)
@@ -68,11 +74,10 @@ public:
 			return syclSubmitSeq(f);
 		else
 		{
-#ifdef USE_ASYNC_SYCL_SUBMIT
-			return syclSubmitAsync(f);
-#else
-			return syclSubmitSync(f);
-#endif
+			if (_isAsyncQueue)
+				return syclSubmitAsync(f);
+			else
+				return syclSubmitSync(f);
 		}
 	}
 
@@ -136,13 +141,24 @@ public:
 
 	void waitAll() override;
 
+	bool isAsyncQueue() const override		{ return _isAsyncQueue; }
+	bool canSupportFP64() const override	{ return _isFP64Supported; }
+	syclQueueType getSyclQueueType() const override	{ return _queueType; }
+#ifdef SYCL_EXT_INTEL_QUEUE_INDEX
+	int getComputeIndex() const		{ return _computeIndex; }
+#else
+	int getComputeIndex() const		{ return -1; }
+#endif
+
 	std::string getName() override;
-	int getCardID() const override	{ return cardID; }
-	void setCardID(int id) override	{ cardID = id; }
 	int getDeviceID() const override	{ return deviceID; }
 	void setDeviceID(int id) override	{ deviceID = id; }
+	int getCardID() const override	{ return cardID; }
+	void setCardID(int id) override	{ cardID = id; }
 	int getStackID() const override	{ return stackID; }
 	void setStackID(int id) override	{ stackID = id; }
+	int getNumStack() const override	{ return nStack; }
+	void setNumStack(int n) override	{ nStack = n; }
 	int getSliceID() const override	{ return sliceID; }
 	void setSliceID(int id) override	{ sliceID = id; }
 	int getNumSlice() const override	{ return nSlice; }
@@ -156,7 +172,6 @@ public:
 	sycl::event& getLastEvent()			{ return _event.back(); }
 	sycl::event& getPrevSubmission()	{ return _prev_submission; }
 	std::vector<sycl::event>& getEventList()	{ return _event; }
-	bool canSupportFP64()	{ return	isFP64Supported; }
 #ifdef USE_ONEDPL
 	oneapi::dpl::execution::device_policy<>& getDevicePolicy()	{ return _devicePolicy; }
 #endif
@@ -181,9 +196,12 @@ private:
 	int cardID;
 	int deviceID;
 	int stackID;
+	int nStack;
 	int sliceID;
 	int nSlice;
-	bool isFP64Supported;
+	bool _isAsyncQueue;
+	bool _isFP64Supported;
+	int _computeIndex;
 #ifdef USE_ONEDPL
 	oneapi::dpl::execution::device_policy<> _devicePolicy;
 #endif

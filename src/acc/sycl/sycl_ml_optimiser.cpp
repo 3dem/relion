@@ -66,6 +66,16 @@ bool isPartitionableByCSlice(sycl::device &Dev) {
 }
 #endif
 
+#ifdef SYCL_EXT_INTEL_QUEUE_INDEX
+int numPartitionableByQueueIndex(sycl::device &Dev) {
+	return Dev.get_info<sycl::ext::intel::info::device::max_compute_queue_indices>();
+}
+#else
+int numPartitionableByQueueIndex(sycl::device &Dev) {
+	return 1;
+}
+#endif
+
 std::mutex	fft_mutex;
 
 MlSyclDataBundle::MlSyclDataBundle(virtualSYCL *dev) : generateProjectionPlanOnTheFly {false}, _devAcc {dev}
@@ -183,34 +193,40 @@ void MlSyclDataBundle::setup(MlOptimiser *baseMLO)
 	}
 }
 
-MlOptimiserSYCL::MlOptimiserSYCL(MlOptimiser *baseMLOptimiser, MlSyclDataBundle *b, const char *timing_fnm) :
+MlOptimiserSYCL::MlOptimiserSYCL(MlOptimiser *baseMLOptimiser, MlSyclDataBundle *b, const bool isStream, const char *timing_fnm) :
 	baseMLO {baseMLOptimiser},
+	bundle {b},
 	transformer1 {baseMLOptimiser->mymodel.data_dim},
 	transformer2 {baseMLOptimiser->mymodel.data_dim},
 	refIs3D {baseMLO->mymodel.ref_dim == 3},
 	dataIs3D {baseMLO->mymodel.data_dim == 3},
 	shiftsIs3D {baseMLO->mymodel.data_dim == 3 || baseMLO->mydata.is_tomo},
 	generateProjectionPlanOnTheFly {bundle->generateProjectionPlanOnTheFly},
-	bundle {b}
+	_useStream {isStream}
 {
-	setupDevice();
+	if (baseMLOptimiser == nullptr)
+		_devAcc = nullptr;
+	else
+		setupDevice();
 }
 
 MlOptimiserSYCL::~MlOptimiserSYCL()
 {
-#ifdef USE_SYCL_STREAM
-	for (auto q : classStreams)
-		delete q;
-#endif
+	if (_useStream)
+		for (auto q : classStreams)
+			delete q;
 
 	classStreams.clear();
 #ifndef USE_EXISTING_SYCL_DEVICE
-	delete _devAcc;
+	if (_devAcc != nullptr)
+		delete _devAcc;
 #endif
 }
 
-std::vector<virtualSYCL*> MlOptimiserSYCL::getDevices(const syclDeviceType select, const syclBackendType BE, const bool verbose)
+std::vector<virtualSYCL*> MlOptimiserSYCL::getDevices(const syclDeviceType select, const std::tuple<bool,bool,bool> syclOpt, const syclBackendType BE, const bool verbose)
 {
+	bool isSubSub, isInOrderQueue, isAsyncSubmission;
+	std::tie(isSubSub, isInOrderQueue, isAsyncSubmission) = syclOpt;
 	std::vector<virtualSYCL*> selectedDevices;
 
 	if (select == syclDeviceType::gpu)
@@ -234,18 +250,20 @@ std::vector<virtualSYCL*> MlOptimiserSYCL::getDevices(const syclDeviceType selec
 					int nStack = 0;
 					for (auto &sub : subs)
 					{
-						if (isPartitionableByCSlice(sub))
+#if defined(SYCL_EXT_INTEL_CSLICE) || defined(SYCL_EXT_INTEL_QUEUE_INDEX)
+ #ifdef SYCL_EXT_INTEL_CSLICE
+						if (isSubSub && isPartitionableByCSlice(sub))
 						{
 							auto subsubs = sub.create_sub_devices<sycl::info::partition_property::ext_intel_partition_by_cslice>();
-#ifdef USE_SUBSUB_DEVICE
 							auto ctxctx = sycl::context(subsubs);
 							int nSlice = 0;
 							for (auto &subsub : subsubs)
 							{
-								selectedDevices.push_back(new devSYCL(ctxctx, subsub, nDevice++));
+								selectedDevices.push_back(new devSYCL(ctxctx, subsub, nDevice++, isInOrderQueue, isAsyncSubmission));
 								auto addedDevice = dynamic_cast<devSYCL*>(selectedDevices.back());
 								addedDevice->setCardID(nCard);
 								addedDevice->setStackID(nStack);
+								addedDevice->setNumStack(subs.size());
 								addedDevice->setSliceID(nSlice++);
 								addedDevice->setNumSlice(1);
 								if (verbose)
@@ -257,31 +275,56 @@ std::vector<virtualSYCL*> MlOptimiserSYCL::getDevices(const syclDeviceType selec
 									std::cout << "\n";
 								}
 							}
-#else
-							selectedDevices.push_back(new devSYCL(ctx, sub, nDevice++));
-							auto addedDevice = dynamic_cast<devSYCL*>(selectedDevices.back());
-							addedDevice->setCardID(nCard);
-							addedDevice->setStackID(nStack);
-							addedDevice->setSliceID(-1);
-							addedDevice->setNumSlice(subsubs.size());
-							if (verbose)
-							{
-								std::cout << std::string(80, '*') << std::endl;
-								std::cout << "Created SYCL device is " << addedDevice->getName() << std::endl;
-								std::cout << "maxComputeUnit= " << addedDevice->maxUnit << ", maxWorkGroupSize= " << addedDevice->maxGroup << ", globalMemSize= " << addedDevice->globalMem << std::endl;
-								addedDevice->printDeviceInfo();
-								std::cout << "  Number of Slice: " << subsubs.size() << "\n\n";
-							}
-#endif
 						}
-						else
+ #else
+						int maxQindex = numPartitionableByQueueIndex(sub);
+						if (isSubSub && maxQindex > 1)
 						{
-							selectedDevices.push_back(new devSYCL(ctx, sub, nDevice++));
+							int nSlice = 0;
+							for (int i = 0; i < maxQindex; i++)
+							{
+								selectedDevices.push_back(new devSYCL(ctx, sub, i, nDevice++, isInOrderQueue, isAsyncSubmission));
+								auto addedDevice = dynamic_cast<devSYCL*>(selectedDevices.back());
+								addedDevice->setCardID(nCard);
+								addedDevice->setStackID(nStack);
+								addedDevice->setNumStack(subs.size());
+								addedDevice->setSliceID(nSlice++);
+								addedDevice->setNumSlice(1);
+								if (verbose)
+								{
+									std::cout << std::string(80, '*') << std::endl;
+									std::cout << "Created SYCL device is " << addedDevice->getName() << std::endl;
+									std::cout << "maxComputeUnit= " << addedDevice->maxUnit << ", maxWorkGroupSize= " << addedDevice->maxGroup << ", globalMemSize= " << addedDevice->globalMem << std::endl;
+									addedDevice->printDeviceInfo();
+									std::cout << "\n";
+								}
+							}
+						}
+ #endif
+						else
+#endif
+						{
+							int numSlice = -1;
+#if defined(SYCL_EXT_INTEL_CSLICE) || defined(SYCL_EXT_INTEL_QUEUE_INDEX)
+ #ifdef SYCL_EXT_INTEL_CSLICE
+							if (isSubSub && isPartitionableByCSlice(sub))
+							{
+								auto subsubs = sub.create_sub_devices<sycl::info::partition_property::ext_intel_partition_by_cslice>();
+								if (subsubs.size() > 1)
+									numSlice = subsubs.size();
+							}
+ #else
+							if (isSubSub && numPartitionableByQueueIndex(sub) > 1)
+								numSlice = numPartitionableByQueueIndex(sub);
+ #endif
+#endif
+							selectedDevices.push_back(new devSYCL(ctx, sub, nDevice++, isInOrderQueue, isAsyncSubmission));
 							auto addedDevice = dynamic_cast<devSYCL*>(selectedDevices.back());
 							addedDevice->setCardID(nCard);
 							addedDevice->setStackID(nStack);
+							addedDevice->setNumStack(subs.size());
 							addedDevice->setSliceID(-1);
-							addedDevice->setNumSlice(1);
+							addedDevice->setNumSlice(numSlice);
 							if (verbose)
 							{
 								std::cout << std::string(80, '*') << std::endl;
@@ -296,18 +339,20 @@ std::vector<virtualSYCL*> MlOptimiserSYCL::getDevices(const syclDeviceType selec
 				}
 				else
 				{
-					if (isPartitionableByCSlice(device))
+#if defined(SYCL_EXT_INTEL_CSLICE) || defined(SYCL_EXT_INTEL_QUEUE_INDEX)
+ #ifdef SYCL_EXT_INTEL_CSLICE
+					if (isSubSub && isPartitionableByCSlice(device))
 					{
 						auto subsubs = device.create_sub_devices<sycl::info::partition_property::ext_intel_partition_by_cslice>();
-#ifdef USE_SUBSUB_DEVICE
 						auto ctxctx = sycl::context(subsubs);
 						int nSlice = 0;
 						for (auto &subsub : subsubs)
 						{
-							selectedDevices.push_back(new devSYCL(ctxctx, subsub, nDevice++));
+							selectedDevices.push_back(new devSYCL(ctxctx, subsub, nDevice++, isInOrderQueue, isAsyncSubmission));
 							auto addedDevice = dynamic_cast<devSYCL*>(selectedDevices.back());
 							addedDevice->setCardID(nCard);
 							addedDevice->setStackID(0);
+							addedDevice->setNumStack(1);
 							addedDevice->setSliceID(nSlice++);
 							addedDevice->setNumSlice(1);
 							if (verbose)
@@ -319,31 +364,62 @@ std::vector<virtualSYCL*> MlOptimiserSYCL::getDevices(const syclDeviceType selec
 								std::cout << "\n";
 							}
 						}
-#else
-						selectedDevices.push_back(new devSYCL(device, nDevice++));
-						auto addedDevice = dynamic_cast<devSYCL*>(selectedDevices.back());
-						addedDevice->setCardID(nCard);
-						addedDevice->setStackID(0);
-						addedDevice->setSliceID(-1);
-						addedDevice->setNumSlice(subsubs.size());
-						if (verbose)
-						{
-							std::cout << std::string(80, '*') << std::endl;
-							std::cout << "Created SYCL device is " << addedDevice->getName() << std::endl;
-							std::cout << "maxComputeUnit= " << addedDevice->maxUnit << ", maxWorkGroupSize= " << addedDevice->maxGroup << ", globalMemSize= " << addedDevice->globalMem << std::endl;
-							addedDevice->printDeviceInfo();
-							std::cout << "  Number of Slice: " << subsubs.size() << "\n\n";
-						}
-#endif
 					}
-					else
+ #else
+					int maxQindex = numPartitionableByQueueIndex(device);
+					if (isSubSub && maxQindex > 1)
 					{
-						selectedDevices.push_back(new devSYCL(device, nDevice++));
+						sycl::context ctx;
+						int nSlice = 0;
+						for (int i = 0; i < maxQindex; i++)
+						{
+							if (i == 0)
+								selectedDevices.push_back(new devSYCL(device, i, nDevice++, isInOrderQueue, isAsyncSubmission));
+							else
+								selectedDevices.push_back(new devSYCL(ctx, device, i, nDevice++, isInOrderQueue, isAsyncSubmission));
+							auto addedDevice = dynamic_cast<devSYCL*>(selectedDevices.back());
+							if (i == 0)
+								ctx = addedDevice->getContext();
+							addedDevice->setCardID(nCard);
+							addedDevice->setStackID(0);
+							addedDevice->setNumStack(1);
+							addedDevice->setSliceID(nSlice++);
+							addedDevice->setNumSlice(1);
+							if (verbose)
+							{
+								std::cout << std::string(80, '*') << std::endl;
+								std::cout << "Created SYCL device is " << addedDevice->getName() << std::endl;
+								std::cout << "maxComputeUnit= " << addedDevice->maxUnit << ", maxWorkGroupSize= " << addedDevice->maxGroup << ", globalMemSize= " << addedDevice->globalMem << std::endl;
+								addedDevice->printDeviceInfo();
+								std::cout << "\n";
+							}
+						}
+					}
+ #endif
+					else
+#endif
+					{
+						int numSlice = -1;
+#if defined(SYCL_EXT_INTEL_CSLICE) || defined(SYCL_EXT_INTEL_QUEUE_INDEX)
+ #ifdef SYCL_EXT_INTEL_CSLICE
+						if (isSubSub && isPartitionableByCSlice(device))
+						{
+							auto subsubs = device.create_sub_devices<sycl::info::partition_property::ext_intel_partition_by_cslice>();
+							if (subsubs.size() > 1)
+								numSlice = subsubs.size();
+						}
+ #else
+						if (isSubSub && numPartitionableByQueueIndex(device) > 1)
+							numSlice = numPartitionableByQueueIndex(device);
+ #endif
+#endif
+						selectedDevices.push_back(new devSYCL(device, nDevice++, isInOrderQueue, isAsyncSubmission));
 						auto addedDevice = dynamic_cast<devSYCL*>(selectedDevices.back());
 						addedDevice->setCardID(nCard);
 						addedDevice->setStackID(0);
+						addedDevice->setNumStack(1);
 						addedDevice->setSliceID(-1);
-						addedDevice->setNumSlice(1);
+						addedDevice->setNumSlice(numSlice);
 						if (verbose)
 						{
 							std::cout << std::string(80, '*') << std::endl;
@@ -390,14 +466,15 @@ std::vector<virtualSYCL*> MlOptimiserSYCL::getDevices(const syclDeviceType selec
 			{
 				auto subs = device.create_sub_devices<sycl::info::partition_property::partition_by_affinity_domain>(sycl::info::partition_affinity_domain::numa);
 				for (auto &sub : subs)
-					selectedDevices.push_back(new devSYCL(sub, nDevice++));
+					selectedDevices.push_back(new devSYCL(sub, nDevice++, isInOrderQueue, isAsyncSubmission));
 			}
 			else
 */
-				selectedDevices.push_back(new devSYCL(device, nDevice++));
+				selectedDevices.push_back(new devSYCL(device, nDevice++, isInOrderQueue, isAsyncSubmission));
 				auto addedDevice = dynamic_cast<devSYCL*>(selectedDevices.back());
 				addedDevice->setCardID(-1);
 				addedDevice->setStackID(-1);
+				addedDevice->setNumStack(-1);
 				addedDevice->setSliceID(-1);
 				addedDevice->setNumSlice(-1);
 				if (verbose)
@@ -612,12 +689,24 @@ void MlOptimiserSYCL::setupDevice()
 	_devAcc = new devSYCL(dynamic_cast<devSYCL*>(bundle->getSyclDevice()));
 #else
 // This will create separate device queue while the above is using existing queue
-	auto q = dynamic_cast<devSYCL*>(bundle->getSyclDevice())->getQueue();
+	auto dev = dynamic_cast<devSYCL*>(bundle->getSyclDevice());
+	auto qType = dev->getSyclQueueType();
+	auto isAsync = dev->isAsyncQueue();
+	auto computeIndex = dev->getComputeIndex();
+	auto q = dev->getQueue();
 	auto c = q->get_context();
 	auto d = q->get_device();
-	_devAcc = new devSYCL(c, d, bundle->getSyclDevice()->getDeviceID());
+
+ #ifdef SYCL_EXT_INTEL_QUEUE_INDEX
+	if (computeIndex >= 0)
+		_devAcc = new devSYCL(c, d, computeIndex, qType, bundle->getSyclDevice()->getDeviceID(), isAsync);
+	else
+ #endif
+		_devAcc = new devSYCL(c, d, qType, bundle->getSyclDevice()->getDeviceID(), isAsync);
+
 	_devAcc->setCardID(bundle->getSyclDevice()->getCardID());
 	_devAcc->setStackID(bundle->getSyclDevice()->getStackID());
+	_devAcc->setNumStack(bundle->getSyclDevice()->getNumStack());
 	_devAcc->setSliceID(bundle->getSyclDevice()->getSliceID());
 	_devAcc->setNumSlice(bundle->getSyclDevice()->getNumSlice());
 //	_devAcc->printDeviceInfo();
@@ -631,17 +720,30 @@ void MlOptimiserSYCL::resetData()
 
 	for (int i = 0; i < baseMLO->mymodel.nr_classes; i++)
 	{
-#ifdef USE_SYCL_STREAM
-		auto d = dynamic_cast<devSYCL*>(_devAcc)->getDevice();
-		auto c = dynamic_cast<devSYCL*>(_devAcc)->getContext();
-		classStreams.push_back(new devSYCL(c, d, syclQueueType::inOrder, i));
-		classStreams.back()->setCardID(dynamic_cast<devSYCL*>(_devAcc)->getCardID());
-		classStreams.back()->setStackID(dynamic_cast<devSYCL*>(_devAcc)->getStackID());
-		classStreams.back()->setSliceID(dynamic_cast<devSYCL*>(_devAcc)->getSliceID());
-		classStreams.back()->setNumSlice(dynamic_cast<devSYCL*>(_devAcc)->getNumSlice());
-#else
-		classStreams.push_back(_devAcc);
-#endif
+		if (_useStream)
+		{
+			auto dev = dynamic_cast<devSYCL*>(_devAcc);
+			auto isAsync = dev->isAsyncQueue();
+			auto computeIndex = dev->getComputeIndex();
+			auto q = dev->getQueue();
+			auto c = q->get_context();
+			auto d = q->get_device();
+
+ #ifdef SYCL_EXT_INTEL_QUEUE_INDEX
+			if (computeIndex >= 0)
+				classStreams.push_back(new devSYCL(c, d, computeIndex, i, true, isAsync));
+ #endif
+			else
+				classStreams.push_back(new devSYCL(c, d, i, true, isAsync));
+	
+			classStreams.back()->setCardID(dynamic_cast<devSYCL*>(_devAcc)->getCardID());
+			classStreams.back()->setStackID(dynamic_cast<devSYCL*>(_devAcc)->getStackID());
+			classStreams.back()->setNumStack(dynamic_cast<devSYCL*>(_devAcc)->getNumStack());
+			classStreams.back()->setSliceID(dynamic_cast<devSYCL*>(_devAcc)->getSliceID());
+			classStreams.back()->setNumSlice(dynamic_cast<devSYCL*>(_devAcc)->getNumSlice());
+		}
+		else
+			classStreams.push_back(_devAcc);
 	}
 }
 
