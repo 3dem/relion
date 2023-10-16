@@ -8804,7 +8804,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 void MlOptimiser::monitorHiddenVariableChanges(long int my_first_part_id, long int my_last_part_id)
 {
 
-    for (long int part_id_sorted = my_first_part_id, metadata_offset = 0; part_id_sorted <= my_last_part_id; part_id_sorted++)
+    for (long int part_id_sorted = my_first_part_id, metadata_offset = 0; part_id_sorted <= my_last_part_id; part_id_sorted++, metadata_offset++)
     {
 
         long int part_id = mydata.sorted_idx[part_id_sorted];
