@@ -16,18 +16,6 @@
 	#endif
 	#define ACCCOMPLEX float2
 #endif
-#ifdef ALTCPU
-	#ifndef _CUDA_ENABLED
-		typedef float cudaStream_t;
-		typedef double CudaCustomAllocator;
-		#define cudaStreamPerThread 0
-	#endif
-	#ifndef _HIP_ENABLED
-		typedef float hipStream_t;
-		typedef double HipCustomAllocator;
-		#define hipStreamPerThread 0
-	#endif
-#endif
 
 #ifdef _CUDA_ENABLED
 	#define accGPUGetDeviceCount cudaGetDeviceCount
@@ -47,6 +35,8 @@
 	#define accGPUMemGetInfo hipMemGetInfo
 	#define MlOptimiserAccGPU MlOptimiserHip
 	#define AutoPickerAccGPU AutoPickerHip
+#elif _SYCL_ENABLED
+	#define MlOptimiserAccGPU MlOptimiserSYCL
 #endif
 
 #endif /* ACC_SETTINGS_H_ */

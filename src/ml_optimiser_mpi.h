@@ -140,6 +140,10 @@ public:
      */
     void iterate();
 
+#ifdef _SYCL_ENABLED
+private:
+	int syclDevicePerRank;
+#endif
 
 };
 

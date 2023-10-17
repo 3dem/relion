@@ -2,7 +2,7 @@
 #include <string.h>
 #include <signal.h>
 #include <cassert>
-#include "src/acc/cpu/cuda_stubs.h"
+#include "src/acc/cpu/device_stubs.h"
 
 #include "src/acc/acc_ptr.h"
 #include "src/acc/acc_projector.h"

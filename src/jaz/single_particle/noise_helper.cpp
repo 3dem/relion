@@ -106,7 +106,7 @@ Image<RFLOAT> NoiseHelper::predictCCNoise(Projector &prj, double sigma2,
         const double sigmaCC = sqrt(sigma2CC);
 
         RFLOAT vMin = std::numeric_limits<RFLOAT>::max();
-        RFLOAT vMax = -std::numeric_limits<RFLOAT>::max();
+        RFLOAT vMax = std::numeric_limits<RFLOAT>::lowest();
 
         for (long int y = 0; y < s; y++)
         for (long int x = 0; x < s; x++)

@@ -36,8 +36,7 @@ void weights_exponent_coarse(
 
 		T diff2 = g_weights[idx];
 		if( diff2 < g_min_diff2 || g_pdf_orientation_zeros[iorient] || g_pdf_offset_zeros[itrans])
-	// TODO - replace with lowest() when C++11 is supported
-			g_weights[idx] = -std::numeric_limits<T>::max(); //large negative number
+			g_weights[idx] = std::numeric_limits<T>::lowest();
 		else
 			g_weights[idx] = g_pdf_orientation[iorient] + g_pdf_offset[itrans] + g_min_diff2 - diff2;
 	}
@@ -239,30 +238,6 @@ void cpu_translate3D(T * g_image_in,
 					int      dz);
 
 //----------------------------------------------------------------------------
-template <typename T>
-void centerFFT_2D(  int		batch_size,
-					size_t		pixel_start,
-					size_t		pixel_end,
-					T		*img_in,
-					size_t	image_size,
-					int		xdim,
-					int		ydim,
-					int		xshift,
-					int		yshift);
-
-template <typename T>
-void centerFFT_3D(  int		batch_size,
-					size_t	pixel_start,
-					size_t	pixel_end,
-					T		*img_in,
-					size_t	image_size,
-					int		xdim,
-					int		ydim,
-					int		zdim,
-					int		xshift,
-					int		yshift,
-					int		zshift);
-//----------------------------------------------------------------------------
 /*void probRatio( int       blockIdx_x, 
 				int       threadIdx_x,
 				XFLOAT *d_Mccf,
@@ -359,17 +334,17 @@ void batch_convol_B(int           blockIdx_x,
 					ACCCOMPLEX  *d_A,
 					ACCCOMPLEX  *d_B,
 					size_t        image_size);
-|*
+*/
+/*
  * Multiplies scalar array A by a scalar S
  *
  *  OUT[i] = A[i]*S
- *|
+ */
 template <typename T>
 void cpu_kernel_multi( T   *A,
 			T   *OUT,
 			T    S,
 			size_t   image_size);
-*/
 /*
  * In place multiplies scalar array A by a scalar S
  *

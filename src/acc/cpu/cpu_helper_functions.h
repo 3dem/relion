@@ -14,6 +14,8 @@
 #include <ctime>
 #include <iostream>
 #include <fstream>
+#include <limits>
+#include <numeric>
 #include <signal.h>
 #include "src/complex.h"
 #include "src/parallel.h"
@@ -80,43 +82,75 @@ void window_fourier_transform(
 template <typename T>
 static T getMin(T *data, size_t size)
 {
-	T min = data[0];
-	for(size_t i=1; i<size; i++)
-		min = data[i] < min ? data[i] : min;
+	T minv = std::numeric_limits<T>::max();
+#if _OPENMP >= 201307   // For OpenMP 4.0 and later
+	#pragma omp simd reduction(min:minv)
+#endif
+	for(size_t i=0; i<size; i++)
+		minv = data[i] < minv ? data[i] : minv;
 	 
-	return min;
+	return minv;
 }
 
 // may need to change to parallel reduce if it becomes the bottle neck.
 template <typename T>
 static T getMax(T *data, size_t size)
 {
-	T max = data[0];
-	for(size_t i=1; i<size; i++)
-		max = data[i] > max ? data[i] : max;
+	T maxv = std::numeric_limits<T>::lowest();
+#if _OPENMP >= 201307   // For OpenMP 4.0 and later
+	#pragma omp simd reduction(max:maxv)
+#endif
+	for(size_t i=0; i<size; i++)
+		maxv = data[i] > maxv ? data[i] : maxv;
 
-	return max;
+	return maxv;
 }
 
 template <typename T>
 static T getSum(T *data, size_t size)
 {
-	T sum = data[0];
-	for(size_t i=1; i<size; i++)
+	T sum = static_cast<T>(0);
+#if _OPENMP >= 201307   // For OpenMP 4.0 and later
+	#pragma omp simd reduction(+:sum)
+#endif
+	for(size_t i=0; i<size; i++)
 		sum += data[i];
 	 
 	return sum;
 }
 
 template <typename T>
+inline void min_loc(std::pair<size_t, T> *out, std::pair<size_t, T> *in)
+{
+	if (out->second > in->second)
+	{
+		out->first = in->first;
+		out->second = in->second;
+	}
+}
+
+template <typename T>
+inline void max_loc(std::pair<size_t, T> *out, std::pair<size_t, T> *in)
+{
+	if (out->second < in->second)
+	{
+		out->first = in->first;
+		out->second = in->second;
+	}
+}
+
+template <typename T>
 static std::pair<size_t, T> getArgMin(T *data, size_t size)
 {
-	std::pair<size_t, T> pair;
-	pair.first = 0;
-	pair.second = data[0];
-	
-	for(size_t i=1; i<size; i++)
-		if( data[i] < pair.second) {
+	std::pair<size_t, T> pair {-1, std::numeric_limits<T>::max()};
+#if _OPENMP >= 201307   // For OpenMP 4.0 and later
+	#pragma omp declare reduction(minloc: std::pair<size_t, T>: min_loc<T>(&omp_out, &omp_in)) \
+		initializer(omp_priv = {-1, std::numeric_limits<T>::max()})
+	#pragma omp simd reduction(minloc:pair)
+#endif
+	for(size_t i=0; i<size; i++)
+		if( data[i] < pair.second)
+		{
 			pair.first = i;
 			pair.second = data[i];
 		}
@@ -127,12 +161,15 @@ static std::pair<size_t, T> getArgMin(T *data, size_t size)
 template <typename T>
 static std::pair<size_t, T> getArgMax(T *data, size_t size)
 {
-	std::pair<size_t, T> pair;
-	pair.first = 0;
-	pair.second = data[0];
-	
-	for(size_t i=1; i<size; i++)
-		if( data[i] > pair.second) {
+	std::pair<size_t, T> pair {-1, std::numeric_limits<T>::lowest()};
+#if _OPENMP >= 201307   // For OpenMP 4.0 and later
+	#pragma omp declare reduction(maxloc: std::pair<size_t, T>: max_loc<T>(&omp_out, &omp_in)) \
+		initializer(omp_priv = {-1, std::numeric_limits<T>::lowest()})
+	#pragma omp simd reduction(maxloc:pair)
+#endif
+	for(size_t i=0; i<size; i++)
+		if( data[i] > pair.second)
+		{
 			pair.first = i;
 			pair.second = data[i];
 		}

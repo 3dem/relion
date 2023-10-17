@@ -6,8 +6,11 @@
 	using deviceStream_t = cudaStream_t;
 #elif _HIP_ENABLED
 	using deviceStream_t = hipStream_t;
+#elif _SYCL_ENABLED
+	#include "src/acc/sycl/sycl_virtual_dev.h"
+	using deviceStream_t = virtualSYCL*;
 #else
-	using deviceStream_t = cudaStream_t;
+	using deviceStream_t = float;
 #endif
 /*
  * This assisting function goes over the orientations determined as significant for this image, and checks
@@ -222,6 +225,8 @@ size_t findThresholdIdxInCumulativeSum(AccPtr<T> &data, T threshold)
 		idx.cpToHost();
 		DEBUG_HANDLE_ERROR(hipStreamSynchronize(data.getStream()));
 		return idx[0];
+#elif defined(_SYCL_ENABLED) && defined(USE_ONEDPL)
+		return AccUtilities::findThresholdIdxInCumulativeSum(data, threshold);
 #else
 		size_t idx = 0;
 		size_t size_m1 = data.getSize()-1;

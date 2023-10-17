@@ -16,6 +16,10 @@ using deviceStream_t = cudaStream_t;
 #include "src/acc/hip/hip_kernels/diff2.h"
 #include "src/acc/hip/hip_fft.h"
 using deviceStream_t = hipStream_t;
+#elif _SYCL_ENABLED
+#include "src/acc/sycl/sycl_kernels/helper.h"
+#include "src/acc/sycl/sycl_kernels/wavg.h"
+#include "src/acc/sycl/sycl_kernels/diff2.h"
 #else
 #include "src/acc/cpu/cpu_kernels/helper.h"
 #include "src/acc/cpu/cpu_kernels/wavg.h"
@@ -332,6 +336,21 @@ void makeNoiseImage(XFLOAT sigmaFudgeFactor,
     // transformer can be used to set up the actual particle image
     accMLO->transformer1.reals.cpOnDevice(~RandomImage);
     //hipMLO->transformer1.reals.streamSync();
+#elif _SYCL_ENABLED
+	// Create noise image with the correct spectral profile
+	if(is3D)
+		syclKernels::RNDnormalDitributionComplexWithPowerModulation3D(accMLO->transformer1.fouriers(), accMLO->transformer1.xFSize, accMLO->transformer1.yFSize, ~NoiseSpectra);
+	else
+		syclKernels::RNDnormalDitributionComplexWithPowerModulation2D(accMLO->transformer1.fouriers(), accMLO->transformer1.xFSize, ~NoiseSpectra);
+
+	// Transform to real-space, to get something which look like
+	// the particle image without actual signal (a particle)
+	accMLO->transformer1.backward();
+
+	// Copy the randomized image to A separate device-array, so that the
+	// transformer can be used to set up the actual particle image
+	for(size_t i=0; i<RandomImage.getSize(); i++)
+		RandomImage[i]=accMLO->transformer1.reals[i];
 #else
 
     // Create noise image with the correct spectral profile
@@ -379,6 +398,8 @@ static void TranslateAndNormCorrect(MultidimArray<RFLOAT > &img_in,
 #elif _HIP_ENABLED
 		int BSZ = ( (int) ceilf(( float)temp.getSize() /(float)BLOCK_SIZE));
 		hipLaunchKernelGGL(HIP_KERNEL_NAME(HipKernels::hip_kernel_multi<XFLOAT>), dim3(BSZ), dim3(BLOCK_SIZE), 0, temp.getStream(), temp(), normcorr, temp.getSize());
+#elif _SYCL_ENABLED
+		syclKernels::sycl_kernel_multi<XFLOAT>(temp(),normcorr, temp.getSize());
 #else
 		CpuKernels::cpu_kernel_multi<XFLOAT>(temp(),normcorr, temp.getSize());
 #endif
@@ -401,6 +422,11 @@ static void TranslateAndNormCorrect(MultidimArray<RFLOAT > &img_in,
 	else
 		hipLaunchKernelGGL(HIP_KERNEL_NAME(HipKernels::hip_kernel_translate2D<XFLOAT>), dim3(BSZ), dim3(BLOCK_SIZE), 0, temp.getStream(), temp(), img_out(), img_in.zyxdim, img_in.xdim, img_in.ydim, xOff, yOff);
 	//LAUNCH_PRIVATE_ERROR(hipGetLastError(),accMLO->errorStatus);
+#elif _SYCL_ENABLED
+	if (DATA3D)
+		syclKernels::sycl_translate3D<XFLOAT>(temp(),img_out(),img_in.zyxdim,img_in.xdim,img_in.ydim,img_in.zdim,xOff,yOff,zOff);
+	else
+		syclKernels::sycl_translate2D<XFLOAT>(temp(),img_out(),img_in.zyxdim,img_in.xdim,img_in.ydim,xOff,yOff);
 #else
 	if (DATA3D)
 		CpuKernels::cpu_translate3D<XFLOAT>(temp(),img_out(),img_in.zyxdim,img_in.xdim,img_in.ydim,img_in.zdim,xOff,yOff,zOff);
@@ -496,6 +522,23 @@ static void softMaskBackgroundValue(
 				cosine_width,
 				~g_sum,
 				~g_sum_bg);
+#elif _SYCL_ENABLED
+	syclKernels::softMaskBackgroundValue(
+			block_dim,
+			SOFTMASK_BLOCK_SIZE,
+			~vol,
+			vol.getxyz(),
+			vol.getx(),
+			vol.gety(),
+			vol.getz(),
+			vol.getx()/2,
+			vol.gety()/2,
+			vol.getz()/2,
+			radius,
+			radius_p,
+			cosine_width,
+			~g_sum,
+			~g_sum_bg);
 #else
 	CpuKernels::softMaskBackgroundValue(
 			block_dim,
@@ -544,6 +587,24 @@ static void cosineFilter(
 			sum_bg_total);
 #elif _HIP_ENABLED
 	hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_cosineFilter), dim3(block_dim), dim3(SOFTMASK_BLOCK_SIZE), 0, vol.getStream(),
+			~vol,
+			vol.getxyz(),
+			vol.getx(),
+			vol.gety(),
+			vol.getz(),
+			vol.getx()/2,
+			vol.gety()/2,
+			vol.getz()/2,
+			!do_Mnoise,
+			~Noise,
+			radius,
+			radius_p,
+			cosine_width,
+			sum_bg_total);
+#elif _SYCL_ENABLED
+	syclKernels::cosineFilter(
+			block_dim,
+			SOFTMASK_BLOCK_SIZE,
 			~vol,
 			vol.getxyz(),
 			vol.getx(),
@@ -637,7 +698,7 @@ void centerFFT_2D(int grid_size, int batch_size, int block_size,
 				xshift,
 				yshift);
 #else
-	CpuKernels::centerFFT_2D<XFLOAT>(batch_size, 0, image_size/2,
+	centerFFT_2D_CPU<XFLOAT>(batch_size, 0, image_size/2,
 				img_in,
 				image_size,
 				xdim,
@@ -674,7 +735,7 @@ void centerFFT_2D(int grid_size, int batch_size, int block_size,
 				xshift,
 				yshift);
 #else
-	CpuKernels::centerFFT_2D<XFLOAT>(batch_size, 0, image_size/2,
+	centerFFT_2D_CPU<XFLOAT>(batch_size, 0, image_size/2,
 			img_in,
 			image_size,
 			xdim,
@@ -718,7 +779,7 @@ void centerFFT_3D(int grid_size, int batch_size, int block_size,
 				yshift,
 				zshift);
 #else
-	CpuKernels::centerFFT_3D<XFLOAT>(batch_size, (size_t)0, (size_t)image_size/2,
+	centerFFT_3D_CPU<XFLOAT>(batch_size, (size_t)0, (size_t)image_size/2,
 			img_in,
 			image_size,
 			xdim,
@@ -777,6 +838,39 @@ void kernel_exponentiate_weights_fine(	XFLOAT *g_pdf_orientation,
 		d_job_idx,
 		d_job_num,
 		job_num);
+#elif _SYCL_ENABLED
+ #ifdef USE_ONEDPL
+	syclGpuKernels::sycl_kernel_exponentiate_weights_fine(
+		g_pdf_orientation,
+		g_pdf_orientation_zeros,
+		g_pdf_offset,
+		g_pdf_offset_zeros,
+		g_weights,
+		min_diff2,
+		oversamples_orient,
+		oversamples_trans,
+		d_rot_id,
+		d_trans_idx,
+		d_job_idx,
+		d_job_num,
+		job_num,
+		stream);
+ #else
+	syclKernels::exponentiate_weights_fine(
+		g_pdf_orientation,
+		g_pdf_orientation_zeros,
+		g_pdf_offset,
+		g_pdf_offset_zeros,
+		g_weights,
+		min_diff2,
+		oversamples_orient,
+		oversamples_trans,
+		d_rot_id,
+		d_trans_idx,
+		d_job_idx,
+		d_job_num,
+		job_num);
+ #endif
 #else
 	CpuKernels::exponentiate_weights_fine(
 		g_pdf_orientation,

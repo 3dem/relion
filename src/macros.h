@@ -422,7 +422,7 @@ static void PRINT_VERSION_INFO()
 	<< "BASE=double"
 #endif
 
-#if defined(_CUDA_ENABLED) || defined(_HIP_ENABLED) || defined(ALTCPU)
+#if defined(_CUDA_ENABLED) || defined(_HIP_ENABLED) || defined(_SYCL_ENABLED) || defined(ALTCPU)
 
 	#ifdef _CUDA_ENABLED
 	<< ", CUDA-ACC="
@@ -430,6 +430,10 @@ static void PRINT_VERSION_INFO()
 
 	#ifdef _HIP_ENABLED
 	<< ", HIP-ACC="
+	#endif
+	
+	#ifdef _SYCL_ENABLED
+	<< ", SYCL-ACC="
 	#endif
 	
 	#ifdef ALTCPU
