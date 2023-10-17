@@ -1,28 +1,26 @@
-#ifndef CPU_HELPER_FUNCTIONS_H_
-#define CPU_HELPER_FUNCTIONS_H_
+#ifndef SYCL_HELPER_FUNCTIONS_H_
+#define SYCL_HELPER_FUNCTIONS_H_
 
-#include "src/acc/cpu/cpu_ml_optimiser.h"
-#include "src/acc/acc_projector.h"
-#include "src/acc/cpu/cpu_benchmark_utils.h"
-#include "src/acc/cpu/cpu_kernels/helper.h"
-#include "src/acc/cpu/cpu_kernels/diff2.h"
-#include "src/acc/cpu/cpu_kernels/wavg.h"
 #include <sys/time.h>
-#include <stdio.h>
-#include <time.h>
-#include <math.h>
+#include <signal.h>
+#include <cstdio>
+#include <ctime>
+#include <cmath>
 #include <ctime>
 #include <iostream>
 #include <fstream>
 #include <limits>
+#include <algorithm>
 #include <numeric>
-#include <signal.h>
+
 #include "src/complex.h"
 #include "src/parallel.h"
-#include <tbb/parallel_for.h>
-#include <tbb/queuing_mutex.h>
+#include "src/acc/sycl/sycl_ml_optimiser.h"
+#include "src/acc/sycl/sycl_benchmark_utils.h"
+#include "src/acc/acc_projector.h"
+#include "src/acc/sycl/sycl_kernels/sycl_utils.h"
 
-namespace CpuKernels
+namespace syclKernels
 {
 #define WINDOW_FT_BLOCK_SIZE 128
 template<bool check_max_r2>
@@ -82,13 +80,13 @@ void window_fourier_transform(
 template <typename T>
 static T getMin(T *data, size_t size)
 {
+//	return *std::min_element(std::execution::unseq, data, data+size);
 	T minv = std::numeric_limits<T>::max();
-#if _OPENMP >= 201307   // For OpenMP 4.0 and later
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
 	#pragma omp simd reduction(min:minv)
 #endif
-	for(size_t i=0; i<size; i++)
-		minv = data[i] < minv ? data[i] : minv;
-	 
+	for (size_t i = 0; i < size; i++)
+		if (data[i] < minv)	minv = data[i];
 	return minv;
 }
 
@@ -96,26 +94,26 @@ static T getMin(T *data, size_t size)
 template <typename T>
 static T getMax(T *data, size_t size)
 {
+//	return *std::max_element(std::execution::unseq, data, data+size);
 	T maxv = std::numeric_limits<T>::lowest();
-#if _OPENMP >= 201307   // For OpenMP 4.0 and later
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
 	#pragma omp simd reduction(max:maxv)
 #endif
-	for(size_t i=0; i<size; i++)
-		maxv = data[i] > maxv ? data[i] : maxv;
-
+	for (size_t i = 0; i < size; i++)
+		if (data[i] > maxv)	maxv = data[i];
 	return maxv;
 }
 
 template <typename T>
 static T getSum(T *data, size_t size)
 {
+//	return std::reduce(std::execution::unseq, data, data+size);
 	T sum = static_cast<T>(0);
-#if _OPENMP >= 201307   // For OpenMP 4.0 and later
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
 	#pragma omp simd reduction(+:sum)
 #endif
-	for(size_t i=0; i<size; i++)
+	for (size_t i = 0; i < size; i++)
 		sum += data[i];
-	 
 	return sum;
 }
 
@@ -142,42 +140,60 @@ inline void max_loc(std::pair<size_t, T> *out, std::pair<size_t, T> *in)
 template <typename T>
 static std::pair<size_t, T> getArgMin(T *data, size_t size)
 {
+#if 0
+	auto dist = std::min_element(std::execution::unseq, data, data+size);
+
+	std::pair<size_t, T> pair;
+	pair.first = std::distance(data, dist);
+	pair.second = data[pair.first];
+	return pair;
+#else
 	std::pair<size_t, T> pair {-1, std::numeric_limits<T>::max()};
-#if _OPENMP >= 201307   // For OpenMP 4.0 and later
+ #if _OPENMP >= 201307   // For OpenMP 4.0 and later
 	#pragma omp declare reduction(minloc: std::pair<size_t, T>: min_loc<T>(&omp_out, &omp_in)) \
 		initializer(omp_priv = {-1, std::numeric_limits<T>::max()})
 	#pragma omp simd reduction(minloc:pair)
-#endif
+ #endif
 	for(size_t i=0; i<size; i++)
 		if( data[i] < pair.second)
 		{
 			pair.first = i;
 			pair.second = data[i];
 		}
-		
+
 	return pair;
+#endif
 }
 
 template <typename T>
 static std::pair<size_t, T> getArgMax(T *data, size_t size)
 {
+#if 0
+	auto dist = std::max_element(std::execution::unseq, data, data+size);
+
+	std::pair<size_t, T> pair;
+	pair.first = std::distance(data, dist);
+	pair.second = data[pair.first];
+	return pair;
+#else
 	std::pair<size_t, T> pair {-1, std::numeric_limits<T>::lowest()};
-#if _OPENMP >= 201307   // For OpenMP 4.0 and later
+ #if _OPENMP >= 201307   // For OpenMP 4.0 and later
 	#pragma omp declare reduction(maxloc: std::pair<size_t, T>: max_loc<T>(&omp_out, &omp_in)) \
 		initializer(omp_priv = {-1, std::numeric_limits<T>::lowest()})
 	#pragma omp simd reduction(maxloc:pair)
-#endif
+ #endif
 	for(size_t i=0; i<size; i++)
 		if( data[i] > pair.second)
 		{
 			pair.first = i;
 			pair.second = data[i];
 		}
-		
+
 	return pair;
+#endif
 }
 
-} // Namespace CpuKernels
+} // Namespace syclKernels
 
 #endif //CPU_HELPER_FUNCTIONS_H_
 

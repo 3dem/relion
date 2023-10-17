@@ -1,6 +1,9 @@
 static omp_lock_t global_mutex;
 
-#include "src/ml_optimiser_mpi.h"
+#ifdef _SYCL_ENABLED
+#include "src/acc/sycl/sycl_virtual_dev.h"
+using deviceStream_t = virtualSYCL*;
+#endif
 
 // ----------------------------------------------------------------------------
 // -------------------- getFourierTransformsAndCtfs ---------------------------
@@ -620,8 +623,13 @@ void getFourierTransformsAndCtfs(long int part_id,
             XFLOAT bg_val(0.);
             if(baseMLO->do_zero_mask)
             {
+#ifdef _SYCL_ENABLED
+				AccPtr<XFLOAT> softMaskSum    = ptrFactory.make<XFLOAT>((size_t)SOFTMASK_BLOCK_SIZE);
+				AccPtr<XFLOAT> softMaskSum_bg = ptrFactory.make<XFLOAT>((size_t)SOFTMASK_BLOCK_SIZE);
+#else
                 AccPtr<XFLOAT> softMaskSum    = ptrFactory.make<XFLOAT>((size_t)SOFTMASK_BLOCK_SIZE, 0);
                 AccPtr<XFLOAT> softMaskSum_bg = ptrFactory.make<XFLOAT>((size_t)SOFTMASK_BLOCK_SIZE, 0);
+#endif
                 softMaskSum.accAlloc();
                 softMaskSum_bg.accAlloc();
                 softMaskSum.accInit(0);
@@ -701,7 +709,11 @@ void getFourierTransformsAndCtfs(long int part_id,
         // Store the power_class spectrum of the whole image (to fill sigma2_noise between current_size and full_size
         if (baseMLO->image_current_size[optics_group] < baseMLO->image_full_size[optics_group])
         {
+#ifdef _SYCL_ENABLED
+			AccPtr<XFLOAT> spectrumAndXi2 = ptrFactory.make<XFLOAT>((size_t)((baseMLO->image_full_size[optics_group]/2+1)+1));
+#else
             AccPtr<XFLOAT> spectrumAndXi2 = ptrFactory.make<XFLOAT>((size_t)((baseMLO->image_full_size[optics_group]/2+1)+1), 0); // last +1 is the Xi2, to remove an expensive memcpy
+#endif
             spectrumAndXi2.allAlloc();
             spectrumAndXi2.accInit(0);
             spectrumAndXi2.streamSync();
@@ -1033,6 +1045,9 @@ void getAllSquaredDifferencesCoarse(
 			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2, op.FstMulti, dummyRF);
 
 	CTOC(accMLO->timer,"diff_pre_gpu");
+#ifdef _SYCL_ENABLED
+	deviceStream_t devAcc = accMLO->getSyclDevice();
+#endif
 #ifdef _HIP_ENABLED
     std::vector< AccProjectorPlan > projectorPlans(0, (HipCustomAllocator *)accMLO->getAllocator());
 #else
@@ -1092,6 +1107,9 @@ void getAllSquaredDifferencesCoarse(
                         else MBL = mag;
                     }
 
+#ifdef _SYCL_ENABLED
+					projectorPlans[iclass*sp.nr_images + img_id].setSyclDevice(devAcc);
+#endif
                     projectorPlans[iclass*sp.nr_images + img_id].setup(
                             baseMLO->sampling,
                             op.directions_prior,
@@ -1139,12 +1157,39 @@ void getAllSquaredDifferencesCoarse(
 	allWeights.setStreamAccType(devAcc);
  #ifdef USE_ONEDPL
 	allWeights.accAlloc();
+ #else
+	allWeights.allAlloc();
+ #endif
+#else
+	allWeights.accAlloc();
+#endif
 	deviceInitValue<XFLOAT>(allWeights, 0);  // Make sure entire array initialized
 
     bool do_CC = (baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc;
     long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
 
     unsigned long image_size = op.local_Minvsigma2.nzyxdim;
+
+	// here we introduce offsets for the trans_ and img_ in an array as it is more efficient to
+	// copy one big array to/from GPU rather than four small arrays
+	size_t trans_x_offset = 0*(size_t)translation_num;
+	size_t trans_y_offset = 1*(size_t)translation_num;
+	size_t trans_z_offset = 2*(size_t)translation_num;
+	size_t img_re_offset = 0*(size_t)image_size;
+	size_t img_im_offset = 1*(size_t)image_size;
+
+	AccPtr<XFLOAT> Fimg_ = ptrFactory.make<XFLOAT>((size_t)image_size*2);
+	AccPtr<XFLOAT> trans_xyz = ptrFactory.make<XFLOAT>((size_t)translation_num*3);
+	AccPtr<XFLOAT> corr_img = ptrFactory.make<XFLOAT>((size_t)image_size);
+
+#ifdef _SYCL_ENABLED
+	Fimg_.setStreamAccType(devAcc);
+	trans_xyz.setStreamAccType(devAcc);
+	corr_img.setStreamAccType(devAcc);
+#endif
+	Fimg_.allAlloc();
+	trans_xyz.allAlloc();
+	corr_img.allAlloc();
 
 	for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
@@ -1154,20 +1199,6 @@ void getAllSquaredDifferencesCoarse(
 		======================================*/
 
 		CTIC(accMLO->timer,"translation_1");
-
-		// here we introduce offsets for the trans_ and img_ in an array as it is more efficient to
-		// copy one big array to/from GPU rather than four small arrays
-		size_t trans_x_offset = 0*(size_t)translation_num;
-		size_t trans_y_offset = 1*(size_t)translation_num;
-		size_t trans_z_offset = 2*(size_t)translation_num;
-		size_t img_re_offset = 0*(size_t)image_size;
-		size_t img_im_offset = 1*(size_t)image_size;
-
-		AccPtr<XFLOAT> Fimg_ = ptrFactory.make<XFLOAT>((size_t)image_size*2);
-		AccPtr<XFLOAT> trans_xyz = ptrFactory.make<XFLOAT>((size_t)translation_num*3);
-
-		Fimg_.allAlloc();
-		trans_xyz.allAlloc();
 
 		std::vector<RFLOAT> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
 
@@ -1243,11 +1274,13 @@ void getAllSquaredDifferencesCoarse(
 
 		// To speed up calculation, several image-corrections are grouped into a single pixel-wise "filter", or image-correciton
 
-		AccPtr<XFLOAT> corr_img = ptrFactory.make<XFLOAT>((size_t)image_size);
-
-		corr_img.allAlloc();
-
+#ifdef _SYCL_ENABLED
+		corr_img.setAccType(accCPU);
+#endif
 		buildCorrImage(baseMLO,op,corr_img,img_id,group_id);
+#ifdef _SYCL_ENABLED
+		corr_img.setAccType(accSYCL);
+#endif
 		corr_img.cpToDevice();
 
         // do_CC does not seem Xi2 in the input allWeights!
@@ -1266,7 +1299,7 @@ void getAllSquaredDifferencesCoarse(
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(hipStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
-    #else
+    #elif _CUDA_ENABLED
    		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
@@ -1309,7 +1342,6 @@ void getAllSquaredDifferencesCoarse(
 						accMLO->classStreams[iclass],
 						do_CC,
 						accMLO->dataIs3D);
-
 #if !defined(_SYCL_ENABLED) || defined(USE_ONEDPL)
 				if (img_id == sp.nr_images - 1)
                     mapAllWeightsToMweights(
@@ -1320,7 +1352,7 @@ void getAllSquaredDifferencesCoarse(
 						translation_num,
 						accMLO->classStreams[iclass]
 						);
-
+#endif
 				/*====================================
 				    	   Retrieve Results
 				======================================*/
@@ -1334,7 +1366,7 @@ void getAllSquaredDifferencesCoarse(
         for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(hipStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread)); // does not appear to be NEEDED FOR NON-BLOCKING CLASS STREAMS in tests, but should be to sync against classStreams
-    #else
+    #elif _CUDA_ENABLED
 		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread)); // does not appear to be NEEDED FOR NON-BLOCKING CLASS STREAMS in tests, but should be to sync against classStreams
@@ -1420,6 +1452,9 @@ void getAllSquaredDifferencesFine(
 
 	CTOC(accMLO->timer,"diff_pre_gpu");
 
+#ifdef _SYCL_ENABLED
+	deviceStream_t devAcc = accMLO->getSyclDevice();
+#endif
 	/*=======================================================================================
 										  Particle Iteration
 	=========================================================================================*/
@@ -1429,6 +1464,27 @@ void getAllSquaredDifferencesFine(
     RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id);
     int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id);
     unsigned long image_size = op.local_Minvsigma2.nzyxdim;
+	long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
+	// here we introduce offsets for the trans_ and img_ in an array as it is more efficient to
+	// copy one big array to/from GPU rather than four small arrays
+	size_t trans_x_offset = 0*(size_t)translation_num;
+	size_t trans_y_offset = 1*(size_t)translation_num;
+	size_t trans_z_offset = 2*(size_t)translation_num;
+	size_t img_re_offset = 0*(size_t)image_size;
+	size_t img_im_offset = 1*(size_t)image_size;
+
+	AccPtr<XFLOAT> Fimg_     = ptrFactory.make<XFLOAT>((size_t)image_size*2);
+	AccPtr<XFLOAT> trans_xyz = ptrFactory.make<XFLOAT>((size_t)translation_num*3);
+	AccPtr<XFLOAT> corr_img = ptrFactory.make<XFLOAT>((size_t)image_size);
+
+#ifdef _SYCL_ENABLED
+	Fimg_.setStreamAccType(devAcc);
+	trans_xyz.setStreamAccType(devAcc);
+	corr_img.setStreamAccType(devAcc);
+#endif
+	Fimg_.allAlloc();
+	trans_xyz.allAlloc();
+	corr_img.allAlloc();
 
     for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
@@ -1445,21 +1501,6 @@ void getAllSquaredDifferencesFine(
 		======================================*/
 
 		CTIC(accMLO->timer,"translation_2");
-
-		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
-		// here we introduce offsets for the trans_ and img_ in an array as it is more efficient to
-		// copy one big array to/from GPU rather than four small arrays
-		size_t trans_x_offset = 0*(size_t)translation_num;
-		size_t trans_y_offset = 1*(size_t)translation_num;
-		size_t trans_z_offset = 2*(size_t)translation_num;
-		size_t img_re_offset = 0*(size_t)image_size;
-		size_t img_im_offset = 1*(size_t)image_size;
-
-		AccPtr<XFLOAT> Fimg_     = ptrFactory.make<XFLOAT>((size_t)image_size*2);
-		AccPtr<XFLOAT> trans_xyz = ptrFactory.make<XFLOAT>((size_t)translation_num*3);
-
-		Fimg_.allAlloc();
-		trans_xyz.allAlloc();
 
 		std::vector<RFLOAT> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
 
@@ -1537,13 +1578,15 @@ void getAllSquaredDifferencesFine(
 
 		CTIC(accMLO->timer,"kernel_init_1");
 
-		AccPtr<XFLOAT> corr_img = ptrFactory.make<XFLOAT>((size_t)image_size);
-
-		corr_img.allAlloc();
+#ifdef _SYCL_ENABLED
+		corr_img.setAccType(accCPU);
+#endif
 		buildCorrImage(baseMLO,op,corr_img,img_id,group_id);
+#ifdef _SYCL_ENABLED
+		corr_img.setAccType(accSYCL);
+#endif
 
 		trans_xyz.cpToDevice();
-
 
 		Fimg_.cpToDevice();
 		corr_img.cpToDevice();
@@ -1553,6 +1596,9 @@ void getAllSquaredDifferencesFine(
 		std::vector< AccPtr<XFLOAT> > eulers((size_t)(sp.iclass_max-sp.iclass_min+1), ptrFactory.make<XFLOAT>());
 
 		AccPtrBundle AllEulers = ptrFactory.makeBundle();
+#ifdef _SYCL_ENABLED
+		AllEulers.setStreamAccType(devAcc);
+#endif
 		AllEulers.setSize(9*FineProjectionData.orientationNumAllClasses*sizeof(XFLOAT));
 		AllEulers.allAlloc();
 
@@ -1626,6 +1672,10 @@ void getAllSquaredDifferencesFine(
                 //bundleD2.pack(FPCMasks[exp_iclass].jobOrigin);
                 //bundleD2.pack(FPCMasks[exp_iclass].jobExtent);
 
+#ifdef _SYCL_ENABLED
+				FPCMasks[exp_iclass].jobOrigin.setStreamAccType(devAcc);
+				FPCMasks[exp_iclass].jobExtent.setStreamAccType(devAcc);
+#endif
                 FPCMasks[exp_iclass].jobOrigin.freeDeviceIfSet();
 				FPCMasks[exp_iclass].jobExtent.freeDeviceIfSet();
 				FPCMasks[exp_iclass].jobOrigin.deviceAlloc();
@@ -1677,6 +1727,9 @@ void getAllSquaredDifferencesFine(
 						MBL,
 						MBR);
 
+#ifdef _SYCL_ENABLED
+				eulers[exp_iclass-sp.iclass_min].setStreamAccType(devAcc);
+#endif
 				AllEulers.pack(eulers[exp_iclass-sp.iclass_min]);
 
 				CTOC(accMLO->timer,"generateEulerMatrices");
@@ -1694,7 +1747,7 @@ void getAllSquaredDifferencesFine(
         for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(hipStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
-    #else
+    #elif _CUDA_ENABLED
 		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
@@ -1783,7 +1836,7 @@ void getAllSquaredDifferencesFine(
         for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(hipStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
-    #else
+    #elif _CUDA_ENABLED
 		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
@@ -1888,6 +1941,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 #else
 	pdf_orientation.accAlloc();
 	pdf_orientation_zeros.accAlloc();
+#endif
 	pdf_offset.allAlloc();
 	pdf_offset_zeros.allAlloc();
 
@@ -2172,7 +2226,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
                 CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_SORTSUM");
 
-                filtered.deviceAlloc();
+                filtered.accAlloc();
 
 #if defined DEBUG_CUDA || defined DEBUG_HIP
                 if (unsorted_ipart.getSize()==0)
@@ -2271,7 +2325,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
                 arrayOverThreshold<XFLOAT>(unsorted_ipart, Mcoarse_significant, significant_weight);
                 Mcoarse_significant.cpToHost();
                 DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
-#else
+#elif _CUDA_ENABLED
                 DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
                 arrayOverThreshold<XFLOAT>(unsorted_ipart, Mcoarse_significant, significant_weight);
                 Mcoarse_significant.cpToHost();
@@ -2299,7 +2353,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
             for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
                 DEBUG_HANDLE_ERROR(hipStreamSynchronize(accMLO->classStreams[exp_iclass]));
             DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
-#else
+#elif _CUDA_ENABLED
             for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
                 DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
             DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
@@ -2333,6 +2387,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					pdf_orientation_zeros_class.setStreamAccType(devAcc);
 					pdf_offset_zeros_class.setStreamAccType(devAcc);
 #endif
+
 
                     pdf_orientation_class      .setAccPtr(&((~pdf_orientation)      [(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]));
                     pdf_orientation_zeros_class.setAccPtr(&((~pdf_orientation_zeros)[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]));
@@ -2386,7 +2441,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
             for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
                 DEBUG_HANDLE_ERROR(hipStreamSynchronize(accMLO->classStreams[exp_iclass]));
             DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
-#else
+#elif _CUDA_ENABLED
             for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
                 DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
             DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
@@ -2416,7 +2471,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
             CTIC(accMLO->timer,"sort");
 #ifdef _HIP_ENABLED
             DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
-#else
+#elif _CUDA_ENABLED
             DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 #elif defined(_SYCL_ENABLED) && defined(USE_ONEDPL)
 			devAcc->waitAll();
@@ -2561,6 +2616,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	thr_wsum_sigma2_offset = 0.;
 	CTOC(accMLO->timer,"store_init");
 
+#ifdef _SYCL_ENABLED
+	deviceStream_t devAcc = accMLO->getSyclDevice();
+#endif
 	/*=======================================================================================
 	                           COLLECT 2 AND SET METADATA
 	=======================================================================================*/
@@ -2881,22 +2939,24 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
         int group_id = baseMLO->mydata.getGroupId(op.part_id);
         bool ctf_premultiplied = baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group);
 
+		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
+
+		size_t trans_x_offset = 0*(size_t)translation_num;
+		size_t trans_y_offset = 1*(size_t)translation_num;
+		size_t trans_z_offset = 2*(size_t)translation_num;
+
+		AccPtr<XFLOAT> trans_xyz = ptrFactory.make<XFLOAT>((size_t)translation_num*3);
+#ifdef _SYCL_ENABLED
+		trans_xyz.setStreamAccType(devAcc);
+#endif
+		trans_xyz.allAlloc();
+
 		for (int img_id = 0; img_id < sp.nr_images; img_id++)
 		{
 
 			/*======================================================
 			                     TRANSLATIONS
 			======================================================*/
-
-			long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
-
-			size_t trans_x_offset = 0*(size_t)translation_num;
-			size_t trans_y_offset = 1*(size_t)translation_num;
-			size_t trans_z_offset = 2*(size_t)translation_num;
-
-			AccPtr<XFLOAT> trans_xyz = ptrFactory.make<XFLOAT>((size_t)translation_num*3);
-
-			trans_xyz.allAlloc();
 
 			int j = 0;
 			for (long int itrans = 0; itrans < (sp.itrans_max - sp.itrans_min + 1); itrans++)
@@ -2964,7 +3024,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			size_t im_nomask_offset = 3*(size_t)image_size;
 
 			AccPtr<XFLOAT> Fimgs = ptrFactory.make<XFLOAT>(4*(size_t)image_size);
-
+#ifdef _SYCL_ENABLED
+			Fimgs.setStreamAccType(devAcc);
+#endif
 			Fimgs.allAlloc();
 
 			for (unsigned long i = 0; i < image_size; i ++)
@@ -3007,6 +3069,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			}
 
 			AccPtr<XFLOAT> ctfs = ptrFactory.make<XFLOAT>((size_t)image_size);
+#ifdef _SYCL_ENABLED
+			ctfs.setStreamAccType(devAcc);
+#endif
 			ctfs.allAlloc();
 
 			if (baseMLO->do_ctf_correction)
@@ -3027,6 +3092,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			======================================================*/
 
 			AccPtr<XFLOAT> Minvsigma2s = ptrFactory.make<XFLOAT>((size_t)image_size);
+#ifdef _SYCL_ENABLED
+			Minvsigma2s.setStreamAccType(devAcc);
+#endif
 			Minvsigma2s.allAlloc();
 
 			if (baseMLO->do_map)
@@ -3050,7 +3118,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			size_t sum_offset = 2*(size_t)(baseMLO->mymodel.nr_classes*image_size);
 
 			AccPtr<XFLOAT> wdiff2s    = ptrFactory.make<XFLOAT>(wdiff2s_buf);
-
+#ifdef _SYCL_ENABLED
+			wdiff2s.setStreamAccType(devAcc);
+#endif
 			wdiff2s.allAlloc();
 			wdiff2s.accInit(0);
 
@@ -3060,6 +3130,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
 			AccPtr<XFLOAT> sorted_weights = ptrFactory.make<XFLOAT>((size_t)(ProjectionData.orientationNumAllClasses * translation_num));
+#ifdef _SYCL_ENABLED
+			sorted_weights.setStreamAccType(devAcc);
+#endif
 			sorted_weights.allAlloc();
 			std::vector<AccPtr<XFLOAT> > eulers(baseMLO->mymodel.nr_classes, ptrFactory.make<XFLOAT>());
 
@@ -3068,7 +3141,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
             for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 				DEBUG_HANDLE_ERROR(hipStreamSynchronize(accMLO->classStreams[exp_iclass]));
 			DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
-        #else
+        #elif _CUDA_ENABLED
 			for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
@@ -3119,6 +3192,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 				eulers[iclass].setSize(orientation_num * 9);
 				eulers[iclass].setStream(accMLO->classStreams[iclass]);
+#ifdef _SYCL_ENABLED
+				eulers[iclass].setAccType(accSYCL);
+#endif
 				eulers[iclass].hostAlloc();
 
 				CTIC(accMLO->timer,"generateEulerMatricesProjector");
@@ -3175,7 +3251,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
             for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
 				DEBUG_HANDLE_ERROR(hipStreamSynchronize(accMLO->classStreams[iclass]));
 			DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
-        #else
+        #elif _CUDA_ENABLED
 			for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[iclass]));
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
@@ -3357,7 +3433,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			wdiff2s.cpToHost();
 			DEBUG_HANDLE_ERROR(hipStreamSynchronize(hipStreamPerThread));
-    #else
+    #elif _CUDA_ENABLED
 			// NOTE: We've never seen that this sync is necessary, but it is needed in principle, and
 			// its absence in other parts of the code has caused issues. It is also very low-cost.
 			for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -3799,6 +3875,11 @@ baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_D);
                 //set a maximum possible size for all weights (to be reduced by significance-checks)
                 // SHWS 6Jul2022: assume dataSize of FineProjectionData is the same for all img_id
                 size_t dataSize = FineProjectionData.orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans;
+#ifdef _SYCL_ENABLED
+				FinePassWeights.setStreamAccType_all(myInstance->getSyclDevice(), accSYCL);
+				FinePassWeights.ihidden_overs.setAccType(accCPU);
+				assert(dataSize > 0);
+#endif
                 FinePassWeights.setDataSize(dataSize);
                 FinePassWeights.dual_alloc_all();
 

@@ -112,6 +112,9 @@ file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/*.cpp")
 file(GLOB RELION_JAZ_SPA_TARGETS "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/apps/*.cpp")
 file(GLOB RELION_JAZ_TOMO_TARGETS "${CMAKE_SOURCE_DIR}/src/jaz/tomography/apps/*.cpp")
 
+file(GLOB RELION_MPI_TARGETS RELATIVE "${CMAKE_SOURCE_DIR}/src/apps" "${CMAKE_SOURCE_DIR}/src/apps/*_mpi.cpp")
+list(APPEND RELION_MPI_TARGETS "postprocess.cpp;flex_analyse.cpp;autopick.cpp")
+
 if(RELION_TEST)
 	file(GLOB RELION_JAZ_EXPERIMENTAL_TARGETS "${CMAKE_SOURCE_DIR}/src/jaz/scripts/*.cpp")
 endif(RELION_TEST)
@@ -481,6 +484,11 @@ foreach (_target ${RELION_TARGETS})
 		target_link_libraries(${_target} ${TIFF_LIBRARIES})
 	endif()
 
+	list(FIND RELION_MPI_TARGETS ${_target}.cpp IS_MPI_TARGET)
+	if(NOT ${IS_MPI_TARGET} LESS 0)
+		target_link_libraries(${_target} ${MPI_LIBRARIES})
+	endif()
+
 	install (TARGETS ${_target} RUNTIME DESTINATION bin)
 
 endforeach()
@@ -497,6 +505,10 @@ foreach (_target ${RELION_JAZ_SPA_TARGETS})
 	if(TIFF_FOUND)
 		target_link_libraries(${_target} ${TIFF_LIBRARIES})
 	endif()
+
+    if(SYCL)
+        target_link_libraries(${_target} sycl OpenCL relion_lib)
+    endif(SYCL)
 
 	if (ALTCPU)
 		target_link_libraries(${_target} ${TBB_LIBRARIES})
@@ -519,6 +531,10 @@ foreach (_target ${RELION_JAZ_TOMO_TARGETS})
 		target_link_libraries(${_target} ${TIFF_LIBRARIES})
 	endif()
 
+    if(SYCL)
+        target_link_libraries(${_target} sycl OpenCL relion_lib)
+    endif(SYCL)
+
 	install (TARGETS ${_target} RUNTIME DESTINATION bin)
 endforeach()
 
@@ -535,6 +551,10 @@ foreach (_target ${RELION_JAZ_EXPERIMENTAL_TARGETS})
 		target_link_libraries(${_target} ${TIFF_LIBRARIES})
 	endif()
 
+    if(SYCL)
+        target_link_libraries(${_target} sycl OpenCL relion_lib)
+    endif(SYCL)
+
 	if (ALTCPU)
 		target_link_libraries(${_target} ${TBB_LIBRARIES})
 	endif(ALTCPU)
@@ -542,17 +562,26 @@ foreach (_target ${RELION_JAZ_EXPERIMENTAL_TARGETS})
 	install (TARGETS ${_target} RUNTIME DESTINATION bin)
 endforeach()
 
-FIND_PACKAGE( OpenMP REQUIRED)
-if(OPENMP_FOUND)
-	#message("OPENMP FOUND")
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
-	target_link_libraries(relion_lib ${OpenMP_omp_LIBRARY})
-endif()
+if(SYCL)    # Intel DPC++ specific
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fiopenmp")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fiopenmp")
+	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fiopenmp")
 
-set(CMAKE_C_FLAGS "-std=c99 ${CMAKE_C_FLAGS}")
-set(CMAKE_CXX_FLAGS "-fPIC -std=c++14 ${CMAKE_CXX_FLAGS}")
+	set(CMAKE_C_FLAGS "-std=c99 ${CMAKE_C_FLAGS}")
+	set(CMAKE_CXX_FLAGS "-fPIC -std=c++17 ${CMAKE_CXX_FLAGS}")
+else()
+	FIND_PACKAGE( OpenMP REQUIRED)
+	if(OPENMP_FOUND)
+		#message("OPENMP FOUND")
+		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+		set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+		target_link_libraries(relion_lib ${OpenMP_omp_LIBRARY})
+	endif()
+
+	set(CMAKE_C_FLAGS "-std=c99 ${CMAKE_C_FLAGS}")
+	set(CMAKE_CXX_FLAGS "-fPIC -std=c++14 ${CMAKE_CXX_FLAGS}")
+endif()
 
 # Set this flag to activate bounds checking in stl-vectors (incl. strings)
 # It is useful to do this periodically, as it catches

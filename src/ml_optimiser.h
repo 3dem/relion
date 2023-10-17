@@ -24,6 +24,9 @@
 #ifdef ALTCPU
 	#include <tbb/enumerable_thread_specific.h>
 	#include <complex>
+#elif _SYCL_ENABLED
+	#include "src/acc/sycl/sycl_virtual_dev.h"
+	using deviceStream_t = virtualSYCL*;
 #endif
 
 #include <string>
@@ -462,6 +465,14 @@ public:
 	bool do_gpu;
 	bool anticipate_oom;
 
+	// Use SYCL resources
+	bool do_sycl;
+	bool do_sycl_levelzero;
+	bool do_sycl_cuda;
+	bool do_sycl_hip;
+	bool do_sycl_opencl;
+	bool do_sycl_cpu;
+
 	// Use alternate cpu implementation
 	bool do_cpu;
 
@@ -850,6 +861,7 @@ public:
             debug_split_random_half(0),
             random_seed(0),
             do_gpu(0),
+			do_sycl(0), do_sycl_levelzero(0), do_sycl_cuda(0), do_sycl_hip(0), do_sycl_opencl(0), do_sycl_cpu(0),
             anticipate_oom(0),
             do_helical_refine(0),
             do_preread_images(0),
@@ -913,6 +925,10 @@ public:
 		tbbCpuOptimiser = CpuOptimiserType((void*)NULL);
 #endif
 	};
+
+#ifdef _SYCL_ENABLED
+	~MlOptimiser();
+#endif
 
 	/** ========================== I/O operations  =========================== */
 	/// Print help message

@@ -94,15 +94,15 @@ void globalThreadExpectationSomeParticles(void *self, int thread_id)
     }
 }
 
+#ifdef _SYCL_ENABLED
 MlOptimiser::~MlOptimiser()
 {
-#ifdef _SYCL_ENABLED
 	for (int i = 0; i < syclDeviceList.size(); i++)
 		delete syclDeviceList[i];
 
 	syclDeviceList.clear();
-#endif
 }
+#endif
 
 /** ========================== I/O operations  =========================== */
 
@@ -583,9 +583,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	if (parser.checkOption("--blush_skip_spectral_trailing", "Skip spectral trailing during Blush reconstruction (WARNING: This could potentially lead to an exaggeration of resolution estimates.)"))
 		blush_args += " --skip-spectral-trailing ";
 
-    do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
-
-    min_sigma2_offset = textToFloat(parser.getOption("--min_sigma2_offset", "Lower bound for sigma2 for offset", "2.", true));
+	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
 
 	min_sigma2_offset = textToFloat(parser.getOption("--min_sigma2_offset", "Lower bound for sigma2 for offset", "2.", true));
 
@@ -1006,11 +1004,11 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     do_skip_maximization = parser.checkOption("--skip_maximize", "Skip maximization step (only write out data.star file)?");
     failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be handled by fail-safe mode, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
 
-    do_blush = parser.checkOption("--blush", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
+	do_blush = parser.checkOption("--blush", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
 	if (parser.checkOption("--blush_skip_spectral_trailing", "Skip spectral trailing during Blush reconstruction (WARNING: This may inflate resolution estimates)"))
 		blush_args += " --skip-spectral-trailing ";
 
-    do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction with the Blush algorithm.");
+	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction with the Blush algorithm.");
     nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
     auto_ignore_angle_changes = parser.checkOption("--auto_ignore_angles", "In auto-refinement, update angular sampling regardless of changes in orientations for convergence. This makes convergence faster.");
     auto_resolution_based_angles= parser.checkOption("--auto_resol_angles", "In auto-refinement, update angular sampling based on resolution-based required sampling. This makes convergence faster.");
@@ -2017,16 +2015,16 @@ void MlOptimiser::initialiseGeneral(int rank)
         REPORT_ERROR("ERROR: output directory does not exist!");
 
     // Just die if trying to use accelerators and skipping alignments
-    if ((do_skip_align || do_skip_rotate) && (do_gpu || do_cpu))
+    if ((do_skip_align || do_skip_rotate) && (do_gpu || do_sycl || do_cpu))
         REPORT_ERROR("ERROR: you cannot use accelerators when skipping alignments.");
 
     if (do_always_cc)
         do_calculate_initial_sigma_noise = false;
 
 
-    if (do_shifts_onthefly && (do_gpu || do_cpu))
+    if (do_shifts_onthefly && (do_gpu || do_sycl || do_cpu))
     {
-        std::cerr << "WARNING: --onthefly_shifts cannot be combined with --cpu or --gpu, setting do_shifts_onthefly to false" << std::endl;
+        std::cerr << "WARNING: --onthefly_shifts cannot be combined with --cpu, --sycl or --gpu, setting do_shifts_onthefly to false" << std::endl;
         do_shifts_onthefly = false;
     }
 
@@ -2305,7 +2303,7 @@ void MlOptimiser::initialiseGeneral(int rank)
         sampling.offset_range *= mymodel.pixel_size;
         sampling.offset_step *= mymodel.pixel_size;
     }
-    sampling.initialise(mymodel.ref_dim, (mymodel.data_dim == 3 || mydata.is_tomo), do_gpu, (verb>0),
+    sampling.initialise(mymodel.ref_dim, (mymodel.data_dim == 3 || mydata.is_tomo), do_gpu || do_sycl || do_cpu, (verb>0),
             do_local_searches_helical, (do_helical_refine) && (!ignore_helical_symmetry),
             helical_rise_initial, helical_twist_initial);
 
@@ -2383,7 +2381,7 @@ void MlOptimiser::initialiseGeneral(int rank)
         mymodel.padding_factor = 1;
         if (rank == 0) std::cerr << " Warning! Blush regularisation can only be done without padding the maps for now; setting --pad to 1 ..." << std::endl;
     }
-    
+
     // Initialise the wsum_model according to the mymodel
     wsum_model.initialise(mymodel, sampling.symmetryGroup(), asymmetric_padding, skip_gridding, grad_pseudo_halfsets);
 
@@ -2412,7 +2410,7 @@ void MlOptimiser::initialiseGeneral(int rank)
         // Don't do norm correction for volume averaging at this stage....
         do_norm_correction = false;
 
-        if (!((do_helical_refine) && (!ignore_helical_symmetry)) && !(do_cpu || do_gpu)) // For 3D helical sub-tomogram averaging, either is OK, so let the user decide
+        if (!((do_helical_refine) && (!ignore_helical_symmetry)) && !(do_cpu || do_sycl || do_gpu)) // For 3D helical sub-tomogram averaging, either is OK, so let the user decide
             do_shifts_onthefly = true; // save RAM for volume data (storing all shifted versions would take a lot!)
 
         if (do_skip_align)
@@ -2527,7 +2525,6 @@ void MlOptimiser::initialiseGeneral(int rank)
         subset_size = -1;
         mu = 0.;
     }
-
 
 	char *env_blush_args = getenv("RELION_BLUSH_ARGS");
 	if (env_blush_args != nullptr)
@@ -4894,8 +4891,8 @@ void MlOptimiser::maximization()
 		if (do_blush)
 			std::cout << " Maximization (with Blush regularization)..." << std::endl;
 		else
-        	std::cout << " Maximization..." << std::endl;
-        init_progress_bar(mymodel.nr_classes);
+			std::cout << " Maximization..." << std::endl;
+		init_progress_bar(mymodel.nr_classes);
     }
 
     // When doing ctf_premultiplied, correct the tau2 estimates for the average CTF^2
@@ -6874,7 +6871,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
             }
         }
 
-        //Shifts are done on the fly on the gpu, if do_gpu || do_cpu, do_shifts_onthefly is always false!
+        //Shifts are done on the fly on the gpu, if do_gpu || do_sycl || do_cpu, do_shifts_onthefly is always false!
         if (do_shifts_onthefly)
         {
             // Store a single, down-sized version of exp_Fimg[img_id] in exp_local_Fimgs_shifted[img_id]
@@ -6886,7 +6883,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
             std::cerr << " MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(): do_shifts_onthefly && !do_gpu" << std::endl;
 #endif
         }
-        else if(!(do_gpu || do_cpu))
+        else if(!(do_gpu || do_sycl || do_cpu))
         {
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
             Image<RFLOAT> img_save_ori, img_save_mask, img_save_nomask;

@@ -5,6 +5,9 @@
 
 #ifdef ALTCPU
 #include <tbb/spin_mutex.h>
+#elif _SYCL_ENABLED
+#include "src/acc/sycl/sycl_virtual_dev.h"
+using deviceStream_t = virtualSYCL*;
 #endif
 
 /*
@@ -335,6 +338,32 @@ public:
 		trans_idx.setSize(newSize);
 		ihidden_overs.setSize(newSize);
 	}
+
+#ifdef _SYCL_ENABLED
+	void setStream_all(deviceStream_t dev)
+	{
+		weights.setStream(dev);
+		rot_id.setStream(dev);
+		rot_idx.setStream(dev);
+		trans_idx.setStream(dev);
+		ihidden_overs.setStream(dev);
+	}
+
+	void setAccType_all(AccType accT)
+	{
+		weights.setAccType(accT);
+		rot_id.setAccType(accT);
+		rot_idx.setAccType(accT);
+		trans_idx.setAccType(accT);
+		ihidden_overs.setAccType(accT);
+	}
+
+	void setStreamAccType_all(deviceStream_t dev, AccType accT = accSYCL)
+	{
+		setStream_all(dev);
+		setAccType_all(accT);
+	}
+#endif
 
 	void host_alloc_all()
 	{

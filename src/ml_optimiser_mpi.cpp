@@ -20,7 +20,7 @@
 #include "src/ml_optimiser_mpi.h"
 #include "src/ml_optimiser.h"
 #ifdef _CUDA_ENABLED
-#include "src/acc/cuda/cuda_ml_optimiser.h"
+	#include "src/acc/cuda/cuda_ml_optimiser.h"
 #elif _HIP_ENABLED
 	#include "src/acc/hip/hip_ml_optimiser.h"
 #elif _SYCL_ENABLED
@@ -35,7 +35,6 @@
 #endif
 #include <stdio.h>
 #include <stdlib.h>
-
 
 //#define PRINT_GPU_MEM_INFO
 //#define DEBUG
@@ -1146,7 +1145,6 @@ void MlOptimiserMpi::expectation()
 
 	// Wait until expected angular errors have been calculated
 	MPI_Barrier(MPI_COMM_WORLD);
-	sleep(1);
 #ifdef TIMING
 	timer.toc(TIMING_EXP_4a);
 #endif
@@ -1283,7 +1281,6 @@ void MlOptimiserMpi::expectation()
 #ifdef ALTCPU
 	/************************************************************************/
 	//CPU memory setup
-	MPI_Barrier(MPI_COMM_WORLD);   // Is this really necessary?
 	if (do_cpu  && ! node->isLeader())
 	{
 		unsigned nr_classes = mymodel.PPref.size();
@@ -2055,6 +2052,7 @@ void MlOptimiserMpi::combineAllWeightedSums()
 			if (node->rank == 1) std::cerr << " MPI_Allreduce MULTIDIM_SIZE(Mpack)= "<< MULTIDIM_SIZE(Mpack) << std::endl;
  #endif
 
+			Mpack.clear();
 			wsum_model.unpack(Msum);
 		}
 #else
@@ -2256,6 +2254,7 @@ void MlOptimiserMpi::combineWeightedSumsTwoRandomHalves()
 			Msum.resize(wsum_model.getPackSize());
 			node->relion_MPI_Recv(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, 2, MPITAG_PACK, MPI_COMM_WORLD, status);
 			Mpack += Msum;
+			Msum.clear();
 		}
 		else if (node->rank == 2)
 		{
@@ -2728,15 +2727,15 @@ void MlOptimiserMpi::maximization()
 						int split_rank = node->getSplitRank(reconstruct_rank);
 
 						node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]), MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, split_rank, node->splitC);
-						node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[ith_recons]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[ith_recons]), MY_MPI_DOUBLE, split_rank, node->splitC);
-						node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.fourier_coverage_class[ith_recons]), MULTIDIM_SIZE(mymodel.fourier_coverage_class[ith_recons]), MY_MPI_DOUBLE, split_rank, node->splitC);
-						node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.sigma2_class[ith_recons]), MULTIDIM_SIZE(mymodel.sigma2_class[ith_recons]), MY_MPI_DOUBLE, split_rank, node->splitC);
-
 						if (do_grad)
 						{
 							node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Igrad1[ith_recons]), MULTIDIM_SIZE(mymodel.Igrad1[ith_recons]), MY_MPI_DOUBLE, split_rank, node->splitC);
 							node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Igrad2[ith_recons]), MULTIDIM_SIZE(mymodel.Igrad2[ith_recons]), MY_MPI_DOUBLE, split_rank, node->splitC);
 						}
+						node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[ith_recons]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[ith_recons]), MY_MPI_DOUBLE, split_rank, node->splitC);
+						node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.fourier_coverage_class[ith_recons]), MULTIDIM_SIZE(mymodel.fourier_coverage_class[ith_recons]), MY_MPI_DOUBLE, split_rank, node->splitC);
+						node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.sigma2_class[ith_recons]), MULTIDIM_SIZE(mymodel.sigma2_class[ith_recons]), MY_MPI_DOUBLE, split_rank, node->splitC);
+//						node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.fsc_halves_class[ibody]), MULTIDIM_SIZE(mymodel.fsc_halves_class[ibody]), MY_MPI_DOUBLE, split_rank, node->splitC);
 					}
 #else
 					MPI_Status status;

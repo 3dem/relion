@@ -60,11 +60,12 @@
 #endif
 
 #ifdef FAST_CENTERFFT	// defined if ALTCPU=on *AND* Intel Compiler used
-#include "src/acc/cpu/cuda_stubs.h"
 #include "src/acc/settings.h"
-#include "src/acc/cpu/cpu_settings.h"
-#include "src/acc/cpu/cpu_kernels/helper.h"
-#include <tbb/parallel_for.h>
+#ifdef _SYCL_ENABLED
+ #include "src/acc/sycl/sycl_settings.h"
+#else
+ #include "src/acc/cpu/cpu_settings.h"
+#endif
 #endif
 
 /** @defgroup FourierW FFTW Fourier transforms
@@ -401,6 +402,104 @@ void CenterFFTbySign(MultidimArray <T> &v)
     }
 }
 
+template <typename T>
+#ifndef __INTEL_COMPILER
+__attribute__((always_inline))
+inline
+#endif
+void centerFFT_2D_CPU(
+			int     batch_size,
+			size_t  pixel_start,
+			size_t  pixel_end,
+			T       *img_in,
+			size_t  image_size,
+			int     xdim,
+			int     ydim,
+			int     xshift,
+			int     yshift)
+{
+#ifdef DEBUG_CUDA
+	if (image_size > (size_t)std::numeric_limits<int>::max())
+		ACC_PTR_DEBUG_INFO("centerFFT_2D: image_size > std::numeric_limits<int>::max()");
+	if (image_size*(size_t)batch_size > (size_t)std::numeric_limits<int>::max())
+		ACC_PTR_DEBUG_INFO("centerFFT_2D: image_size*batch_size > std::numeric_limits<int>::max()");
+	if (pixel_end > image_size)
+		ACC_PTR_DEBUG_INFO("centerFFT_2D: pixel_end > image_size");
+#endif
+	size_t pix_start = pixel_start;
+	size_t pix_end = pixel_end;
+	for(int batch=0; batch<batch_size; batch++)
+	{
+		for(size_t pixel=pix_start; pixel < pix_end; pixel++)
+		{
+			size_t image_offset = image_size*batch;
+			int y = floorf((T)pixel/(T)xdim);
+			int x = pixel % xdim;               // also = pixel - y*xdim, but this depends on y having been calculated, i.e. serial evaluation
+
+			int yp = (y + yshift + ydim)%ydim;
+			int xp = (x + xshift + xdim)%xdim;
+
+			size_t n_pixel = (size_t)yp*(size_t)xdim + (size_t)xp;
+
+			T buffer                       = img_in[image_offset + n_pixel];
+			img_in[image_offset + n_pixel] = img_in[image_offset + pixel];
+			img_in[image_offset + pixel]   = buffer;
+		} // tid
+	} // batch
+}
+
+template <typename T>
+#ifndef __INTEL_COMPILER
+__attribute__((always_inline))
+inline
+#endif
+void centerFFT_3D_CPU(
+			int     batch_size,
+			size_t  pixel_start,
+			size_t  pixel_end,
+			T        *img_in,
+			size_t  image_size,
+			int     xdim,
+			int     ydim,
+			int     zdim,
+			int     xshift,
+			int     yshift,
+			int     zshift)
+{
+#ifdef DEBUG_CUDA
+	if (image_size > (size_t)std::numeric_limits<int>::max())
+		ACC_PTR_DEBUG_INFO("centerFFT_3D: image_size > std::numeric_limits<int>::max()");
+	if (image_size*(size_t)batch_size > (size_t)std::numeric_limits<int>::max())
+		ACC_PTR_DEBUG_INFO("centerFFT_3D: image_size*batch_size > std::numeric_limits<int>::max()");
+	if (pixel_end > image_size)
+		ACC_PTR_DEBUG_INFO("centerFFT_3D: pixel_end > image_size");
+#endif
+	size_t pix_start = pixel_start;
+	size_t pix_end = pixel_end;
+	int xydim = xdim*ydim;
+	for(int batch=0; batch<batch_size; batch++)
+	{
+		size_t image_offset = image_size*batch;
+		for(size_t pixel = pix_start; pixel < pix_end; pixel++)
+		{
+			int z = floorf((T)pixel/(T)(xydim));
+			int xy = pixel % xydim;
+			int y = floorf((T)xy/(T)xdim);
+			int x = xy % xdim;
+
+			int xp = (x + xshift + xdim)%xdim;
+			int yp = (y + yshift + ydim)%ydim;
+			int zp = (z + zshift + zdim)%zdim;
+
+			size_t n_pixel = (size_t)zp*(size_t)xydim + (size_t)yp*(size_t)xdim
+							+ (size_t)xp;
+
+			T buffer                       = img_in[image_offset + n_pixel];
+			img_in[image_offset + n_pixel] = img_in[image_offset + pixel];
+			img_in[image_offset + pixel]   = buffer;
+		} // tid
+	} // batch
+}
 
 /** Center an array, to have its origin at the origin of the FFTW
  *
@@ -648,17 +747,16 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
 		size_t isize2 = image_size/2;
 		int blocks = ceilf((float)(image_size/(float)(2*CFTT_BLOCK_SIZE)));
 
-//		for(int i=0; i<blocks; i++) {
-		tbb::parallel_for(0, blocks, [&](int i) {
+		#pragma omp parallel for
+		for(int i=0; i<blocks; i++) {
 			size_t pixel_start = i*(CFTT_BLOCK_SIZE);
 			size_t pixel_end = (i+1)*(CFTT_BLOCK_SIZE);
 			if (pixel_end > isize2)
 				pixel_end = isize2;
 
-			CpuKernels::centerFFT_2D<T>(batchSize, pixel_start, pixel_end, MULTIDIM_ARRAY(v),
+			centerFFT_2D_CPU<T>(batchSize, pixel_start, pixel_end, MULTIDIM_ARRAY(v),
 			                            (size_t)xSize*ySize, xSize, ySize, xshift, yshift);
 		}
-		);
 	}
 	else if ( v.getDim() == 3 )
 	{
@@ -683,17 +781,16 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
 			size_t image_size = xSize*ySize*zSize;
 			size_t isize2 = image_size/2;
 			int block =ceilf((float)(image_size/(float)(2*CFTT_BLOCK_SIZE)));
-//			for(int i=0; i<block; i++){
-			tbb::parallel_for(0, block, [&](int i) {
+			#pragma omp parallel for
+			for(int i=0; i<block; i++){
 				size_t pixel_start = i*(CFTT_BLOCK_SIZE);
 				size_t pixel_end = (i+1)*(CFTT_BLOCK_SIZE);
 				if (pixel_end > isize2)
 					pixel_end = isize2;
 
-				CpuKernels::centerFFT_3D<T>(batchSize, pixel_start, pixel_end, MULTIDIM_ARRAY(v),
+				centerFFT_3D_CPU<T>(batchSize, pixel_start, pixel_end, MULTIDIM_ARRAY(v),
 				                            (size_t)xSize*ySize*zSize, xSize, ySize, zSize, xshift, yshift, zshift);
 			}
-			);
 		}
 		else
 		{
@@ -709,17 +806,16 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
 			size_t image_size = xSize*ySize;
 			size_t isize2 = image_size/2;
 			int blocks = ceilf((float)(image_size/(float)(2*CFTT_BLOCK_SIZE)));
-//			for(int i=0; i<blocks; i++) {
-			tbb::parallel_for(0, blocks, [&](int i) {
+			#pragma omp parallel for
+			for(int i=0; i<blocks; i++) {
 				size_t pixel_start = i*(CFTT_BLOCK_SIZE);
 				size_t pixel_end = (i+1)*(CFTT_BLOCK_SIZE);
 				if (pixel_end > isize2)
 					pixel_end = isize2;
 
-				CpuKernels::centerFFT_2D<T>(batchSize, pixel_start, pixel_end, MULTIDIM_ARRAY(v),
+				centerFFT_2D_CPU<T>(batchSize, pixel_start, pixel_end, MULTIDIM_ARRAY(v),
 				                            (size_t)xSize*ySize, xSize, ySize, xshift, yshift);
 			}
-			);
 		}
 	}
 	else

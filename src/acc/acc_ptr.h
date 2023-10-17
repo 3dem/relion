@@ -14,7 +14,15 @@
 #include "src/acc/hip/custom_allocator.h"
 #include "src/acc/hip/hip_mem_utils.h"
 #include "src/acc/hip/shortcuts.h"
+#elif _SYCL_ENABLED
+#include <sstream>
+#include <string>
+#include <cassert>
+#include "src/acc/sycl/device_stubs.h"
+#include "src/acc/sycl/sycl_settings.h"
+#include "src/acc/sycl/sycl_virtual_dev.h"
 #else
+#include "src/acc/cpu/device_stubs.h"
 #include "src/acc/cpu/cpu_settings.h"
 #endif
 
@@ -54,7 +62,7 @@ static void HandleAccPtrDebugInformational( const char *err, const char *file, i
 		fflush(stdout);
 }
 
-enum AccType {accUNSET, accHIP, accCUDA, accCPU};
+enum AccType {accUNSET, accSYCL, accHIP, accCUDA, accCPU};
 
 
 #ifdef _CUDA_ENABLED
@@ -66,9 +74,9 @@ typedef hipStream_t StreamType;
 typedef HipCustomAllocator AllocatorType;
 typedef HipCustomAllocator::Alloc AllocationType;
 #else
-typedef float StreamType; //Dummy type
-typedef double AllocatorType;  //Dummy type
-typedef double AllocationType;  //Dummy type
+using StreamType = deviceStream_t;
+using AllocatorType = double;  //Dummy type
+using AllocationType = double;  //Dummy type
 #endif
 
 template <typename T>
@@ -84,6 +92,9 @@ protected:
 	size_t size; //Size used when copying data from and to device
 	T *hPtr, *dPtr; //Host and device pointers
 	bool doFreeDevice; //True if host or device needs to be freed
+#ifdef _SYCL_ENABLED
+	bool isHostSYCL;    // Check if host pointer is from sycl::malloc_host
+#endif
 
 public:
 	bool doFreeHost; //TODO make this private
@@ -235,6 +246,8 @@ public:
 		accType(accCUDA)
 #elif _HIP_ENABLED
 		accType(accHIP)
+#elif _SYCL_ENABLED
+		accType(accSYCL)
 #else
 		accType(accCPU)
 #endif
@@ -356,6 +369,14 @@ public:
 		accType = accT;
 	}
 
+#ifdef _SYCL_ENABLED
+	void setStreamAccType(StreamType s, AccType accT = accSYCL)
+	{
+		stream = s;
+		accType = accT;
+	}
+#endif
+
 	void markReadyEvent()
 	{
 #ifdef _CUDA_ENABLED
@@ -412,6 +433,22 @@ public:
 				alloc = allocator->alloc(size * sizeof(T));
 				dPtr = (T*) alloc->getPtr();
 		}
+#elif _SYCL_ENABLED
+		if (accType == accSYCL)
+		{
+			assert(size > 0);
+			assert(doFreeDevice == false);
+
+			doFreeDevice = true;
+			dPtr = (T*)(stream->syclMalloc(size * sizeof(T), syclMallocType::device));
+
+			if (dPtr == nullptr)
+			{
+				std::string str = "syclMalloc DEVICE error of size " + std::to_string(size * sizeof(T)) + ".\n";
+				ACC_PTR_DEBUG_FATAL(str.c_str());
+				CRITICAL(RAMERR);
+			}
+		}
 #endif
 	}
 
@@ -460,6 +497,7 @@ public:
 		// TODO - alternatively, this could be aligned std::vector
 		if(posix_memalign((void **)&hPtr, MEM_ALIGN, sizeof(T) * size))
 			CRITICAL(RAMERR);
+#endif
 	}
 
 	/**
@@ -486,7 +524,7 @@ public:
 
 	void accAlloc()
 	{
-		if (accType == accCUDA || accType == accHIP)
+		if (accType == accCUDA || accType == accHIP || accType == accSYCL)
 			deviceAlloc();
 		else
 			hostAlloc();
@@ -494,7 +532,7 @@ public:
 
 	void accAlloc(size_t newSize)
 	{
-		if (accType == accCUDA || accType == accHIP)
+		if (accType == accCUDA || accType == accHIP || accType == accSYCL)
 			deviceAlloc(newSize);
 		else
 			hostAlloc(newSize);
@@ -509,8 +547,28 @@ public:
 #endif
 		// TODO - alternatively, this could be aligned std::vector
 		T* newArr;
+#ifdef _SYCL_ENABLED
+		if(accType == accSYCL)
+		{
+			newArr = (T*)(stream->syclMalloc(newSize * sizeof(T), syclMallocType::host));
+			if(newArr == nullptr)
+			{
+				std::string str = "syclMalloc HOST in resizeHost error of size " + std::to_string(newSize * sizeof(T)) + ".\n";
+				ACC_PTR_DEBUG_FATAL(str.c_str());
+				CRITICAL(RAMERR);
+			}
+			isHostSYCL = true;
+		}
+		else
+		{
+			if(posix_memalign((void **)&newArr, MEM_ALIGN, sizeof(T) * newSize))
+				CRITICAL(RAMERR);
+			isHostSYCL = false;
+		}
+#else
 		if(posix_memalign((void **)&newArr, MEM_ALIGN, sizeof(T) * newSize))
 			CRITICAL(RAMERR);
+#endif
 		memset( newArr, 0x0, sizeof(T) * newSize);
 
 #if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
@@ -534,8 +592,28 @@ public:
 #endif
 		// TODO - alternatively, this could be aligned std::vector
 		T* newArr;
+#ifdef _SYCL_ENABLED
+		if(accType == accSYCL)
+		{
+			newArr = (T*)(stream->syclMalloc(newSize * sizeof(T), syclMallocType::host));
+			if(newArr == nullptr)
+			{
+				std::string str = "syclMalloc HOST in resizeHostCopy error of size " + std::to_string(newSize * sizeof(T)) + ".\n";
+				ACC_PTR_DEBUG_FATAL(str.c_str());
+				CRITICAL(RAMERR);
+			}
+			isHostSYCL = true;
+		}
+		else
+		{
+			if(posix_memalign((void **)&newArr, MEM_ALIGN, sizeof(T) * newSize))
+				CRITICAL(RAMERR);
+			isHostSYCL = false;
+		}
+#else
 		if(posix_memalign((void **)&newArr, MEM_ALIGN, sizeof(T) * newSize))
 			CRITICAL(RAMERR);
+#endif
 		
 		// Copy in what we can from the original matrix
 		if ((size > 0) && (hPtr != NULL))
@@ -594,6 +672,14 @@ public:
 	#endif
 			hipMemInit<T>( dPtr, value, size, stream);
 		}
+#elif _SYCL_ENABLED
+		if (accType == accSYCL)
+		{
+			assert(dPtr != NULL);
+			assert(value == 0);
+
+			stream->syclMemset(dPtr, value, size * sizeof(T));
+		}
 #endif
 	}
 
@@ -614,7 +700,7 @@ public:
 	 */
 	void accInit(int value)
 	{
-		if (accType == accCUDA || accType == accHIP)
+		if (accType == accCUDA || accType == accHIP || accType == accSYCL)
 			deviceInit(value);
 		else
 			hostInit(value);
@@ -626,7 +712,7 @@ public:
 	void allInit(int value)
 	{
 		hostInit(value);
-		if (accType == accCUDA || accType == accHIP)
+		if (accType == accCUDA || accType == accHIP || accType == accSYCL)
 			deviceInit(value);
 	}
 
@@ -657,6 +743,14 @@ public:
 	#endif
 			HipShortcuts::cpyHostToDevice<T>(hPtr, dPtr, size, stream);
 		}
+#elif _SYCL_ENABLED
+		if (accType == accSYCL)
+		{
+			assert(dPtr != NULL);
+			assert(hPtr != NULL);
+
+			stream->syclMemcpy(dPtr, hPtr, size * sizeof(T));
+		}
 #endif
 	}
 
@@ -665,7 +759,7 @@ public:
 	 */
 	void cpToDevice(T * hostPtr)
 	{
-		if (accType == accCUDA || accType == accHIP)
+		if (accType == accCUDA || accType == accHIP || accType == accSYCL)
 		{
 #if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 			if (hostPtr == NULL)
@@ -723,6 +817,14 @@ public:
 	#endif
 			hipCpyDeviceToHost<T>(dPtr, hPtr, size, stream);
 		}
+#elif _SYCL_ENABLED
+		if (accType == accSYCL)
+		{
+			assert(dPtr != NULL);
+			assert(hPtr != NULL);
+
+			stream->syclMemcpy(hPtr, dPtr, size * sizeof(T));
+		}
 #endif
 	}
 
@@ -752,6 +854,14 @@ public:
 				ACC_PTR_DEBUG_FATAL("NULL host pointer in cp_to_host(thisSize).\n");
 	#endif
 			hipCpyDeviceToHost<T>(dPtr, hPtr, thisSize, stream);
+		}
+#elif _SYCL_ENABLED
+		if (accType == accSYCL)
+		{
+			assert(dPtr != NULL);
+			assert(hPtr != NULL);
+
+			stream->syclMemcpy(hPtr, dPtr, thisSize * sizeof(T));
 		}
 #endif
 	}
@@ -783,6 +893,14 @@ public:
 	#endif
 			hipCpyDeviceToHost<T>(dPtr, hstPtr, thisSize, stream);
 		}
+#elif _SYCL_ENABLED
+		if (accType == accSYCL)
+		{
+			assert(dPtr != NULL);
+			assert(hstPtr != NULL);
+			
+			stream->syclMemcpy(hstPtr, dPtr, thisSize * sizeof(T));
+		}
 #endif
 	}
 
@@ -813,6 +931,9 @@ public:
 	#endif
 			hipCpyDeviceToHost<T>(dPtr, hPtr, size, s);
 		}
+#elif _SYCL_ENABLED
+		if (accType == accSYCL)
+			ACC_PTR_DEBUG_FATAL("cpToHostOnStream(StreamType s) does not work on SYCL.\n");
 #endif
 	}
 
@@ -839,6 +960,14 @@ public:
 	#endif
 			HipShortcuts::cpyDeviceToDevice(dPtr, dstDevPtr, size, stream);
 		}
+#elif _SYCL_ENABLED
+		if (accType == accSYCL)
+		{
+			assert(dPtr != NULL);
+			assert(dstDevPtr != NULL);
+
+			stream->syclMemcpy(dstDevPtr, dPtr, size * sizeof(T));
+		}
 #endif
 	}
 
@@ -858,7 +987,7 @@ public:
 
 	void cpOnAcc(T * dstDevPtr)
 	{
-		if (accType == accCUDA || accType == accHIP)
+		if (accType == accCUDA || accType == accHIP || accType == accSYCL)
 			cpOnDevice(dstDevPtr);
 		else
 			cpOnHost(dstDevPtr);
@@ -866,7 +995,7 @@ public:
 
 	void cpOnAcc(AccPtr<T> &devPtr)
 	{
-		if (accType == accCUDA || accType == accHIP)
+		if (accType == accCUDA || accType == accHIP || accType == accSYCL)
 			cpOnDevice(devPtr.dPtr);
 		else
 			cpOnHost(devPtr.hPtr);
@@ -928,7 +1057,7 @@ public:
 	{
 		// TODO - this could cause considerable confusion given the above operators.  But it
 		// also simplifies code that uses it.   What to do...
-		if (accType == accCUDA || accType == accHIP)
+		if (accType == accCUDA || accType == accHIP || accType == accSYCL)
 		{
 #if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 			if (dPtr == NULL)
@@ -950,7 +1079,7 @@ public:
 	{
 		// TODO - this could cause considerable confusion given the above operators.  But it
 		// also simplifies code that uses it.   What to do...
-		if (accType == accCUDA || accType == accHIP)
+		if (accType == accCUDA || accType == accHIP || accType == accSYCL)
 		{
 #if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 			if ( dPtr == 0)
@@ -976,6 +1105,9 @@ public:
 #elif _HIP_ENABLED
 		if (accType == accHIP)
 			DEBUG_HANDLE_ERROR(hipStreamSynchronize(stream));
+#elif _SYCL_ENABLED
+		if (accType == accSYCL)
+			stream->waitAll();
 #endif
 	}
 
@@ -995,6 +1127,17 @@ public:
 		{
 			T value;
 			hipCpyDeviceToHost<T>(&dPtr[idx], &value, 1, stream);
+			streamSync();
+			return value;
+		}
+		else
+#elif _SYCL_ENABLED
+		if (accType == accSYCL)
+		{
+			assert(dPtr != NULL);
+			assert(idx < size);
+			T value;
+			stream->syclMemcpy(&value, &dPtr[idx], sizeof(T));
 			streamSync();
 			return value;
 		}
@@ -1021,9 +1164,48 @@ public:
 			streamSync();
 			return value;
 		}
+#elif _SYCL_ENABLED
+		if (accType == accSYCL)
+		{
+			assert(dPtr != NULL);
+			assert(idx < size);
+			T value;
+			stream->syclMemcpy(&value, &dPtr[idx], sizeof(T));
+			streamSync();
+			return value;
+		}
 #else
 		return NULL;
 #endif
+	}
+
+	void setAccValueAt(T value, size_t idx)
+	{
+#ifdef _CUDA_ENABLED
+		if (accType == accCUDA)
+		{
+			CudaShortcuts::cpyHostToDevice<T>(&value, &dPtr[idx], sizeof(T), stream);
+			streamSync();
+		}
+		else
+#elif _HIP_ENABLED
+		if (accType == accHIP)
+		{
+			HipShortcuts::cpyHostToDevice<T>(&value, &dPtr[idx], sizeof(T), stream);
+			streamSync();
+		}
+		else
+#elif _SYCL_ENABLED
+		if (accType == accSYCL)
+		{
+			assert(dPtr != NULL);
+			assert(idx < size);
+			stream->syclMemcpy(&dPtr[idx], &value, sizeof(T));
+			streamSync();
+		}
+		else
+#endif
+			hPtr[idx] = value;
 	}
 
 	void dumpDeviceToFile(std::string fileName)
@@ -1059,6 +1241,21 @@ public:
 			delete [] tmp;
 		}
 		else
+#elif _SYCL_ENABLED
+		if (accType == accSYCL)
+		{
+			T *tmp = new T[size];
+			stream->syclMemcpy(tmp, dPtr, size * sizeof(T));
+
+			std::ofstream f;
+			f.open(fileName.c_str());
+			streamSync();
+			for (unsigned i = 0; i < size; i ++)
+				f << tmp[i] << std::endl;
+			f.close();
+			delete [] tmp;
+		}
+		else
 #endif
 		{
 			std::ofstream f;
@@ -1079,7 +1276,7 @@ public:
 
 	void dumpAccToFile(std::string fileName)
 	{
-		if (accType == accCUDA || accType == accHIP)
+		if (accType == accCUDA || accType == accHIP || accType == accSYCL)
 			dumpDeviceToFile(fileName);
 		else
 			dumpHostToFile(fileName);
@@ -1126,6 +1323,16 @@ public:
 
 			dPtr = NULL;
 		}
+#elif _SYCL_ENABLED
+//		if (accType == accSYCL)
+		{
+			assert(dPtr != NULL);
+
+			stream->waitAll();
+			stream->syclFree(dPtr);
+			doFreeDevice = false;
+			dPtr = NULL;
+		}
 #endif
 	}
 
@@ -1140,7 +1347,16 @@ public:
 #endif
 		doFreeHost = false;
 		if (NULL != hPtr)
+#ifdef _SYCL_ENABLED
+		{
+			if(isHostSYCL)
+				stream->syclFree(hPtr);
+			else
+				free(hPtr);
+		}
+#else
 			free(hPtr);
+#endif
 		hPtr = NULL;
 	}
 
@@ -1224,7 +1440,7 @@ public:
 
 	T *getAccPtr()
 	{
-		if (accType == accCUDA || accType == accHIP)
+		if (accType == accCUDA || accType == accHIP || accType == accSYCL)
 			return dPtr;
 		else
 			return hPtr;
@@ -1279,7 +1495,7 @@ public:
 
 	void setAccPtr(const AccPtr<T> &ptr)
 	{
-		if (accType == accCUDA || accType == accHIP)
+		if (accType == accCUDA || accType == accHIP || accType == accSYCL)
 			setDevicePtr(ptr.hPtr);
 		else
 			setHostPtr(ptr.hPtr);
@@ -1287,7 +1503,7 @@ public:
 
 	void setAccPtr(T *ptr)
 	{
-		if (accType == accCUDA || accType == accHIP)
+		if (accType == accCUDA || accType == accHIP || accType == accSYCL)
 			setDevicePtr(ptr);
 		else
 			setHostPtr(ptr);
@@ -1338,55 +1554,64 @@ public:
 		setSize(size);
 	}
 
+#ifdef _SYCL_ENABLED
+	AccPtrBundle(StreamType dev):
+		AccPtr<AccPtrBundleByte>(dev), current_packed_pos(0)
+	{}
+#endif
+
 	template <typename T>
 	void pack(AccPtr<T> &ptr)
 	{
-#if defined _CUDA_ENABLED || defined _HIP_ENABLED
+		if (accType == accCUDA || accType == accHIP || accType == accSYCL)
+		{
 	#if defined DEBUG_CUDA || defined DEBUG_HIP
-		if (current_packed_pos + ptr.getSize() > size)
-			ACC_PTR_DEBUG_FATAL("Packing exceeds bundle total size.\n");
-		if (hPtr == NULL)
-			ACC_PTR_DEBUG_FATAL("Pack called on null host pointer.\n");
+			if (current_packed_pos + ptr.getSize() > size)
+				ACC_PTR_DEBUG_FATAL("Packing exceeds bundle total size.\n");
+			if (hPtr == NULL)
+				ACC_PTR_DEBUG_FATAL("Pack called on null host pointer.\n");
 	#endif
-		if (ptr.getHostPtr() != NULL)
-			memcpy ( &hPtr[current_packed_pos], ptr.getHostPtr(), ptr.getSize() * sizeof(T));
-		ptr.freeHostIfSet();
-		ptr.setHostPtr((T*) &hPtr[current_packed_pos]);
-		ptr.setDevicePtr((T*) &dPtr[current_packed_pos]);
+			if (ptr.getHostPtr() != NULL)
+				memcpy ( &hPtr[current_packed_pos], ptr.getHostPtr(), ptr.getSize() * sizeof(T));
+			ptr.freeHostIfSet();
+			ptr.setHostPtr((T*) &hPtr[current_packed_pos]);
+			ptr.setDevicePtr((T*) &dPtr[current_packed_pos]);
 
-		current_packed_pos += ptr.getSize() * sizeof(T);
-#else
-		if (ptr.getHostPtr() == NULL)
-			ptr.hostAlloc();
-#endif
+			current_packed_pos += ptr.getSize() * sizeof(T);
+		}
+		else
+		{
+			if (ptr.getHostPtr() == NULL)
+				ptr.hostAlloc();
+		}
 	}
 	
 	//Overwrite allocation methods and block for no device
 	
 	void allAlloc()
 	{
-#if defined _CUDA_ENABLED || defined _HIP_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED || defined _SYCL_ENABLED
 		AccPtr<AccPtrBundleByte>::allAlloc();
 #endif
 	}
 	
 	void allAlloc(size_t size)
 	{
-#if defined _CUDA_ENABLED || defined _HIP_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED || defined _SYCL_ENABLED
 		AccPtr<AccPtrBundleByte>::allAlloc(size);
 #endif
 	}
 	
 	void hostAlloc()
 	{
-#if defined _CUDA_ENABLED || defined _HIP_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED || defined _SYCL_ENABLED
 AccPtr<AccPtrBundleByte>::hostAlloc();
 #endif
 	}
 	
 	void hostAlloc(size_t size)
 	{
-#if defined _CUDA_ENABLED || defined _HIP_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED || defined _SYCL_ENABLED
 AccPtr<AccPtrBundleByte>::hostAlloc(size);
 #endif
 	}
@@ -1410,6 +1635,11 @@ public:
 		allocator(NULL), stream(0), accType(accT)
 	{}
 
+#ifdef _SYCL_ENABLED
+	AccPtrFactory(StreamType s):
+		allocator(NULL), stream(s), accType(accSYCL)
+	{}
+#else
 	AccPtrFactory(AllocatorType *alloc):
 #ifdef _CUDA_ENABLED
 		allocator(alloc), stream(0), accType(accCUDA)
@@ -1429,24 +1659,46 @@ public:
 		allocator(alloc), stream(0), accType(accCPU)
 #endif
 	{}
+#endif
 
 	template <typename T>
 	AccPtr<T> make()
 	{
-		AccPtr<T> ptr(stream, allocator);
-		ptr.setAccType(accType);
+		if (accType == accSYCL)
+		{
+			AccPtr<T> ptr(stream);
+			ptr.setAccType(accType);
 
-		return ptr;
+			return ptr;
+		}
+		else
+		{
+			AccPtr<T> ptr(stream, allocator);
+			ptr.setAccType(accType);
+
+			return ptr;
+		}
 	}
 
 	template <typename T>
 	AccPtr<T> make(size_t size)
 	{
-		AccPtr<T> ptr(stream, allocator);
-		ptr.setAccType(accType);
-		ptr.setSize(size);
+		if (accType == accSYCL)
+		{
+			AccPtr<T> ptr(stream);
+			ptr.setAccType(accType);
+			ptr.setSize(size);
 
-		return ptr;
+			return ptr;
+        }
+        else
+        {
+			AccPtr<T> ptr(stream, allocator);
+			ptr.setAccType(accType);
+			ptr.setSize(size);
+
+			return ptr;
+		}
 	}
 
 
@@ -1462,10 +1714,20 @@ public:
 
 	AccPtrBundle makeBundle()
 	{
-		AccPtrBundle bundle(stream, allocator);
-		bundle.setAccType(accType);
+		if (accType == accSYCL)
+		{
+			AccPtrBundle bundle(stream, 0);
+			bundle.setAccType(accType);
 
-		return bundle;
+			return bundle;
+		}
+		else
+		{
+			AccPtrBundle bundle(stream, allocator);
+			bundle.setAccType(accType);
+
+			return bundle;
+		}
 	}
 
 	AccPtrBundle makeBundle(size_t size)
@@ -1475,6 +1737,25 @@ public:
 
 		return bundle;
 	}
+
+#ifdef _SYCL_ENABLED
+	template <typename T>
+	AccPtr<T> make(StreamType dev)
+	{
+		AccPtr<T> ptr(dev);
+		ptr.setAccType(accType);
+
+		return ptr;
+	}
+
+	AccPtrBundle makeBundle(StreamType dev)
+	{
+		AccPtrBundle bundle(dev);
+		bundle.setAccType(accType);
+
+		return bundle;
+	}
+#endif
 };
 
 #endif

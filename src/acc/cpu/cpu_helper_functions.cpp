@@ -1,7 +1,7 @@
 #ifdef ALTCPU
 
 // Make sure we build for CPU
-#include "src/acc/cpu/cuda_stubs.h"
+#include "src/acc/cpu/device_stubs.h"
 
 #include "src/acc/acc_ptr.h"
 #include "src/acc/acc_projector.h"

@@ -6,8 +6,11 @@
 	using deviceStream_t = cudaStream_t;
 #elif _HIP_ENABLED
 	using deviceStream_t = hipStream_t;
+#elif _SYCL_ENABLED
+	#include "src/acc/sycl/sycl_virtual_dev.h"
+	using deviceStream_t = virtualSYCL*;
 #else
-	using deviceStream_t = cudaStream_t;
+	using deviceStream_t = float;
 #endif
 /*
  * This assisting function goes over the orientations determined as significant for this image, and checks

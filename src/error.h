@@ -160,7 +160,7 @@ are incompatible with either the data or your installation of relion.\n\
 If you \n\n\
 \t-> INSTALLED RELION YOURSELF: if you e.g. specified -DCUDA_ARCH=50\n\
 \t   and are trying ot run on a compute 3.5 GPU (-DCUDA_ARCH=3.5), or \n\
-\t   a similar mismatch on AMD GPUs, this may happen.\n\n\
+\t   a similar mismatch on AMD or Intel GPUs, this may happen.\n\n\
 \t-> HAVE MULTIPLE GPUS OF DIFFERNT VERSIONS: relion needs at least NVIDIA \n\
 \t   GPUs with compute 5.0 or AMD MI GPUs with archtiecture gfx906. \n\
 \t   You may be trying to use a GPU architectures older than these. \n\
