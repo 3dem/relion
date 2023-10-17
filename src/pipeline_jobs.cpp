@@ -5726,6 +5726,15 @@ bool RelionJob::getCommandsDynaMightJob(std::string &outputname, std::vector<std
 
     }
 
+    if (joboptions["do_preload"].getBoolean() && !joboptions["do_visualize"].getBoolean())
+        command += " --preload-images";
+
+    if (joboptions["fn_mask"].getString() != "" && !joboptions["do_inverse"].getBoolean())
+        command += " --mask-file " + joboptions["fn_mask"].getString();
+
+    if (joboptions["fn_checkpoint"].getString() != "")
+        command += " --checkpoint-file " + joboptions["fn_checkpoint"].getString();
+
     if (joboptions["gpu_id"].getString() != "")
         command += " --gpu-id " + joboptions["gpu_id"].getString();
 
