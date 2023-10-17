@@ -926,13 +926,9 @@ public:
 #endif
 	};
 
-<<<<<<< HEAD
 #ifdef _SYCL_ENABLED
 	~MlOptimiser();
 #endif
-=======
-	~MlOptimiser();
->>>>>>> 609f1ba3d392d15b72be0740227961d6bf6b820c
 
 	/** ========================== I/O operations  =========================== */
 	/// Print help message

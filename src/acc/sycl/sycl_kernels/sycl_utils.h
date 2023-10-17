@@ -183,7 +183,6 @@ static void complex3D(
 	imag = dxy0[1] + (dxy1[1] - dxy0[1])*fz;	
 }
 
-<<<<<<< HEAD
 // From https://en.cppreference.com/w/cpp/types/numeric_limits/epsilon
 template <typename T>
 bool almostEqual(const T x, const T y, const int ulp)
@@ -285,8 +284,6 @@ static size_t countLargerThanNumber(const T *ptrA, const size_t sz, const T val)
 	return count;
 }
 
-=======
->>>>>>> 609f1ba3d392d15b72be0740227961d6bf6b820c
 } // end of namespace syclKernels
 
 #endif //SYCL_UTILITIES_H

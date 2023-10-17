@@ -2422,7 +2422,6 @@ void JobWindow::initialiseDynaMightWindow()
     group3->end();
     place("do_reconstruct",TOGGLE_REACTIVATE, group3, false);
     group3->begin();
-    place("do_store_deform");
     place("backproject_batchsize");
     group3->end();
 
