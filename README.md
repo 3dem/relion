@@ -6,10 +6,9 @@ program for Maximum A Posteriori refinement of (multiple) 3D reconstructions
 or 2D class averages in cryo-electron microscopy. It is developed in the
 research group of Sjors Scheres at the MRC Laboratory of Molecular Biology.
 
-The underlying theory of MAP refinement is given in a [scientific publication](https://www.ncbi.nlm.nih.gov/pubmed/22100448).
-If RELION is useful in your work, please cite this paper.
+If RELION is useful in your work, please cite our papers.
 
-The more comprehensive documentation of RELION is stored [here](https://relion.readthedocs.io/en/release-4.0/).
+The more comprehensive documentation of RELION is stored [here](https://relion.readthedocs.io/).
 
 ## Installation
 
