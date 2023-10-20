@@ -8,7 +8,7 @@ research group of Sjors Scheres at the MRC Laboratory of Molecular Biology.
 
 If RELION is useful in your work, please cite our papers.
 
-The more comprehensive documentation of RELION is stored [here](https://relion.readthedocs.io/).
+Comprehensive documentation of RELION and tutorials are stored [here](https://relion.readthedocs.io/).
 
 ## Installation
 
