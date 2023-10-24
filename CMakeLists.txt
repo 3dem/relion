@@ -551,7 +551,12 @@ if (FETCH_WEIGHTS)
 	if(SCRIPT_RESULT EQUAL 0)
 		message(STATUS "Successfully downloaded model weights")
 	else()
-		message(WARNING "Failed to download model weights: ${SCRIPT_RESULT}")
+		message(WARNING
+				"Failed to download model weights."
+				"You could ignore this."
+				"The downloads will be attempted again when the model weights are required later."
+				"NOTE: You can skip this step by setting -DFETCH_WEIGHTS=OFF"
+		)
 	endif()
 else()
 	message(STATUS "Omitting download of model weights for dependent packages")
