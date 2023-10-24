@@ -82,7 +82,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # ------------------OPTIONS WHICH ARE NEEDED TO SET BUILD-TYPES (COMPILATION FLAGS)--
 # ----------------------------------------------------------CUDA-ARCH--
 
-set(CUDA_ARCH "" CACHE "CUDA architecture to use")
+set(CUDA_ARCH "" CACHE STRING "CUDA architecture to use")
 if (CUDA_ARCH STREQUAL "")
 	message(STATUS "Setting fallback CUDA_ARCH=50")
 	set(CUDARCH "-arch=sm_50")
@@ -98,7 +98,7 @@ option(HIP "Enable HIP GPU acceleration" OFF)
 option(SYCL "Enable SYCL acceleration" OFF)
 option(ALTCPU "Enable Accelerated CPU version" OFF)
 if(HIP)
-	set(HIP_ARCH "" CACHE "HIP architecture to use")
+	set(HIP_ARCH "" CACHE STRING "HIP architecture to use")
 	if (HIP_ARCH STREQUAL "")
 		message(STATUS "Setting fallback HIP_ARCH=gfx906")
 		set(AMDGPU_TARGETS "gfx906" CACHE STRING
