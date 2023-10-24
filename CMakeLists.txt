@@ -537,20 +537,25 @@ foreach (SCRIPT_FILE ${RELION_PYTHON_WRAPPERS})
     )
 endforeach()
 
-message(STATUS "Will attempts to download model weights for dependent packages...")
+option(FETCH_WEIGHTS "Download model weights for dependent packages" ON)
+if (FETCH_WEIGHTS)
+	message(STATUS "Will attempts to download model weights for dependent packages...")
 
-execute_process(
-        COMMAND bash ${CMAKE_BINARY_DIR}/bin/relion_python_fetch_weights
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        RESULT_VARIABLE SCRIPT_RESULT
-)
+	execute_process(
+			COMMAND bash ${CMAKE_BINARY_DIR}/bin/relion_python_fetch_weights
+			WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+			RESULT_VARIABLE SCRIPT_RESULT
+	)
 
-# Check the result of the script execution
-if(SCRIPT_RESULT EQUAL 0)
-    message(STATUS "Successfully downloaded model weights")
+	# Check the result of the script execution
+	if(SCRIPT_RESULT EQUAL 0)
+		message(STATUS "Successfully downloaded model weights")
+	else()
+		message(WARNING "Failed to download model weights: ${SCRIPT_RESULT}")
+	endif()
 else()
-    message(WARNING "Failed to download model weights: ${SCRIPT_RESULT}")
-endif()
+	message(STATUS "Omitting download of model weights for dependent packages")
+endif ()
 
 # ----------------------------------------------------------------------COPY SCRIPTS--
 
