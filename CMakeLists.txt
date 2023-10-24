@@ -80,37 +80,38 @@ endif()
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # ------------------OPTIONS WHICH ARE NEEDED TO SET BUILD-TYPES (COMPILATION FLAGS)--
-# ----------------------------------------------------------CUDA-ARCH--OR--HIP-ARCH--
-if(NOT (DEFINED CUDA_ARCH OR DEFINED HIP_ARCH))
-  if (CUDA)
-    message(STATUS "Setting fallback CUDA_ARCH=50")
-    set(CUDARCH "-arch=sm_50")
-  elseif (HIP)
-    message(STATUS "Setting fallback HIP_ARCH=gfx906")
-    set(AMDGPU_TARGETS "gfx906" CACHE STRING "Semicolon delimited list of AMD GPU targets to compile for (e.g gf908;gfx90a)")
-  endif()
-else(NOT (DEFINED CUDA_ARCH OR DEFINED HIP_ARCH))
-if (CUDA)
-  message(STATUS "Using provided CUDA_ARCH=${CUDA_ARCH}")
-  set(CUDARCH "-arch=sm_${CUDA_ARCH}")
-elseif (HIP)
-  message(STATUS "Using provided HIP_ARCH=${HIP_ARCH}")
-  set(AMDGPU_TARGETS "${HIP_ARCH}" CACHE STRING "Semicolon delimited list of AMD GPU targets to compile for (e.g gf908;gfx90a)")
-  endif()
-endif(NOT (DEFINED CUDA_ARCH OR DEFINED HIP_ARCH))
+# ----------------------------------------------------------CUDA-ARCH--
+
+set(CUDA_ARCH "" CACHE PATH "CUDA architecture to use")
+if (NOT CUDA_ARCH STREQUAL "")
+	message(STATUS "Setting fallback CUDA_ARCH=50")
+	set(CUDARCH "-arch=sm_50")
+else ()
+	message(STATUS "Using provided CUDA_ARCH=${CUDA_ARCH}")
+	set(CUDARCH "-arch=sm_${CUDA_ARCH}")
+endif ()
 
 # -------------------------------------------------------------------FURTHER OPTIONS--
-
 
 # CUDA on by default, so check for other GPU/CPU-accelration request and possible conflicting dual-requests
 option(HIP "Enable HIP GPU acceleration" OFF)
 option(SYCL "Enable SYCL acceleration" OFF)
 option(ALTCPU "Enable Accelerated CPU version" OFF)
 if(HIP)
-  option(CUDA "Enable CUDA GPU acceleration" OFF)
-  if(HIP AND CUDA)
-    message(FATAL_ERROR "You cannot build with both CUDA=ON and HIP=ON.  Please choose one and rerun CMAKE")
-  endif()
+	set(HIP_ARCH "" CACHE PATH "HIP architecture to use")
+	if (NOT HIP_ARCH STREQUAL "")
+		message(STATUS "Setting fallback HIP_ARCH=gfx906")
+		set(AMDGPU_TARGETS "gfx906" CACHE STRING
+				"Semicolon delimited list of AMD GPU targets to compile for (e.g gf908;gfx90a)")
+	else ()
+		message(STATUS "Using provided HIP_ARCH=${HIP_ARCH}")
+		set(AMDGPU_TARGETS "${HIP_ARCH}" CACHE STRING
+				"Semicolon delimited list of AMD GPU targets to compile for (e.g gf908;gfx90a)")
+	endif ()
+	option(CUDA "Enable CUDA GPU acceleration" OFF)
+	if(HIP AND CUDA)
+		message(FATAL_ERROR "You cannot build with both CUDA=ON and HIP=ON.  Please choose one and rerun CMAKE")
+	endif()
 elseif(SYCL)
   option(CUDA "Enable CUDA GPU acceleration" OFF)
   if(SYCL AND CUDA)
@@ -601,7 +602,7 @@ endif()
 
 # -----------------------------------------------------------------RELION COMPONENTS--
 option(BUILD_SHARED_LIBS "BUILD_SHARED_LIBS" OFF)
-message("BUILD_SHARED_LIBS = ${BUILD_SHARED_LIBS}")
+#message(STATUS "BUILD_SHARED_LIBS = ${BUILD_SHARED_LIBS}")
 if(BUILD_SHARED_LIBS)
     message(STATUS "Building shared libs (smaller build size and binaries)")
 else()
