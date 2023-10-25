@@ -886,7 +886,7 @@ void RelionJob::initialise(int _job_type)
 	}
 	else if (type == PROC_MODELANGELO)
 	{
-		has_mpi = has_thread = true;
+		has_mpi = has_thread = false;
 		initialiseModelAngeloJob();
 	}
 	else if (type == PROC_TOMO_IMPORT)
@@ -5588,18 +5588,18 @@ void RelionJob::initialiseDynaMightJob()
 
     joboptions["fn_star"] = JobOption("Input images STAR file:", NODE_PARTS_CPIPE, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata).");
     joboptions["fn_map"] = JobOption("Consensus map:", NODE_MAP_CPIPE, "", "Image Files (*.{spi,vol,mrc})", "A 3D map in MRC/Spider format. Make sure this map has the same dimensions and the same pixel size as your input images.");
-    joboptions["fn_mask"] = JobOption("Mask (optional):", NODE_MASK_CPIPE, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a mask to limit deformations to a specific region of the consensus structure. Regions outside the mask will be kept fized and will not be visualised.");
+    //joboptions["fn_mask"] = JobOption("Mask (optional):", NODE_MASK_CPIPE, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a mask to limit deformations to a specific region of the consensus structure. Regions outside the mask will be kept fized and will not be visualised.");
     joboptions["gpu_id"] = JobOption("Which (single) GPU to use:", std::string("0"), "Note that DynaMight can only use one GPU at a time. Data sets with many particles or large box sizes will require powerful GPUs, like an A100.");
     joboptions["do_preload"] = JobOption("Preload images in RAM?", false, "If set to Yes, dynamight will preload images into memory for learning the forward or inverse deformations and for deformed backprojection. This will speed up the calculations, but you need to make sure you have enough RAM to do so.");
 
-    joboptions["nr_gaussians"] = JobOption("Number of Gaussians: ", 30000, 10000, 50000, 1000, "Number of Gaussian basis function to describe the consensus map with. Larger structures that one wishes to describe at higher resolutions will need more Gaussians.");
+    joboptions["nr_gaussians"] = JobOption("Number of Gaussians: ", 10000, 5000, 40000, 1000, "Number of Gaussians to describe the consensus map with. Larger structures that one wishes to describe at higher resolutions will need more Gaussians. As a rule of thumb, you could try and use 1-2 Gaussians per amino acid or nucleotide in your complex. But note that running DynaMight with more than 30,000 Gaussians may be problematic on GPUs with a memory of 24 GB.");
     joboptions["initial_threshold"] = JobOption("Initial map threshold (optional): ",std::string("") , "If provided, this threshold will be used to position initial Gaussians in the consensus map. If left empty, an automated procedure will be used to estimate the appropriate threshold.");
     joboptions["reg_factor"] = JobOption("Regularization factor: ", 1, 0.2, 5, 0.1, "This regularization factor defines the relative weights between the data over the restraints. Values higher than one will put more weights on the restraints.");
 
     joboptions["fn_checkpoint"] = JobOption("Checkpoint file:", std::string(""), "Checkpoint files (*.pth)", "CURRENT_ODIR/forward_deformations/checkpoints", "Select the checkpoint file to use for visualization, inverse deformation estimation or deformed backprojection. If left empty, the last available checkpoint file will be used");
 
     joboptions["do_visualize"] = JobOption("Do visualization?", false, "If set to Yes, dynamight will be run to visualize the latent space and deformed models. One can also save series of maps to make movies in Chimera, or STAR files of particle subsets within this task.");
-    joboptions["halfset"] = JobOption("Half-set to visualize: ", 1, 1, 2, 1, "Select either halfset 1 or halfset 2 to explore the latent space.");
+    joboptions["halfset"] = JobOption("Half-set to visualize: ", 1, 0, 2, 1, "Select halfset 1 or 2 to explore the latent space of that halfset. If you select halfset 0, then the validation set is being visualised, which will give you an estimate of the errors in the deformations.");
 
     joboptions["do_inverse"] = JobOption("Do inverse-deformation estimation?", false, "If set to Yes, dynamight will be run to estimate inverse-deformations. These are necessary if one want to perform deformed backprojection to calculate an improved consensus model.");
     joboptions["nr_epochs"] = JobOption("Number of epochs to perform: ", 200, 50, 500, 10, "Number of epochs to perform inverse deformations. You can monitor the convergence of the loss function to assess how many are necessary. Often 200 are enough");
@@ -5628,11 +5628,13 @@ bool RelionJob::getCommandsDynaMightJob(std::string &outputname, std::vector<std
         inputNodes.push_back(node);
         Node node2(joboptions["fn_map"].getString(), joboptions["fn_map"].node_type);
         inputNodes.push_back(node2);
+        /*
         if (joboptions["fn_mask"].getString() != "")
         {
             Node node3(joboptions["fn_mask"].getString(), joboptions["fn_mask"].node_type);
             inputNodes.push_back(node3);
         }
+        */
 
     }
     else
@@ -5670,8 +5672,8 @@ bool RelionJob::getCommandsDynaMightJob(std::string &outputname, std::vector<std
         if (joboptions["do_preload"].getBoolean())
             command += " --preload-images ";
 
-        if (joboptions["fn_mask"].getString() != "")
-            command += " --mask-file " + joboptions["fn_mask"].getString();
+        //if (joboptions["fn_mask"].getString() != "")
+        //    command += " --mask-file " + joboptions["fn_mask"].getString();
 
     }
     else if (joboptions["do_visualize"].getBoolean())
@@ -5683,8 +5685,8 @@ bool RelionJob::getCommandsDynaMightJob(std::string &outputname, std::vector<std
         if (joboptions["fn_checkpoint"].getString() != "")
             command += " --checkpoint-file " + joboptions["fn_checkpoint"].getString();
 
-        if (joboptions["fn_mask"].getString() != "")
-            command += " --mask-file " + joboptions["fn_mask"].getString();
+        //if (joboptions["fn_mask"].getString() != "")
+        //    command += " --mask-file " + joboptions["fn_mask"].getString();
 
     }
     else if (joboptions["do_inverse"].getBoolean())
@@ -5716,8 +5718,8 @@ bool RelionJob::getCommandsDynaMightJob(std::string &outputname, std::vector<std
         if (joboptions["do_preload"].getBoolean())
             command += " --preload-images";
 
-        if (joboptions["fn_mask"].getString() != "")
-            command += " --mask-file " + joboptions["fn_mask"].getString();
+        //if (joboptions["fn_mask"].getString() != "")
+        //    command += " --mask-file " + joboptions["fn_mask"].getString();
 
         Node onode(outputname + "backprojection/map_half1.mrc", LABEL_DYNAMIGHT_HALFMAP);
         outputNodes.push_back(onode);
@@ -5750,7 +5752,7 @@ void RelionJob::initialiseModelAngeloJob()
     joboptions["gpu_id"] = JobOption("Which GPUs to use:", std::string("0"), "Provide a number for the GPU to be used (e.g. 0, 1 etc). Use comman-separated values to use multiple GPUs, e.g. 0,1,2");
 
     joboptions["do_hhmer"] = JobOption("Perform HMMer search?", false ,"If set to Yes, model-angelo will perform a HMM search using HHMer in the output directory of the model-angelo run (without sequence). You can continue an old run with this option switched on, and the model building step will be skipped if the output .cif exists. This way, you can try multiple HHMer runs.");
-    joboptions["fn_lib"] = JobOption("Library with sequences for HMMer search:", NODE_SEQUENCE_CPIPE, "", "FASTA sequence files (*.{mrc,txt})", "FASTA file with library with all sequences for HMMer search. This is often an entire proteome.");
+    joboptions["fn_lib"] = JobOption("Library with sequences for HMMer search:", NODE_SEQUENCE_CPIPE, "", "FASTA sequence files (*.{fasta,txt})", "FASTA file with library with all sequences for HMMer search. This is often an entire proteome.");
     joboptions["alphabet"] = JobOption("Alphabet for the HMMer search:", job_modelangelo_alphabet_options, 0, "Type of Alphabet for HMM searches.");
     joboptions["F1"] = JobOption("HMMSearch F1: ", 0.02, 1., 10., 0.1, "F1 parameter for HMMSearch, see their documentation at http://eddylab.org/software/hmmer/Userguide.pdf");
     joboptions["F2"] = JobOption("HMMSearch F2: ", 0.001, 1., 10., 0.1, "F2 parameter for HMMSearch, see their documentation at http://eddylab.org/software/hmmer/Userguide.pdf");
@@ -5849,8 +5851,6 @@ bool RelionJob::getCommandsModelAngeloJob(std::string &outputname, std::vector<s
         command2 += " --F2 " + joboptions["F2"].getString();
         command2 += " --F3 " + joboptions["F3"].getString();
         command2 += " --E " + joboptions["E"].getString();
-
-        command2 += " --pipeline-control ";
 
         // Other arguments for model_angelo
         command2 += " " + joboptions["other_args"].getString();

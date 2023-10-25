@@ -2372,7 +2372,7 @@ void JobWindow::initialiseDynaMightWindow()
 
     place("fn_star", TOGGLE_DEACTIVATE);
     place("fn_map", TOGGLE_DEACTIVATE);
-    place("fn_mask", TOGGLE_DEACTIVATE);
+    //place("fn_mask", TOGGLE_DEACTIVATE);
 
  	current_y += STEPY /2 ;
 

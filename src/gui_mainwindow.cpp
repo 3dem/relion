@@ -601,7 +601,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 		nr_browse_tabs++;
 
         browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-        browser->add("Flexibility DynaMight");
+        browser->add("DynaMight flexibility");
         gui_jobwindows[nr_browse_tabs] = new JobWindow();
         gui_jobwindows[nr_browse_tabs]->initialise(PROC_DYNAMIGHT);
         browse_grp[nr_browse_tabs]->end();
