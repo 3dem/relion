@@ -1,5 +1,5 @@
-RELION 5.0-alpha
-============
+RELION 5.0-beta
+===============
 
 RELION (for REgularised LIkelihood OptimisatioN) is a stand-alone computer
 program for Maximum A Posteriori refinement of (multiple) 3D reconstructions
@@ -12,7 +12,7 @@ Comprehensive documentation of RELION and tutorials are stored [here](https://re
 
 ## Installation
 
-More extensive options and configurations are available [here](https://relion.readthedocs.io/en/release-4.0/Installation.html),
+More extensive options and configurations are available [here](https://relion.readthedocs.io/en/release-5.0/Installation.html),
 but the outlines to clone and install RELION for typical use are made easy through [cmake](https://en.wikipedia.org/wiki/CMake).
 
 On Debian or Ubuntu machines, installing cmake, the compiler, and additional dependencies (mpi, fftw) is as easy as:
@@ -31,7 +31,7 @@ Now download RELION and checkout the verison you want, by running:
 ```
 git clone https://github.com/3dem/relion.git
 cd relion
-git checkout master # or ver5.0; see below
+git checkout relion-5.0 # the master branch contains 4.0.x until 5.0 becomes stable
 ```
 
 To add support for Python modules (e.g. Blush, ModelAngelo and DynaMight) you will have to install a Python environment.
@@ -64,9 +64,9 @@ cmake ..
 make
 ```
 
-By performing `git checkout ver5.0` instead of `git checkout master`, you can access the latest
-(developmental) updates for RELION 5.0.x. The code there is not tested as throughfully as that in
-the master branch and not generally recommended.
+By performing `git checkout ver5.0` instead of `git checkout master`, you receive the latest
+(developmental) updates for RELION 5.0 beta. Until RELION 5.0 becomes the stable release,
+the master branch hosts 4.0.x.
 
 The binaries will be produced in the `build/bin` directory. If you want to copy binaries
 into somewhere else, run `cmake` with `-DCMAKE_INSTALL_PREFIX=/where/to/install/` and
@@ -91,12 +91,9 @@ libtiff in a non-standard location, specify the location by
 
 ## Building with HIP
 
-Currently the AMD GPU ROCm port and HIP optimisation of RELION are housed in an internal repo.
-Once the pre-requistes are loaded (follow the steps in previous sections), the configuration with HIP can be easily done through:
+TODO: more details will be added later.
+
 ```
-git clone git@github.com:AMD-HPC/RELION.git relion
-cd relion
-git checkout suyash/ver4.0-hip
 mkdir build
 cd build
 cmake -DCMAKE_INSTALL_PREFIX=/where/to/install/ \
