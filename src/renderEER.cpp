@@ -594,6 +594,7 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 		}
 		else
 			REPORT_ERROR("Logic error: an invalid EER size at EERRenderer::renderFrames().");
+
 		RCTOC(TIMING_RENDER_ELECTRONS);
 
 		total_n_electron += n_electron;
