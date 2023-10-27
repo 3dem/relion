@@ -12,103 +12,25 @@ Comprehensive documentation of RELION and tutorials are stored [here](https://re
 
 ## Installation
 
-More extensive options and configurations are available [here](https://relion.readthedocs.io/en/release-5.0/Installation.html),
-but the outlines to clone and install RELION for typical use are made easy through [cmake](https://en.wikipedia.org/wiki/CMake).
+See our relion.readthedocs.io page for [Installation instructions](https://relion.readthedocs.io/en/release-5.0/Installation.html),
 
-On Debian or Ubuntu machines, installing cmake, the compiler, and additional dependencies (mpi, fftw) is as easy as:
-
-```
-sudo apt install cmake git build-essential mpi-default-bin mpi-default-dev libfftw3-dev libtiff-dev libpng-dev ghostscript libxft-dev
-```
-
-RedHat-like systems (CentOS, RHEL, Scientific Linux etc) use `yum` package manager:
-
-```
-sudo yum install cmake git gcc gcc-c++ openmpi-devel fftw-devel libtiff-devel libpng-devel ghostscript libXft-devel libX11-devel
-```
-
-Now download RELION and checkout the verison you want, by running:
-```
-git clone https://github.com/3dem/relion.git
-cd relion
-git checkout relion-5.0 # the master branch contains 4.0.x until 5.0 becomes stable
-```
-
-To add support for Python modules (e.g. Blush, ModelAngelo and DynaMight) you will have to install a Python environment.
-We recommend installing miniconda3. You can find that here: [miniconda](https://docs.conda.io/en/latest/miniconda.html)
-
-Once you have Conda setup, you can install all the RELION Python dependencies into a new environment by running:
-```conda env create -f environment.yml```
-
-<details>
-<summary><b>Using a Custom Conda/Python Environment with RELION (Advanced)</b></summary>
-To enforce RELION to utilize a particular Python interpreter, incorporate the following flag during the cmake call: 
-
-```-DPYTHON_EXE_PATH=path/to/python```
-
-Additionally, if you intend to make use of automatically downloaded pretrained model weights (used in e.g. Blush, ModelAngelo and Classranker),
-it's recommended to set the TORCH_HOME directory. To do this, include the following flag:
-
-```-DTORCH_HOME_PATH=path/to/torch/home```
-</details>
-
-Before installing RELION make sure Conda is not active. If it is, you can deactivate it by running:
-```conda deactivate```
-
-You can now build RELION through:
-
-```
-mkdir build
-cd build
-cmake ..
-make
-```
-
-By performing `git checkout ver5.0` instead of `git checkout master`, you receive the latest
-(developmental) updates for RELION 5.0 beta. Until RELION 5.0 becomes the stable release,
-the master branch hosts 4.0.x.
-
-The binaries will be produced in the `build/bin` directory. If you want to copy binaries
-into somewhere else, run `cmake` with `-DCMAKE_INSTALL_PREFIX=/where/to/install/` and
-perform `make install` as the final step. Do not specify the build directory itself
-as `CMAKE_INSTALL_PREFIX`! This will not work.
+Compared to previous release of RELION, please note that to add support for Python modules (e.g. Blush, ModelAngelo and DynaMight) you will have to install a Python environment. We recommend installing miniconda3. You can find that here: [miniconda](https://docs.conda.io/en/latest/miniconda.html) 
 
 Also note that the MPI library used for compilation must be the one you intend to use RELION with.
 Compiling RELION with one version of MPI and running the resulting binary with mpirun from another
-version can cause crash. See our wiki below for details.
+version can cause crash. 
 
 In any case, you have to make sure your PATH environmental variable points to the directory
 containing RELION binaries. Launching RELION as `/path/to/relion` is NOT a right way; this
 starts the right GUI, but the GUI might invoke other versions of RELION in the PATH.
 
-If FLTK related errors are reported, please add `-DFORCE_OWN_FLTK=ON` to
-`cmake`. For FFTW related errors, try `-DFORCE_OWN_FFTW=ON`.
+If FLTK related errors are reported, please add `-DFORCE_OWN_FLTK=ON` to `cmake`. For FFTW related errors, try `-DFORCE_OWN_FFTW=ON`.
 
 RELION also requires libtiff. Most Linux distributions have packages like `libtiff-dev` or `libtiff-devel`.
 Note that you need a developer package. You need version 4.0.x to read BigTIFF files. If you installed
 libtiff in a non-standard location, specify the location by
 `-DTIFF_INCLUDE_DIR=/path/to/include -DTIFF_LIBRARY=/path/to/libtiff.so.5`.
 
-## Building with HIP
-
-TODO: more details will be added later.
-
-```
-mkdir build
-cd build
-cmake -DCMAKE_INSTALL_PREFIX=/where/to/install/ \
-      -DCMAKE_BUILD_TYPE=release   \
-      -DHIP=on -DHIP_ARCH="gfx90a" \
-      -DGUI=off                    \
-      -DTIFF_INCLUDE_DIR=/path/to/include  \
-      -DTIFF_LIBRARY=/path/to/libtiff.so.5 \
-      -DAMDFFTW=on .. # only on AMD systems to build an optimized version of FFTW lib
-make -j
-```
-
-## Building with SYCL
-
-For detailed information on RELION build with SYCL support, please read [README_sycl](README_sycl.md) file.
 
 ## Updating
 
