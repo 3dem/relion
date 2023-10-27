@@ -2539,6 +2539,12 @@ If RELION is useful in your work, please cite us. Relevant papers are:\n \n \
      Zivanov et al. (2020) IUCrJ (PMID: 32148853)\n\n\
  * Amyloid structure determination:\n\
      Scheres (2020) Acta Cryst. D (PMID: 32038040)\n\n\
+ * Blush regularization:\n\
+     Kimanius et al. (2023) preprint (DOI: 10.1101/2023.10.23.563586)\n\n\
+ * ModelAngelo:\n\
+     Jamali et al. (2023) preprint (DOI: 10.1101/2023.05.16.541002)\n\n\
+ * DynaMight:\n\
+     Schwab et al. (2023) preprint (DOI: 10.1101/2023.10.18.562877)\n\n\
 \
 Please also cite relevant papers when you used external programs or their algorithms re-implemented in RELION: \n \n \
 * MOTIONCOR2 algorithm for beam-induced motion correction:\n\
@@ -2557,12 +2563,9 @@ Please also cite relevant papers when you used external programs or their algori
 * Postscript plots are made using CPlot2D from http://www.amzsaki.com\n\n\
 \
 About the start up screen:\n\n\
-The map shown is the cryo-EM map of mouse heavy-chain apoferritin\n\
-at 1.22 A (EMDB-11638) collected on a new Titan Krios microscope with\n\
-cold FEG, Selectris X energy filter and Falcon4 direct electron detector.\n\
-Densities for hydrogen atoms are visible in the hydrogen difference map\n\
-(orange mesh). See Nakane et al, Nature (2020) (doi:10.1038/s41586-020-2829-0)\n\
-for details. The raw dataset is available at EMPIAR-10424.\
+The map shown is the cryo-EM map of a fungal pheromone receptor STE2 dimer\n\
+without G proteins. Application of Blush algorithm improved the map\n\
+from the left to the middle and allowed automatic chain tracing by ModelAngelo.\n\
 ")
 
 	ShowHelpText *help = new ShowHelpText(HELPTEXT);
