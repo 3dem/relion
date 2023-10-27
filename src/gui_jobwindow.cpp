@@ -858,6 +858,7 @@ void JobWindow::initialiseAutopickWindow()
 	// Add a little spacer
 	current_y += STEPY/2;
 
+	place("fn_topaz_exe", TOGGLE_DEACTIVATE);
 	place("topaz_other_args", TOGGLE_DEACTIVATE);
 
 	tab3->end();
@@ -2382,6 +2383,7 @@ void JobWindow::initialiseDynaMightWindow()
 
     current_y += STEPY /2 ;
 
+    place("fn_dynamight_exe", TOGGLE_DEACTIVATE);
     place("gpu_id");
     place("do_preload");
 
@@ -2448,6 +2450,7 @@ void JobWindow::initialiseModelAngeloWindow()
     place("r_seq", TOGGLE_DEACTIVATE);
 
  	current_y += STEPY /2 ;
+    place("fn_modelangelo_exe", TOGGLE_DEACTIVATE);
     place("gpu_id", TOGGLE_DEACTIVATE);
 
     tab1->end();

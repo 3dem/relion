@@ -206,6 +206,9 @@ public:
 	// Topaz particle radius for use in extract
 	int topaz_radius;
 
+    // Topaz executable
+    FileName fn_topaz_exe;
+
 	// GPU Device ID
 	int device_id = -1;
 

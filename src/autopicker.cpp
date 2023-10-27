@@ -160,6 +160,7 @@ if(do_gpu)
 	topaz_additional_args = parser.getOption("--topaz_args", "Additional arguments to be passed to topaz", "");
 	topaz_workers = textToInteger(parser.getOption("--topaz_workers", "Number of topaz workers for parallelized training", "1"));
 	do_topaz_plot = parser.checkOption("--topaz_plot", "Plot intermediate information for helical picking in topaz (developmental)");
+    fn_topaz_exe = parser.getOption("--fn_topaz_exe", "Topaz executable (default is using relion_python_topaz from conda install)", "relion_python_topaz");
 
 	int helix_section = parser.addSection("Helix options");
 	autopick_helical_segments = parser.checkOption("--helix", "Are the references 2D helical segments? If so, in-plane rotation angles (psi) are estimated for the references.");
@@ -2967,7 +2968,7 @@ void AutoPicker::trainTopaz()
 	fh << "#!" << fn_shell  << std::endl;
 
 	// Call Topaz to train the network
-	fh << "relion_python_topaz " << " train ";
+	fh << fn_topaz_exe << " train ";
 	fh << " -n " << integerToString(topaz_nr_particles);
 	// Let's use 25% of particle_radius (set in initialise()) for training...
 	fh << " -r " << integerToString(topaz_radius);
@@ -3018,7 +3019,7 @@ void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 	 REPORT_ERROR( (std::string)"AutoPicker::autoPickTopazOneMicrograph cannot create file: " + fn_script);
 
 	fh << "#!" << fn_shell  << std::endl;
-	fh << "relion_python_topaz " << " extract ";
+	fh << fn_topaz_exe << " extract ";
 	if (autopick_helical_segments)
 	{
 		fh << " --filaments ";

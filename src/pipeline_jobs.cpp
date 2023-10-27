@@ -2015,6 +2015,7 @@ void RelionJob::initialiseAutopickJob()
 	joboptions["topaz_particle_diameter"] = JobOption("Particle diameter (A) ", -1, 0, 2000, 20, "Diameter of the particle (to be used to infer topaz downscale factor and particle radius)");
 	joboptions["topaz_nr_particles"] = JobOption("Nr of particles per micrograph: ", -1, 0, 2000, 20, "Expected average number of particles per micrograph");
 	joboptions["topaz_model"] = JobOption("Trained topaz model: ", "", "SAV Files (*.sav)", ".", "Trained topaz model for topaz-based picking. Use on job for training and a next job for picking. Leave this empty to use the default (general) model.");
+	joboptions["fn_topaz_exe"]= JobOption("Topaz executable:", std::string("relion_python_topaz"), "Executable for running topaz. The default relion_python_topaz gets installed automatically through conda in a typical relion install. Only change this if this executable gives you problems.");
 	joboptions["topaz_other_args"]= JobOption("Additional topaz arguments:", std::string(""), "These additional arguments will be passed onto all topaz programs.");
 
 	joboptions["do_refs"] = JobOption("Use reference-based template-matching?", false, "If set to Yes, 2D or 3D references, as defined on the References tab will be used for autopicking.");
@@ -2193,7 +2194,9 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 
 		if (!(joboptions["do_topaz"].getBoolean() && joboptions["do_topaz_train"].getBoolean()))
 		{
-			// Output new version: no longer save coords_suffix nodetype, but 2-column list of micrographs and coordinate files
+			command += " --fn_topaz_exe " + joboptions["fn_topaz_exe"].getString();
+
+            // Output new version: no longer save coords_suffix nodetype, but 2-column list of micrographs and coordinate files
 			Node node3(outputname + "autopick.star", LABEL_AUTOPICK_COORDS);
 			outputNodes.push_back(node3);
 
@@ -5591,6 +5594,8 @@ void RelionJob::initialiseDynaMightJob()
     //joboptions["fn_mask"] = JobOption("Mask (optional):", NODE_MASK_CPIPE, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a mask to limit deformations to a specific region of the consensus structure. Regions outside the mask will be kept fized and will not be visualised.");
     joboptions["gpu_id"] = JobOption("Which (single) GPU to use:", std::string("0"), "Note that DynaMight can only use one GPU at a time. Data sets with many particles or large box sizes will require powerful GPUs, like an A100.");
     joboptions["do_preload"] = JobOption("Preload images in RAM?", false, "If set to Yes, dynamight will preload images into memory for learning the forward or inverse deformations and for deformed backprojection. This will speed up the calculations, but you need to make sure you have enough RAM to do so.");
+    joboptions["fn_dynamight_exe"] = JobOption("DynaMight executable:", std::string("relion_python_dynamight"), "The DynaMight executable. By default, the relion_python_dynamight will be used, which was installed inside conda with a typical relion install. Only change this if that version is giving you problems.");
+
 
     joboptions["nr_gaussians"] = JobOption("Number of Gaussians: ", 10000, 5000, 40000, 1000, "Number of Gaussians to describe the consensus map with. Larger structures that one wishes to describe at higher resolutions will need more Gaussians. As a rule of thumb, you could try and use 1-2 Gaussians per amino acid or nucleotide in your complex. But note that running DynaMight with more than 30,000 Gaussians may be problematic on GPUs with a memory of 24 GB.");
     joboptions["initial_threshold"] = JobOption("Initial map threshold (optional): ",std::string("") , "If provided, this threshold will be used to position initial Gaussians in the consensus map. If left empty, an automated procedure will be used to estimate the appropriate threshold.");
@@ -5618,7 +5623,7 @@ bool RelionJob::getCommandsDynaMightJob(std::string &outputname, std::vector<std
     initialisePipeline(outputname, job_counter);
     std::string command;
 
-    command="`which relion_python_dynamight`";
+    command = joboptions["fn_dynamight_exe"].getString();
 
     if (!is_continue)
     {
@@ -5749,7 +5754,8 @@ void RelionJob::initialiseModelAngeloJob()
     joboptions["p_seq"] = JobOption("FASTA sequence for proteins:", NODE_SEQUENCE_CPIPE, "", "FASTA sequence files (*.{fasta,txt})",  "Provide a FASTA file with sequences for all protein chains to be built in the map. You can leave this empty if you don't know the proteins that are there, and then run a HMMer search to identify the unknown proteins. ModelAngelo will build much better models when provided with a FASTA sequence file!");
     joboptions["d_seq"] = JobOption("FASTA sequence for DNA:", NODE_SEQUENCE_CPIPE, "", "FASTA sequence files (*.{fasta,txt})",  "Provide a FASTA file with sequences for all DNA chains to be built in the map.");
     joboptions["r_seq"] = JobOption("FASTA sequence for RNA:", NODE_SEQUENCE_CPIPE, "", "FASTA sequence files (*.{fasta,txt})",  "Provide a FASTA file with sequences for all RNA chains to be built in the map.");
-    joboptions["gpu_id"] = JobOption("Which GPUs to use:", std::string("0"), "Provide a number for the GPU to be used (e.g. 0, 1 etc). Use comman-separated values to use multiple GPUs, e.g. 0,1,2");
+    joboptions["fn_modelangelo_exe"] = JobOption("ModelAngelo executable:", std::string("relion_python_modelangelo"), "The modelangelo executable. By default, the relion_python_modelangelo will be used, which was installed inside conda with a typical relion install. Only change this if that version is giving you problems.");
+    joboptions["gpu_id"] = JobOption("Which GPUs to use:", std::string("0"), "Provide a number for the GPU to be used (e.g. 0, 1 etc). Use comma-separated values to use multiple GPUs, e.g. 0,1,2");
 
     joboptions["do_hhmer"] = JobOption("Perform HMMer search?", false ,"If set to Yes, model-angelo will perform a HMM search using HHMer in the output directory of the model-angelo run (without sequence). You can continue an old run with this option switched on, and the model building step will be skipped if the output .cif exists. This way, you can try multiple HHMer runs.");
     joboptions["fn_lib"] = JobOption("Library with sequences for HMMer search:", NODE_SEQUENCE_CPIPE, "", "FASTA sequence files (*.{fasta,txt})", "FASTA file with library with all sequences for HMMer search. This is often an entire proteome.");
@@ -5780,7 +5786,7 @@ bool RelionJob::getCommandsModelAngeloJob(std::string &outputname, std::vector<s
         Node node(joboptions["fn_map"].getString(), joboptions["fn_map"].node_type);
         inputNodes.push_back(node);
 
-        std::string command="relion_python_modelangelo";
+        std::string command = joboptions["fn_modelangelo_exe"].getString();
         if (joboptions["p_seq"].getString() != "" || joboptions["d_seq"].getString() != "" || joboptions["r_seq"].getString() != "" )
         {
             command += " build ";
@@ -5838,7 +5844,7 @@ bool RelionJob::getCommandsModelAngeloJob(std::string &outputname, std::vector<s
             return false;
         }
 
-        std::string command2 = "relion_python_modelangelo";
+        std::string command2 = joboptions["fn_modelangelo_exe"].getString();
 
         command2 += " hmm_search ";
         command2 += " -i " + outputname;
