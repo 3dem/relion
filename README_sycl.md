@@ -21,8 +21,7 @@ This is SYCL/DPC++ version for [RELION](https://github.com/3dem/relion)
 
 
 ```bash
-$ git clone https://github.com/3dem/relion-devel.git relion_sycl -b sycl-merge
-$ cd relion_sycl; mkdir build_sycl; cd build_sycl
+$ mkdir build_sycl; cd build_sycl
 $ {Load Intel oneAPI toolkit and SYCL/Level Zero/OpenCL runtime environment}
 $ sycl-ls                        # This will display available SYCL devices
 $ cmake \
