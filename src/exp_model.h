@@ -314,8 +314,8 @@ public:
 
     // Get the shift in the 2D tilt series image for a subtomo particle from a 3D shift
     void getTranslationInTiltSeries(long int part_id, int img_id,
-                                    double shift3d_x, double shift3d_y, double shift3d_z,
-                                    double &shift2d_x, double &shift2d_y, double &shift2d_z);
+                                    RFLOAT shift3d_x, RFLOAT shift3d_y, RFLOAT shift3d_z,
+                                    RFLOAT &shift2d_x, RFLOAT &shift2d_y, RFLOAT &shift2d_z);
 
     // Get the vector of number of images per group_id
 	void getNumberOfParticlesPerGroup(std::vector<long int> &nr_particles_per_group, int random_subset = 0);

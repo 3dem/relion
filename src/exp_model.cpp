@@ -94,8 +94,8 @@ Matrix2D<RFLOAT> Experiment::getRotationMatrix(long int part_id, int img_id)
 }
 
 void Experiment::getTranslationInTiltSeries(long int part_id, int img_id,
-                                                        double shift3d_x, double shift3d_y, double shift3d_z,
-                                                        double &shift2d_x, double &shift2d_y, double &shift2d_z)
+                                                        RFLOAT shift3d_x, RFLOAT shift3d_y, RFLOAT shift3d_z,
+                                                        RFLOAT &shift2d_x, RFLOAT &shift2d_y, RFLOAT &shift2d_z)
 {
     Matrix2D<RFLOAT> Aproj = particles[part_id].images[img_id].Aproj;
     shift2d_x = Aproj(0,0) * shift3d_x + Aproj(0,1) * shift3d_y + Aproj(0,2) * shift3d_z;
