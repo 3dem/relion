@@ -2496,19 +2496,8 @@ void GuiMainWindow::cb_about(Fl_Widget* o, void* v)
 void GuiMainWindow::cb_about_i()
 {
 #define HELPTEXT ("RELION " RELION_SHORT_VERSION " \n\n\
-RELION is developed in the groups of:\n\n\
-Sjors H.W. Scheres at the MRC Laboratory of Molecular Biology\n\
- - Sjors H.W. Scheres\n\
- - Shaoda He\n\
- - Takanori Nakane\n\
- - Jasenko Zivanov\n\
- - Liyi Dong\n\
- - Dari Kimanius\n\
-\n\
-and Erik Lindahl at Stockholm University\n\
- - Erik Lindahl\n\
- - Björn O. Forsber\n\
-\n\
+RELION is mainly developed in the group of Sjors Scheres at the MRC Laboratory of Molecular Biology. They are grateful for contributions by other labs and companies. \n\
+\
 Note that RELION is completely free, open-source software. You can redistribute it and/or modify it for your own purposes, but please do make sure \
 the contribution of the developers are acknowledged appropriately. In order to maintain an overview of existing versions, a notification regarding  \
 any redistribution of (modified versions of) the code is appreciated (contact Sjors directly).\n\n\
@@ -2565,7 +2554,7 @@ Please also cite relevant papers when you used external programs or their algori
 About the start up screen:\n\n\
 The map shown is the cryo-EM map of a fungal pheromone receptor STE2 dimer\n\
 without G proteins. Application of Blush algorithm improved the map\n\
-from the left to the middle and allowed automatic chain tracing by ModelAngelo.\n\
+from the left to the middle panel and allowed automatic chain tracing by ModelAngelo (right panel).\n\
 ")
 
 	ShowHelpText *help = new ShowHelpText(HELPTEXT);

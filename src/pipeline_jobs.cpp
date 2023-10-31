@@ -2188,13 +2188,13 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 			return false;
 		}
 
+        command += " --fn_topaz_exe " + joboptions["fn_topaz_exe"].getString();
 		command += " --i " + joboptions["fn_input_autopick"].getString();
 		Node node(joboptions["fn_input_autopick"].getString(), joboptions["fn_input_autopick"].node_type);
 		inputNodes.push_back(node);
 
 		if (!(joboptions["do_topaz"].getBoolean() && joboptions["do_topaz_train"].getBoolean()))
 		{
-			command += " --fn_topaz_exe " + joboptions["fn_topaz_exe"].getString();
 
             // Output new version: no longer save coords_suffix nodetype, but 2-column list of micrographs and coordinate files
 			Node node3(outputname + "autopick.star", LABEL_AUTOPICK_COORDS);
