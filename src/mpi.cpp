@@ -108,9 +108,10 @@ MpiNode::MpiNode(int &argc, char ** argv)
 	MPI_Comm_create_group(MPI_COMM_WORLD, root_evenG, 1, &root_evenC);
 	MPI_Comm_create_group(MPI_COMM_WORLD, root_oddG, 2, &root_oddC);
 
-	constexpr std::ptrdiff_t defBlock = RELION_MPI_MAX_SIZE;	// default for MPI communication
+	constexpr std::ptrdiff_t defPtBlock = 4ULL*1024*1024*1024;	// 4 GiB, default for MPI communication
+	constexpr std::ptrdiff_t defColBlock = 64*1024*1024;		// 64 MiB, default for MPI communication
 	constexpr std::ptrdiff_t maxPtBlock = 8ULL*1024*1024*1024;		// 8 GiB, max for MPI pt-2-pt. Normal limit is sizeof(variable) * INT_MAX bytes
-	constexpr std::ptrdiff_t maxCollBlock = 4ULL*1024*1024*1024;	// 4 GiB, max for MPI collective. Normal limit is sizeof(variable) * INT_MAX bytes
+	constexpr std::ptrdiff_t maxCollBlock = 1ULL*1024*1024*1024;	// 1 GiB, max for MPI collective. Normal limit is sizeof(variable) * INT_MAX bytes
 
 	// User input to change default MPI communication blocking size
 	char* pEnvBlock = std::getenv("MAX_MPI_BLOCK");     // For both pt-2-pt and collective
@@ -144,7 +145,7 @@ MpiNode::MpiNode(int &argc, char ** argv)
 				p2p_blocksize = maxPtBlock;
 		}
 		else
-			p2p_blocksize = defBlock;
+			p2p_blocksize = defPtBlock;
 
 		if (lColl > 0)  // "MAX_MPI_COLL_BLOCK" is set
 		{
@@ -154,7 +155,7 @@ MpiNode::MpiNode(int &argc, char ** argv)
 				coll_blocksize = maxCollBlock;
 		}
 		else
-			coll_blocksize = defBlock;
+			coll_blocksize = defColBlock;
 	}
 	// Make it multiple of 8 bytes
 	p2p_blocksize = (p2p_blocksize / 8ULL) * 8ULL;
