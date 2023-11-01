@@ -35,7 +35,6 @@ $ cmake \
 -DCMAKE_BUILD_TYPE=Release \
 -DCMAKE_C_FLAGS="-O3" \
 -DCMAKE_CXX_FLAGS="-O3 -march=native" \
--DCMAKE_EXE_LINKER_FLAGS="-O3 -march=native" \
 ..
 
 $ #### This is Intel GPU Level Zero backend specific #####
