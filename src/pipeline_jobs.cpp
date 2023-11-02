@@ -2705,7 +2705,7 @@ void RelionJob::initialiseSelectJob()
 
     joboptions["do_filaments"] = JobOption("OR: select filaments by dendrogram?", false, "If set to Yes, then the FilamentTools program by David Li will be used to perform a hierarchical clustering of the filaments, based on 2D class average assignments of their individual segments.");
     joboptions["dendrogram_threshold"] = JobOption("Dendrogram threshold: ", 0.85, 0, 1, 0.05, "Lower thresholds will produce more clusters; After the dendrogram has been calculated in the initial running of this job, subsequent continuation jobs can quickly test other threshold values. The output logfile.pdf can be visualised to follow the process until a good threshold has been achieved.");
-    joboptions["dendrogram_minclass"] = JobOption("Dendrogram threshold: ", -1000, -1000, 50000, 1000, "If set to a positive value, then particle star files with clusters that have at least this number of particles will be written out. Keep th default negative value for faster testing of the threshold.");
+    joboptions["dendrogram_minclass"] = JobOption("Minimum class size: ", -1000, -1000, 50000, 1000, "If set to a positive value, then particle star files with clusters that have at least this number of particles will be written out. Keep th default negative value for faster testing of the threshold.");
 }
 
 bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::string> &commands,
