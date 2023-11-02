@@ -21,8 +21,7 @@ This is SYCL/DPC++ version for [RELION](https://github.com/3dem/relion)
 
 
 ```bash
-$ git clone https://github.com/3dem/relion-devel.git relion_sycl -b sycl-merge
-$ cd relion_sycl; mkdir build_sycl; cd build_sycl
+$ mkdir build_sycl; cd build_sycl
 $ {Load Intel oneAPI toolkit and SYCL/Level Zero/OpenCL runtime environment}
 $ sycl-ls                        # This will display available SYCL devices
 $ cmake \
@@ -36,7 +35,6 @@ $ cmake \
 -DCMAKE_BUILD_TYPE=Release \
 -DCMAKE_C_FLAGS="-O3" \
 -DCMAKE_CXX_FLAGS="-O3 -march=native" \
--DCMAKE_EXE_LINKER_FLAGS="-O3 -march=native" \
 ..
 
 $ #### This is Intel GPU Level Zero backend specific #####
