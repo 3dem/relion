@@ -418,14 +418,6 @@ void centerFFT_2D_CPU(
 			int     xshift,
 			int     yshift)
 {
-#ifdef DEBUG_CUDA
-	if (image_size > (size_t)std::numeric_limits<int>::max())
-		ACC_PTR_DEBUG_INFO("centerFFT_2D: image_size > std::numeric_limits<int>::max()");
-	if (image_size*(size_t)batch_size > (size_t)std::numeric_limits<int>::max())
-		ACC_PTR_DEBUG_INFO("centerFFT_2D: image_size*batch_size > std::numeric_limits<int>::max()");
-	if (pixel_end > image_size)
-		ACC_PTR_DEBUG_INFO("centerFFT_2D: pixel_end > image_size");
-#endif
 	size_t pix_start = pixel_start;
 	size_t pix_end = pixel_end;
 	for(int batch=0; batch<batch_size; batch++)
@@ -466,14 +458,6 @@ void centerFFT_3D_CPU(
 			int     yshift,
 			int     zshift)
 {
-#ifdef DEBUG_CUDA
-	if (image_size > (size_t)std::numeric_limits<int>::max())
-		ACC_PTR_DEBUG_INFO("centerFFT_3D: image_size > std::numeric_limits<int>::max()");
-	if (image_size*(size_t)batch_size > (size_t)std::numeric_limits<int>::max())
-		ACC_PTR_DEBUG_INFO("centerFFT_3D: image_size*batch_size > std::numeric_limits<int>::max()");
-	if (pixel_end > image_size)
-		ACC_PTR_DEBUG_INFO("centerFFT_3D: pixel_end > image_size");
-#endif
 	size_t pix_start = pixel_start;
 	size_t pix_end = pixel_end;
 	int xydim = xdim*ydim;
