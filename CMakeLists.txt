@@ -553,9 +553,9 @@ if (FETCH_WEIGHTS)
 		message(STATUS "Successfully downloaded model weights")
 	else()
 		message(WARNING
-				"Failed to download model weights."
-				"You could ignore this."
-				"The downloads will be attempted again when the model weights are required later."
+				"Failed to download model weights. YOU CAN IGNORE THIS. "
+				"The downloads will be attempted again when the model weights are required later. "
+				"\n"
 				"NOTE: You can skip this step by setting -DFETCH_WEIGHTS=OFF"
 		)
 	endif()

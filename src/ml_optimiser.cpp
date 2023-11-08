@@ -2375,13 +2375,6 @@ void MlOptimiser::initialiseGeneral(int rank)
     if (directions_have_changed)
         mymodel.initialisePdfDirection(sampling.NrDirections());
 
-    // Do this before initialising wsum_model!
-    if (do_blush && mymodel.padding_factor > 1)
-    {
-        mymodel.padding_factor = 1;
-        if (rank == 0) std::cerr << " Warning! Blush regularisation can only be done without padding the maps for now; setting --pad to 1 ..." << std::endl;
-    }
-
     // Initialise the wsum_model according to the mymodel
     wsum_model.initialise(mymodel, sampling.symmetryGroup(), asymmetric_padding, skip_gridding, grad_pseudo_halfsets);
 
