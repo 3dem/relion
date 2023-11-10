@@ -2261,9 +2261,11 @@ void MlOptimiserMpi::maximization()
 										mymodel.helical_twist[ith_recons],
 										width_mask_edge);
 							}
-							helical_rise_half2 = mymodel.helical_rise[ith_recons];
-							helical_twist_half2 = mymodel.helical_twist[ith_recons];
 						} // end if !do_join_random_halves
+
+                        // Rank 2 still updates the estimated twist and rise
+                        helical_rise_half2 = mymodel.helical_rise[ith_recons];
+                        helical_twist_half2 = mymodel.helical_twist[ith_recons];
 
 						// But rank 2 always does the unfiltered reconstruction
 						if (do_auto_refine && has_converged)
