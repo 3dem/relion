@@ -353,6 +353,8 @@ enum EMDLabel
 	EMDL_OPTIMISER_DO_CORRECT_NORM,
 	EMDL_OPTIMISER_DO_CORRECT_SCALE,
 	EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT,
+	EMDL_OPTIMISER_DO_BLUSH,
+	EMDL_OPTIMISER_DO_BLUSH_NO_SPECTRAL_TRAILING,
 	EMDL_OPTIMISER_DO_REALIGN_MOVIES,
 	EMDL_OPTIMISER_DO_MAP,
 	EMDL_OPTIMISER_GRAD_REFINE,
@@ -1060,9 +1062,11 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_DO_CORRECT_NORM, EMDL_BOOL, "rlnDoCorrectNorm", "Flag to indicate that (per-image) normalisation-error correction should be performed");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_CORRECT_SCALE, EMDL_BOOL, "rlnDoCorrectScale", "Flag to indicate that internal (per-group) intensity-scale correction should be performed");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT, EMDL_BOOL, "rlnDoExternalReconstruct", "Flag to indicate that the reconstruction will be performed outside relion_refine, e.g. for learned priors");
+		EMDL::addLabel(EMDL_OPTIMISER_DO_BLUSH, EMDL_BOOL, "rlnDoBlush", "Flag to indicate that the reconstruction will be performed with Blush regularization.");
+		EMDL::addLabel(EMDL_OPTIMISER_DO_BLUSH_NO_SPECTRAL_TRAILING, EMDL_BOOL, "rlnBlushNoSpectralTrailing", "Flag to indicate that Blush regularization will be performed without spectral trailing.");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_REALIGN_MOVIES, EMDL_BOOL, "rlnDoRealignMovies", "Flag to indicate that individual frames of movies are being re-aligned");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_MAP, EMDL_BOOL, "rlnDoMapEstimation", "Flag to indicate that MAP estimation should be performed (otherwise ML estimation)");
-        EMDL::addLabel(EMDL_OPTIMISER_GRAD_REFINE, EMDL_BOOL, "rlnDoGradientRefine", "Perform gradient refine.");
+		EMDL::addLabel(EMDL_OPTIMISER_GRAD_REFINE, EMDL_BOOL, "rlnDoGradientRefine", "Perform gradient refine.");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_GRAD, EMDL_BOOL, "rlnDoStochasticGradientDescent", "Flag to indicate that gradient refinement should be performed (otherwise expectation maximisation)");
 		EMDL::addLabel(EMDL_OPTIMISER_GRAD_EM_ITERS, EMDL_INT, "rlnGradEmIters", "Finish gradient optimization with this many iterations of Expectation-Maximization.");
 		EMDL::addLabel(EMDL_OPTIMISER_GRAD_HAS_CONVERGED, EMDL_BOOL, "rlnGradHasConverged", "Has gradient refinement converged.");
