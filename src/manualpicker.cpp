@@ -582,7 +582,7 @@ void manualpickerGuiWindow::cb_menubar_quit(Fl_Widget* w, void* v)
 void manualpickerGuiWindow::cb_menubar_quit_i()
 {
 	cb_menubar_recount_i();
-	RELION_EXIT_SUCCESS;
+	exit(0);
 }
 
 void manualpickerGuiWindow::cb_closing(Fl_Widget* w, void* v)
