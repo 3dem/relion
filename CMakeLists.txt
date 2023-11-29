@@ -251,7 +251,7 @@ elseif(ALTCPU)
 	endif()
 endif()
 
-# ----------------------------------------------------------INCLUDE ALL BUILD TYPES--
+# ----------------------------------------------------------INCLUDE ALL BUILD TYPES---
  #This *has* to be AFTER project()
  include(${CMAKE_SOURCE_DIR}/cmake/BuildTypes.cmake)
  
@@ -364,6 +364,29 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
+# ----------------------------------------------------------------- OpenMP ----------
+# This MUST be set before all cuda_add_executable/library calls.
+# Otherwise the -Xcompiler argument to NVCC does not contain -fopenmp
+# and #pragma omp critical is SILENTLY ignored, giving a wrong binary!!!
+# https://github.com/3dem/relion/issues/1016
+
+if(SYCL)    # Intel DPC++ specific
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fiopenmp")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fiopenmp")
+	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fiopenmp")
+
+	set(CMAKE_C_FLAGS "-std=c99 ${CMAKE_C_FLAGS}")
+	set(CMAKE_CXX_FLAGS "-fPIC -std=c++17 ${CMAKE_CXX_FLAGS}")
+else()
+	FIND_PACKAGE(OpenMP REQUIRED)
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+
+	set(CMAKE_C_FLAGS "-std=c99 ${CMAKE_C_FLAGS}")
+	set(CMAKE_CXX_FLAGS "-fPIC -std=c++14 ${CMAKE_CXX_FLAGS}")
+endif()
+
 # ----------------------------------------------------------Intel Compiler support --
 # ----------------------------------  and build flags including MKL and IPP ---------
 
@@ -379,6 +402,10 @@ if(MKLFFT)
 	add_definitions(-DMKLFFT)
 endif(MKLFFT)
 
+# NVCC calls ICC several times. The first call is to check compiler compatibility
+# and -Xcompiler is not passed. Thus, even with -diag-disable=10441,10412,
+# the deprecation warning cannot be completely silenced.
+# https://github.com/3dem/relion/issues/1038#issuecomment-1831312535
 if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Intel" OR "${CMAKE_CXX_COMPILER}" MATCHES "mpiicpx")
 # "Intel" is for classic Intel compiler and "IntelLLVM" is for oneAPI compiler which is supported from CMake 3.20
 	if(ALTCPU OR SYCL)
@@ -623,8 +650,8 @@ ADD_SUBDIRECTORY(src/apps)
 
 #get_directory_property( DirDefs COMPILE_DEFINITIONS )
 #message(STATUS "COMPILE_DEFINITIONS = ${DirDefs}" )
-#message(STATUS "CMAKE_C_FLAGS : ${CMAKE_C_FLAGS}")
-#message(STATUS "CMAKE_CXX_FLAGS : ${CMAKE_CXX_FLAGS}")
+message(STATUS "CMAKE_C_FLAGS : ${CMAKE_C_FLAGS}")
+message(STATUS "CMAKE_CXX_FLAGS : ${CMAKE_CXX_FLAGS}")
 #message(STATUS "CMAKE_C_COMPILER : ${CMAKE_C_COMPILER}")
 #message(STATUS "CMAKE_CXX_COMPILER : ${CMAKE_CXX_COMPILER}")
 #message(STATUS "MPI_C_COMPILER : ${MPI_C_COMPILER}")

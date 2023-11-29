@@ -562,25 +562,8 @@ foreach (_target ${RELION_JAZ_EXPERIMENTAL_TARGETS})
 	install (TARGETS ${_target} RUNTIME DESTINATION bin)
 endforeach()
 
-if(SYCL)    # Intel DPC++ specific
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fiopenmp")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fiopenmp")
-	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fiopenmp")
-
-	set(CMAKE_C_FLAGS "-std=c99 ${CMAKE_C_FLAGS}")
-	set(CMAKE_CXX_FLAGS "-fPIC -std=c++17 ${CMAKE_CXX_FLAGS}")
-else()
-	FIND_PACKAGE( OpenMP REQUIRED)
-	if(OPENMP_FOUND)
-		#message("OPENMP FOUND")
-		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-		set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
-		target_link_libraries(relion_lib ${OpenMP_omp_LIBRARY})
-	endif()
-
-	set(CMAKE_C_FLAGS "-std=c99 ${CMAKE_C_FLAGS}")
-	set(CMAKE_CXX_FLAGS "-fPIC -std=c++14 ${CMAKE_CXX_FLAGS}")
+if (NOT SYCL)
+	target_link_libraries(relion_lib ${OpenMP_omp_LIBRARY})
 endif()
 
 # Set this flag to activate bounds checking in stl-vectors (incl. strings)
