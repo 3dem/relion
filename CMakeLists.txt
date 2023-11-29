@@ -209,6 +209,19 @@ if (ALTCPU)
 	endif(FORCE_OWN_TBB)
 endif(ALTCPU)
 
+# This MUST be set before all cuda_add_executable/library calls.
+# Otherwise the -Xcompiler argument to NVCC does not contain -fopenmp
+# and #pragma omp critical is SILENTLY ignored, giving a wrong binary!!!
+# https://github.com/3dem/relion/issues/1016
+
+FIND_PACKAGE( OpenMP REQUIRED)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+
 # -------------------------------------------------------------------------------MPI--
 find_package(MPI REQUIRED)
 
