@@ -250,6 +250,7 @@ int manualpickerGuiWindow::fill()
 {
 	color(GUI_BACKGROUND_COLOR);
 
+	this->callback(cb_closing);
 
 	Fl_Menu_Bar *menubar = new Fl_Menu_Bar(0, 0, w(), 25);
 	if (do_allow_save)
@@ -580,8 +581,14 @@ void manualpickerGuiWindow::cb_menubar_quit(Fl_Widget* w, void* v)
 
 void manualpickerGuiWindow::cb_menubar_quit_i()
 {
-	cb_menubar_save_i();
+	cb_menubar_recount_i();
 	exit(0);
+}
+
+void manualpickerGuiWindow::cb_closing(Fl_Widget* w, void* v)
+{
+	manualpickerGuiWindow* T=(manualpickerGuiWindow*)w;
+	T->cb_menubar_quit_i();
 }
 
 void manualpickerGuiWindow::cb_menubar_recount(Fl_Widget* w, void* v)
@@ -589,6 +596,7 @@ void manualpickerGuiWindow::cb_menubar_recount(Fl_Widget* w, void* v)
 	manualpickerGuiWindow* T=(manualpickerGuiWindow*)v;
 	T->cb_menubar_recount_i();
 }
+
 void manualpickerGuiWindow::cb_menubar_recount_i()
 {
 
@@ -781,10 +789,6 @@ void ManualPicker::initialise()
 			global_lowpass = new_nyquist;
 		std::cout << " Set low-pass filter to " << global_lowpass << " due to downscaling of " << global_micscale << std::endl;
 	}
-
-	std::cerr << " NOTE: in order to write the new list of coordinate STAR files, you need to re-count the particles or quite this program through the File menu. Do NOT kill the program using the operating system's window manager!" << std::endl;
-
-
 }
 
 void ManualPicker::run()
