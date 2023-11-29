@@ -39,8 +39,7 @@ class SubtomoProgram
 				env_sigma,
 				cone_slope,
 				cone_sig0,
-				freqCutoffFract,
-                maxDose;
+				freqCutoffFract;
 			
 			bool 
 				flip_value, 

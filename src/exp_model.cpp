@@ -968,7 +968,7 @@ bool Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
 
                 if (tomo_name != prev_tomo_name)
                 {
-                    tomogram = tomogramSet.loadTomogram(tomo_id, false, false, false, particleSet.max_dose);
+                    tomogram = tomogramSet.loadTomogram(tomo_id, false);
                     prev_tomo_name = tomo_name;
 
                     // Tomogram sanity checks
@@ -988,17 +988,12 @@ bool Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
                 const int fc = tomogram.frameCount;
                 for (int f = 0; f < fc; f++)
                 {
+                    d4Matrix P = tomogram.projectionMatrices[f] * d4Matrix(A);
 
-                    int fp = tomogram.selectedFrameIndex[f];
-                    if (fp >= 0)
-                    {
-                        d4Matrix P = tomogram.projectionMatrices[f] * d4Matrix(A);
+                    CTF ctf = tomogram.getCtf(f, pos);
 
-                        CTF ctf = tomogram.getCtf(f, pos);
-
-                        float dose = tomogram.getCumulativeDose(f);
-                        addImageToParticle(part_id, &P, &ctf, dose);
-                    }
+                    float dose = tomogram.getCumulativeDose(f);
+                    addImageToParticle(part_id, &P, &ctf, dose);
                 }
             }
             else

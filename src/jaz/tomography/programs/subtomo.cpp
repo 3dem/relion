@@ -52,7 +52,6 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 	write_multiplicity = parser.checkOption("--multi", "Write out multiplicity volumes");
 	SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio (negative means use a heuristic)", "-1"));
     min_frames = textToInteger(parser.getOption("--min_frames", "Minimum number of lowest-dose tilt series frames that needs to be inside the box (default is half the number of frames)", "-1"));
-    maxDose = textToDouble(parser.getOption("--max_dose", "Only include tilt series frames with a dose (in e-/A2) that is lower or equal to this number (default is no selection)", "-1"));
 
 	do_cone_weight = parser.checkOption("--cone_weight", "Weight down a double cone along Z");
 	const double alpha = 0.5 * textToDouble(parser.getOption("--cone_angle", "Opening angle of the cone in degrees", "10"));
@@ -303,7 +302,6 @@ void SubtomoProgram::writeParticleSet(
 	ParticleSet copy = particleSet;
 	copy.clearParticles();
     copy.is_stack2d = do_stack2d;
-    copy.max_dose = maxDose;
 
 	int particles_removed = 0;
 
@@ -317,7 +315,7 @@ void SubtomoProgram::writeParticleSet(
 		{
 			const ParticleIndex part_id = particles[t][p];
 
-			Tomogram tomogram = tomogramSet.loadTomogram(t, false, false, false, maxDose);
+			Tomogram tomogram = tomogramSet.loadTomogram(t, false);
 
 			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
 						part_id, tomogram.frameCount, tomogram.optics.pixelSize, !apply_offsets);
@@ -446,7 +444,7 @@ void SubtomoProgram::processTomograms(
 			Log::print("Loading");
 		}
 
-		Tomogram tomogram = tomogramSet.loadTomogram(t, true, false, false, maxDose);
+		Tomogram tomogram = tomogramSet.loadTomogram(t, true);
 		tomogram.validateParticleOptics(particles[t], particleSet);
 
 		const int fc = tomogram.frameCount;
@@ -508,17 +506,17 @@ void SubtomoProgram::processTomograms(
             const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
                     part_id, fc, tomogram.optics.pixelSize, !apply_offsets);
 
-            int my_min_frames = (min_frames < 0 ) ? tomogram.nr_selected_frames / 2 : min_frames;
+            int my_min_frames = (min_frames < 0 ) ? tomogram.frameCount / 2 : min_frames;
             if (!tomogram.isVisibleFirstFrames(traj, s2D / 2.0, my_min_frames)) {
                 continue;
             }
 
             const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s2D / 2.0);
 
-            std::vector<d4Matrix> projCut(tomogram.nr_selected_frames), projPart(tomogram.nr_selected_frames);
+            std::vector<d4Matrix> projCut(fc), projPart(fc);
 
-            BufferedImage<fComplex> particleStack = BufferedImage<fComplex>(sh2D, s2D, tomogram.nr_selected_frames);
-            BufferedImage<float> weightStack(sh2D, s2D, tomogram.nr_selected_frames);
+            BufferedImage<fComplex> particleStack = BufferedImage<fComplex>(sh2D, s2D, fc);
+            BufferedImage<float> weightStack(sh2D, s2D, fc);
 
             TomoExtraction::extractAt3D_Fourier(
                     tomogram.stack, s02D, binning, tomogram, traj, isVisible,
@@ -534,43 +532,40 @@ void SubtomoProgram::processTomograms(
             const float sign = flip_value ? -1.f : 1.f;
             for (int f = 0; f < fc; f++)
             {
-                int fp = tomogram.selectedFrameIndex[f];
-                if (fp >= 0 && isVisible[f])
-                {
+                if (!isVisible[f]) continue;
 
-                    d3Matrix A;
+                d3Matrix A;
 
-                    if (apply_orientations) {
-                        A = particleSet.getMatrix3x3(part_id);
-                    } else {
-                        A = particleSet.getSubtomogramMatrix(part_id);
-                    }
+                if (apply_orientations) {
+                    A = particleSet.getMatrix3x3(part_id);
+                } else {
+                    A = particleSet.getSubtomogramMatrix(part_id);
+                }
 
-                    projPart[fp] = projCut[fp] * d4Matrix(A);
+                projPart[f] = projCut[f] * d4Matrix(A);
 
-                    if (do_ctf) {
-                        const d3Vector pos = (apply_offsets) ? particleSet.getPosition(part_id)
-                                                             : particleSet.getParticleCoord(part_id);
+                if (do_ctf) {
+                    const d3Vector pos = (apply_offsets) ? particleSet.getPosition(part_id)
+                                                         : particleSet.getParticleCoord(part_id);
 
-                        CTF ctf = tomogram.getCtf(f, pos);
-                        BufferedImage<float> ctfImg(sh2D, s2D);
-                        ctf.draw(s2D, s2D, binnedPixelSize, gammaOffset, &ctfImg(0, 0, 0));
+                    CTF ctf = tomogram.getCtf(f, pos);
+                    BufferedImage<float> ctfImg(sh2D, s2D);
+                    ctf.draw(s2D, s2D, binnedPixelSize, gammaOffset, &ctfImg(0, 0, 0));
 
-                        for (int y = 0; y < s2D; y++) {
-                            for (int x = 0; x < xRanges(y, f); x++) {
-                                const double c = ctfImg(x, y) * doseWeights(x, y, f);
+                    for (int y = 0; y < s2D; y++) {
+                        for (int x = 0; x < xRanges(y, f); x++) {
+                            const double c = ctfImg(x, y) * doseWeights(x, y, f);
 
-                                particleStack(x, y, fp) *= sign * c;
-                                weightStack(x, y, fp) = c * c;
-                            }
-                            // SHWS 23nov22: for writing out 2D stacks: need to set everything outside the xRanges to zero!
-                            for (int x = xRanges(y, f); x < sh2D; x++) {
-                                particleStack(x, y, fp) = 0.;
-                                weightStack(x, y, fp) = 0.;
-                            }
+                            particleStack(x, y, f) *= sign * c;
+                            weightStack(x, y, f) = c * c;
                         }
-                    } // end if do_ctf
-                }    // end if tomogram.hasImagePerFrame[f]
+                        // SHWS 23nov22: for writing out 2D stacks: need to set everything outside the xRanges to zero!
+                        for (int x = xRanges(y, f); x < sh2D; x++) {
+                            particleStack(x, y, f) = 0.;
+                            weightStack(x, y, f) = 0.;
+                        }
+                    }
+                } // end if do_ctf
             } // end for f
 
             // If we're not doing CTF premultiplication, we may still want to invert the contrast
@@ -627,14 +622,13 @@ void SubtomoProgram::processTomograms(
 
                 for (int f = 0; f < fc; f++)
                 {
-                    int fp = tomogram.selectedFrameIndex[f];
-                    if (fp >= 0 && isVisible[f])
+                    if (isVisible[f])
                     {
                         FourierBackprojection::backprojectSlice_forward_with_multiplicity(
                                 &xRanges(0, f),
-                                particleStack.getSliceRef(fp),
-                                weightStack.getSliceRef(fp),
-                                projPart[fp] * relative_box_scale,
+                                particleStack.getSliceRef(f),
+                                weightStack.getSliceRef(f),
+                                projPart[f] * relative_box_scale,
                                 dataImgFS,
                                 ctfImgFS,
                                 multiImageFS);
