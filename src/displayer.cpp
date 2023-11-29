@@ -1982,10 +1982,7 @@ int pickerViewerCanvas::handle(int ev)
 			else if ( strcmp(m->label(), "Help") == 0 )
 				printHelp();
 			else if ( strcmp(m->label(), "Quit (CTRL-q)") == 0 )
-                        {
-                            saveCoordinates(false);
-                            exit(0);
-                        }
+                exit(0);
 			redraw();
 			return 1; // (tells caller we handled this event)
 		}
