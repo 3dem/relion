@@ -422,7 +422,7 @@ if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Intel" OR "${CMAKE_CXX_COMPILER}" MATCHES
 	endif(MKLFFT)
 
 	if(INTEL_IPP OR DEFINED ENV{IPPROOT})
-		if(EXISTS "$ENV{IPPROOT}/include/ipps.h" AND EXISTS "$ENV{IPPROOT}/lib/intel64/libipps.a")
+		if(EXISTS "$ENV{IPPROOT}/include/ipp.h" AND EXISTS "$ENV{IPPROOT}/lib/intel64/libipps.a")
 			if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "IntelLLVM")
 				SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qipp")
 				SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -qipp -qipp-link=static")

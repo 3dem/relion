@@ -62,7 +62,7 @@ void RNDnormalDitributionComplexWithPowerModulation2D(ACCCOMPLEX *Image, size_t 
 	size_t x,y,size;
 	size = xdim*((xdim-1)*2);
 	for(size_t i=0; i<size; i++)
-    {
+	{
 		y = ( i / xdim ); // fftshift in one of two dims;
 		if(y>=xdim)
 			y -= (xdim-1)*2;
@@ -80,7 +80,7 @@ void RNDnormalDitributionComplexWithPowerModulation2D(ACCCOMPLEX *Image, size_t 
 			Image[i].x = 0;
 			Image[i].y = 0;
 		}
-    }
+	}
 }
 
 void RNDnormalDitributionComplexWithPowerModulation3D(ACCCOMPLEX *Image, size_t xdim, size_t ydim, XFLOAT *spectra)
@@ -88,15 +88,15 @@ void RNDnormalDitributionComplexWithPowerModulation3D(ACCCOMPLEX *Image, size_t 
 	int x,y,z,xydim(xdim*ydim),size;
 	size = xdim*((xdim-1)*2);				//assuming square input images (particles)
 	for(int i=0; i<size; i++)
-    {
-	   	z = i / xydim;
-        y = ( i - (z*xydim) / xdim );
-        x = i % xdim;
-        // fftshift in two of three dims;
-        if(z>=xdim)
-     	   z -= (xdim-1)*2;					//assuming square input images (particles)
-        if(y>=xdim)
-           y -= (xdim-1)*2;					//assuming square input images (particles)
+	{
+		z = i / xydim;
+		y = ( i - (z*xydim) / xdim );
+		x = i % xdim;
+		// fftshift in two of three dims;
+		if(z>=xdim)
+			z -= (xdim-1)*2;					//assuming square input images (particles)
+		if(y>=xdim)
+			y -= (xdim-1)*2;					//assuming square input images (particles)
 
 		int ires = (int)(sqrtf(x*x + y*y + z*z));
 
@@ -110,7 +110,7 @@ void RNDnormalDitributionComplexWithPowerModulation3D(ACCCOMPLEX *Image, size_t 
 			Image[i].x = 0;
 			Image[i].y = 0;
 		}
-    }
+	}
 }
 
 void softMaskBackgroundValue(	int      block_dim,
@@ -136,7 +136,7 @@ void softMaskBackgroundValue(	int      block_dim,
 	//		vol.setXmippOrigin(); // sets xinit=xdim , also for y z
 			XFLOAT r, raisedcos;
 			int x,y,z;
-			XFLOAT     img_pixels;
+			XFLOAT img_pixels;
 
 			size_t texel_pass_num = ceilfracf((size_t)vol_size,(size_t)block_size*(size_t)block_dim);
 			size_t texel = (size_t)bid*(size_t)block_size*(size_t)texel_pass_num + tid;
@@ -204,7 +204,7 @@ void cosineFilter(	int      block_dim,
 //		vol.setXmippOrigin(); // sets xinit=xdim , also for y z
 			XFLOAT r, raisedcos, defVal;
 			int x,y,z;
-			XFLOAT     img_pixels;
+			XFLOAT img_pixels;
 
 			size_t texel_pass_num = ceilfracf((size_t)vol_size,(size_t)block_size*(size_t)block_dim);
 			size_t texel = (size_t)bid*(size_t)block_size*(size_t)texel_pass_num + tid;
@@ -370,7 +370,7 @@ void sycl_kernel_make_eulers_2D(int grid_size, int block_size,
 		unsigned long orientation_num)
 {
 	for(int blockIdx_x=0; blockIdx_x<(int)(grid_size); blockIdx_x++) {
-		for(int threadIdx_x=0; threadIdx_x<block_size; threadIdx_x++)  {
+		for(int threadIdx_x=0; threadIdx_x<block_size; threadIdx_x++) {
 			unsigned long oid = (unsigned long)blockIdx_x * (unsigned long)block_size + threadIdx_x; //Orientation id
 
 			if (oid >= orientation_num)
@@ -426,7 +426,7 @@ void sycl_kernel_make_eulers_3D(int grid_size, int block_size,
 		XFLOAT *R)
 {
 	for(int blockIdx_x=0; blockIdx_x<(int)(grid_size); blockIdx_x++) {
-        for(int threadIdx_x=0; threadIdx_x<block_size; threadIdx_x++) {
+		for(int threadIdx_x=0; threadIdx_x<block_size; threadIdx_x++) {
 			XFLOAT a(0.f),b(0.f),g(0.f), A[9],B[9];
 			XFLOAT ca, sa, cb, sb, cg, sg, cc, cs, sc, ss;
 
@@ -549,10 +549,10 @@ void sycl_kernel_make_eulers_3D(int grid_size, int block_size,
 
 // -------------------------------  Some explicit template instantiations
 template void syclKernels::sycl_translate2D<XFLOAT>(XFLOAT *,
-    XFLOAT *, size_t, int, int, int, int);
+	XFLOAT *, size_t, int, int, int, int);
 
 template void syclKernels::sycl_translate3D<XFLOAT>(XFLOAT *,
-    XFLOAT *, size_t, int, int, int, int, int, int);
+	XFLOAT *, size_t, int, int, int, int, int, int);
 
 template void syclKernels::sycl_kernel_multi<XFLOAT>( XFLOAT *, XFLOAT, size_t);
 template void syclKernels::sycl_kernel_add<XFLOAT>( XFLOAT *, XFLOAT, size_t);

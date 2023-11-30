@@ -67,12 +67,12 @@ namespace syclKernels
 							g_eulers, trans_x, trans_y, trans_z, g_real, g_imag,
 							g_corr, g_diff2s,
 							static_cast<int>(trans_num), static_cast<int>(image_size),
-							s_eulers_acc.get_pointer(),
-							s_ref_real_acc.get_pointer(),
-							s_ref_imag_acc.get_pointer(),
-							s_real_acc.get_pointer(),
-							s_imag_acc.get_pointer(),
-							s_corr_acc.get_pointer()
+							s_eulers_acc.get_multi_ptr<access::decorated::yes>().get_raw(),
+							s_ref_real_acc.get_multi_ptr<access::decorated::yes>().get_raw(),
+							s_ref_imag_acc.get_multi_ptr<access::decorated::yes>().get_raw(),
+							s_real_acc.get_multi_ptr<access::decorated::yes>().get_raw(),
+							s_imag_acc.get_multi_ptr<access::decorated::yes>().get_raw(),
+							s_corr_acc.get_multi_ptr<access::decorated::yes>().get_raw()
 						);	// End of sycl_kernel_diff2_coarse
 					}	// End of cgh.parallel_for Lamda function
 				);	// End of cgh.parallel_for
@@ -134,7 +134,7 @@ namespace syclKernels
 							static_cast<int>(image_size), sum_init,
 							static_cast<int>(num_jobs),
 							d_rot_idx, d_trans_idx, d_job_idx, d_job_num,
-							s_acc.get_pointer()
+							s_acc.get_multi_ptr<access::decorated::yes>().get_raw()
 						);	// End of sycl_kernel_diff2_fine
 					}	// End of cgh.parallel_for Lamda function
 				);	// End of cgh.parallel_for
@@ -169,10 +169,10 @@ namespace syclKernels
 
 		sycl::range<3> wi {1,1,block_sz};
 		sycl::range<3> wg {grid_size,trans_num,block_sz};
-        auto event = dGPU->syclSubmit
-        (
-            [&](sycl::handler &cgh) //
-            {
+		auto event = dGPU->syclSubmit
+		(
+			[&](sycl::handler &cgh) //
+			{
 				using namespace sycl;
 				// accessors to device memory
 				local_accessor<XFLOAT, 1> s_weight_acc(range<1>(block_sz), cgh);
@@ -192,8 +192,8 @@ namespace syclKernels
 							g_eulers, g_imgs_real, g_imgs_imag, g_trans_x, g_trans_y, g_trans_z,
 							g_corr_img, g_diff2s,
 							static_cast<int>(trans_num), static_cast<int>(image_size),
-							s_weight_acc.get_pointer(),
-							s_norm_acc.get_pointer()
+							s_weight_acc.get_multi_ptr<access::decorated::yes>().get_raw(),
+							s_norm_acc.get_multi_ptr<access::decorated::yes>().get_raw()
 						);	// End of sycl_kernel_diff2_CC_coarse
 					}	// End of cgh.parallel_for Lamda function
 				);	// End of cgh.parallel_for
@@ -255,7 +255,7 @@ namespace syclKernels
 							g_corr_img, g_diff2s,
 							static_cast<int>(image_size), sum_init, static_cast<int>(num_jobs),
 							d_rot_idx, d_trans_idx, d_job_idx, d_job_num,
-							s_acc.get_pointer(), s_cc_acc.get_pointer()
+							s_acc.get_multi_ptr<access::decorated::yes>().get_raw(), s_cc_acc.get_multi_ptr<access::decorated::yes>().get_raw()
 						);	// End of sycl_kernel_diff2_CC_fine
 					}	// End of cgh.parallel_for Lamda function
 				);	// End of cgh.parallel_for

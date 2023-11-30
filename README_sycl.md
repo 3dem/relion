@@ -1,6 +1,6 @@
 # RELION SYCL/DPC++ version
 
-This is SYCL/DPC++ version for [RELION](https://github.com/3dem/relion)
+This is SYCL/DPC++ version of [RELION](https://github.com/3dem/relion)
 
 ## Build & Running
 
@@ -40,15 +40,11 @@ $ cmake \
 $ #### This is Intel GPU Level Zero backend specific #####
 $ export ZE_AFFINITY_MASK=0         # Use only the first available Level Zero device. This can be replaced by --gpu 0 syntax.
 $ export ZEX_NUMBER_OF_CCS=0:4,1:4  # Set this only if you are putting more than one MPI ranks per GPU. 0:4 means 4 MPI ranks running on card 0
-$ export SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=2
-$ export SYCL_PI_LEVEL_ZERO_DEVICE_SCOPE_EVENTS=0
-$ export SYCL_PI_LEVEL_ZERO_USM_ALLOCATOR="1;4G;host:16M,512,64K;device:16M,1024,64K;shared:0,0,64K"
 $ #### End of Intel GPU Level Zero backend specific  #####
 $ # For finer control of SYCL devcices, please see the above descrpition on ONEAPI_DEVICE_SELECTOR
-$ 
-$ ulimit -n 512000 # this is necessary for multi-GPU jobs
 $ {Run 2D/3D/refinement application by replacing --gpu/--cpu with --gpu/--sycl/--sycl-opencl/--sycl-cpu/--sycl-cuda/--sycl-hip}
 ```
+
 
 ## Optional runtime environment variables
 
@@ -59,6 +55,12 @@ $ {Run 2D/3D/refinement application by replacing --gpu/--cpu with --gpu/--sycl/-
 	+ `relionSyclUseAsyncSubmission`: Remove wait() for each SYCL kernel submission. (experimental)
 	+ `relionSyclUseStream`: Create new in-order SYCL queue for each cudaStream. (experimental)
 	+ `relionSyclUseSubSubDevice`: Create separate SYCL queue for each CCS. (experimental)
+	+ `relionSyclBlockSize`: SYCL memory pool block size. This takes precedence over relionSyclHostBlockSize and relionSyclDeviceBlockSize.
+	+ `relionSyclHostBlockSize`: SYCL memory pool block size for sycl::malloc_host. Default is 256MB
+	+ `relionSyclDeviceBlockSize`: SYCL memory pool block size for sycl::malloc_device. Default is 256MB
+	+ `MAX_MPI_BLOCK`: Maximum MPI message size per single MPI API call for point-to-point and collective communication. This takes precedence over MAX_MPI_P2P_BLOCK and MAX_MPI_COLL_BLOCK.
+	+ `MAX_MPI_P2P_BLOCK`: Maximum MPI message size per single MPI API call for point-to-point communication. Default is 4GB.
+	+ `MAX_MPI_COLL_BLOCK`: Maximum MPI message size per single MPI API call for collective communication. Default is 64MB.
 
 
 ## Added macros

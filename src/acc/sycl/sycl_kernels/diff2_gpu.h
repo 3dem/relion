@@ -50,7 +50,7 @@ void sycl_kernel_diff2_coarse(
 	const XFLOAT tz {trans_z[tid % trans_num]};
 
 	//Step through data
-    const int max_block_pass_pixel {(image_size/block_sz + 1) * block_sz};
+	const int max_block_pass_pixel {(image_size/block_sz + 1) * block_sz};
 	for (int init_pixel = 0; init_pixel < max_block_pass_pixel; init_pixel += block_sz/prefetch_fraction)
 	{
 		__group_barrier(nit);
@@ -196,14 +196,14 @@ void sycl_kernel_diff2_fine(
 	const int maxR = projector.maxR;
 
 	if (bid < todo_blocks ) // we only need to make
-    {
-		int trans_num  = static_cast<int>(d_job_num[bid]); //how many transes we have for this rot
+	{
+		int trans_num = static_cast<int>(d_job_num[bid]); //how many transes we have for this rot
 		for (int itrans = 0; itrans < trans_num; itrans++)
 			s[itrans*block_sz + tid] = 0.0f;
 
 		// index of comparison
 		int ix = static_cast<int>(d_rot_idx[d_job_idx[bid]]);
-        int pass_num {image_size/block_sz + 1};
+		int pass_num {image_size/block_sz + 1};
 
 		for (int pass = 0; pass < pass_num; pass++) // finish an entire ref image each block
 		{
@@ -516,8 +516,8 @@ void sycl_kernel_diff2_CC_fine(
 			__group_barrier(nit);
 		}
 
-        if (tid < trans_num)
-            g_diff2s[d_job_idx[bid] + tid] += -s[tid * block_sz] / sycl::native::sqrt(s_cc[tid * block_sz]);
+		if (tid < trans_num)
+			g_diff2s[d_job_idx[bid] + tid] += -s[tid * block_sz] / sycl::native::sqrt(s_cc[tid * block_sz]);
     }
 }
 
