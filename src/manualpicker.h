@@ -104,6 +104,8 @@ private:
     static void cb_menubar_quit(Fl_Widget*, void*);
     inline void cb_menubar_quit_i();
 
+    static void cb_closing(Fl_Widget*, void*);
+
     static void cb_menubar_recount(Fl_Widget*, void*);
     inline void cb_menubar_recount_i();
 
