@@ -20,8 +20,6 @@ class Tomogram
 			
 			
 			bool hasOptics, hasImage, hasDeformations, hasMatrices;
-            std::vector<int> selectedFrameIndex;
-            int nr_selected_frames;
 			OpticsData optics;
 			gravis::i2Vector imageSize;
 			int frameCount;

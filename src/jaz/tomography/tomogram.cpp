@@ -132,35 +132,31 @@ BufferedImage<float> Tomogram::computeNoiseWeight(int boxSize, double binning, d
 	const int sh = s/2 + 1;
 	const int fc = stack.zdim;
 
-	BufferedImage<float> out(sh, s, nr_selected_frames);
+	BufferedImage<float> out(sh, s, fc);
 
 	for (int f = 0; f < fc; f++)
 	{
-		int fp = selectedFrameIndex[f];
-        if (fp >= 0)
+        BufferedImage<double> powSpec = PowerSpectrum::periodogramAverage2D(
+                stack, s0, s0, overlap, f, false);
+
+        std::vector<double> powSpec1D = RadialAvg::fftwHalf_2D_lin(powSpec);
+
+        std::vector<float> frqWghts1D(powSpec1D.size());
+
+        for (int i = 0; i < powSpec1D.size(); i++)
         {
-            BufferedImage<double> powSpec = PowerSpectrum::periodogramAverage2D(
-                    stack, s0, s0, overlap, f, false);
-
-            std::vector<double> powSpec1D = RadialAvg::fftwHalf_2D_lin(powSpec);
-
-            std::vector<float> frqWghts1D(powSpec1D.size());
-
-            for (int i = 0; i < powSpec1D.size(); i++)
+            if (powSpec1D[i] > 0.0)
             {
-                if (powSpec1D[i] > 0.0)
-                {
-                    frqWghts1D[i] = (float)(1.0 / sqrt(powSpec1D[i]));
-                }
-                else
-                {
-                    frqWghts1D[i] = 0.f;
-                }
+                frqWghts1D[i] = (float)(1.0 / sqrt(powSpec1D[i]));
             }
-
-            RawImage<float> outSlice = out.getSliceRef(f);
-            RadialAvg::toFftwHalf_2D_lin(frqWghts1D, sh, s, outSlice, binning);
+            else
+            {
+                frqWghts1D[i] = 0.f;
+            }
         }
+
+        RawImage<float> outSlice = out.getSliceRef(f);
+        RadialAvg::toFftwHalf_2D_lin(frqWghts1D, sh, s, outSlice, binning);
     }
 
 	return out;
