@@ -6,13 +6,11 @@
 #include <utility>
 #include <list>
 #include <map>
-#include <unordered_map>
 #include <sycl/sycl.hpp>
 
 using memoryStorage = std::byte*;
 using memoryAllocMap = std::map<memoryStorage,memoryStorage>;
 using memoryFreeMap = std::map<memoryStorage,memoryStorage>;
-//using memoryFreeMap = std::unordered_map<memoryStorage,memoryStorage>;
 using memoryFreeSizeMap = std::multimap<size_t,std::pair<memoryStorage,memoryStorage>>;
 using alloc_kind = sycl::usm::alloc;
 
@@ -96,22 +94,4 @@ class syclMemoryPool
 		const alloc_kind _mem_type;
 		std::list<syclMemoryBlock> _memory_block_list;
 		inline static std::mutex _mem_lock;
-};
-
-// TO-DO
-template <typename T>
-class syclMemoryPoolAllocator	// std::allocator
-{
-	using	size_type		= size_t;
-	using	difference_type	= ptrdiff_t;
-	using	pointer			= T*;
-	using	const_pointer	= const T*;
-	using	reference		= T&;
-	using	const_reference	= const T&;
-	using	value_type		= T;
-};
-
-template <typename T>
-class syclMemoryPoolPolyAllocator	// std::pmr::polymorphic_allocator
-{
 };

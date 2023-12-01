@@ -39,36 +39,6 @@ syclMemoryBlock::~syclMemoryBlock()
 	if (_mem)
 	{
 		sycl::free(_mem, *_Q);
-#ifdef DEBUG_SYCL_MEMORY_POOL
-		if (_alloc_list.size() != 0)
-			std::cerr << (_mem_type == alloc_kind::device ? "DEVICE" : "HOST") << " [!! ERROR/destructor !!] There is _alloc_list(" << _alloc_bytes << " bytes/ " << _alloc_list.size() << ") remained\n" << std::flush;
-		if (_free_list.size() == 0)
-			std::cerr << (_mem_type == alloc_kind::device ? "DEVICE" : "HOST") << " [!! BUG/destructor !!] There is no _free_list\n" << std::flush;
-		if (_free_list.size() > 1)
-		{
-			size_t size = 0;
-			for (const auto& f : _free_list)
-			{
-				size += f.second - f.first;
-				std::cerr << (_mem_type == alloc_kind::device ? "DEVICE" : "HOST") << " [!! BUG/_free_list !!] " << f.first << " ~ " << f.second << " \n" << std::flush;
-			}
-			if (size != _free_bytes)
-				std::cerr << (_mem_type == alloc_kind::device ? "DEVICE" : "HOST") << " [!! BUG/destructor !!] There is mismatch in _free_list size: " << _free_bytes << " vs " << size << "\n" << std::flush;
-			std::cerr << (_mem_type == alloc_kind::device ? "DEVICE" : "HOST") << " [!! BUG/destructor !!] There is not-merged _free_list(" << _free_bytes << " bytes/ " << _free_list.size() << ")\n" << std::flush;
-		}
-		if (_rfree_list.size() == 0)
-			std::cerr << (_mem_type == alloc_kind::device ? "DEVICE" : "HOST") << " [!! BUG/destructor !!] There is no _rfree_list\n" << std::flush;
-		if (_rfree_list.size() > 1)
-		{
-			size_t size = 0;
-			for (const auto& r : _rfree_list)
-			{
-				size += r.first - r.second;
-				std::cerr << (_mem_type == alloc_kind::device ? "DEVICE" : "HOST") << " [!! BUG/_rfree_list !!] " << r.second << " ~ " << r.first << " \n" << std::flush;
-			}
-			std::cerr << (_mem_type == alloc_kind::device ? "DEVICE" : "HOST") << " [!! BUG/destructor !!] There is not-merged _rfree_list(" << size << " bytes/ " << _rfree_list.size() << ")\n" << std::flush;
-		}
-#endif
 #ifdef DIAG_SYCL_MEMORY_POOL
 		printStats();
 #endif
@@ -80,36 +50,6 @@ void syclMemoryBlock::clean()
 	if (_mem)
 	{
 		std::lock_guard<std::mutex> locker(_container_lock[_blockID].mutex);
-#ifdef DEBUG_SYCL_MEMORY_POOL
-		if (_alloc_list.size() != 0)
-			std::cerr << (_mem_type == alloc_kind::device ? "DEVICE" : "HOST") << " [!! ERROR/clean !!] There is _alloc_list(" << _alloc_bytes << " bytes/ " << _alloc_list.size() << ") remained\n" << std::flush;
-		if (_free_list.size() == 0)
-			std::cerr << (_mem_type == alloc_kind::device ? "DEVICE" : "HOST") << " [!! BUG/clean !!] There is no _free_list\n" << std::flush;
-		if (_free_list.size() > 1)
-		{
-			size_t size = 0;
-			for (const auto& f : _free_list)
-			{
-				size += f.second - f.first;
-				std::cerr << (_mem_type == alloc_kind::device ? "DEVICE" : "HOST") << " [!! BUG/_free_list !!] " << f.first << " ~ " << f.second << " \n" << std::flush;
-			}
-			if (size != _free_bytes)
-				std::cerr << (_mem_type == alloc_kind::device ? "DEVICE" : "HOST") << " [!! BUG/clean !!] There is mismatch in _free_list size: " << _free_bytes << " vs " << size << "\n" << std::flush;
-			std::cerr << (_mem_type == alloc_kind::device ? "DEVICE" : "HOST") << " [!! BUG/clean !!] There is not-merged _free_list(" << _free_bytes << " bytes/ " << _free_list.size() << ")\n" << std::flush;
-		}
-		if (_rfree_list.size() == 0)
-			std::cerr << (_mem_type == alloc_kind::device ? "DEVICE" : "HOST") << " [!! BUG/clean !!] There is no _rfree_list\n" << std::flush;
-		if (_rfree_list.size() > 1)
-		{
-			size_t size = 0;
-			for (const auto& r : _rfree_list)
-			{
-				size += r.first - r.second;
-				std::cerr << (_mem_type == alloc_kind::device ? "DEVICE" : "HOST") << " [!! BUG/_rfree_list !!] " << r.second << " ~ " << r.first << " \n" << std::flush;
-			}
-			std::cerr << (_mem_type == alloc_kind::device ? "DEVICE" : "HOST") << " [!! BUG/clean !!] There is not-merged _rfree_list(" << size << " bytes/ " << _rfree_list.size() << ")\n" << std::flush;
-		}
-#endif
 #ifdef DIAG_SYCL_MEMORY_POOL
 		printStats();
 #endif
@@ -294,7 +234,7 @@ void syclMemoryPool::shrink(const size_t num)
 	while (it != _memory_block_list.end())
 	{
 		if (it->empty())
-            it = _memory_block_list.erase(it);
+			it = _memory_block_list.erase(it);
 		else if (count >= num && it->isUnused())
 			it = _memory_block_list.erase(it);
 		else
