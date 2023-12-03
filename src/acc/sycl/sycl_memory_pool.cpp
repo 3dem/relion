@@ -115,8 +115,8 @@ void* syclMemoryBlock::alloc(const size_t bytes)
 			}
 			else
 			{
-				_free_list.erase(free->first);
 				_rfree_list.erase(free->second);
+				_free_list.erase(free);
 			}
 
 			_alloc_bytes += bytes;
@@ -174,7 +174,7 @@ bool syclMemoryBlock::free(void* const pos)
 				_free_list.erase(alloc_found->first);
 
 				_rfree_list[end_of_forward_free] = rfree_found->second;
-				_rfree_list.erase(rfree_found->first);
+				_rfree_list.erase(rfree_found);
 			}
 			else
 			{
