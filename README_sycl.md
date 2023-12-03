@@ -49,8 +49,8 @@ $ {Run 2D/3D/refinement application by replacing --gpu/--cpu with --gpu/--sycl/-
 ## Optional runtime environment variables
 
 + The below shell environment variables can be tested for more potential SYCL specific tuning. Setting it to "1" or "on" will enable these features.
-	+ `relionSyclUseCuda`: --sycl-cuda will be used even if --gpu/--sycl is specified in command lines
-	+ `relionSyclUseHip`: --sycl-hip will be used even if --gpu/--sycl is specified in command lines
+	+ `relionSyclUseCuda`: This with --gpu have the same meaning as --sycl-cuda. --sycl-cuda will be used even if --gpu/--sycl is specified in command lines.
+	+ `relionSyclUseHip`: This with --gpu have the same meaning as --sycl-hip. --sycl-hip will be used even if --gpu/--sycl is specified in command lines
 	+ `relionSyclUseInOrderQueue`: Use in-order SYCL queue. Without this, out-of-order SYCL queue is used by default. (experimental)
 	+ `relionSyclUseAsyncSubmission`: Remove wait() for each SYCL kernel submission. (experimental)
 	+ `relionSyclUseStream`: Create new in-order SYCL queue for each cudaStream. (experimental)
@@ -67,13 +67,13 @@ $ {Run 2D/3D/refinement application by replacing --gpu/--cpu with --gpu/--sycl/-
 
 + For CMake configuration
 	+ `SYCL`(=ON/OFF): Enable SYCL based acceleration build
+	+ `SYCL_CUDA_COMPILE`(=ON/OFF): Enable SYCL compilation for CUDA target
+	+ `SYCL_CUDA_TARGET`: SYCL CUDA arch target (i.e. 80)
+	+ `SYCL_HIP_COMPILE`(=ON/OFF): Enable SYCL compilation for HIP target
+	+ `SYCL_HIP_TARGET`: SYCL HIP arch target (i.e gfx90a)
 	+ `SyclForceOneDPL`(=ON/OFF): Use oneDPL(https://github.com/oneapi-src/oneDPL) if it can be used. This has the same effect as setting "-DUSE_ONEDPL" for CMAKE_CXX_FLAGS below. (experimental)
 	+ `SYCL_AOT_COMPILE`(=ON/OFF): Enable AOT(Ahead-Of-Time) compilation for SPIR64 target. Default target is pvc. (for future use)
 	+ `SYCL_AOT_TARGET`(=ON/OFF): Specify AOT(Ahead-Of-Time) SPIR64 target. Possible list can be checked using "ocloc compile --help" command. (for future use)
-	+ `SYCL_CUDA_COMPILE`(=ON/OFF): Enable SYCL compilation for CUDA target (Not tested)
-	+ `SYCL_CUDA_TARGET`: SYCL CUDA arch target (Not tested)
-	+ `SYCL_HIP_COMPILE`(=ON/OFF): Enable SYCL compilation for HIP target (Not tested)
-	+ `SYCL_HIP_TARGET`: SYCL HIP arch target (Not tested)
 	+ `SYCL_HOST_FLAGS`(=list of flags with space as separator): Additional flags for host compiler (for future use)
 	+ `SYCL_COMPILER_NAME`: SYCL compiler command name (for future use)
 	+ `SYCL_COMPILE_FLAGS`: Additional SYCL compile flags (for future use)

@@ -118,9 +118,9 @@ MpiNode::MpiNode(int &argc, char ** argv)
 	char* pEnvP2P   = std::getenv("MAX_MPI_P2P_BLOCK"); // For pt-2-pt blocking size
 	char* pEnvColl  = std::getenv("MAX_MPI_COLL_BLOCK");// For collective blocking size
 
-	const std::ptrdiff_t lBlock = (pEnvBlock == NULL) ? 0 : std::strtoul(pEnvBlock, &pEnvBlock, 10);
-	const std::ptrdiff_t lP2P   = (pEnvP2P == NULL)   ? 0 : std::strtoul(pEnvP2P, &pEnvP2P, 10);
-	const std::ptrdiff_t lColl  = (pEnvColl == NULL)  ? 0 : std::strtoul(pEnvColl, &pEnvColl, 10);
+	const std::ptrdiff_t lBlock = (pEnvBlock == NULL) ? 0 : std::strtoul(pEnvBlock, nullptr, 10);
+	const std::ptrdiff_t lP2P   = (pEnvP2P == NULL)   ? 0 : std::strtoul(pEnvP2P, nullptr, 10);
+	const std::ptrdiff_t lColl  = (pEnvColl == NULL)  ? 0 : std::strtoul(pEnvColl, nullptr, 10);
 
 	if (lBlock > 0) // "MAX_MPI_BLOCK" has precedence if it is set
 	{
