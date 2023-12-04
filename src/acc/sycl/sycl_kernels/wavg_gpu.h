@@ -37,7 +37,7 @@ void sycl_kernel_wavg(
 
 	const XFLOAT inv_weight_norm = 1.0f / weight_norm;
 
-    if (tid < 9)
+	if (tid < 9)
 		s_eulers[tid] = g_eulers[bid*9+tid];
 
 	__group_barrier(nit);

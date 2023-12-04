@@ -2,10 +2,12 @@
 #define _SYCL_DEVICE_RELION_H
 
 #include "src/acc/sycl/sycl_virtual_dev.h"
+#include "src/acc/sycl/sycl_memory_pool.h"
 
 #include <cassert>
 #include <string>
 #include <array>
+#include <mutex>
 #include <vector>
 #include <cstdint>
 #include <sycl/sycl.hpp>
@@ -33,6 +35,7 @@ public:
 	devSYCL(const syclBackendType be, const syclDeviceType dev, int id, const bool isInOrder = false, const bool isAsync = false);
 #ifdef SYCL_EXT_INTEL_QUEUE_INDEX
 	devSYCL(sycl::device &d, const int qIndex, int id, const bool isInOrder = false, const bool isAsync = false);
+	devSYCL(sycl::device &d, const int qIndex, const syclQueueType qType, int id, const bool isAsync = false);
 	devSYCL(sycl::context &c, sycl::device &d, const int qIndex, int id, const bool isInOrder = false, const bool isAsync = false);
 	devSYCL(sycl::context &c, sycl::device &d, const int qIndex, const syclQueueType qType, int id, const bool isAsync = false);
 #endif
@@ -166,6 +169,14 @@ public:
 
 	void reCalculateRange(sycl::range<3> &wg, const sycl::range<3> &wi);
 
+	void setSyclHostPool(syclMemoryPool *sM, const size_t size)		{ _syclHostPool = sM; _host_block_size = size; }
+	void setSyclDevicePool(syclMemoryPool *sM, const size_t size)	{ _syclDevicePool = sM; _device_block_size = size; }
+	syclMemoryPool* getSyclHostPool() const		{ return _syclHostPool; }
+	syclMemoryPool* getSyclDevicePool() const	{ return _syclDevicePool; }
+	const size_t getSyclHostBlockSize() const	{ return _host_block_size; }
+	const size_t getSyclDeviceBlockSize() const	{ return _device_block_size; }
+	void destroyMemoryPool() override;
+
 	sycl::queue* getQueue()		{ return _devQ; }
 	sycl::device& getDevice()		{ return _devD; }
 	sycl::context& getContext()		{ return _devC; }
@@ -193,6 +204,10 @@ private:
 	std::vector<sycl::event> _event;
 	sycl::event _prev_submission;
 	std::string deviceName;
+	syclMemoryPool *_syclHostPool;
+	syclMemoryPool *_syclDevicePool;
+	size_t _host_block_size;
+	size_t _device_block_size;
 	int cardID;
 	int deviceID;
 	int stackID;
@@ -205,6 +220,7 @@ private:
 #ifdef USE_ONEDPL
 	oneapi::dpl::execution::device_policy<> _devicePolicy;
 #endif
+	inline static std::mutex _lock;
 };
 
 #endif

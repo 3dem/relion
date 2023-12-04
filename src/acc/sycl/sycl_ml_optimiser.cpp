@@ -2,7 +2,7 @@
 // A large amount of this code is direct from cuda_ml_optimizer and so could
 // be shared (but possibly with difficulty since it is enough different that
 // we either need a lot of #ifdefs, or a lot of macros/some other mechanism to
-// abstract the differences).  The biggest differences are the type of memory
+// abstract the differences). The biggest differences are the type of memory
 // objects used (std::vector vs. CudaGlobalPtr and CudaCustomAllocator), the
 // lack of transfers to/from the device, and on-device operations (which are
 // replaced by loops/function calls).
@@ -10,10 +10,10 @@
 // CudaFFT has been replaced with lib FFTW, if RELION is configured with mix
 // precision, both single and double precision FFTW are linked into RELION.
 // Install fftw-static.x86_64 and fftw-static.i686 to get the libraries without
-// having to pull them at build time.  Over time we hope to replace FFTW with
+// having to pull them at build time. Over time we hope to replace FFTW with
 // MKL.
 //
-// NOTE:  Since the GPU code was ported back to CPU there may be additional
+// NOTE: Since the GPU code was ported back to CPU there may be additional
 // changes made in the CUDA code which may not have made it here.
 
 #include <cstdio>
@@ -46,6 +46,7 @@
 #include "src/acc/acc_ml_optimiser.h"
 #include "src/acc/acc_ml_optimiser_impl.h"
 #include "src/acc/sycl/sycl_ml_optimiser.h"
+#include "src/acc/sycl/sycl_memory_pool.h"
 
 #include "src/acc/sycl/sycl_dev.h"
 
@@ -84,16 +85,51 @@ MlSyclDataBundle::MlSyclDataBundle(virtualSYCL *dev) : generateProjectionPlanOnT
 
 MlSyclDataBundle::~MlSyclDataBundle()
 {
+	auto dev = dynamic_cast<devSYCL*>(_devAcc);
+	if (dev->getSyclHostPool())
+		dev->getSyclHostPool()->shrink();
+	if (dev->getSyclDevicePool())
+		dev->getSyclDevicePool()->shrink();
+
 	projectors.clear();
 	backprojectors.clear();
 	coarseProjectionPlans.clear();
-//	delete _devAcc;
 }
 
 void MlSyclDataBundle::setup(MlOptimiser *baseMLO)
 {
+	auto dev = dynamic_cast<devSYCL*>(_devAcc);
+	if (dev->getSyclHostPool() == nullptr || dev->getSyclDevicePool() == nullptr)
+	{
+		char* pEnvBlockSize = std::getenv("relionSyclBlockSize");
+		const size_t def_block_size = (pEnvBlockSize == nullptr) ? 0 : std::strtoul(pEnvBlockSize, nullptr, 10);
+		size_t block_size;
+		if (dev->getSyclHostPool() == nullptr)
+		{
+			if (def_block_size > 0)
+				block_size = def_block_size;
+			else
+			{
+				char* pEnvHostBlockSize = std::getenv("relionSyclHostBlockSize");
+				block_size = (pEnvHostBlockSize == nullptr) ? defHostBlockSize : std::strtoul(pEnvHostBlockSize, nullptr, 10);
+			}
+			dev->setSyclHostPool(new syclMemoryPool(dev->getQueue(), alloc_kind::host, block_size), block_size);
+		}
+		if (dev->getSyclDevicePool() == nullptr)
+		{
+			if (def_block_size > 0)
+				block_size = def_block_size;
+			else
+			{
+				char* pEnvDeviceBlockSize = std::getenv("relionSyclDeviceBlockSize");
+				block_size = (pEnvDeviceBlockSize == nullptr) ? defDeviceBlockSize : std::strtoul(pEnvDeviceBlockSize, nullptr, 10);
+			}
+			dev->setSyclDevicePool(new syclMemoryPool(dev->getQueue(), alloc_kind::device, block_size), block_size);
+		}
+	}
+
 	/*======================================================
-				  PROJECTOR AND BACKPROJECTOR
+				PROJECTOR AND BACKPROJECTOR
 	======================================================*/
 
 	unsigned nr_proj = baseMLO->mymodel.PPref.size();
@@ -446,7 +482,7 @@ std::vector<virtualSYCL*> MlOptimiserSYCL::getDevices(const syclDeviceType selec
 		if (! isFP64)
 		{
 			for (auto select : selectedDevices)
-				delete dynamic_cast<devSYCL*>(select);
+				delete select;
 
 			selectedDevices.clear();
 			std::cerr << "Double-Precision for Accelerator is requested but there is device which cannot support FP64.\n";
@@ -499,7 +535,7 @@ void MlOptimiserSYCL::checkDevices()
 	if (devices.size() == 0)
 		REPORT_ERROR("NO SYCL devices are found");
 
-	for (auto& device : devices)
+	for (auto &device : devices)
 	{
 		std::cout << "\nPlatform: " << device.get_platform().get_info<sycl::info::platform::name>() << std::endl;
 
@@ -550,7 +586,7 @@ void MlOptimiserSYCL::checkDevices()
 
 		const auto domains = device.get_info<sycl::info::device::partition_affinity_domains>();
 		std::cout << "  partition_affinity_domain:";
-		for (auto& domain : domains)
+		for (auto &domain : domains)
 		{
 			switch(domain)
 			{
@@ -574,7 +610,7 @@ void MlOptimiserSYCL::checkDevices()
 
 		const auto hconfigs = device.get_info<sycl::info::device::half_fp_config>();
 		std::cout << "  half_fp_config:";
-		for (auto& hconfig : hconfigs)
+		for (auto &hconfig : hconfigs)
 		{
 			switch(hconfig)
 			{
@@ -610,7 +646,7 @@ void MlOptimiserSYCL::checkDevices()
 
 		const auto sconfigs = device.get_info<sycl::info::device::single_fp_config>();
 		std::cout << "  single_fp_config:";
-		for (auto& sconfig : sconfigs)
+		for (auto &sconfig : sconfigs)
 		{
 			switch(sconfig)
 			{
@@ -646,7 +682,7 @@ void MlOptimiserSYCL::checkDevices()
 
 		const auto dconfigs = device.get_info<sycl::info::device::double_fp_config>();
 		std::cout << "  double_fp_config:";
-		for (auto& dconfig : dconfigs)
+		for (auto &dconfig : dconfigs)
 		{
 			switch(dconfig)
 			{
@@ -699,17 +735,20 @@ void MlOptimiserSYCL::setupDevice()
 
  #ifdef SYCL_EXT_INTEL_QUEUE_INDEX
 	if (computeIndex >= 0)
-		_devAcc = new devSYCL(c, d, computeIndex, qType, bundle->getSyclDevice()->getDeviceID(), isAsync);
+		_devAcc = new devSYCL(c, d, computeIndex, qType, dev->getDeviceID(), isAsync);
 	else
  #endif
-		_devAcc = new devSYCL(c, d, qType, bundle->getSyclDevice()->getDeviceID(), isAsync);
+		_devAcc = new devSYCL(c, d, qType, dev->getDeviceID(), isAsync);
 
-	_devAcc->setCardID(bundle->getSyclDevice()->getCardID());
-	_devAcc->setStackID(bundle->getSyclDevice()->getStackID());
-	_devAcc->setNumStack(bundle->getSyclDevice()->getNumStack());
-	_devAcc->setSliceID(bundle->getSyclDevice()->getSliceID());
-	_devAcc->setNumSlice(bundle->getSyclDevice()->getNumSlice());
-//	_devAcc->printDeviceInfo();
+	_devAcc->setCardID(dev->getCardID());
+	_devAcc->setStackID(dev->getStackID());
+	_devAcc->setNumStack(dev->getNumStack());
+	_devAcc->setSliceID(dev->getSliceID());
+	_devAcc->setNumSlice(dev->getNumSlice());
+
+	auto ndev = dynamic_cast<devSYCL*>(_devAcc);
+	ndev->setSyclHostPool(dev->getSyclHostPool(), dev->getSyclHostBlockSize());
+	ndev->setSyclDevicePool(dev->getSyclDevicePool(), dev->getSyclDeviceBlockSize());
 #endif
 }
 
@@ -741,6 +780,10 @@ void MlOptimiserSYCL::resetData()
 			classStreams.back()->setNumStack(dynamic_cast<devSYCL*>(_devAcc)->getNumStack());
 			classStreams.back()->setSliceID(dynamic_cast<devSYCL*>(_devAcc)->getSliceID());
 			classStreams.back()->setNumSlice(dynamic_cast<devSYCL*>(_devAcc)->getNumSlice());
+
+			auto ndev = dynamic_cast<devSYCL*>(classStreams.back());
+			ndev->setSyclHostPool(dev->getSyclHostPool(), dev->getSyclHostBlockSize());
+			ndev->setSyclDevicePool(dev->getSyclDevicePool(), dev->getSyclDeviceBlockSize());
 		}
 		else
 			classStreams.push_back(_devAcc);
@@ -749,8 +792,8 @@ void MlOptimiserSYCL::resetData()
 
 void MlOptimiserSYCL::expectationOneParticle(unsigned long my_part_id, const int thread_id)
 {
-    AccPtrFactory ptrFactory(AccType::accCPU);
-    accDoExpectationOneParticle<MlOptimiserSYCL>(this, my_part_id, thread_id, ptrFactory);
+	AccPtrFactory ptrFactory(AccType::accCPU);
+	accDoExpectationOneParticle<MlOptimiserSYCL>(this, my_part_id, thread_id, ptrFactory);
 }
 
 void MlOptimiserSYCL::doThreadExpectationSomeParticles(const int thread_id)

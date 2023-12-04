@@ -655,10 +655,15 @@ will still yield good performance and possibly a more stable execution. \n" << s
 				{
 					if (fullAutomaticMapping)
 					{
-						if(nodeSize > 1)
+#if 1
+						// Do not span multiple devices between threads for automatic mapping
+						dev_id = devCount * ((node->rank-1)%nodeSize) / nodeSize;
+#else
+						if (nodeSize > 1)
 							dev_id = (devCount*( ((node->rank-1)%nodeSize)*nr_threads + i )) / (nodeSize*nr_threads);
 						else
 							dev_id = devCount*i / nr_threads;
+#endif
 					}
 					else
 						dev_id = textToInteger(allThreadIDs[node->rank-1][i % (allThreadIDs[node->rank-1]).size()].c_str());

@@ -70,7 +70,7 @@ void window_fourier_transform(
 
 				long int  in_idx = (kp < 0 ? kp + iZ : kp) * iYX + (ip < 0 ? ip + iY : ip)*iX + jp;
 				long int out_idx = (kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp;
-				g_out[out_idx + oOFF] =  g_in[in_idx + iOFF];
+				g_out[out_idx + oOFF] = g_in[in_idx + iOFF];
 			} // for tid
 		} // for psi
 	} // for blk
@@ -149,7 +149,7 @@ static std::pair<size_t, T> getArgMin(T *data, size_t size)
 	return pair;
 #else
 	std::pair<size_t, T> pair {-1, std::numeric_limits<T>::max()};
- #if _OPENMP >= 201307   // For OpenMP 4.0 and later
+ #if _OPENMP >= 201307	// For OpenMP 4.0 and later
 	#pragma omp declare reduction(minloc: std::pair<size_t, T>: min_loc<T>(&omp_out, &omp_in)) \
 		initializer(omp_priv = {-1, std::numeric_limits<T>::max()})
 	#pragma omp simd reduction(minloc:pair)
@@ -177,7 +177,7 @@ static std::pair<size_t, T> getArgMax(T *data, size_t size)
 	return pair;
 #else
 	std::pair<size_t, T> pair {-1, std::numeric_limits<T>::lowest()};
- #if _OPENMP >= 201307   // For OpenMP 4.0 and later
+ #if _OPENMP >= 201307	// For OpenMP 4.0 and later
 	#pragma omp declare reduction(maxloc: std::pair<size_t, T>: max_loc<T>(&omp_out, &omp_in)) \
 		initializer(omp_priv = {-1, std::numeric_limits<T>::lowest()})
 	#pragma omp simd reduction(maxloc:pair)
