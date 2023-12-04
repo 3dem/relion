@@ -41,7 +41,7 @@ XFLOAT no_tex2D(XFLOAT *mdl, XFLOAT xp, XFLOAT yp, int mdlX, int mdlInitY)
 	int offset1 = (y0 * mdlX + x0);
 	int offset2 = offset1 + 1;
 	int offset3 = offset1 + mdlX;
-	int offset4 = offset1 + mdlX + 1;  
+	int offset4 = offset1 + mdlX + 1;
 	//-----------------------------
 	XFLOAT d00 = mdl[offset1];
 	XFLOAT d01 = mdl[offset2];
@@ -59,7 +59,7 @@ XFLOAT no_tex2D(XFLOAT *mdl, XFLOAT xp, XFLOAT yp, int mdlX, int mdlInitY)
 __attribute__((always_inline))
 inline
 static void complex2D(std::complex<XFLOAT> *mdlComplex, XFLOAT &real, XFLOAT &imag,
-               XFLOAT xp, XFLOAT yp, int mdlX, int mdlInitY)
+				XFLOAT xp, XFLOAT yp, int mdlX, int mdlInitY)
 {
 	int x0 = sycl::floor(xp);
 	XFLOAT fx = xp - x0;
@@ -71,7 +71,7 @@ static void complex2D(std::complex<XFLOAT> *mdlComplex, XFLOAT &real, XFLOAT &im
 	int offset1 = (y0 * mdlX + x0);
 	int offset2 = offset1 + 1;
 	int offset3 = offset1 + mdlX;
-	int offset4 = offset1 + mdlX + 1;  
+	int offset4 = offset1 + mdlX + 1;
 	//-----------------------------
 	XFLOAT d00[2] {mdlComplex[offset1].real(), mdlComplex[offset1].imag()};
 	XFLOAT d01[2] {mdlComplex[offset2].real(), mdlComplex[offset2].imag()};

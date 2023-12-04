@@ -557,13 +557,11 @@ public:
 				ACC_PTR_DEBUG_FATAL(str.c_str());
 				CRITICAL(RAMERR);
 			}
-			isHostSYCL = true;
 		}
 		else
 		{
 			if(posix_memalign((void **)&newArr, MEM_ALIGN, sizeof(T) * newSize))
 				CRITICAL(RAMERR);
-			isHostSYCL = false;
 		}
 #else
 		if(posix_memalign((void **)&newArr, MEM_ALIGN, sizeof(T) * newSize))
@@ -580,6 +578,12 @@ public:
 		freeHostIfSet();	
 	    setSize(newSize);
 	    setHostPtr(newArr);
+#ifdef _SYCL_ENABLED
+		if(accType == accSYCL)
+			isHostSYCL = true;
+		else
+			isHostSYCL = false;
+#endif
 	    doFreeHost=true;
 	}
 	
@@ -602,13 +606,11 @@ public:
 				ACC_PTR_DEBUG_FATAL(str.c_str());
 				CRITICAL(RAMERR);
 			}
-			isHostSYCL = true;
 		}
 		else
 		{
 			if(posix_memalign((void **)&newArr, MEM_ALIGN, sizeof(T) * newSize))
 				CRITICAL(RAMERR);
-			isHostSYCL = false;
 		}
 #else
 		if(posix_memalign((void **)&newArr, MEM_ALIGN, sizeof(T) * newSize))
@@ -646,6 +648,12 @@ public:
 		freeHostIfSet();
 	    setSize(newSize);
 	    setHostPtr(newArr);
+#ifdef _SYCL_ENABLED
+		if(accType == accSYCL)
+			isHostSYCL = true;
+		else
+			isHostSYCL = false;
+#endif
 	    doFreeHost=true;
 	}
 	

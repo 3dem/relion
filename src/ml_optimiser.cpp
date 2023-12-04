@@ -98,7 +98,10 @@ void globalThreadExpectationSomeParticles(void *self, int thread_id)
 MlOptimiser::~MlOptimiser()
 {
 	for (int i = 0; i < syclDeviceList.size(); i++)
+	{
+		syclDeviceList[i]->destroyMemoryPool();
 		delete syclDeviceList[i];
+	}
 
 	syclDeviceList.clear();
 }
@@ -1733,7 +1736,11 @@ void MlOptimiser::initialise()
 			if (semiAutomaticMapping)
 			{
 				if (fullAutomaticMapping)
+#if 1
+					dev_id = 0;	// Do not span multiple devices between threads for automatic mapping
+#else
 					dev_id = devCount*i / nr_threads;
+#endif
 				else
 					dev_id = textToInteger(allThreadIDs[0][i % (allThreadIDs[0]).size()].c_str());
 			}

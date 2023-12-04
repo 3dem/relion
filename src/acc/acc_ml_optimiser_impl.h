@@ -2017,8 +2017,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
             PassWeights.weights.setAccPtr(&(~Mweight)[0]);
             PassWeights.weights.setHostPtr(&Mweight[0]);
             PassWeights.weights.setSize(nr_coarse_weights);
+            PassWeights.weights.doFreeHost=false;
         }
-        PassWeights.weights.doFreeHost=false;
 
         std::pair<size_t, XFLOAT> min_pair=AccUtilities::getArgMinOnDevice<XFLOAT>(PassWeights.weights);
         PassWeights.weights.cpToHost();

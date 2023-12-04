@@ -7,27 +7,27 @@
 
 // GENERAL -----------------------------
 #define MAX_RESOL_SHARED_MEM 		32
-#define BLOCK_SIZE  				128
+#define BLOCK_SIZE					128
 // -------------------------------------
 
 
 // COARSE DIFF -------------------------
-#define PREFETCH_FRACTION_3D 2	//4
-#define PREFETCH_FRACTION_2D 1	//2
+#define PREFETCH_FRACTION_3D 4	//4
+#define PREFETCH_FRACTION_2D 4	//2
 
-#define D2C_BLOCK_SIZE_2D           1024	//512
-#define D2C_EULERS_PER_BLOCK_2D     1	//4
-#define D2C_BLOCK_SIZE_REF3D        256	//128
-#define D2C_EULERS_PER_BLOCK_REF3D  4	//16
-#define D2C_BLOCK_SIZE_DATA3D       64	//64
-#define D2C_EULERS_PER_BLOCK_DATA3D 32	//32
+#define D2C_BLOCK_SIZE_2D			1024	//512
+#define D2C_EULERS_PER_BLOCK_2D		16	//4
+#define D2C_BLOCK_SIZE_REF3D		256	//128
+#define D2C_EULERS_PER_BLOCK_REF3D	8	//16
+#define D2C_BLOCK_SIZE_DATA3D		64	//64
+#define D2C_EULERS_PER_BLOCK_DATA3D	32	//32
 
-#define D2C_CC_BLOCK_SIZE_2D           1024	//512
-#define D2C_CC_EULERS_PER_BLOCK_2D     1	//4
-#define D2C_CC_BLOCK_SIZE_REF3D        64	//128
-#define D2C_CC_EULERS_PER_BLOCK_REF3D  1	//16
-#define D2C_CC_BLOCK_SIZE_DATA3D       64	//64
-#define D2C_CC_EULERS_PER_BLOCK_DATA3D 32	//32
+#define D2C_CC_BLOCK_SIZE_2D			1024	//512
+#define D2C_CC_EULERS_PER_BLOCK_2D		16	//4
+#define D2C_CC_BLOCK_SIZE_REF3D			256	//128
+#define D2C_CC_EULERS_PER_BLOCK_REF3D	8	//16
+#define D2C_CC_BLOCK_SIZE_DATA3D		64	//64
+#define D2C_CC_EULERS_PER_BLOCK_DATA3D	32	//32
 // -------------------------------------
 
 // FINE DIFF ---------------------------
@@ -35,8 +35,8 @@
 #define D2F_CC_BLOCK_SIZE_2D 		256	//256
 #define D2F_CHUNK_2D 				7
 
-#define D2F_BLOCK_SIZE_REF3D 		256	//256
-#define D2F_CC_BLOCK_SIZE_REF3D		256	//256
+#define D2F_BLOCK_SIZE_REF3D 		512	//256
+#define D2F_CC_BLOCK_SIZE_REF3D		512	//256
 #define D2F_CHUNK_REF3D 			7
 
 #define D2F_BLOCK_SIZE_DATA3D 		512	//512
@@ -46,16 +46,16 @@
 
 
 // WAVG --------------------------------
-#define WAVG_BLOCK_SIZE_DATA3D	512	//512
-#define WAVG_BLOCK_SIZE_REF3D	512	//256
-#define WAVG_BLOCK_SIZE_2D		256	//256
+#define WAVG_BLOCK_SIZE_DATA3D	1024	//512
+#define WAVG_BLOCK_SIZE_REF3D	1024	//256
+#define WAVG_BLOCK_SIZE_2D		1024	//256
 // -------------------------------------
 
 
 // MISC --------------------------------
-#define SUMW_BLOCK_SIZE 	  	32
+#define SUMW_BLOCK_SIZE			32
 #define SOFTMASK_BLOCK_SIZE 	128
-#define CFTT_BLOCK_SIZE 	 	128
+#define CFTT_BLOCK_SIZE			128
 #define PROBRATIO_BLOCK_SIZE 	128
 #define POWERCLASS_BLOCK_SIZE 	128
 #define PROJDIFF_CHUNK_SIZE 	14
@@ -63,8 +63,8 @@
 // -------------------------------------
 
 // RANDOMIZATION -----------------------
-#define RND_BLOCK_NUM                   64
-#define RND_BLOCK_SIZE                  32
+#define RND_BLOCK_NUM			64
+#define RND_BLOCK_SIZE			32
 // -------------------------------------
 
 

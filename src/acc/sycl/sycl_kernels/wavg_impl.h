@@ -33,8 +33,8 @@ namespace syclKernels
 		virtualSYCL *devAcc)
 	{
 		devSYCL *dGPU = dynamic_cast<devSYCL*>(devAcc);
-        assert(    trans_num  <= std::numeric_limits<int>::max());
-        assert(    image_size <= std::numeric_limits<int>::max());
+		assert(    trans_num  <= std::numeric_limits<int>::max());
+		assert(    image_size <= std::numeric_limits<int>::max());
 		assert(    orient_num <= std::numeric_limits<int>::max());
 		assert(    orient_num <= dGPU->maxWorkGroup[1]);
 		assert(      block_sz <= dGPU->maxItem[2]);
@@ -70,10 +70,10 @@ namespace syclKernels
 							g_weights, g_ctfs,
 							g_wdiff2s_parts, g_wdiff2s_AA, g_wdiff2s_XA,
 							static_cast<int>(trans_num), weight_norm, significant_weight, part_scale,
-							s_parts_acc.get_pointer(),
-							s_sumAA_acc.get_pointer(),
-							s_sumXA_acc.get_pointer(),
-							s_eulers_acc.get_pointer()
+							s_parts_acc.get_multi_ptr<access::decorated::yes>().get_raw(),
+							s_sumAA_acc.get_multi_ptr<access::decorated::yes>().get_raw(),
+							s_sumXA_acc.get_multi_ptr<access::decorated::yes>().get_raw(),
+							s_eulers_acc.get_multi_ptr<access::decorated::yes>().get_raw()
 						);  // End of sycl_kernel_wavg
 					}   // End of cgh.parallel_for Lamda function
 				);  // End of cgh.parallel_for
