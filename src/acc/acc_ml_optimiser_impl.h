@@ -3384,7 +3384,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				int iproj_offset = 0;
 				if (baseMLO->grad_pseudo_halfsets)
 					// Backproject every other particle into separate volumes
-					iproj_offset = (op.part_id % 2) * baseMLO->mymodel.nr_classes
+					iproj_offset = (op.part_id % 2) * baseMLO->mymodel.nr_classes;
 
 				CTIC(accMLO->timer,"backproject");
 				runBackProjectKernel(
