@@ -70,7 +70,7 @@ void backproject2D(
 						max_r, max_r2, padding_factor,
 						img_x, img_y, static_cast<int>(img_xy),
 						mdl_x, mdl_inity,
-						s_eulers_acc.get_pointer()
+						s_eulers_acc.get_multi_ptr<access::decorated::yes>().get_raw()
 					);  // End of sycl_kernel_backproject2D
 				}   // End of cgh.parallel_for Lamda function
 			);  // End of cgh.parallel_for
@@ -132,7 +132,7 @@ void backproject3D(
 						max_r, max_r2, padding_factor,
 						img_x, img_y, img_z, static_cast<int>(img_xyz),
 						mdl_x, mdl_y, mdl_inity, mdl_initz,
-						s_eulers_acc.get_pointer()
+						s_eulers_acc.get_multi_ptr<access::decorated::yes>().get_raw()
 					);  // End of sycl_kernel_backproject3D
 				}   // End of cgh.parallel_for Lamda function
 			);  // End of cgh.parallel_for

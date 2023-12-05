@@ -487,24 +487,24 @@ inline void  computeSincosLookupTable2D(unsigned long  trans_num,
 		XFLOAT ty = trans_y[i];
 
 		for(int x=0; x<xSize; x++) {
-		   unsigned long index = i * xSize + x;
+			unsigned long index = i * xSize + x;
 #ifdef ACC_DOUBLE_PRECISION
 			sincos ( x * tx, &sin_x[index], &cos_x[index] );
 #else
 			sincosf( x * tx, &sin_x[index], &cos_x[index] );
-#endif            
+#endif
 		}
 		
 		for(int y=0; y<ySize; y++) {
-            unsigned long index = i * ySize + y;
+			unsigned long index = i * ySize + y;
 #ifdef ACC_DOUBLE_PRECISION
 			sincos ( y * ty, &sin_y[index], &cos_y[index] );
 #else
 			sincosf( y * ty, &sin_y[index], &cos_y[index] );
-#endif            
-		}        
+#endif
+		}
 	}
-}	                                    
+}
 				
 __attribute__((always_inline))
 inline void  computeSincosLookupTable3D(unsigned long  trans_num,
@@ -527,22 +527,22 @@ inline void  computeSincosLookupTable3D(unsigned long  trans_num,
 		XFLOAT tz = trans_z[i];
 
 		for(int x=0; x<xSize; x++) {
-		   unsigned long index = i * xSize + x;
+			unsigned long index = i * xSize + x;
 #ifdef ACC_DOUBLE_PRECISION
 			sincos ( x * tx, &sin_x[index], &cos_x[index] );
 #else
 			sincosf( x * tx, &sin_x[index], &cos_x[index] );
-#endif            
+#endif
 		}
 		
 		for(int y=0; y<ySize; y++) {
-            unsigned long index = i * ySize + y;
+			unsigned long index = i * ySize + y;
 #ifdef ACC_DOUBLE_PRECISION
 			sincos ( y * ty, &sin_y[index], &cos_y[index] );
 #else
 			sincosf( y * ty, &sin_y[index], &cos_y[index] );
-#endif            
-		}           
+#endif
+		}
 		
 		for(int z=0; z<zSize; z++) {
 			unsigned long index = i * zSize + z;
@@ -550,8 +550,8 @@ inline void  computeSincosLookupTable3D(unsigned long  trans_num,
 			sincos ( z * tz, &sin_z[index], &cos_z[index] );
 #else
 			sincosf( z * tz, &sin_z[index], &cos_z[index] );
-#endif            
-		}        		
+#endif
+		}
 	}
 }
 

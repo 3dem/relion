@@ -294,7 +294,7 @@ void sycl_kernel_backproject3D(
 			}
 		}
 
-        //BP
+		//BP
 		if (Fweight > 0.0f)
 		{
 			// Get logical coordinates in the 3D map

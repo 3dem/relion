@@ -2017,8 +2017,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
             PassWeights.weights.setAccPtr(&(~Mweight)[0]);
             PassWeights.weights.setHostPtr(&Mweight[0]);
             PassWeights.weights.setSize(nr_coarse_weights);
+            PassWeights.weights.doFreeHost=false;
         }
-        PassWeights.weights.doFreeHost=false;
 
         std::pair<size_t, XFLOAT> min_pair=AccUtilities::getArgMinOnDevice<XFLOAT>(PassWeights.weights);
         PassWeights.weights.cpToHost();
@@ -3384,7 +3384,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				int iproj_offset = 0;
 				if (baseMLO->grad_pseudo_halfsets)
 					// Backproject every other particle into separate volumes
-					iproj_offset = (op.part_id % 2) * baseMLO->mymodel.nr_classes
+					iproj_offset = (op.part_id % 2) * baseMLO->mymodel.nr_classes;
 
 				CTIC(accMLO->timer,"backproject");
 				runBackProjectKernel(

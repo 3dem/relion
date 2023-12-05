@@ -34,8 +34,7 @@ using deviceStream_t = hipStream_t;
 #endif
 #ifdef USE_IPP
 #include <type_traits>
-#include "ipps.h"
-#include "ipps_l.h"
+#include "ipp.h"
 #endif
 
 void dump_array(char *name, bool *ptr, size_t size);

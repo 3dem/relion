@@ -98,7 +98,10 @@ void globalThreadExpectationSomeParticles(void *self, int thread_id)
 MlOptimiser::~MlOptimiser()
 {
 	for (int i = 0; i < syclDeviceList.size(); i++)
+	{
+		syclDeviceList[i]->destroyMemoryPool();
 		delete syclDeviceList[i];
+	}
 
 	syclDeviceList.clear();
 }
@@ -1003,10 +1006,10 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     do_skip_maximization = parser.checkOption("--skip_maximize", "Skip maximization step (only write out data.star file)?");
     failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be handled by fail-safe mode, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
 
-    do_blush = parser.checkOption("--blush", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
+    do_blush = parser.checkOption("--blush", "Perform the reconstruction with the Blush algorithm.");
     skip_spectral_trailing = parser.checkOption("--blush_skip_spectral_trailing", "Skip spectral trailing during Blush reconstruction (WARNING: This may inflate resolution estimates)");
 
-	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction with the Blush algorithm.");
+    do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
     nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
     auto_ignore_angle_changes = parser.checkOption("--auto_ignore_angles", "In auto-refinement, update angular sampling regardless of changes in orientations for convergence. This makes convergence faster.");
     auto_resolution_based_angles= parser.checkOption("--auto_resol_angles", "In auto-refinement, update angular sampling based on resolution-based required sampling. This makes convergence faster.");
@@ -1733,7 +1736,11 @@ void MlOptimiser::initialise()
 			if (semiAutomaticMapping)
 			{
 				if (fullAutomaticMapping)
+#if 1
+					dev_id = 0;	// Do not span multiple devices between threads for automatic mapping
+#else
 					dev_id = devCount*i / nr_threads;
+#endif
 				else
 					dev_id = textToInteger(allThreadIDs[0][i % (allThreadIDs[0]).size()].c_str());
 			}
