@@ -621,7 +621,7 @@ void JobWindow::initialiseMotioncorrWindow()
 
 void JobWindow::initialiseCtffindWindow()
 {
-	setupTabs(3);
+	setupTabs(2);
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -655,20 +655,11 @@ void JobWindow::initialiseCtffindWindow()
 	tab2->label("CTFFIND-4.1");
 	resetHeight();
 
-	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group2->end();
-
-	place("use_ctffind4", TOGGLE_DEACTIVATE, group2);
-	group2->begin();
-
 	place("fn_ctffind_exe", TOGGLE_DEACTIVATE);
 	place("use_given_ps", TOGGLE_DEACTIVATE);
 	place("slow_search", TOGGLE_DEACTIVATE);
 
 	place("ctf_win", TOGGLE_DEACTIVATE);
-
-	group2->end();
-	guientries["use_ctffind4"].cb_menu_i(); // make default active
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -680,34 +671,16 @@ void JobWindow::initialiseCtffindWindow()
 	place("dfmax", TOGGLE_DEACTIVATE);
 	place("dfstep", TOGGLE_DEACTIVATE);
 
+	// Add a little spacer
+	current_y += STEPY/2;
+
+    if (is_tomo)
+    {
+        place("localsearch_nominal_defocus", TOGGLE_DEACTIVATE);
+        place("exp_factor_dose", TOGGLE_DEACTIVATE);
+    }
 	tab2->end();
 
-	tab3->begin();
-	tab3->label("Gctf");
-	resetHeight();
-
-	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group4->end();
-
-	place("use_gctf", TOGGLE_DEACTIVATE, group4);
-	group4->begin();
-
-	place("fn_gctf_exe", TOGGLE_DEACTIVATE);
-	place("do_ignore_ctffind_params", TOGGLE_DEACTIVATE);
-	place("do_EPA", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-	place("other_gctf_args", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-	place("gpu_ids", TOGGLE_LEAVE_ACTIVE);
-
-	group4->end();
-	guientries["use_gctf"].cb_menu_i(); // make default active
-
-	tab3->end();
 }
 
 void JobWindow::initialiseManualpickWindow()

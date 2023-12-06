@@ -1708,7 +1708,6 @@ void RelionJob::initialiseCtffindJob()
 	// CTFFIND options
 
 	// Check for environment variable RELION_CTFFIND_EXECUTABLE
-	joboptions["use_ctffind4"] = JobOption("Use CTFFIND-4.1?", false, "If set to Yes, the wrapper will use CTFFIND4 (version 4.1) for CTF estimation. This includes thread-support, calculation of Thon rings from movie frames and phase-shift estimation for phase-plate data.");
 	joboptions["use_given_ps"] = JobOption("Use power spectra from MotionCorr job?", true, "If set to Yes, the CTF estimation will be done using power spectra calculated during motion correction. You must use this option if you used float16 in motion correction.");
 	default_location = getenv ("RELION_CTFFIND_EXECUTABLE");
 	char default_ctffind[] = DEFAULTCTFFINDLOCATION;
@@ -1726,21 +1725,14 @@ void RelionJob::initialiseCtffindJob()
 	joboptions["dfmax"] = JobOption("Maximum defocus value (A):", 50000, 20000, 100000, 1000, "CTFFIND's dFMax parameter");
 	joboptions["dfstep"] = JobOption("Defocus step size (A):", 500, 200, 2000, 100,"CTFFIND's FStep parameter");
 
+    if (is_tomo)
+    {
+        joboptions["localsearch_nominal_defocus"] = JobOption("Nominal defocus search range (A) ", 10000, 0, 20000, 1000, "If a positive value is given, the defocus search range will be set to +/- this value (in A) around the nominal defocus value from the input STAR file. If a zero or negative value are given, then the overall min-max defocus search ranges above will be used instead.");
+        joboptions["exp_factor_dose"] = JobOption("Dose-depedent Thon ring fading (e/A^2) ", 100, 0, 200, 10, "If a positive value is given, then the maximum resolution for CTF estimation is lowerered by exp(dose/this_factor) times the original maximum resolution specified above. Remember that exp(1) ~=2.7, so a value of 100 e/A^2 for this factor will yield 2.7x higher maxres for an accumulated dose of 100 e/A^2; Smaller values will lead to faster decay of the maxres. If zero or a negative value is given, the maximum value specified above will be used for all images.");
+    }
+
 	joboptions["ctf_win"] = JobOption("Estimate CTF on window size (pix) ", -1, -16, 4096, 16, "If a positive value is given, a squared window of this size at the center of the micrograph will be used to estimate the CTF. This may be useful to exclude parts of the micrograph that are unsuitable for CTF estimation, e.g. the labels at the edge of phtographic film. \n \n The original micrograph will be used (i.e. this option will be ignored) if a negative value is given.");
 
-	joboptions["use_gctf"] = JobOption("Use Gctf instead?", false, "If set to Yes, Kai Zhang's Gctf program (which runs on NVIDIA GPUs) will be used instead of Niko Grigorieff's CTFFIND4.");
-	default_location = getenv("RELION_GCTF_EXECUTABLE");
-	char default_gctf[] = DEFAULTGCTFLOCATION;
-	if (default_location == NULL)
-	{
-		default_location = default_gctf;
-	}
-	joboptions["fn_gctf_exe"] = JobOption("Gctf executable:", std::string(default_location), "*", ".", "Location of the Gctf executable. You can control the default of this field by setting environment variable RELION_GCTF_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
-	joboptions["do_ignore_ctffind_params"] = JobOption("Ignore 'Searches' parameters?", true, "If set to Yes, all parameters EXCEPT for phase shift search and its ranges on the 'Searches' tab will be ignored, and Gctf's default parameters will be used (box.size=1024; min.resol=50; max.resol=4; min.defocus=500; max.defocus=90000; step.defocus=500; astigm=1000) \n \
-\nIf set to No, all parameters on the CTFFIND tab will be passed to Gctf.");
-	joboptions["do_EPA"] = JobOption("Perform equi-phase averaging?", false, "If set to Yes, equi-phase averaging is used in the defocus refinement, otherwise basic rotational averaging will be performed.");
-	joboptions["other_gctf_args"] = JobOption("Other Gctf options:", std::string(""), "Provide additional gctf options here.");
-	joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':', threads by ','. ");
 }
 
 bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::string> &commands,
@@ -1791,7 +1783,13 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
 	command += " --FStep " + joboptions["dfstep"].getString();
 	command += " --dAst " + joboptions["dast"].getString();
 
-	if (!is_tomo)
+    if (is_tomo)
+    {
+        // tomo-specific options
+        command += " --localsearch_nominal_defocus " + joboptions["localsearch_nominal_defocus"].getString();
+        command += " --exp_factor_dose " +  joboptions["exp_factor_dose"].getString();
+    }
+	else
 	{
 		if (joboptions["use_noDW"].getBoolean())
 			command += " --use_noDW ";
@@ -1804,52 +1802,19 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
 		command += " --phase_step " + joboptions["phase_step"].getString();
 	}
 
-	if (joboptions["use_gctf"].getBoolean())
-	{
-		label += ".gctf";
+    label += ".ctffind4";
 
-		command += " --use_gctf --gctf_exe " + joboptions["fn_gctf_exe"].getString();
-		if (joboptions["do_ignore_ctffind_params"].getBoolean())
-			command += " --ignore_ctffind_params";
-		if (joboptions["do_EPA"].getBoolean())
-			command += " --EPA";
-
-		// GPU-allocation
-		command += " --gpu \"" + joboptions["gpu_ids"].getString() + "\"";
-
-		if (joboptions["other_gctf_args"].getString().find("--phase_shift_H") != std::string::npos ||
-		    joboptions["other_gctf_args"].getString().find("--phase_shift_L") != std::string::npos ||
-		    joboptions["other_gctf_args"].getString().find("--phase_shift_S") != std::string::npos)
-		{
-			error_message = "Please don't specify --phase_shift_L, H, S in 'Other Gctf options'. Use 'Estimate phase shifts' and 'Phase shift - Min, Max, Step' instead.";
-			return false;
-		}
-
-		if ((joboptions["other_gctf_args"].getString()).length() > 0)
-			command += " --extra_gctf_options \" " + joboptions["other_gctf_args"].getString() + " \"";
-
-	}
-	else if (joboptions["use_ctffind4"].getBoolean())
-	{
-		label += ".ctffind4";
-
-		command += " --ctffind_exe " + joboptions["fn_ctffind_exe"].getString();
-		command += " --ctfWin " + joboptions["ctf_win"].getString();
-		command += " --is_ctffind4 ";
-		if (!joboptions["slow_search"].getBoolean())
-		{
-			command += " --fast_search ";
-		}
-		if (joboptions["use_given_ps"].getBoolean())
-		{
-			command += " --use_given_ps ";
-		}
-	}
-	else
-	{
-		error_message = "ERROR: Please select use of CTFFIND4.1 or Gctf...";
-		return false;
-	}
+    command += " --ctffind_exe " + joboptions["fn_ctffind_exe"].getString();
+    command += " --ctfWin " + joboptions["ctf_win"].getString();
+    command += " --is_ctffind4 ";
+    if (!joboptions["slow_search"].getBoolean())
+    {
+        command += " --fast_search ";
+    }
+    if (joboptions["use_given_ps"].getBoolean())
+    {
+        command += " --use_given_ps ";
+    }
 
 	if (is_continue)
 		command += " --only_do_unfinished ";
