@@ -1903,7 +1903,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 #ifdef TIMING
 	if (op.part_id == baseMLO->exp_my_first_part_id)
 	{
-	{
 		if (exp_ipass == 0) baseMLO->timer.tic(baseMLO->TIMING_ESP_WEIGHT1);
 		else baseMLO->timer.tic(baseMLO->TIMING_ESP_WEIGHT2);
 	}

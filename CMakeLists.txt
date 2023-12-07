@@ -571,7 +571,11 @@ endforeach()
 
 option(FETCH_WEIGHTS "Download model weights for dependent packages" ON)
 if (FETCH_WEIGHTS)
-	message(STATUS "Will attempts to download model weights for dependent packages...")
+	message(STATUS
+			"Will attempts to download model weights for dependent packages..."
+			"\n"
+			"NOTE: You can skip this step by setting -DFETCH_WEIGHTS=OFF"
+	)
 
 	execute_process(
 			COMMAND bash ${CMAKE_BINARY_DIR}/bin/relion_python_fetch_weights
