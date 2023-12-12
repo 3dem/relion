@@ -1728,7 +1728,7 @@ void RelionJob::initialiseCtffindJob()
     if (is_tomo)
     {
         joboptions["localsearch_nominal_defocus"] = JobOption("Nominal defocus search range (A) ", 10000, 0, 20000, 1000, "If a positive value is given, the defocus search range will be set to +/- this value (in A) around the nominal defocus value from the input STAR file. If a zero or negative value are given, then the overall min-max defocus search ranges above will be used instead.");
-        joboptions["exp_factor_dose"] = JobOption("Dose-depedent Thon ring fading (e/A^2) ", 100, 0, 200, 10, "If a positive value is given, then the maximum resolution for CTF estimation is lowerered by exp(dose/this_factor) times the original maximum resolution specified above. Remember that exp(1) ~=2.7, so a value of 100 e/A^2 for this factor will yield 2.7x higher maxres for an accumulated dose of 100 e/A^2; Smaller values will lead to faster decay of the maxres. If zero or a negative value is given, the maximum value specified above will be used for all images.");
+        joboptions["exp_factor_dose"] = JobOption("Dose-dependent Thon ring fading (e/A^2) ", 100, 0, 200, 10, "If a positive value is given, then the maximum resolution for CTF estimation is lowerered by exp(dose/this_factor) times the original maximum resolution specified above. Remember that exp(1) ~=2.7, so a value of 100 e/A^2 for this factor will yield 2.7x higher maxres for an accumulated dose of 100 e/A^2; Smaller values will lead to faster decay of the maxres. If zero or a negative value is given, the maximum value specified above will be used for all images.");
     }
 
 	joboptions["ctf_win"] = JobOption("Estimate CTF on window size (pix) ", -1, -16, 4096, 16, "If a positive value is given, a squared window of this size at the center of the micrograph will be used to estimate the CTF. This may be useful to exclude parts of the micrograph that are unsuitable for CTF estimation, e.g. the labels at the edge of phtographic film. \n \n The original micrograph will be used (i.e. this option will be ignored) if a negative value is given.");
@@ -3896,7 +3896,7 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 			inputNodes.push_back(node);
 		}
 
-		if (joboptions["fn_ref"].getString() != "None")
+		if (joboptions["fn_ref"].getString() != "None" && joboptions["fn_ref"].getString() != "")
 		{
 			command += " --ref " + joboptions["fn_ref"].getString();
 			Node node(joboptions["fn_ref"].getString(), joboptions["fn_ref"].node_type);
