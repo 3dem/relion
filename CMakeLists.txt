@@ -188,6 +188,7 @@ endif()
 if(CUDA)
     # -----------------------------------------------------------------------------CUDA--
     # DOC: http://www.cmake.org/cmake/help/v3.0/module/FindCUDA.html
+    include(${CMAKE_SOURCE_DIR}/cmake/BuildTypes.cmake)
     FIND_PACKAGE(CUDA)
 
     if(CUDA_FOUND)
@@ -250,11 +251,14 @@ elseif(ALTCPU)
 		SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fhonor-infinities -fhonor-nans -fsigned-zeros")
 	endif()
 endif()
-
-# ----------------------------------------------------------INCLUDE ALL BUILD TYPES---
- #This *has* to be AFTER project()
- include(${CMAKE_SOURCE_DIR}/cmake/BuildTypes.cmake)
  
+# ----------------------------------------------------------INCLUDE ALL BUILD TYPES---
+# This has to be AFTER project() and find_package(HIP) but BEFORE find_package(CUDA).
+# This is ugly but otherwise causes the GitHub issue #1032.
+if (NOT CUDA)
+    include(${CMAKE_SOURCE_DIR}/cmake/BuildTypes.cmake)
+endif()
+
 # ------------------------------------------------------------------ALLOCATOR CHOICE--
 option(CachedAlloc "CachedAlloc" ON)
 if(NOT CachedAlloc)
@@ -567,7 +571,11 @@ endforeach()
 
 option(FETCH_WEIGHTS "Download model weights for dependent packages" ON)
 if (FETCH_WEIGHTS)
-	message(STATUS "Will attempts to download model weights for dependent packages...")
+	message(STATUS
+			"Will attempts to download model weights for dependent packages..."
+			"\n"
+			"NOTE: You can skip this step by setting -DFETCH_WEIGHTS=OFF"
+	)
 
 	execute_process(
 			COMMAND bash ${CMAKE_BINARY_DIR}/bin/relion_python_fetch_weights
