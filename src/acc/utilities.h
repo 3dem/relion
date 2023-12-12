@@ -422,7 +422,7 @@ static T getSumOnDevice(AccPtr<T> &ptr)
 #if defined DEBUG_CUDA || defined DEBUG_HIP
 	if (ptr.getSize() == 0)
 		printf("DEBUG_ERROR: getSumOnDevice called with pointer of zero size.\n");
-	if (ptr.getHostPtr() == NULL)
+	if (ptr.getDevicePtr() == NULL)
 		printf("DEBUG_ERROR: getSumOnDevice called with null device pointer.\n");
 #endif
 #ifdef _CUDA_ENABLED
@@ -445,7 +445,7 @@ static T getMinOnDevice(AccPtr<T> &ptr)
 #if defined DEBUG_CUDA || defined DEBUG_HIP
 	if (ptr.getSize() == 0)
 		printf("DEBUG_ERROR: getMinOnDevice called with pointer of zero size.\n");
-	if (ptr.getHostPtr() == NULL)
+	if (ptr.getDevicePtr() == NULL)
 		printf("DEBUG_ERROR: getMinOnDevice called with null device pointer.\n");
 #endif
 #ifdef _CUDA_ENABLED
@@ -468,7 +468,7 @@ static T getMaxOnDevice(AccPtr<T> &ptr)
 #if defined DEBUG_CUDA || defined DEBUG_HIP
 	if (ptr.getSize() == 0)
 		printf("DEBUG_ERROR: getMaxOnDevice called with pointer of zero size.\n");
-	if (ptr.getHostPtr() == NULL)
+	if (ptr.getDevicePtr() == NULL)
 		printf("DEBUG_ERROR: getMaxOnDevice called with null device pointer.\n");
 #endif
 #ifdef _CUDA_ENABLED
@@ -491,7 +491,7 @@ static std::pair<size_t, T> getArgMinOnDevice(AccPtr<T> &ptr)
 #if defined DEBUG_CUDA || defined DEBUG_HIP
 	if (ptr.getSize() == 0)
 		printf("DEBUG_ERROR: getArgMinOnDevice called with pointer of zero size.\n");
-	if (ptr.getHostPtr() == NULL)
+	if (ptr.getDevicePtr() == NULL)
 		printf("DEBUG_ERROR: getArgMinOnDevice called with null device pointer.\n");
 #endif
 #ifdef _CUDA_ENABLED
@@ -514,7 +514,7 @@ static std::pair<size_t, T> getArgMaxOnDevice(AccPtr<T> &ptr)
 #if defined DEBUG_CUDA || defined DEBUG_HIP
 	if (ptr.getSize() == 0)
 		printf("DEBUG_ERROR: getArgMaxOnDevice called with pointer of zero size.\n");
-	if (ptr.getHostPtr() == NULL)
+	if (ptr.getDevicePtr() == NULL)
 		printf("DEBUG_ERROR: getArgMaxOnDevice called with null device pointer.\n");
 #endif
 #ifdef _CUDA_ENABLED
