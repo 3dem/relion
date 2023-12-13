@@ -1581,7 +1581,7 @@ public:
 	#endif
 			if (ptr.getHostPtr() != NULL)
 				memcpy ( &hPtr[current_packed_pos], ptr.getHostPtr(), ptr.getSize() * sizeof(T));
-			ptr.freeHostIfSet();
+			ptr.freeIfSet();
 			ptr.setHostPtr((T*) &hPtr[current_packed_pos]);
 			ptr.setDevicePtr((T*) &dPtr[current_packed_pos]);
 
