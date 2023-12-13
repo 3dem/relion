@@ -1370,12 +1370,6 @@ void JobWindow::initialiseInimodelWindow()
 	tab1->label("I/O");
 	resetHeight();
 
-    if (is_tomo)
-    {
-        place("in_optimisation", TOGGLE_DEACTIVATE);
-        current_y += STEPY /2 ;
-    }
-
     place("fn_img", TOGGLE_DEACTIVATE);
     if (is_tomo)
     {
@@ -1459,12 +1453,6 @@ void JobWindow::initialiseClass3DWindow()
 	tab1->begin();
 	tab1->label("I/O");
 	resetHeight();
-
-    if (is_tomo)
-    {
-        place("in_optimisation", TOGGLE_DEACTIVATE);
-        current_y += STEPY /2 ;
-    }
 
     place("fn_img", TOGGLE_DEACTIVATE);
     if (is_tomo)
@@ -1655,12 +1643,6 @@ void JobWindow::initialiseAutorefineWindow()
 	tab1->begin();
 	tab1->label("I/O");
 	resetHeight();
-
-	if (is_tomo)
-	{
-		place("in_optimisation", TOGGLE_DEACTIVATE);
-		current_y += STEPY /2 ;
-	}
 
 	place("fn_img", TOGGLE_DEACTIVATE);
 	if (is_tomo)
@@ -2064,12 +2046,6 @@ void JobWindow::initialisePostprocessWindow()
 	tab1->begin();
 	tab1->label("I/O");
 	resetHeight();
-
-	if (is_tomo)
-	{
-		place("in_optimisation", TOGGLE_DEACTIVATE);
-		current_y += STEPY /2 ;
-	}
 
 	place("fn_in", TOGGLE_DEACTIVATE); //(current_y, "One of the 2 unfiltered half-maps:", NODE_HALFMAP, "", "MRC map files (*half1_class001_unfil.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
 	place("fn_mask", TOGGLE_DEACTIVATE); //(current_y, "Solvent mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask where the protein is white (1) and the solvent is black (0). Often, the softer the mask the higher resolution estimates you will get. A soft edge of 5-10 pixels is often a good edge width.");
@@ -2501,14 +2477,13 @@ void JobWindow::placeTomoInput(bool has_tomograms, bool has_particles,
 	tab1->label("I/O");
 	resetHeight();
 
-	place("in_optimisation", TOGGLE_DEACTIVATE);
-
-	current_y += STEPY /2 ;
-
 	if (has_particles) place("in_particles", TOGGLE_DEACTIVATE);
 	if (has_tomograms) place("in_tomograms", TOGGLE_DEACTIVATE);
 	if (has_trajectories) place("in_trajectories", TOGGLE_DEACTIVATE);
 	if (has_manifolds) place("in_manifolds", TOGGLE_DEACTIVATE);
+
+    current_y += STEPY /2 ;
+
 	if (has_halfmaps) place("in_halfmaps", TOGGLE_DEACTIVATE);
 	if (has_postprocess)
 	{
@@ -2831,19 +2806,6 @@ void JobWindow::initialiseTomoSubtomoWindow()
     place("do_stack2d", TOGGLE_DEACTIVATE);
     place("do_float16", TOGGLE_DEACTIVATE);
 
-	current_y += STEPY /2 ;
-
-	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group1->end();
-	place("do_cone_weight", TOGGLE_DEACTIVATE, group1);
-
-	group1->begin();
-
-	place("cone_angle", TOGGLE_DEACTIVATE);
-
-	group1->end();
-	guientries["do_cone_weight"].cb_menu_i();
-
 	tab2->end();
 }
 
@@ -2930,7 +2892,7 @@ void JobWindow::initialiseTomoCtfRefineWindow()
 
 void JobWindow::initialiseTomoAlignWindow()
 {
-	setupTabs(4);
+	setupTabs(3);
 
 	placeTomoInput(true, true, true, false, true, true);
 
@@ -2973,30 +2935,6 @@ void JobWindow::initialiseTomoAlignWindow()
 	guientries["do_motion"].cb_menu_i();
 
 	tab3->end();
-	tab4->begin();
-	tab4->label("Deformations");
-	resetHeight();
-
-	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group4->end();
-	place("do_deform", TOGGLE_DEACTIVATE, group4);
-
-	current_y += STEPY /2 ;
-
-	group4->begin();
-
-	place("def_w", TOGGLE_DEACTIVATE);
-	place("def_h", TOGGLE_DEACTIVATE);
-	place("def_model", TOGGLE_DEACTIVATE);
-	place("lambda", TOGGLE_DEACTIVATE);
-
-	current_y += STEPY /2 ;
-
-	place("do_frame_def", TOGGLE_DEACTIVATE);
-
-	group4->end();
-	guientries["do_deform"].cb_menu_i();
-	tab4->end();
 }
 
 void JobWindow::initialiseTomoReconParWindow()

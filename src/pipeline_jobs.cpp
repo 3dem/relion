@@ -3325,10 +3325,6 @@ void RelionJob::initialiseInimodelJob()
 {
 	hidden_name = ".gui_inimodel";
 
-	if (is_tomo)
-	{
-		joboptions["in_optimisation"] = JobOption("Input optimisation set: ", OUTNODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*optimisation_set.star)", "Input tomo optimisation set. Input images STAR file, reference halfmaps and reference mask files will be extracted. If input files are specified below, then they will override the components in this optimisation set.");
-	}
 	joboptions["fn_img"] = JobOption("Input images STAR file:", NODE_PARTS_CPIPE, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \
 In Gradient optimisation, it is very important that there are particles from enough different orientations. One only needs a few thousand to 10k particles. When selecting good 2D classes in the Subset Selection jobtype, use the option to select a maximum number of particles from each class to generate more even angular distributions for SGD.\
 \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
@@ -3434,15 +3430,6 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 		//fn_run += "_ct" + floatToString(it);
 		command += " --continue " + joboptions["fn_cont"].getString();
 
-		// If is_continue we still need tomo optimisation set to create output optimisation set
-		if (is_tomo && joboptions["in_optimisation"].getString() != "")
-		{
-			FileName fn_OS = joboptions["in_optimisation"].getString();
-			Node node(fn_OS, joboptions["in_optimisation"].node_type);
-			inputNodes.push_back(node);
-			command += " --ios " + fn_OS;
-		}
-
 	}
 
 	command += " --o " + outputname + fn_run;
@@ -3460,20 +3447,7 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 		command += " --grad --denovo_3dref ";
 
 		// If tomo optimiser set is passed, fn_img and fn_ref can be empty
-		if (is_tomo && joboptions["in_optimisation"].getString() != "")
-		{
-			// Optimiser set should contain particles, halfmap and refmask or they should be set especifically
-			// If Optimiset set is passed without halfmaps or refmask, they cannot be set as "None" in the GUI.
-			FileName fn_OS = joboptions["in_optimisation"].getString();
-			Node node(fn_OS, joboptions["in_optimisation"].node_type);
-			inputNodes.push_back(node);
-			command += " --ios " + fn_OS;
-
-			Node node1( outputname + fn_run + "_optimisation_set.star", LABEL_TOMO_OPTIMISATION);
-			outputNodes.push_back(node1);
-
-		}
-		else if (joboptions["fn_img"].getString() == "")
+		if (joboptions["fn_img"].getString() == "")
 		{
 			error_message = "ERROR: empty field for input STAR file...";
 			return false;
@@ -3600,10 +3574,6 @@ void RelionJob::initialiseClass3DJob()
 {
 	hidden_name = ".gui_class3d";
 
-	if (is_tomo)
-	{
-		joboptions["in_optimisation"] = JobOption("Input optimisation set: ", OUTNODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*optimisation_set.star)", "Input tomo optimisation set. Input images STAR file, reference halfmaps and reference mask files will be extracted. If input files are specified below, then they will override the components in this optimisation set.");
-	}
 	joboptions["fn_img"] = JobOption("Input images STAR file:", NODE_PARTS_CPIPE, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
 nor will it be possible to perform noise spectra estimation or intensity scale corrections in image groups. Therefore, running RELION with an input stack will in general provide sub-optimal results and is therefore not recommended!! Use the Preprocessing procedure to get the input STAR file in a semi-automated manner. Read the RELION wiki for more information.");
 	if (is_tomo)
@@ -3665,7 +3635,8 @@ Therefore, this option is not generally recommended: try increasing amplitude co
 
 	joboptions["nr_classes"] = JobOption("Number of classes:", 1, 1, 50, 1, "The number of classes (K) for a multi-reference refinement. \
 These classes will be made in an unsupervised manner from a single reference by division of the data into random subsets during the first iteration.");
-	joboptions["tau_fudge"] = JobOption("Regularisation parameter T:", 4 , 0.1, 10, 0.1, "Bayes law strictly determines the relative weight between \
+	float default_T = (is_tomo) ? 1 : 4;
+    joboptions["tau_fudge"] = JobOption("Regularisation parameter T:", default_T , 0.1, 10, 0.1, "Bayes law strictly determines the relative weight between \
 the contribution of the experimental data and the prior. However, in practice one may need to adjust this weight to put slightly more weight on \
 the experimental data to allow optimal results. Values greater than 1 for this regularisation parameter (T in the JMB2011 paper) put more \
 weight on the experimental data. Values around 2-4 have been observed to be useful for 3D refinements, values of 1-2 for 2D refinements. \
@@ -3835,12 +3806,6 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 		//fn_run += "_ct" + floatToString(it);;
 		command += " --continue " + joboptions["fn_cont"].getString();
 
-		// If is_continue we still need tomo optimisation set to create output optimisation set
-		if (is_tomo && joboptions["in_optimisation"].getString() != "")
-		{
-			FileName fn_OS = joboptions["in_optimisation"].getString();
-			command += " --ios " + fn_OS;
-		}
 	}
 
 	command += " --o " + outputname + fn_run;
@@ -3855,23 +3820,7 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 
 	if (!is_continue)
 	{
-		// If tomo optimiser set is passed, fn_img and fn_ref can be empty
-		if (is_tomo && joboptions["in_optimisation"].getString() != "")
-		{
-			// Optimiser set should contain particles, halfmap and refmask or they should be set especifically
-			// If Optimiset set is passed without halfmaps or refmask, they cannot be set as "None" in the GUI.
-			FileName fn_OS = joboptions["in_optimisation"].getString();
-			Node node(fn_OS, joboptions["in_optimisation"].node_type);
-			inputNodes.push_back(node);
-			command += " --ios " + fn_OS;
-
-			Node node1( outputname + fn_run + "_optimisation_set.star", LABEL_TOMO_OPTIMISATION);
-			outputNodes.push_back(node1);
-
-			if (joboptions["fn_ref"].getString() == "" && !joboptions["ref_correct_greyscale"].getBoolean())
-				command += " --firstiter_cc";
-		}
-		else if (joboptions["fn_img"].getString() == "")
+		if (joboptions["fn_img"].getString() == "")
 		{
 			error_message = "ERROR: empty field for input STAR file...";
 			return false;
@@ -4115,10 +4064,6 @@ void RelionJob::initialiseAutorefineJob()
 
 	hidden_name = ".gui_auto3d";
 
-	if (is_tomo)
-	{
-		joboptions["in_optimisation"] = JobOption("Input optimisation set: ", OUTNODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*optimisation_set.star)", "Input tomo optimisation set. Input images STAR file, reference halfmaps and reference mask files will be extracted. If input files are specified below, then they will override the components in this optimisation set.");
-	}
 	joboptions["fn_img"] = JobOption("Input images STAR file:", NODE_PARTS_CPIPE, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
 nor will it be possible to perform noise spectra estimation or intensity scale corrections in image groups. Therefore, running RELION with an input stack will in general provide sub-optimal results and is therefore not recommended!! Use the Preprocessing procedure to get the input STAR file in a semi-automated manner. Read the RELION wiki for more information.");
 	if (is_tomo)
@@ -4329,12 +4274,6 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 		//fn_run += "_ct" + floatToString(it);
 		command += " --continue " + joboptions["fn_cont"].getString();
 
-		// If is_continue we still need tomo optimisation set to create output optimisation set
-		if (is_tomo && joboptions["in_optimisation"].getString() != "")
-		{
-			FileName fn_OS = joboptions["in_optimisation"].getString();
-			command += " --ios " + fn_OS;
-		}
 	}
 
 	command += " --o " + outputname + fn_run;
@@ -4352,25 +4291,7 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 			command += " --blush ";
 		}
 
-		 // If tomo optimiser set is passed, fn_img and fn_ref can be empty
-		if (is_tomo && joboptions["in_optimisation"].getString() != "")
-		{
-			// Optimiser set should contain particles, halfmap and refmask or they should be set especifically
-			// If Optimiset set is passed without halfmaps or refmask, they cannot be set as "None" in the GUI.
-			FileName fn_OS = joboptions["in_optimisation"].getString();
-			Node node(fn_OS, joboptions["in_optimisation"].node_type);
-			inputNodes.push_back(node);
-			command += " --ios " + fn_OS;
-
-			Node node1( outputname + fn_run + "_optimisation_set.star", LABEL_TOMO_OPTIMISATION);
-			outputNodes.push_back(node1);
-
-			if (joboptions["fn_mask"].getString() == "" && joboptions["do_solvent_fsc"].getBoolean())
-				command += " --solvent_correct_fsc ";
-			if (joboptions["fn_ref"].getString() == "" && !joboptions["ref_correct_greyscale"].getBoolean())
-				command += " --firstiter_cc";
-		}
-		else if (joboptions["fn_img"].getString() == "")
+		if (joboptions["fn_img"].getString() == "")
 		{
 			error_message = "ERROR: empty field for input STAR file...";
 			return false;
@@ -5264,10 +5185,6 @@ void RelionJob::initialisePostprocessJob()
 {
 	hidden_name = ".gui_post";
 
-	if (is_tomo)
-	{
-		joboptions["in_optimisation"] = JobOption("Input optimisation set: ", OUTNODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*optimisation_set.star)", "Input tomo optimisation set. Half map files will be extracted. If half maps are specified below, then they will override the components in this optimisation set.");
-	}
 	joboptions["fn_in"] = JobOption("One of the 2 unfiltered half-maps:", NODE_HALFMAP_CPIPE, "", "MRC map files (*half1*.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
 	joboptions["fn_mask"] = JobOption("Solvent mask:", NODE_MASK_CPIPE, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask where the protein is white (1) and the solvent is black (0). Often, the softer the mask the higher resolution estimates you will get. A soft edge of 5-10 pixels is often a good edge width.");
 	joboptions["angpix"] = JobOption("Calibrated pixel size (A)", -1, 0.3, 5, 0.1, "Provide the final, calibrated pixel size in Angstroms. This value may be different from the pixel-size used thus far, e.g. when you have recalibrated the pixel size using the fit to a PDB model. The X-axis of the output FSC plot will use this calibrated value.");
@@ -5313,17 +5230,7 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 	FileName fn_half1 = joboptions["fn_in"].getString();
 	FileName fn_half2;
 
-	if (is_tomo && joboptions["in_optimisation"].getString() != "")
-	{
-		FileName fn_OS = joboptions["in_optimisation"].getString();
-		Node node(fn_OS, joboptions["in_optimisation"].node_type);
-		inputNodes.push_back(node);
-		command += " --ios " + fn_OS;
-
-		Node node1(outputname + "postprocess_optimisation_set.star", LABEL_TOMO_OPTIMISATION);
-		outputNodes.push_back(node1);
-	}
-	else if (fn_half1 == "")
+	if (fn_half1 == "")
 	{
 		error_message = "ERROR: empty field for input half-map...";
 		return false;
@@ -6322,17 +6229,16 @@ void RelionJob::addTomoInputOptions(bool has_tomograms, bool has_particles,
 		bool has_trajectories, bool has_manifolds, bool has_halfmaps, bool has_postprocess)
 {
 	// Optional input nodes
-	joboptions["in_optimisation"] = JobOption("Input optimisation set: ", OUTNODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*optimisation_set.star)", "Input optimisation set. This will be passed with a --i argument to the executable. If any inidividual components of the optimisation set are specified below, then they will override the components in this optimisation set.");
-	if (has_particles) joboptions["in_particles"] = JobOption("Input particle set: ", OUTNODE_TOMO_PARTS, "", "Particle STAR file (*.star)", "Input particle set. This will be passed with a --p argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
-	if (has_tomograms) joboptions["in_tomograms"] = JobOption("Input tomogram set: ", OUTNODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "Input tomogram set. This will be passed with a --m argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
-	if (has_trajectories) joboptions["in_trajectories"] = JobOption("Input trajectory set: ", OUTNODE_TOMO_TRAJECTORIES, "", "Trajectory set STAR file (*.star)", "Input trajectory set. This will be passed with a --mot argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
-	if (has_manifolds) joboptions["in_manifolds"] = JobOption("Input manifold set: ", OUTNODE_TOMO_MANIFOLDS, "", "Manifold set STAR file (*.star)", "Input manifold set. This will be passed with a --man argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
-	 if (has_halfmaps) joboptions["in_halfmaps"] = JobOption("One of the 2 reference half-maps:", OUTNODE_TOMO_HALFMAP, "", "MRC map files (*half1*.mrc)", "Provide one of the two reference half-reconstructions. Both maps will be passed with a --ref1 and --ref2 arguments to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
-	 if (has_postprocess)
-	 {
-	 	joboptions["in_refmask"] = JobOption("Reference mask: ", NODE_MASK_CPIPE, "", "Image Files (*.mrc)", "Input reference mask. This will be passed with a --mask argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
-	 	joboptions["in_post"] = JobOption("Input postprocess STAR: ", OUTNODE_TOMO_POST, "", "Postprocess STAR file (postprocess.star)", "Input STAR file from a relion_postprocess job. This will be passed with a --fsc argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
-	 }
+	if (has_particles) joboptions["in_particles"] = JobOption("Input particle set: ", OUTNODE_TOMO_PARTS, "", "Particle STAR file (*.star)", "Input particle set.");
+	if (has_tomograms) joboptions["in_tomograms"] = JobOption("Input tomogram set: ", OUTNODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "Input tomogram set STAR file. This file gets generated during Tomogram Reconstruction, and updated during Tomogram Frame Alignment or Tomogram CTF Refinement.");
+	if (has_trajectories) joboptions["in_trajectories"] = JobOption("Input trajectory set: ", OUTNODE_TOMO_TRAJECTORIES, "", "Trajectory set STAR file (*.star)", "Input trajectory set. Leave empty if no particle motion tracks have been estimated during tomogram frame alignment.");
+	if (has_manifolds) joboptions["in_manifolds"] = JobOption("Input manifold set: ", OUTNODE_TOMO_MANIFOLDS, "", "Manifold set STAR file (*.star)", "Input manifold set. Leave empty if no manifolds have been defined.");
+    if (has_halfmaps) joboptions["in_halfmaps"] = JobOption("One of the 2 reference half-maps:", OUTNODE_TOMO_HALFMAP, "", "MRC map files (*half1*.mrc)", "Provide one of the two reference half-reconstructions.");
+    if (has_postprocess)
+    {
+        joboptions["in_refmask"] = JobOption("Reference mask: ", NODE_MASK_CPIPE, "", "Image Files (*.mrc)", "Input reference mask.");
+        joboptions["in_post"] = JobOption("Input postprocess STAR: ", OUTNODE_TOMO_POST, "", "Postprocess STAR file (postprocess.star)", "postprocess.star file from a relion_postprocess job for weighting of Fourier terms.");
+    }
 }
 
 std::string RelionJob::getTomoInputCommmand(std::string &command, int has_tomograms, int has_particles,
@@ -6340,147 +6246,100 @@ std::string RelionJob::getTomoInputCommmand(std::string &command, int has_tomogr
 {
 	std::string error_message = "";
 
-	// if no optimisation set is given, check all other necessary files are present
-	if (joboptions["in_optimisation"].getString() == "")
-	{
-		if (has_tomograms == HAS_COMPULSORY && joboptions["in_tomograms"].getString() == "")
-		{
-			error_message = "ERROR: no optimisation set is specified, yet also no tomogram set is specified";
-			return error_message;
-		}
-		if (has_particles == HAS_COMPULSORY && joboptions["in_particles"].getString() == "")
-		{
-			error_message = "ERROR: no optimisation set is specified, yet also no particle set is specified";
-			return error_message;
-		}
-		if (has_trajectories == HAS_COMPULSORY && joboptions["in_trajectories"].getString() == "")
-		{
-			error_message = "ERROR: no optimisation set is specified, yet also no trajectory set is specified";
-			return error_message;
-		}
-		if (has_manifolds == HAS_COMPULSORY && joboptions["in_manifolds"].getString() == "")
-		{
-			error_message = "ERROR: no optimisation set is specified, yet also no manifold set is specified";
-			return error_message;
-		}
-		if (has_halfmaps == HAS_COMPULSORY && joboptions["in_halfmaps"].getString() == "")
-		{
-			error_message = "ERROR: no optimisation set is specified, yet also no reference half map file is specified";
-			return error_message;
-		}
-		if (has_postprocess == HAS_COMPULSORY)
-		{
-			if (joboptions["in_refmask"].getString() == "")
-			{
-				error_message = "ERROR: no optimisation set is specified, yet also no reference mask file is specified";
-				return error_message;
-			}
-			if (joboptions["in_post"].getString() == "")
-			{
-				error_message = "ERROR: no optimisation set is specified, yet also no postprocess star file is specified";
-				return error_message;
-			}
-		}
-	}
+	// Check all other necessary files are present
+    if (has_tomograms == HAS_COMPULSORY && joboptions["in_tomograms"].getString() == "")
+    {
+        error_message = "ERROR: no tomogram set is specified";
+        return error_message;
+    }
+    if (has_particles == HAS_COMPULSORY && joboptions["in_particles"].getString() == "")
+    {
+        error_message = "ERROR: no particle set is specified";
+        return error_message;
+    }
+    if (has_trajectories == HAS_COMPULSORY && joboptions["in_trajectories"].getString() == "")
+    {
+        error_message = "ERROR: no trajectory set is specified";
+        return error_message;
+    }
+    if (has_manifolds == HAS_COMPULSORY && joboptions["in_manifolds"].getString() == "")
+    {
+        error_message = "ERROR: no manifold set is specified";
+        return error_message;
+    }
+    if (has_halfmaps == HAS_COMPULSORY && joboptions["in_halfmaps"].getString() == "")
+    {
+        error_message = "ERROR: no reference half map file is specified";
+        return error_message;
+    }
+    if (has_postprocess == HAS_COMPULSORY)
+    {
+        if (joboptions["in_refmask"].getString() == "")
+        {
+            error_message = "ERROR: no reference mask file is specified";
+            return error_message;
+        }
+        if (joboptions["in_post"].getString() == "")
+        {
+            error_message = "ERROR: no postprocess.star file is specified";
+            return error_message;
+        }
+    }
 
-	if (joboptions["in_optimisation"].getString() != "")
-	{
-		Node node(joboptions["in_optimisation"].getString(), joboptions["in_optimisation"].node_type);
-		inputNodes.push_back(node);
-		command += " --i " + joboptions["in_optimisation"].getString();
-	}
-	if (has_tomograms != HAS_NOT && joboptions["in_tomograms"].getString() != "")
-	{
-		Node node(joboptions["in_tomograms"].getString(), joboptions["in_tomograms"].node_type);
-		inputNodes.push_back(node);
-		command += " --t " + joboptions["in_tomograms"].getString();
-		}
-	if (has_particles != HAS_NOT && joboptions["in_particles"].getString() != "")
-	{
-		Node node(joboptions["in_particles"].getString(), joboptions["in_particles"].node_type);
-		inputNodes.push_back(node);
-		command += " --p " + joboptions["in_particles"].getString();
-	}
-	if (has_trajectories != HAS_NOT && joboptions["in_trajectories"].getString() != "")
-	{
-		Node node(joboptions["in_trajectories"].getString(), joboptions["in_trajectories"].node_type);
-		inputNodes.push_back(node);
-		command += " --mot " + joboptions["in_trajectories"].getString();
-	}
-	if (has_manifolds != HAS_NOT && joboptions["in_manifolds"].getString() != "")
-	{
-		Node node(joboptions["in_manifolds"].getString(), joboptions["in_manifolds"].node_type);
-		inputNodes.push_back(node);
-		command += " --man " + joboptions["in_manifolds"].getString();
-	}
-	if (has_halfmaps != HAS_NOT && joboptions["in_halfmaps"].getString() != "")
-	{
-		// Input half map (one of them)
-		FileName fn_half1 = joboptions["in_halfmaps"].getString();
-		FileName fn_half2;
-		if (!fn_half1.getTheOtherHalf(fn_half2))
-		{
-			error_message = "ERROR: cannot find 'half' substring in the halfmap filename...";
-			return error_message;
-		}
-		Node node(fn_half1, joboptions["in_halfmaps"].node_type);
-		inputNodes.push_back(node);
-		command += " --ref1 " + fn_half1;
-		command += " --ref2 " + fn_half2;
-	}
-	if (has_postprocess != HAS_NOT && joboptions["in_refmask"].getString() != "")
-	{
-		Node node(joboptions["in_refmask"].getString(), joboptions["in_refmask"].node_type);
-		inputNodes.push_back(node);
-		command += " --mask " + joboptions["in_refmask"].getString();
-	}
-	if (has_postprocess != HAS_NOT && joboptions["in_post"].getString() != "")
-	{
-		Node node(joboptions["in_post"].getString(), joboptions["in_post"].node_type);
-		inputNodes.push_back(node);
-		command += " --fsc " + joboptions["in_post"].getString();
-	}
+    if (has_particles != HAS_NOT && joboptions["in_particles"].getString() != "")
+    {
+        Node node(joboptions["in_particles"].getString(), joboptions["in_particles"].node_type);
+        inputNodes.push_back(node);
+        command += " --p " + joboptions["in_particles"].getString();
+    }
+    if (has_tomograms != HAS_NOT && joboptions["in_tomograms"].getString() != "")
+    {
+        Node node(joboptions["in_tomograms"].getString(), joboptions["in_tomograms"].node_type);
+        inputNodes.push_back(node);
+        command += " --t " + joboptions["in_tomograms"].getString();
+    }
+    if (has_trajectories != HAS_NOT && joboptions["in_trajectories"].getString() != "")
+    {
+        Node node(joboptions["in_trajectories"].getString(), joboptions["in_trajectories"].node_type);
+        inputNodes.push_back(node);
+        command += " --mot " + joboptions["in_trajectories"].getString();
+    }
+    if (has_manifolds != HAS_NOT && joboptions["in_manifolds"].getString() != "")
+    {
+        Node node(joboptions["in_manifolds"].getString(), joboptions["in_manifolds"].node_type);
+        inputNodes.push_back(node);
+        command += " --man " + joboptions["in_manifolds"].getString();
+    }
+    if (has_halfmaps != HAS_NOT && joboptions["in_halfmaps"].getString() != "")
+    {
+        // Input half map (one of them)
+        FileName fn_half1 = joboptions["in_halfmaps"].getString();
+        FileName fn_half2;
+        if (!fn_half1.getTheOtherHalf(fn_half2))
+        {
+            error_message = "ERROR: cannot find 'half' substring in the halfmap filename...";
+            return error_message;
+        }
+        Node node(fn_half1, joboptions["in_halfmaps"].node_type);
+        inputNodes.push_back(node);
+        command += " --ref1 " + fn_half1;
+        command += " --ref2 " + fn_half2;
+    }
+    if (has_postprocess != HAS_NOT && joboptions["in_refmask"].getString() != "")
+    {
+        Node node(joboptions["in_refmask"].getString(), joboptions["in_refmask"].node_type);
+        inputNodes.push_back(node);
+        command += " --mask " + joboptions["in_refmask"].getString();
+    }
+    if (has_postprocess != HAS_NOT && joboptions["in_post"].getString() != "")
+    {
+        Node node(joboptions["in_post"].getString(), joboptions["in_post"].node_type);
+        inputNodes.push_back(node);
+        command += " --fsc " + joboptions["in_post"].getString();
+    }
 
 	return error_message;
 }
-
-std::string RelionJob::setTomoOutputCommand(std::string &command, std::string optimisationSet,	std::string tomograms,
-								std::string particles, std::string trajectories, std::string manifolds,
-								std::string halfmap1, std::string postprocess, std::string refmask,
-								std::string optimisationSetOut)
-{
-	std::string error_message = "";
-
-	// Create output optimisation set
-	command = "`which relion_tomo_make_optimisation_set`";
-	command += " --o " + optimisationSetOut;
-
-	if (optimisationSet != "") command += " --i " + optimisationSet;
-	if (tomograms != "") command += " --t " + tomograms;
-	if (particles != "") command += " --p " + particles;
-	if (trajectories != "") command += " --mot " + trajectories;
-	if (manifolds != "") command += " --man " + manifolds;
-	if (halfmap1 != "")
-	{
-		FileName fn_half1 = halfmap1;
-		FileName halfmap2;
-		if (!fn_half1.getTheOtherHalf(halfmap2))
-		{
-			error_message = "ERROR: cannot find 'half' substring in the input filename...";
-			return error_message;
-		}
-		command += " --ref1 " + halfmap1;
-		command += " --ref2 " + halfmap2;
-	}
-	if (postprocess != "") command += " --fsc " + postprocess;
-	if (refmask != "") command += " --mask " + refmask;
-
-	Node node1(optimisationSetOut, LABEL_TOMO_OPTIMISATION);
-	outputNodes.push_back(node1);
-
-	return error_message;
-}
-
 
 void RelionJob::initialiseTomoImportJob()
 {
@@ -6649,8 +6508,6 @@ bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<st
 
 		Node node(outputname+"particles.star", LABEL_TOMO_PARTS);
 		outputNodes.push_back(node);
-		Node node2(outputname+"optimisation_set.star", LABEL_TOMO_OPTIMISATION);
-		outputNodes.push_back(node2);
 	}
 	else if (do_other)
 	{
@@ -7165,14 +7022,11 @@ void RelionJob::initialiseTomoSubtomoJob()
 
 	hidden_name = ".gui_tomo_subtomo";
 
-	addTomoInputOptions(true, true, true, false, false, false);
+    addTomoInputOptions(true, true, true, false, false, false);
 
 	joboptions["box_size"] = JobOption("Box size (pix):", 128, 32, 512, 16, "The initial box size of the reconstruction. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
 	joboptions["crop_size"] = JobOption("Cropped box size (pix):", -1, -1, 512, 16, "If set to a positive value, after construction, the resulting pseudo subtomograms are cropped to this size. A smaller box size allows the (generally expensive) refinement using relion_refine to proceed more rapidly.");
 	joboptions["binning"] = JobOption("Binning factor:", 1, 1, 16, 1, "The tilt series images will be binned by this (real-valued) factor and then reconstructed in the specified box size above. Note that thereby the reconstructed region becomes larger when specifying binning factors larger than one.");
-
-	joboptions["do_cone_weight"] = JobOption("Use cone weight?", false, "If set to Yes, then downweight a cone in Fourier space along the Z axis (as defined by the coordinate system of the particle). This is useful for particles embedded in a membrane, as it can prevent the alignment from being driven by the membrane signal (the signal of a planar membrane is localised within one line in 3D Fourier space). Note that the coordinate system of a particle is given by both the subtomogram orientation (if defined) and the particle orientation (see particle set). This allows the user to first obtain a membrane-driven alignment, and to then specifically suppress the signal in that direction.");
-	joboptions["cone_angle"] = JobOption("Cone angle:", 10, 1, 50, 1, "The (full) opening angle of the cone to be suppressed, given in degrees. This angle should include both the uncertainty about the membrane orientation and its variation across the region represented in the subtomogram.");
 
 	joboptions["do_stack2d"] = JobOption("Write output as 2D stacks?", true ,"If set to Yes, this program will write output subtomograms as 2D substacks. This is new as of relion-4.1, and the preferred way of generating subtomograms. If set to No, then relion-4.0 3D pseudo-subtomograms will be written out. Either can be used in subsequent refinements and classifications.");
 	joboptions["do_float16"] = JobOption("Write output in float16?", true ,"If set to Yes, this program will write output images in float16 MRC format. This will save a factor of two in disk space compared to the default of writing in float32. Note that RELION and CCPEM will read float16 images, but other programs may not (yet) do so.");
@@ -7199,8 +7053,6 @@ bool RelionJob::getCommandsTomoSubtomoJob(std::string &outputname, std::vector<s
 
 	command += " --theme classic --o " + outputname;
 
-	Node node1(outputname+"optimisation_set.star", LABEL_TOMO_OPTIMISATION);
-	outputNodes.push_back(node1);
 	Node node2(outputname+"particles.star", LABEL_TOMO_PARTS);
 	outputNodes.push_back(node2);
 
@@ -7213,11 +7065,6 @@ bool RelionJob::getCommandsTomoSubtomoJob(std::string &outputname, std::vector<s
 	if (crop_size > 0.) command += " --crop " + joboptions["crop_size"].getString();
 
 	command += " --bin " + joboptions["binning"].getString();
-
-	if (joboptions["do_cone_weight"].getBoolean())
-	{
-		command += " --cone_weight --cone_angle " + joboptions["cone_angle"].getString();
-	}
 
 	if (joboptions["do_float16"].getBoolean())
 	{
@@ -7295,8 +7142,6 @@ bool RelionJob::getCommandsTomoCtfRefineJob(std::string &outputname, std::vector
 
 	command += " --theme classic --o " + outputname;
 
-	Node node1(outputname+"optimisation_set.star", LABEL_TOMO_OPTIMISATION);
-	outputNodes.push_back(node1);
 	Node node2(outputname+"tomograms.star", LABEL_TOMO_TOMOGRAMS);
 	outputNodes.push_back(node2);
 	Node node3(outputname + "logfile.pdf", LABEL_TOMO_CTFREFINE_LOG);
@@ -7371,13 +7216,6 @@ void RelionJob::initialiseTomoAlignJob()
 	joboptions["sigma_div"] = JobOption("Sigma for divergence (A): ", 5000, 0, 10000, 10000, "The expected spatial smoothness of the particle trajectories in A (a greater value means spatially smoother motion");
 	joboptions["do_sq_exp_ker"] = JobOption("Use Gaussian decay?", false, "If set to Yes, then assume that the correlation of the velocities of two particles decays as a Gaussian over their distance, instead of as an exponential. This will produce spatially smoother motion and result in a shorter program runtime.");
 
-	joboptions["do_deform"] = JobOption("Estimate 2D deformations?", false, "If set to Yes, then the subtomogram version of Bayesian polishing will be used to fit per-particle (3D) motion tracks, besides the rigid part of the motion in the tilt series.");
-	joboptions["def_w"] = JobOption("Horizontal sampling points: ", 3, 0, 10, 1, "Number of horizontal sampling points for the deformation grid.");
-	joboptions["def_h"] = JobOption("Vertical sampling points: ", 3, 0, 10, 1, "Number of vertical sampling points for the deformation grid.");
-	joboptions["def_model"] = JobOption("Deformation Model:", job_tomo_align_def_model, 1, "Type of model to use (linear, spline or Fourier).");
-	joboptions["lambda"] = JobOption("Deformation regularisation lambda:", 0., 0, 1, 0.05, "Deformation regularisation scale.");
-	joboptions["do_frame_def"] = JobOption("Refine deformations per frame?", false, "If set to Yes, it models deformations per tilt frame instead of per tilt series.");
-
 }
 
 bool RelionJob::getCommandsTomoAlignJob(std::string &outputname, std::vector<std::string> &commands,
@@ -7401,8 +7239,6 @@ bool RelionJob::getCommandsTomoAlignJob(std::string &outputname, std::vector<std
 
 	command += " --theme classic --o " + outputname;
 
-	Node node1(outputname+"optimisation_set.star", LABEL_TOMO_OPTIMISATION);
-	outputNodes.push_back(node1);
 	Node node2(outputname+"tomograms.star", LABEL_TOMO_TOMOGRAMS);
 	outputNodes.push_back(node2);
 	Node node3(outputname+"particles.star", LABEL_TOMO_PARTS);
@@ -7447,19 +7283,6 @@ bool RelionJob::getCommandsTomoAlignJob(std::string &outputname, std::vector<std
 		if (joboptions["do_sq_exp_ker"].getBoolean())
 		{
 			command += " --sq_exp_ker ";
-		}
-	}
-	if (joboptions["do_deform"].getBoolean())
-	{
-		command += " --deformation ";
-		command += " --def_w " + joboptions["def_w"].getString();
-		command += " --def_h " + joboptions["def_h"].getString();
-		command += " --def_model " + joboptions["def_model"].getString();
-		command += " --def_reg " + joboptions["lambda"].getString();
-
-		if (joboptions["do_frame_def"].getBoolean())
-		{
-			command += " --per_frame_deformation ";
 		}
 	}
 
@@ -7529,8 +7352,6 @@ bool RelionJob::getCommandsTomoReconPartJob(std::string &outputname, std::vector
 		outputNodes.push_back(node1);
 		Node node2(outputname+"half1.mrc", LABEL_TOMO_HALFMAP);
 		outputNodes.push_back(node2);
-		Node node3(outputname+"optimisation_set.star", LABEL_TOMO_OPTIMISATION);
-		outputNodes.push_back(node3);
 
 		// Job-specific stuff goes here
 		command += " --b " + joboptions["box_size"].getString();

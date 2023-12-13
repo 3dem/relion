@@ -1318,11 +1318,6 @@ public:
 	std::string getTomoInputCommmand(std::string &command, int has_tomograms, int has_particles,
 									 int has_trajectories, int has_manifolds, bool has_halfmaps, int has_postprocess);
 
-	std::string setTomoOutputCommand(std::string &command, std::string optimisationSet, std::string tomograms,
-									 std::string particles, std::string trajectories, std::string manifolds,
-									 std::string halfmap1, std::string postprocess, std::string refmask,
-									 std::string optimisationSetOut);
-
 	void initialiseTomoImportJob();
 	bool getCommandsTomoImportJob(std::string &outputname, std::vector<std::string> &commands,
 								  std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
