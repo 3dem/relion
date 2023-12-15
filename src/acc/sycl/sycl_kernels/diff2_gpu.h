@@ -146,8 +146,13 @@ void sycl_kernel_diff2_coarse(
 				{
 //					translatePixel(x, y, z, tx, ty, tz, s_real[pix+init_pixel%block_sz], s_imag[pix+init_pixel%block_sz], real, imag);
 					XFLOAT val {x*tx + y*ty + z*tz};
+#ifdef ACC_DOUBLE_PRECISION
+					XFLOAT s {sycl::sin(val)};
+					XFLOAT c {sycl::cos(val)};
+#else
 					XFLOAT s {sycl::native::sin(val)};
 					XFLOAT c {sycl::native::cos(val)};
+#endif
 					real = c * s_real[pix + init_pixel%block_sz] - s * s_imag[pix + init_pixel%block_sz];
 					imag = c * s_imag[pix + init_pixel%block_sz] + s * s_real[pix + init_pixel%block_sz];
 				}
@@ -155,8 +160,13 @@ void sycl_kernel_diff2_coarse(
 				{
 //					translatePixel(x, y,    tx, ty,     s_real[pix+init_pixel%block_sz], s_imag[pix+init_pixel%block_sz], real, imag);
 					XFLOAT val {x*tx + y*ty};
+#ifdef ACC_DOUBLE_PRECISION
+					XFLOAT s {sycl::sin(val)};
+					XFLOAT c {sycl::cos(val)};
+#else
 					XFLOAT s {sycl::native::sin(val)};
 					XFLOAT c {sycl::native::cos(val)};
+#endif
 					real = c*s_real[pix + init_pixel%block_sz] - s*s_imag[pix + init_pixel%block_sz];
 					imag = c*s_imag[pix + init_pixel%block_sz] + s*s_real[pix + init_pixel%block_sz];
 				}
@@ -396,7 +406,11 @@ void sycl_kernel_diff2_CC_coarse(
 	}
 
 	if (tid == 0)
+#ifdef ACC_DOUBLE_PRECISION
+		g_diff2[iorient*trans_num + itrans] += -s_weight[0] / sycl::sqrt(s_norm[0]);
+#else
 		g_diff2[iorient*trans_num + itrans] += -s_weight[0] / sycl::native::sqrt(s_norm[0]);
+#endif
 }
 
 template<bool REF3D, bool DATA3D, int block_sz>
@@ -517,7 +531,11 @@ void sycl_kernel_diff2_CC_fine(
 		}
 
 		if (tid < trans_num)
+#ifdef ACC_DOUBLE_PRECISION
+			g_diff2s[d_job_idx[bid] + tid] += -s[tid * block_sz] / sycl::sqrt(s_cc[tid * block_sz]);
+#else
 			g_diff2s[d_job_idx[bid] + tid] += -s[tid * block_sz] / sycl::native::sqrt(s_cc[tid * block_sz]);
+#endif
     }
 }
 
