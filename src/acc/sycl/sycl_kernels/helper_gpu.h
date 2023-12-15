@@ -345,7 +345,11 @@ static void sycl_kernel_exponentiate(
 	assert(count <= std::numeric_limits<int>::max());
 	sycl::queue *Q = dynamic_cast<devSYCL*>(devAcc)->getQueue();
  #ifdef USE_MORE_ONEDPL
+  #ifdef ACC_DOUBLE_PRECISION
+	dpl::transform(dynamic_cast<devSYCL*>(devAcc)->getDevicePolicy(), g_array, g_array+count, g_array, [=](T v) { v+=add; v = (v<KERNEL_EXP_VALUE) ? static_cast<T>(0) : sycl::exp(v); return v;});
+  #else
 	dpl::transform(dynamic_cast<devSYCL*>(devAcc)->getDevicePolicy(), g_array, g_array+count, g_array, [=](T v) { v+=add; v = (v<KERNEL_EXP_VALUE) ? static_cast<T>(0) : sycl::native::exp(v); return v;});
+  #endif
  #else
 	Q->submit([&](sycl::handler &cgh)
 	{
@@ -359,7 +363,11 @@ static void sycl_kernel_exponentiate(
 				if (a < KERNEL_EXP_VALUE)
 					g_array[idx] = static_cast<T>(0);
 				else
+  #ifdef ACC_DOUBLE_PRECISION
+					g_array[idx] = sycl::exp(a);
+  #else
 					g_array[idx] = sycl::native::exp(a);
+  #endif
 			}
 		});
 	}).wait_and_throw();
@@ -852,7 +860,11 @@ inline void powerClass(int          gridSize,
 
 inline std::pair<XFLOAT, XFLOAT> sycl_sincos(XFLOAT val)
 {
+#ifdef ACC_DOUBLE_PRECISION
+	return std::make_pair(sycl::sin(val), sycl::cos(val));
+#else
 	return std::make_pair(sycl::native::sin(val), sycl::native::cos(val));
+#endif
 }
 
 inline void translatePixel(
@@ -866,8 +878,13 @@ inline void translatePixel(
 		XFLOAT &tImag)
 {
 	XFLOAT v = x * tx + y * ty;
+#ifdef ACC_DOUBLE_PRECISION
+	XFLOAT s = sycl::sin(v);
+	XFLOAT c = sycl::cos(v);
+#else
 	XFLOAT s = sycl::native::sin(v);
 	XFLOAT c = sycl::native::cos(v);
+#endif
 
 	tReal = c * real - s * imag;
 	tImag = c * imag + s * real;
@@ -886,8 +903,13 @@ inline void translatePixel(
 		XFLOAT &tImag)
 {
 	XFLOAT v = x * tx + y * ty + z * tz;
+#ifdef ACC_DOUBLE_PRECISION
+	XFLOAT s = sycl::sin(v);
+	XFLOAT c = sycl::cos(v);
+#else
 	XFLOAT s = sycl::native::sin(v);
 	XFLOAT c = sycl::native::cos(v);
+#endif
 
 	tReal = c * real - s * imag;
 	tImag = c * imag + s * real;
@@ -916,15 +938,25 @@ inline void  computeSincosLookupTable2D(unsigned long  trans_num,
 		for(int x=0; x<xSize; x++) {
 			unsigned long index = i * xSize + x;
 			XFLOAT v = x * tx;
+#ifdef ACC_DOUBLE_PRECISION
+			sin_x[index] = sycl::sin(v);
+			cos_x[index] = sycl::cos(v);
+#else
 			sin_x[index] = sycl::native::sin(v);
 			cos_x[index] = sycl::native::cos(v);
+#endif
 		}
 		
 		for(int y=0; y<ySize; y++) {
 			unsigned long index = i * ySize + y;
 			XFLOAT v = y * ty;
+#ifdef ACC_DOUBLE_PRECISION
+			sin_y[index] = sycl::sin(v);
+			cos_y[index] = sycl::cos(v);
+#else
 			sin_y[index] = sycl::native::sin(v);
 			cos_y[index] = sycl::native::cos(v);
+#endif
 		}
 	}
 }
@@ -951,22 +983,37 @@ inline void  computeSincosLookupTable3D(unsigned long  trans_num,
 		for(int x=0; x<xSize; x++) {
 			unsigned long index = i * xSize + x;
 			XFLOAT v = x * tx;
+#ifdef ACC_DOUBLE_PRECISION
+			sin_x[index] = sycl::sin(v);
+			cos_x[index] = sycl::cos(v);
+#else
 			sin_x[index] = sycl::native::sin(v);
 			cos_x[index] = sycl::native::cos(v);
+#endif
 		}
 		
 		for(int y=0; y<ySize; y++) {
 			unsigned long index = i * ySize + y;
 			XFLOAT v = y * ty;
+#ifdef ACC_DOUBLE_PRECISION
+			sin_y[index] = sycl::sin(v);
+			cos_y[index] = sycl::cos(v);
+#else
 			sin_y[index] = sycl::native::sin(v);
 			cos_y[index] = sycl::native::cos(v);
+#endif
 		}
 		
 		for(int z=0; z<zSize; z++) {
 			unsigned long index = i * zSize + z;
 			XFLOAT v = z * tz;
+#ifdef ACC_DOUBLE_PRECISION
+			sin_z[index] = sycl::sin(v);
+			cos_z[index] = sycl::cos(v);
+#else
 			sin_z[index] = sycl::native::sin(v);
 			cos_z[index] = sycl::native::cos(v);
+#endif
 		}
 	}
 }
