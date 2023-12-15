@@ -148,6 +148,14 @@ void Postprocessing::initialise()
 		std::cout.width(35); std::cout << std::left <<"  + half2-map: "; std::cout << fn_I2 << std::endl;
 	}
 
+    // Check if output directory exists, otherwise create it
+    if (fn_out.contains("/"))
+    {
+        FileName fn_dir = fn_out.beforeLastOf("/");
+        if (!exists(fn_dir)) mktree(fn_dir);
+    }
+
+
 	I1.read(fn_I1);
 	I2.read(fn_I2);
 	I1().setXmippOrigin();
