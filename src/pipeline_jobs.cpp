@@ -1201,10 +1201,6 @@ bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &c
 	{
 		result = getCommandsTomoPickTomogramsJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
-	else if (type == PROC_TOMO_RECONSTRUCT)
-	{
-		result = getCommandsTomoReconPartJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-	}
 	else if (type == PROC_EXTERNAL)
 	{
 		result = getCommandsExternalJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
@@ -3610,6 +3606,7 @@ If set to No, RELION will use a (grey-scale invariant) cross-correlation criteri
 and prior to the second iteration the map will be filtered again using the initial low-pass filter. \
 This procedure is relatively quick and typically does not negatively affect the outcome of the subsequent MAP refinement. \
 Therefore, if in doubt it is recommended to set this option to No.");
+    joboptions["trust_ref_size"] = JobOption("Resize reference if needed?", true, "If true, and if the input reference map (and mask) do not have the same pixel size and/or box size, then they will be re-scaled and re-boxed accordingly. If this option is set to false, then the program will die with an error if the reference does not have the correct pixel and/or box size.");
 	joboptions["ini_high"] = JobOption("Initial low-pass filter (A):", 60, 0, 200, 5, "It is recommended to strongly low-pass filter your initial reference map. \
 If it has not yet been low-pass filtered, it may be done internally using this option. \
 If set to 0, no low-pass filter will be applied to the initial reference(s).");
@@ -3853,6 +3850,9 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 
 			if (!joboptions["ref_correct_greyscale"].getBoolean()) // dont do firstiter_cc when giving None
 				command += " --firstiter_cc";
+
+            if (joboptions["trust_ref_size"].getBoolean())
+                command += " --trust_ref_size";
 		}
 
 		if (joboptions["ini_high"].getNumber(error_message) > 0.)
@@ -4100,6 +4100,7 @@ If set to No, RELION will use a (grey-scale invariant) cross-correlation criteri
 and prior to the second iteration the map will be filtered again using the initial low-pass filter. \
 This procedure is relatively quick and typically does not negatively affect the outcome of the subsequent MAP refinement. \
 Therefore, if in doubt it is recommended to set this option to No.");
+    joboptions["trust_ref_size"] = JobOption("Resize reference if needed?", true, "If true, and if the input reference map (and mask) do not have the same pixel size and/or box size, then they will be re-scaled and re-boxed accordingly. If this option is set to false, then the program will die with an error if the reference does not have the correct pixel and/or box size.");
 	joboptions["ini_high"] = JobOption("Initial low-pass filter (A):", 60, 0, 200, 5, "It is recommended to strongly low-pass filter your initial reference map. \
 If it has not yet been low-pass filtered, it may be done internally using this option. \
 If set to 0, no low-pass filter will be applied to the initial reference(s).");
@@ -4325,7 +4326,11 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 
 			if (!joboptions["ref_correct_greyscale"].getBoolean())
 				command += " --firstiter_cc";
-		}
+
+            if (joboptions["trust_ref_size"].getBoolean())
+                command += " --trust_ref_size";
+
+        }
 		if (joboptions["ini_high"].getNumber(error_message) > 0.)
 		{
 			if (error_message != "") return false;
@@ -6358,7 +6363,7 @@ void RelionJob::initialiseTomoImportJob()
 	joboptions["prefix"] = JobOption("Prefix:", (std::string)"","Optional prefix added to avoid tilt-series name collisions when dealing with multiple datasets.");
 	joboptions["tilt_axis_angle"] = JobOption("Tilt axis angle (deg):", 85.0, 0.0, 180.0, 1.0 , "Nominal value for the tilt-axis rotation angle (positive is CCW from Y)");
 	joboptions["mtf_file"] = JobOption("MTF file:", (std::string)"","MTF file for the detector");
-	joboptions["flip_tiltseries_hand"] = JobOption("Invert defocus handedness?", false, "Specify Yes to flip the handedness of the defocus geometry (default = 1, the same as the tutorial dataset: EMPIAR-10164)");
+	joboptions["flip_tiltseries_hand"] = JobOption("Invert defocus handedness?", true, "Specify Yes to flip the handedness of the defocus geometry (default = Yes (value -1 in the STAR file), the same as the tutorial dataset: EMPIAR-10164)");
 	joboptions["images_are_motion_corrected"] = JobOption("Movies already motion corrected?", false, "Select Yes if your input images in 'Tilt image movie files' have already been motion corrected and/or are summed single frame images. Make sure the image file names match the corresponding image file names under SubFramePath in the mdoc files");
 
 	joboptions["do_tomo"] = JobOption("Import tomograms?", false, "Set this to Yes for importing tomogram directories from IMOD.");
@@ -7096,9 +7101,9 @@ void RelionJob::initialiseTomoCtfRefineJob()
 {
 	hidden_name = ".gui_tomo_refine_ctf";
 
-	addTomoInputOptions(true, true, true, false, true, true);
+	addTomoInputOptions(true, true, true);
+    initialiseTomoReconPartJob();
 
-	joboptions["box_size"] = JobOption("Box size for estimation (pix):", 128, 32, 512, 16, "Box size to be used for the estimation. Note that this can be larger than the box size of the reference map. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
 	joboptions["do_defocus"] = JobOption("Refine defocus?", true, "If set to Yes, then estimate the defoci of the individual tilt images.");
 	joboptions["focus_range"] = JobOption("Defocus search range (A):", 3000, 0, 10000, 500, "Defocus search range (in A). This search range will be, by default, sampled in 100 steps. Use the additional argument --ds to change the number of sampling points.");
 	joboptions["do_reg_def"] = JobOption("Do defocus regularisation?", false, "Apply defocus regularisation. " \
@@ -7128,7 +7133,12 @@ bool RelionJob::getCommandsTomoCtfRefineJob(std::string &outputname, std::vector
 
 	commands.clear();
 	initialisePipeline(outputname, job_counter);
-	std::string command;
+
+    // First calculate a bin1 reconstructionParticleTomo Before the CTF refinement
+    if (!getCommandsTomoReconPartJob(outputname+"Before/", commands, error_message))
+        return false;
+
+    std::string command;
 
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
 	command="`which relion_tomo_refine_ctf_mpi`";
@@ -7137,8 +7147,28 @@ bool RelionJob::getCommandsTomoCtfRefineJob(std::string &outputname, std::vector
 	if (error_message != "") return false;
 
 	// I/O
-	error_message = getTomoInputCommmand(command, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT, HAS_COMPULSORY, HAS_OPTIONAL);
-	if (error_message != "") return false;
+    error_message = getTomoInputCommmand(command, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL);
+    if (error_message != "") return false;
+
+    // Input half maps, mask and fsc
+    if (joboptions["fn_half"].getString() == "")
+    {
+        command += " --ref1 " + outputname + "Before/half1.mrc";
+        command += " --ref2 " + outputname + "Before/half2.mrc";
+    }
+    else
+    {
+        FileName halfmap2, halfmap1 = joboptions["fn_half"].getString();
+        if (!halfmap1.getTheOtherHalf(halfmap2))
+        {
+            error_message = "ERROR: cannot find 'half' substring in the input filename...";
+            return false;
+        }
+        command += " --ref1 " + halfmap1;
+        command += " --ref2 " + halfmap2;
+    }
+    command += " --mask " + joboptions["fn_mask"].getString();
+    command += " --fsc " + outputname + "Before/postprocess.star";
 
 	command += " --theme classic --o " + outputname;
 
@@ -7196,6 +7226,29 @@ bool RelionJob::getCommandsTomoCtfRefineJob(std::string &outputname, std::vector
 	command += " " + joboptions["other_args"].getString();
 	commands.push_back(command);
 
+    // Quickly remove RELION_JOB_EXIT_SUCCESS
+    std::string command0 = "rm -f " + outputname + RELION_JOB_EXIT_SUCCESS;
+    commands.push_back(command0);
+
+
+    std::string keep1=joboptions["in_tomograms"].getString();
+    std::string keep2=joboptions["fn_half"].getString();
+    joboptions["in_tomograms"].setString(outputname+"tomograms.star");
+    joboptions["fn_half"].setString("");
+    if (!getCommandsTomoReconPartJob(outputname+"After/", commands, error_message))
+        return false;
+    joboptions["in_tomograms"].setString(keep1);
+    joboptions["fn_half"].setString(keep2);
+
+    Node node6(outputname+"After/merged.mrc", LABEL_TOMO_MAP);
+    outputNodes.push_back(node6);
+    Node node7(outputname+"After/half1.mrc", LABEL_TOMO_HALFMAP);
+    outputNodes.push_back(node7);
+
+    // And re-introduce RELION_JOB_EXIT_SUCCESS
+    std::string commandF = "touch " + outputname + RELION_JOB_EXIT_SUCCESS;
+    commands.push_back(commandF);
+
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
 
@@ -7203,9 +7256,9 @@ void RelionJob::initialiseTomoAlignJob()
 {
 	hidden_name = ".gui_tomo_align";
 
-	addTomoInputOptions(true, true, true, false, true, true);
+	addTomoInputOptions(true, true, true);
+    initialiseTomoReconPartJob();
 
-	joboptions["box_size"] = JobOption("Box size for estimation (pix):", 128, 32, 512, 16, "Box size to be used for the estimation. Note that this can be larger than the box size of the reference map. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
 	joboptions["max_error"] = JobOption("Max position error (pix):", 5, 0, 64, 1, "maximal assumed error in the initial 2D particle-positions (distances between the projected 3D positions and their true positions in the images), given in pixels.");
 
 	joboptions["do_shift_align"] = JobOption("Align by shift only?", false, "If set to Yes, tilt series projection shifts are refined based on cross-correlation. Useful for very badly aligned frames. No iterative optimisation.");
@@ -7224,8 +7277,12 @@ bool RelionJob::getCommandsTomoAlignJob(std::string &outputname, std::vector<std
 
 	commands.clear();
 	initialisePipeline(outputname, job_counter);
-	std::string command;
 
+    // First perform a bin1 reconstructionParticleTomo Before the frame alignment
+    if (!getCommandsTomoReconPartJob(outputname+"Before/", commands, error_message))
+        return false;
+
+	std::string command;
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
 		command="`which relion_tomo_align_mpi`";
 	else
@@ -7233,9 +7290,28 @@ bool RelionJob::getCommandsTomoAlignJob(std::string &outputname, std::vector<std
 	if (error_message != "") return false;
 
 	// I/O
-	error_message = getTomoInputCommmand(command, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT, HAS_COMPULSORY,
-			HAS_OPTIONAL);
+	error_message = getTomoInputCommmand(command, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT, HAS_NOT, HAS_NOT);
 	if (error_message != "") return false;
+
+    // Input half maps, mask and fsc
+    if (joboptions["fn_half"].getString() == "")
+    {
+        command += " --ref1 " + outputname + "Before/half1.mrc";
+        command += " --ref2 " + outputname + "Before/half2.mrc";
+    }
+    else
+    {
+        FileName halfmap2, halfmap1 = joboptions["fn_half"].getString();
+        if (!halfmap1.getTheOtherHalf(halfmap2))
+        {
+            error_message = "ERROR: cannot find 'half' substring in the input filename...";
+            return false;
+        }
+        command += " --ref1 " + halfmap1;
+        command += " --ref2 " + halfmap2;
+    }
+    command += " --mask " + joboptions["fn_mask"].getString();
+    command += " --fsc " + outputname + "Before/postprocess.star";
 
 	command += " --theme classic --o " + outputname;
 
@@ -7298,21 +7374,41 @@ bool RelionJob::getCommandsTomoAlignJob(std::string &outputname, std::vector<std
 	command += " " + joboptions["other_args"].getString();
 	commands.push_back(command);
 
-	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
+    // Quickly remove RELION_JOB_EXIT_SUCCESS
+    std::string command0 = "rm -f " + outputname + RELION_JOB_EXIT_SUCCESS;
+    commands.push_back(command0);
+
+    // Also calculate a bin1 reconstructionParticleTomo After the CTF refinement
+    std::string keep1=joboptions["in_tomograms"].getString();
+    std::string keep2=joboptions["fn_half"].getString();
+    joboptions["in_tomograms"].setString(outputname+"tomograms.star");
+    joboptions["fn_half"].setString("");
+    if (!getCommandsTomoReconPartJob(outputname+"After/", commands, error_message))
+        return false;
+    joboptions["in_tomograms"].setString(keep1);
+    joboptions["fn_half"].setString(keep2);
+
+    Node node6(outputname+"After/merged.mrc", LABEL_TOMO_MAP);
+    outputNodes.push_back(node6);
+    Node node7(outputname+"After/half1.mrc", LABEL_TOMO_HALFMAP);
+    outputNodes.push_back(node7);
+    //Node node4(outputname+"After/logfile.pdf", LABEL_TOMO_POST_LOG);
+    //outputNodes.push_back(node4);
+
+	// And re-introduce RELION_JOB_EXIT_SUCCESS
+	std::string commandF = "touch " + outputname + RELION_JOB_EXIT_SUCCESS;
+    commands.push_back(commandF);
+
+    return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
 
 void RelionJob::initialiseTomoReconPartJob()
 {
-	hidden_name = ".gui_tomo_reconstruct_particle";
+    joboptions["fn_mask"] = JobOption("Solvent mask (bin1, cropped):", NODE_MASK_CPIPE, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask to automatically estimate the postprocess FSC for reconstructions made without binning (bin1). It will also create an optimisation set file to be used in other tomo protocols.");
+    joboptions["fn_half"] = JobOption("Reference half1 (bin1, cropped; optional):", OUTNODE_TOMO_HALFMAP, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide one of the two reference half-maps. If left empty, then the half-maps will be calculated again from the input particles.");
 
-	addTomoInputOptions(true, true, true, false, false, false);
-
-	joboptions["do_from2d"] = JobOption("Average from 2D tilt series?", true, "If set to Yes, then relion_tomo_reconstruct_particle is used, with the options below, to calculate the new average from the original 2D tilt series images. This yields the best results. If set to No, then relion_reconstruct is used to calculate the average of the 3D subtomogram images in the particle set on the I/O tab. This is quicker, but gives worse results.");
 	joboptions["box_size"] = JobOption("Box size (pix):", 128, 32, 512, 16, "Box size of the reconstruction. Note that this is independent of the box size that has been used to refine the particle. This allows the user to construct a 3D map of arbitrary size to gain an overview of the structure surrounding the particle. A sufficiently large box size also allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
-	joboptions["crop_size"] = JobOption("Cropped box size (pix):", -1, -1, 512, 16, "If set to a positive value, the program will output an additional set of maps that have been cropped to this size. This is useful if a map is desired that is smaller than the box size required to retrieve the CTF-delocalised signal.");
-	joboptions["binning"] = JobOption("Binning factor:", 1, 1, 16, 1, "The tilt series images will be binned by this (real-valued) factor and then reconstructed in the specified box size above. Note that thereby the reconstructed region becomes larger when specifying binning factors larger than one.");
-	joboptions["snr"] = JobOption("Wiener SNR constant:", 0, 0, 0.0001, 0.00001, "If set to a positive value, apply a Wiener filter with this signal-to-noise ratio. If omitted, the reconstruction will use a heuristic to prevent divisions by excessively small numbers. Please note that using a low (even though realistic) SNR might wash out the higher frequencies, which could make the map unsuitable to be used for further refinement.");
-	joboptions["fn_mask"] = JobOption("FSC Solvent mask:", NODE_MASK_CPIPE, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask to automatically estimate the postprocess FSC. It will also create an optimisation set file to be used in other tomo protocols.");
+    joboptions["crop_size"] = JobOption("Cropped box size (pix):", -1, -1, 512, 16, "If set to a positive value, after construction, the resulting reconstructions are cropped to this size. ");
 	joboptions["sym_name"] = JobOption("Symmetry:", std::string("C1"), "If the molecule is asymmetric, \
 set Symmetry group to C1. Note their are multiple possibilities for icosahedral symmetry: \n \
 * I1: No-Crowther 222 (standard in Heymann, Chagoyen & Belnap, JSB, 151 (2005) 196–207) \n \
@@ -7325,108 +7421,61 @@ Therefore, look at the XMIPP Wiki for more details:  http://xmipp.cnb.csic.es/tw
 
 }
 
-bool RelionJob::getCommandsTomoReconPartJob(std::string &outputname, std::vector<std::string> &commands,
-				std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+bool RelionJob::getCommandsTomoReconPartJob(std::string outputname, std::vector<std::string> &commands, std::string &error_message)
 {
 
-	commands.clear();
-	initialisePipeline(outputname, job_counter);
 	std::string command, command2;
 
-	if (joboptions["do_from2d"].getBoolean())
-	{
-		if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-			command="`which relion_tomo_reconstruct_particle_mpi`";
-		else
-			command="`which relion_tomo_reconstruct_particle`";
-		if (error_message != "") return false;
+    std::string mymap = joboptions["fn_half"].getString();
+    if (mymap == "")
+    {
+        if (joboptions["nr_mpi"].getNumber(error_message) > 1)
+            command = "`which relion_tomo_reconstruct_particle_mpi`";
+        else
+            command = "`which relion_tomo_reconstruct_particle`";
+        if (error_message != "") return false;
 
-		// I/O
-		error_message = getTomoInputCommmand(command, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT, HAS_NOT,
-						HAS_NOT);
-		if (error_message != "") return false;
+        // I/O
+        error_message = getTomoInputCommmand(command, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT, HAS_NOT,
+                                             HAS_NOT);
+        if (error_message != "") return false;
 
-		command += " --theme classic --o " + outputname;
+        command += " --theme classic --o " + outputname;
 
-		Node node1(outputname+"merged.mrc", LABEL_TOMO_MAP);
-		outputNodes.push_back(node1);
-		Node node2(outputname+"half1.mrc", LABEL_TOMO_HALFMAP);
-		outputNodes.push_back(node2);
+        // Job-specific stuff goes here
+        command += " --bin 1 --b " + joboptions["box_size"].getString();
+        command += " --sym " + joboptions["sym_name"].getString();
+        int crop_size = joboptions["crop_size"].getNumber(error_message);
+        if (error_message != "") return false;
+        if (crop_size > 0.) command += " --crop " + joboptions["crop_size"].getString();
 
-		// Job-specific stuff goes here
-		command += " --b " + joboptions["box_size"].getString();
+        // Running stuff
+        command += " --j " + joboptions["nr_threads"].getString();
+        command += " --j_out " + joboptions["nr_threads"].getString();
+        command += " --j_in 1 ";
 
-		int crop_size = joboptions["crop_size"].getNumber(error_message);
-		if (error_message != "") return false;
-		if (crop_size > 0.) command += " --crop " + joboptions["crop_size"].getString();
+        if (is_continue) {
+            command += " --only_do_unfinished ";
+        }
+        commands.push_back(command);
 
-		command += " --bin " + joboptions["binning"].getString();
+        // Quickly remove RELION_JOB_EXIT_SUCCESS
+        std::string command0 = "rm -f " + outputname + RELION_JOB_EXIT_SUCCESS;
+        commands.push_back(command0);
 
-		float SNR = joboptions["snr"].getNumber(error_message);
-		if (error_message != "") return false;
-		if (SNR > 0.) command += " --SNR " + joboptions["snr"].getString();
+        mymap = outputname + "half1.mrc";
+    }
 
-		// Running stuff
-		command += " --j " + joboptions["nr_threads"].getString();
-		command += " --j_out " + joboptions["nr_threads"].getString();
-		command += " --j_in 1 ";
+    // Estimate FSC
+    command2 = "`which relion_postprocess`";
+    command2 += " --i " + mymap;
+    command2 += " --o " + outputname + "postprocess";
+    command2 += " --mask "+ joboptions["fn_mask"].getString();
 
-		if (is_continue)
-		{
-			command += " --only_do_unfinished ";
-		}
+    commands.push_back(command2);
 
-		// Estimate FSC
-		if (joboptions["fn_mask"].getString() != "")
-		{
-			command2 = "`which relion_tomo_make_reference`";
-			command2 += " --rec "+ outputname;
-			command2 += " --o "+ outputname;
-			command2 += " --mask "+ joboptions["fn_mask"].getString();
-			error_message = getTomoInputCommmand(command2, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT,
-												 HAS_NOT,
-												 HAS_NOT);
-			Node node4(outputname+"PostProcess/logfile.pdf", LABEL_TOMO_POST_LOG);
-			outputNodes.push_back(node4);
-			Node node5(outputname+"PostProcess/postprocess.star", LABEL_TOMO_POST);
-			outputNodes.push_back(node5);
-		}
-	}
-	else
-	{
-		if (joboptions["in_particles"].getString() == "")
-		{
-			error_message = "ERROR: when not reconstructing from the 2D tilt series images, you need to provide a particle set on the I/O tab.";
-			return false;
-		}
 
-		if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-			command="`which relion_reconstruct_mpi`";
-		else
-			command="`which relion_reconstruct`";
-		if (error_message != "") return false;
+    return true;
 
-		Node node(joboptions["in_particles"].getString(), joboptions["in_particles"].node_type);
-		inputNodes.push_back(node);
-		command += " --i " + joboptions["in_particles"].getString();
-
-		Node node1(outputname+"reconstruct.mrc", LABEL_TOMO_MAP);
-		outputNodes.push_back(node1);
-		command += " --o " + outputname + "reconstruct.mrc";
-		command += " --ctf ";
-	}
-
-	command += " --sym " + joboptions["sym_name"].getString();
-
-	// Other arguments for extraction
-	command += " " + joboptions["other_args"].getString();
-	commands.push_back(command);
-
-	if (command2 != "")
-	{
-		commands.push_back(command2);
-	}
-
-	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
 

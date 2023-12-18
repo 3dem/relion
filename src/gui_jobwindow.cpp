@@ -464,11 +464,6 @@ void JobWindow::initialise(int my_job_type, bool _is_tomo)
 		myjob.initialise(my_job_type);
 		initialiseTomoAlignWindow();
 	}
-	else if (my_job_type == PROC_TOMO_RECONSTRUCT)
-	{
-		myjob.initialise(my_job_type);
-		initialiseTomoReconParWindow();
-	}
 	else if (my_job_type == PROC_EXTERNAL)
 	{
 		myjob.initialise(my_job_type);
@@ -1469,6 +1464,7 @@ void JobWindow::initialiseClass3DWindow()
 	resetHeight();
 
 	place("ref_correct_greyscale", TOGGLE_DEACTIVATE);
+    place("trust_ref_size", TOGGLE_DEACTIVATE);
 	place("ini_high", TOGGLE_DEACTIVATE);
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -1659,6 +1655,7 @@ void JobWindow::initialiseAutorefineWindow()
 	resetHeight();
 
 	place("ref_correct_greyscale", TOGGLE_DEACTIVATE);
+    place("trust_ref_size", TOGGLE_DEACTIVATE);
 	place("ini_high", TOGGLE_DEACTIVATE);
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -2471,7 +2468,7 @@ void JobWindow::initialiseExternalWindow()
 }
 
 void JobWindow::placeTomoInput(bool has_tomograms, bool has_particles,
-							   bool has_trajectories, bool has_manifolds, bool has_halfmaps, bool has_postprocess)
+							   bool has_trajectories, bool has_manifolds)
 {
 	tab1->begin();
 	tab1->label("I/O");
@@ -2481,15 +2478,6 @@ void JobWindow::placeTomoInput(bool has_tomograms, bool has_particles,
 	if (has_tomograms) place("in_tomograms", TOGGLE_DEACTIVATE);
 	if (has_trajectories) place("in_trajectories", TOGGLE_DEACTIVATE);
 	if (has_manifolds) place("in_manifolds", TOGGLE_DEACTIVATE);
-
-    current_y += STEPY /2 ;
-
-	if (has_halfmaps) place("in_halfmaps", TOGGLE_DEACTIVATE);
-	if (has_postprocess)
-	{
-		place("in_refmask", TOGGLE_DEACTIVATE);
-		place("in_post", TOGGLE_DEACTIVATE);
-	}
 
 	tab1->end();
 
@@ -2791,7 +2779,7 @@ void JobWindow::initialiseTomoSubtomoWindow()
 {
 	setupTabs(2);
 
-	placeTomoInput(true, true, true, false, false, false);
+	placeTomoInput(true, true, true, false);
 
 	tab2->begin();
 	tab2->label("Reconstruct");
@@ -2813,15 +2801,24 @@ void JobWindow::initialiseTomoCtfRefineWindow()
 {
 	setupTabs(3);
 
-	placeTomoInput(true, true, true, false, true, true);
+	placeTomoInput(true, true, true);
 
-	tab2->begin();
+    tab1->begin();
+
+    current_y += STEPY /2 ;
+    place("fn_mask", TOGGLE_DEACTIVATE);
+    place("fn_half", TOGGLE_DEACTIVATE);
+
+    current_y += STEPY /2 ;
+    place("box_size", TOGGLE_DEACTIVATE);
+    place("crop_size", TOGGLE_DEACTIVATE);
+    place("sym_name", TOGGLE_DEACTIVATE);
+
+    tab1->end();
+
+    tab2->begin();
 	tab2->label("Defocus");
 	resetHeight();
-
-	place("box_size", TOGGLE_DEACTIVATE);
-
-	current_y += STEPY /2 ;
 
 	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group1->end();
@@ -2894,13 +2891,25 @@ void JobWindow::initialiseTomoAlignWindow()
 {
 	setupTabs(3);
 
-	placeTomoInput(true, true, true, false, true, true);
+	placeTomoInput(true, true, true);
+
+	tab1->begin();
+
+    current_y += STEPY /2 ;
+    place("fn_mask", TOGGLE_DEACTIVATE);
+    place("fn_half", TOGGLE_DEACTIVATE);
+
+    current_y += STEPY /2 ;
+    place("box_size", TOGGLE_DEACTIVATE);
+    place("crop_size", TOGGLE_DEACTIVATE);
+    place("sym_name", TOGGLE_DEACTIVATE);
+
+	tab1->end();
 
 	tab2->begin();
 	tab2->label("Polish");
 	resetHeight();
 
-	place("box_size", TOGGLE_DEACTIVATE);
 	place("max_error", TOGGLE_DEACTIVATE);
 
 	current_y += STEPY /2 ;
@@ -2935,37 +2944,6 @@ void JobWindow::initialiseTomoAlignWindow()
 	guientries["do_motion"].cb_menu_i();
 
 	tab3->end();
-}
-
-void JobWindow::initialiseTomoReconParWindow()
-{
-	setupTabs(2);
-
-	placeTomoInput(true, true, true, false, false, false);
-
-	tab2->begin();
-	tab2->label("Average");
-	resetHeight();
-
-	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group1->end();
-	place("do_from2d", TOGGLE_DEACTIVATE, group1);
-
-	group1->begin();
-	place("box_size", TOGGLE_DEACTIVATE);
-	place("crop_size", TOGGLE_DEACTIVATE);
-	place("binning", TOGGLE_DEACTIVATE);
-	place("snr", TOGGLE_DEACTIVATE);
-	place("fn_mask", TOGGLE_DEACTIVATE);
-
-	group1->end();
-	guientries["do_from2d"].cb_menu_i();
-
-	current_y += STEPY /2 ;
-
-	place("sym_name", TOGGLE_DEACTIVATE);
-
-	tab2->end();
 }
 
 void JobWindow::initialiseTomoExcludeTiltImagesWindow()

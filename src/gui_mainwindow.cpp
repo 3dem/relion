@@ -562,12 +562,6 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 
 	if (_do_tomo)
 	{
-		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Tomo reconstruct particle");
-		gui_jobwindows[nr_browse_tabs] = new JobWindow();
-		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_RECONSTRUCT);
-		browse_grp[nr_browse_tabs]->end();
-		nr_browse_tabs++;
 
 		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 		browser->add("Tomo CTF refinement");
@@ -1475,7 +1469,7 @@ void GuiMainWindow::cb_display_io_node_i()
     else if (pipeline.nodeList[mynode].type.find(LABEL_TOMO_TILTSERIES) != std::string::npos )
     {
 
-        command = "relion_tomo_view tilt-series --tilt-series-star-file " + pipeline.nodeList[mynode].name;
+        command = "relion_python_tomo_view tilt-series --tilt-series-star-file " + pipeline.nodeList[mynode].name;
 
         // Read cache-size from gui_tomo_exclude_tilt_imagesjob.star if that file exists
 		RelionJob excludetiltseriesjob;
@@ -1494,7 +1488,7 @@ void GuiMainWindow::cb_display_io_node_i()
     else if (pipeline.nodeList[mynode].type.find(LABEL_TOMO_TOMOGRAMS) != std::string::npos )
     {
 
-        command = "relion_tomo_view tomograms --tilt-series-star-file " + pipeline.nodeList[mynode].name;
+        command = "relion_python_tomo_view tomograms --tilt-series-star-file " + pipeline.nodeList[mynode].name;
 
         // Read cache-size from gui_tomo_exclude_tilt_imagesjob.star if that file exists
         RelionJob excludetiltseriesjob;

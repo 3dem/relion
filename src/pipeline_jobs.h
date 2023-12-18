@@ -1314,9 +1314,9 @@ public:
 
 	// relion-3.2: add subtomogram averaging programs by Jasenko
 	void addTomoInputOptions(bool has_tomograms, bool has_particles,
-							 bool has_trajectories, bool has_manifolds, bool has_halfmaps, bool has_postprocess);
+							 bool has_trajectories, bool has_manifolds=false, bool has_halfmaps=false, bool has_postprocess=false);
 	std::string getTomoInputCommmand(std::string &command, int has_tomograms, int has_particles,
-									 int has_trajectories, int has_manifolds, bool has_halfmaps, int has_postprocess);
+									 int has_trajectories, int has_manifolds=HAS_NOT, bool has_halfmaps=HAS_NOT, int has_postprocess=HAS_NOT);
 
 	void initialiseTomoImportJob();
 	bool getCommandsTomoImportJob(std::string &outputname, std::vector<std::string> &commands,
@@ -1355,8 +1355,7 @@ public:
 								 std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
     void initialiseTomoReconPartJob();
-    bool getCommandsTomoReconPartJob(std::string &outputname, std::vector<std::string> &commands,
-									 std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+    bool getCommandsTomoReconPartJob(std::string outputname, std::vector<std::string> &commands, std::string &error_message);
 
 
 };
