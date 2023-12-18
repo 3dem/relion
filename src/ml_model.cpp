@@ -1037,10 +1037,51 @@ void MlModel::initialiseFromImages(
 					 + integerToString(box_size_first_optics_group) + " px!\n";
 			}
 
-			if (!_do_trust_ref_size)
-				REPORT_ERROR("ERROR " + mesg + "\nIf you want to re-scale and/or re-box input particles into the pixel size and the box size of the reference, re-run the program with the --trust_ref_size option.");
-			else if (verb)
-				std::cerr << " WARNING " << mesg;
+
+            if (_do_trust_ref_size)
+            {
+                if (verb > 0) std::cerr << " WARNING: " << mesg;
+                RFLOAT pixel_size_first_optics_group = _mydata.getOpticsPixelSize(0);
+                int box_size_first_optics_group = _mydata.getOpticsImageSize(0);
+
+                int newsize = ROUND(ori_size * (pixel_size / pixel_size_first_optics_group));
+                newsize -= newsize % 2; //make even in case it is not already
+
+                RFLOAT real_angpix = ori_size * pixel_size / newsize;
+                if (verb > 0 && fabs(real_angpix - pixel_size_first_optics_group) > 0.001)
+                    std::cerr << "WARNING: Although the requested resized pixel size is " << pixel_size_first_optics_group << " A/px, the actual resized pixel size of the reference will be " << real_angpix << " A/px due to rounding of the box size to an even number. " << std::endl;
+
+                if (verb > 0) std::cerr << "WARNING: Resizing input reference(s) to pixel_size= " << real_angpix << " and box size= " << box_size_first_optics_group << " ..." << std::endl;
+
+                ori_size = box_size_first_optics_group;
+                pixel_size = real_angpix;
+
+                for (int iclass = 0; iclass < nr_classes; iclass++)
+                {
+                    resizeMap(Iref[iclass], newsize);
+                    Iref[iclass].setXmippOrigin();
+                    if (ref_dim == 2)
+                    {
+                        Iref[iclass].window(FIRST_XMIPP_INDEX(box_size_first_optics_group),
+                                            FIRST_XMIPP_INDEX(box_size_first_optics_group),
+                                            LAST_XMIPP_INDEX(box_size_first_optics_group),
+                                            LAST_XMIPP_INDEX(box_size_first_optics_group));
+                    } else if (ref_dim == 3)
+                    {
+                        Iref[iclass].window(FIRST_XMIPP_INDEX(box_size_first_optics_group),
+                                            FIRST_XMIPP_INDEX(box_size_first_optics_group),
+                                            FIRST_XMIPP_INDEX(box_size_first_optics_group),
+                                            LAST_XMIPP_INDEX(box_size_first_optics_group),
+                                            LAST_XMIPP_INDEX(box_size_first_optics_group),
+                                            LAST_XMIPP_INDEX(box_size_first_optics_group));
+                    }
+                }
+
+            }
+            else
+            {
+                REPORT_ERROR("ERROR " + mesg + "\nIf you want to re-scale and/or re-box input particles into the pixel size and the box size of the reference, re-run the program with the --trust_ref_size option.");
+            }
 		}
 
 	}
