@@ -616,7 +616,7 @@ enum EMDLabel
     EMDL_TOMO_ETOMO_DIRECTIVE_FILE,
 	EMDL_TOMO_FRAME_COUNT,
 	EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME,
-EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF1_FILE_NAME,
+    EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF1_FILE_NAME,
 	EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF2_FILE_NAME,
 	EMDL_TOMO_DENOISED_TOMOGRAM_FILE_NAME,
     EMDL_TOMO_SIZE_X,
@@ -642,6 +642,7 @@ EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF1_FILE_NAME,
     EMDL_TOMO_SUBTOMOGRAM_STACK2D,
 	EMDL_TOMO_SUBTOMOGRAM_BINNING,
     EMDL_TOMO_TOMOGRAM_BINNING,
+    EMDL_TOMO_ORIGINAL_BOXSIZE,
     EMDL_TOMO_PARTICLE_NAME,
 	EMDL_TOMO_PARTICLE_ID,
 	EMDL_TOMO_MANIFOLD_INDEX,
@@ -1354,6 +1355,7 @@ private:
         EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_STACK2D, EMDL_BOOL, "rlnTomoSubTomosAre2DStacks", "This flag is set to true if subtomograms are saved as 2D image stacks");
 		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_BINNING, EMDL_DOUBLE, "rlnTomoSubtomogramBinning", "Binning level of a subtomogram");
         EMDL::addLabel(EMDL_TOMO_TOMOGRAM_BINNING, EMDL_DOUBLE, "rlnTomoTomogramBinning", "Binning level of a  reconstructed tomogram");
+        EMDL::addLabel(EMDL_TOMO_ORIGINAL_BOXSIZE, EMDL_INT, "rlnTomoOriginalBoxSize", "Original box size which with the particles was extracted from the tomogram");
         EMDL::addLabel(EMDL_TOMO_PARTICLE_NAME, EMDL_STRING, "rlnTomoParticleName", "Name of each individual particle");
 		EMDL::addLabel(EMDL_TOMO_PARTICLE_ID, EMDL_INT, "rlnTomoParticleId", "Unique particle index");
 

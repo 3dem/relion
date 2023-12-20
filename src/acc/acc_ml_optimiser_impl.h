@@ -327,8 +327,8 @@ void getFourierTransformsAndCtfs(long int part_id,
     }
     CTOC(accMLO->timer,"readData");
 
-    Image<RFLOAT> wholestack;
-    if (op.is_tomo) wholestack=img;
+    MultidimArray<RFLOAT> wholestack;
+    if (op.is_tomo) wholestack=img();
 
     for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
@@ -341,11 +341,8 @@ void getFourierTransformsAndCtfs(long int part_id,
         if (op.is_tomo)
         {
             MultidimArray<RFLOAT> my_img;
-            wholestack().getImage(img_id, my_img);
+            wholestack.getImage(img_id, my_img);
             img() = my_img;
-
-            // Keep track whether this image is empty
-            baseMLO->mydata.particles[part_id].images[img_id].is_empty = (img().computeStddev() == 0.);
         }
 
 		// ------------------------------------------------------------------------------------------
@@ -820,13 +817,13 @@ void getFourierTransformsAndCtfs(long int part_id,
 				CTF ctf;
 
                 if (op.is_tomo)
-    				ctf.setValuesByGroup(
+                    ctf.setValuesByGroup(
                         &(baseMLO->mydata).obsModel, optics_group,
                         baseMLO->mydata.particles[part_id].images[img_id].defU,
                         baseMLO->mydata.particles[part_id].images[img_id].defV,
                         baseMLO->mydata.particles[part_id].images[img_id].defAngle,
                         0.,
-                        (baseMLO->mydata.particles[part_id].images[img_id].is_empty) ? 0. : 1.,
+                        1.,
                         0.,
                         baseMLO->mydata.particles[part_id].images[img_id].dose);
                 else
@@ -1193,7 +1190,7 @@ void getAllSquaredDifferencesCoarse(
 	trans_xyz.allAlloc();
 	corr_img.allAlloc();
 
-	for (int img_id = 0; img_id < sp.nr_images; img_id++)
+    for (unsigned long img_id = 0; img_id < sp.nr_images; img_id++)
 	{
 
 		/*====================================
@@ -1488,7 +1485,7 @@ void getAllSquaredDifferencesFine(
 	trans_xyz.allAlloc();
 	corr_img.allAlloc();
 
-    for (int img_id = 0; img_id < sp.nr_images; img_id++)
+    for (unsigned long img_id = 0; img_id < sp.nr_images; img_id++)
 	{
 
 		// Reset size without de-allocating: we will append everything significant within
@@ -2952,7 +2949,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 #endif
 		trans_xyz.allAlloc();
 
-		for (int img_id = 0; img_id < sp.nr_images; img_id++)
+        for (unsigned long img_id = 0; img_id < sp.nr_images; img_id++)
 		{
 
 			/*======================================================
@@ -3495,7 +3492,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		RFLOAT thr_sum_dLL = 0., thr_sum_Pmax = 0.;
 
         // If the current images were smaller than the original size, fill the rest of wsum_model.sigma2_noise with the power_class spectrum of the images
-        for (int img_id = 0; img_id < sp.nr_images; img_id++)
+        for (unsigned long img_id = 0; img_id < sp.nr_images; img_id++)
         {
 
             for (unsigned long ires = baseMLO->image_current_size[optics_group] / 2 + 1;

@@ -2065,6 +2065,7 @@ void MlOptimiser::initialiseGeneral(int rank)
                 fn_ref, is_3d_model, mydata,
                 do_average_unaligned, do_generate_seeds,refs_are_ctf_corrected,
                 ref_angpix, gradient_refine, grad_pseudo_halfsets, do_trust_ref_size, (rank==0));
+
     }
 
     if (mymodel.nr_classes > 1 && do_split_random_halves)
@@ -2823,8 +2824,8 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
             img().setXmippOrigin();
         }
 
-        Image<RFLOAT> wholestack;
-        if (mydata.is_tomo) wholestack=img;
+        MultidimArray<RFLOAT> wholestack;
+        if (mydata.is_tomo) wholestack = mydata.removeInvisibleTomoImages(part_id, img());
 
         for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++)
         {
@@ -2833,9 +2834,8 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
             if (mydata.is_tomo)
             {
                 MultidimArray<RFLOAT> my_img;
-                wholestack().getImage(img_id, my_img);
+                wholestack.getImage(img_id, my_img);
                 img() = my_img;
-                if (img().computeStddev() == 0.) continue;
             }
 
             if (nr_particles_done_per_optics_group[optics_group] >= minimum_nr_particles_sigma2_noise)
@@ -2864,7 +2864,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
             }
 
             // Check that the average in the noise area is approximately zero and the stddev is one
-            if (!dont_raise_norm_error && verb > 0)
+            if (!dont_raise_norm_error && !(mymodel.data_dim == 3 || mydata.is_tomo) && verb > 0)
             {
                 // NEW METHOD
                 RFLOAT sum, sum2, sphere_radius_pix, cyl_radius_pix;
@@ -4238,6 +4238,7 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
             std::cerr << " fn_img= " << fn_img << " part_id= " << part_id << std::endl;
 #endif
             img.readFromOpenFile(fn_img, hFile, -1, false);
+            if (mydata.is_tomo) img() = mydata.removeInvisibleTomoImages(part_id, img());
             img().setXmippOrigin();
             exp_imgs.push_back(img());
 
@@ -6157,7 +6158,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
     else // !do_parallel_disc_io
     {
 
-        if (mymodel.data_dim == 3 || mydata.is_tomo) REPORT_ERROR("BUG: no STA for !do_parallel_disc_io");
+        if (mymodel.data_dim == 3 || mydata.is_tomo) REPORT_ERROR("BUG: subtomogram averaging should always use parallel disc I/O");
 
         // Unpack the image from the imagedata
         img().resize(image_full_size[optics_group], image_full_size[optics_group]);
@@ -6213,8 +6214,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(
             selfTranslate(rec_img(), my_old_offset, DONT_WRAP);
     }
 
-    Image<RFLOAT> wholestack;
-    if (mydata.is_tomo) wholestack=img;
+    MultidimArray<RFLOAT> wholestack;
+    if (mydata.is_tomo) wholestack=img();
 
     FourierTransformer transformer;
     for (int img_id = 0; img_id < exp_nr_images; img_id++)
@@ -6224,11 +6225,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(
         if (mydata.is_tomo)
         {
             MultidimArray<RFLOAT> my_img;
-            wholestack().getImage(img_id, my_img);
+            wholestack.getImage(img_id, my_img);
             img() = my_img;
-
-            // Keep info whether this image is empty
-            mydata.particles[part_id].images[img_id].is_empty = (img().computeStddev() == 0.);
         }
 
 //#define DEBUG_SOFTMASK
@@ -6433,7 +6431,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
                             mydata.particles[part_id].images[img_id].defV,
                             mydata.particles[part_id].images[img_id].defAngle,
                             0.,
-                            (mydata.particles[part_id].images[img_id].is_empty) ? 0. : 1.,
+                            1.,
                             0.,
                             mydata.particles[part_id].images[img_id].dose);
                 else
@@ -7198,8 +7196,6 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                             // loop over all images inside this particle
                             for (int img_id = 0; img_id < exp_nr_images; img_id++)
                             {
-
-                                if (mydata.is_tomo && mydata.particles[part_id].images[img_id].is_empty) continue;
 
                                 // Get the Euler matrix
                                 Euler_angles2matrix(oversampled_rot[iover_rot],
@@ -8261,7 +8257,6 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 
     //Sigma2_noise estimation
     MultidimArray<RFLOAT> thr_wsum_sigma2_noise, thr_wsum_ctf2, thr_wsum_stMulti;
-    mydata.getOpticsGroup(part_id);
     thr_wsum_sigma2_noise.initZeros(image_full_size[optics_group]/2 + 1);
     thr_wsum_ctf2.initZeros(image_full_size[optics_group]/2 + 1);
     if (do_subtomo_correction)
@@ -8345,7 +8340,6 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
                     // The order of the looping here has changed for 3.1: different img_id have different optics_group and therefore different applyAnisoMag....
                     for (int img_id = 0; img_id < exp_nr_images; img_id++)
                     {
-                        if (mydata.is_tomo && mydata.particles[part_id].images[img_id].is_empty) continue;
 
                         // Loop over all oversampled orientations (only a single one in the first pass)
                         for (long int iover_rot = 0; iover_rot < exp_nr_oversampled_rot; iover_rot++)
@@ -8934,8 +8928,6 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
     // loop over all images inside this particle
     for (int img_id = 0; img_id < exp_nr_images; img_id++)
     {
-        if (mydata.is_tomo && mydata.particles[part_id].images[img_id].is_empty) continue;
-
         // If the current images were smaller than the original size, fill the rest of wsum_model.sigma2_noise with the power_class spectrum of the images
         for (int ires = image_current_size[optics_group]/2 + 1; ires < image_full_size[optics_group]/2 + 1; ires++)
         {
@@ -9248,8 +9240,9 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
     // P(X | X_1) / P(X | X_2) = exp ( |F_1 - F_2|^2 / (-2 sigma2) )
     // exp(-4.60517) = 0.01
     RFLOAT pvalue = 4.60517;
-    //if (mymodel.data_dim == 3)
-    //	pvalue *= 2.;
+    //SHWS 13dec2023: angular accuracies are way to low for tomography!
+    if (mymodel.data_dim == 3 || mydata.is_tomo)
+    	pvalue *= 2.;
 
     std::cout << " Estimating accuracies in the orientational assignment ... " << std::endl;
     int nr_particles = (my_last_part_id - my_first_part_id + 1);
@@ -9366,7 +9359,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
                                     mydata.particles[part_id].images[img_id].defV,
                                     mydata.particles[part_id].images[img_id].defAngle,
                                     0.,
-                                    (mydata.particles[part_id].images[img_id].is_empty) ? 0.: 1.,
+                                    1.,
                                     0.,
                                     mydata.particles[part_id].images[img_id].dose);
                         else

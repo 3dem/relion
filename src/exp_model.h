@@ -46,11 +46,11 @@ public:
 	// To which particle does this image belong
 	long int particle_id;
 
+    // Which frame in the tilt series am I? (non-visible images are not added to particles...)
+    int frame;
+
     // Projection matrix for tilt series stacks
     Matrix2D<RFLOAT> Aproj;
-
-    // Flag to monitor whether this images is all-zero
-    bool is_empty;
 
     // CTF information for defocus adjustment of tilt seriers
     float defU, defV, defAngle, dose;
@@ -65,8 +65,8 @@ public:
 	ExpImage(ExpImage const& copy)
 	{
 		particle_id = copy.particle_id;
+        frame = copy.frame;
 		Aproj = copy.Aproj;
-        is_empty =copy.is_empty;
         defU = copy.defU;
         defV = copy.defV;
         defAngle = copy.defAngle;
@@ -78,8 +78,8 @@ public:
 	{
 
 		particle_id = copy.particle_id;
+        frame = copy.frame;
         Aproj = copy.Aproj;
-        is_empty =copy.is_empty;
         defU = copy.defU;
         defV = copy.defV;
         defAngle = copy.defAngle;
@@ -158,6 +158,7 @@ public:
 	{
 		return images.size();
 	}
+
 };
 
 class ExpGroup
@@ -333,7 +334,7 @@ public:
 	void addParticle(std::string img_name, int optics_group, long int group_id, int random_subset = 0, int tomogram_id = 0);
 
  	// Add an image to the given particle
-	void addImageToParticle(long int part_id, d4Matrix *Aproj = NULL, CTF *ctf = NULL, float dose = 0.);
+	void addImageToParticle(long int part_id, int frame = 0, d4Matrix *Aproj = NULL, CTF *ctf = NULL, float dose = 0.);
 
 	// Add a group
 	long int addGroup(std::string mic_name, int optics_group);
@@ -373,7 +374,34 @@ public:
 	// in that case, stop copying, and keep reading particles from where they were...
 	void copyParticlesToScratch(int verb, bool do_copy = true, bool also_do_ctf_image = false, RFLOAT free_scratch_Gb = 10);
 
-	// Read from file
+    // Images stacks from relion_tomo_subtomo contain all-zero images for invisible frames, which need to be removed for relion_refine
+    template<typename T>
+    MultidimArray<T> removeInvisibleTomoImages(long int part_id, MultidimArray<T> &in_img)
+    {
+        MultidimArray<T> result;
+
+        int my_nr_images = particles[part_id].numberOfImages();
+        if (NSIZE(in_img) == my_nr_images)
+        {
+            result = in_img;
+        }
+        else
+        {
+            result.resize(my_nr_images, ZSIZE(in_img), YSIZE(in_img), XSIZE(in_img));
+            for (int img_id = 0; img_id < my_nr_images; img_id++)
+            {
+                int myframe = particles[part_id].images[img_id].frame;
+                MultidimArray<T> my_img;
+                in_img.getImage(myframe, my_img);
+                result.setImage(img_id, my_img);
+            }
+        }
+
+        return result;
+    }
+
+
+    // Read from file
 	bool read(
 		FileName fn_in, FileName fn_tomo, FileName fn_motion,
 		bool do_ignore_particle_name = false,

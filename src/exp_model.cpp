@@ -183,7 +183,7 @@ void Experiment::addParticle(std::string img_name, int optics_group, long int gr
     return;
 }
 
-void Experiment::addImageToParticle(long int part_id, d4Matrix *Aproj, CTF *ctf, float dose)
+void Experiment::addImageToParticle(long int part_id, int _frame, d4Matrix *Aproj, CTF *ctf, float dose)
 {
 
     Matrix2D<RFLOAT> A(3,3);
@@ -211,8 +211,8 @@ void Experiment::addImageToParticle(long int part_id, d4Matrix *Aproj, CTF *ctf,
     }
 
 	img.particle_id = part_id;
+    img.frame = _frame;
 	img.Aproj = A;
-    img.is_empty = false;
     img.dose = dose;
 
 	// Push back this particle in the particles vector
@@ -793,6 +793,7 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 	}
 }
 
+
 // Read from file
 bool Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
                       bool do_ignore_particle_name, bool do_ignore_group_name, bool do_preread_images,
@@ -986,14 +987,19 @@ bool Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
 
                 // Add all images for this particle
                 const int fc = tomogram.frameCount;
+                int ori_boxsize;
+                obsModel.opticsMdt.getValue(EMDL_TOMO_ORIGINAL_BOXSIZE, ori_boxsize, optics_group);
                 for (int f = 0; f < fc; f++)
                 {
+
+                    if (!tomogram.isVisible(pos, f, ori_boxsize/2.)) continue;
+
                     d4Matrix P = tomogram.projectionMatrices[f] * d4Matrix(A);
 
                     CTF ctf = tomogram.getCtf(f, pos);
 
                     float dose = tomogram.getCumulativeDose(f);
-                    addImageToParticle(part_id, &P, &ctf, dose);
+                    addImageToParticle(part_id, f, &P, &ctf, dose);
                 }
             }
             else
@@ -1013,7 +1019,8 @@ bool Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
                 if (is_tomo || is_3D)
                 {
                     img.read(img_name);
-                    particles[part_id].img = img();
+                    if (is_tomo) particles[part_id].img = removeInvisibleTomoImages(part_id, img());
+                    else particles[part_id].img = img();
                 }
                 else
                 {
