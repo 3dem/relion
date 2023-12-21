@@ -132,7 +132,7 @@ private:
 	void initialiseExternalWindow();
 
 	// relion-4.0: add subtomogram averaging programs by Jasenko
-	void placeTomoInput(bool has_tomograms, bool has_particles,	bool has_trajectories, bool has_manifolds=false);
+	void placeTomoInput(bool has_tomograms, bool has_particles,	bool has_trajectories, bool has_manifolds, bool has_halfmaps, bool has_postprocess);
 	void initialiseTomoImportWindow();
 	void initialiseTomoExcludeTiltImagesWindow();
     void initialiseTomoReconstructTomogramsWindow();
@@ -142,6 +142,7 @@ private:
     void initialiseTomoSubtomoWindow();
 	void initialiseTomoCtfRefineWindow();
 	void initialiseTomoAlignWindow();
+    void initialiseTomoReconParWindow();
 
 };
 

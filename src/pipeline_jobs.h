@@ -1355,8 +1355,8 @@ public:
 								 std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
     void initialiseTomoReconPartJob();
-    bool getCommandsTomoReconPartJob(std::string outputname, std::vector<std::string> &commands, std::string &error_message);
-
+    bool getCommandsTomoReconPartJob(std::string &outputname, std::vector<std::string> &commands,
+									 std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
 };
 
