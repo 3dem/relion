@@ -2482,7 +2482,11 @@ void JobWindow::placeTomoInput(bool has_tomograms, bool has_particles,
 	if (has_particles) place("in_particles", TOGGLE_DEACTIVATE);
 	if (has_tomograms) place("in_tomograms", TOGGLE_DEACTIVATE);
 	if (has_trajectories) place("in_trajectories", TOGGLE_DEACTIVATE);
-	if (has_manifolds) place("in_manifolds", TOGGLE_DEACTIVATE);
+
+    // Add a little spacer
+    current_y += STEPY/2;
+
+    if (has_manifolds) place("in_manifolds", TOGGLE_DEACTIVATE);
 	if (has_halfmaps) place("in_halfmaps", TOGGLE_DEACTIVATE);
 	if (has_postprocess)
 	{
@@ -2813,19 +2817,6 @@ void JobWindow::initialiseTomoCtfRefineWindow()
 	setupTabs(3);
 
 	placeTomoInput(true, true, true, false, true, true);
-
-    tab1->begin();
-
-    current_y += STEPY /2 ;
-    place("fn_mask", TOGGLE_DEACTIVATE);
-    place("fn_half", TOGGLE_DEACTIVATE);
-
-    current_y += STEPY /2 ;
-    place("box_size", TOGGLE_DEACTIVATE);
-    place("crop_size", TOGGLE_DEACTIVATE);
-    place("sym_name", TOGGLE_DEACTIVATE);
-
-    tab1->end();
 
     tab2->begin();
 	tab2->label("Defocus");
