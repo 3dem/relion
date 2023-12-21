@@ -579,6 +579,9 @@ void SubtomoProgram::processTomograms(
                 weightStack *= noiseWeights;
             }
 
+            // Make sure output greyscale of 2D stacks does not depend on binning
+            if (do_stack2d) particleStack/= (float)binning;
+
             const int boundary = (boxSize - cropSize) / 2;
 
             BufferedImage<float> particlesRS;
@@ -599,14 +602,7 @@ void SubtomoProgram::processTomograms(
 
             if (do_stack2d) {
 
-                // SHWS 18dec2023: attempt to unify greyscales for pseudo-subtomos and 2D stacks...
-                //float normfft= (float)binning*(float)s3D/(float)s02D;
-                //if (tt==0 && p==0) std::cerr << "normfft= "<<normfft<<std::endl;
-                //particleStack *= normfft;
-
-                aberrationsCache.correctObservations(particleStack, og);
                 BufferedImage<float> cropParticlesRS = Padding::unpadCenter2D_full(particlesRS, boundary);
-
                 cropParticlesRS.write(outData, binnedPixelSize, write_float16);
 
             } else {
@@ -646,9 +642,7 @@ void SubtomoProgram::processTomograms(
                 Centering::shiftInSitu(dataImgFS);
 
                 // correct FT scale after the implicit cropping:
-                float normfft = 1.;
-                if (s3D != s2D) normfft *= (float) s2D / (float) s3D;
-                if (binning != 1) normfft /= sqrt((float)(binning));
+                float normfft = (float) s2D / ((float) s3D * sqrt((float)(binning)) );
                 if (fabs(normfft - 1.) > 0.0001)
                     dataImgFS *= normfft;
 
