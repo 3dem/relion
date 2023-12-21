@@ -491,25 +491,28 @@ will still yield good performance and possibly a more stable execution. \n" << s
 
 	initialiseWorkLoad();
 
-	// Only the first follower calculates the sigma2_noise spectra and sets initial guesses for Iref
-	if (node->rank == 1)
-	{
-		MlOptimiser::initialiseSigma2Noise();
-		MlOptimiser::initialiseReferences();
-    }
+	// Only the first follower calculates the sigma2_noise spectra (and if fn_ref == None, later sets initial guesses for Iref)
+	if (node->rank == 1) MlOptimiser::initialiseSigma2Noise();
 
-	//Now the first follower broadcasts resulting Iref and sigma2_noise to everyone else
+        MlOptimiser::initialiseReferences();
+
+	// Now the first follower broadcasts resulting sigma2_noise to everyone else
 	for (int i = 0; i < mymodel.sigma2_noise.size(); i++)
 	{
 		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.sigma2_noise[i]),
 							   MULTIDIM_SIZE(mymodel.sigma2_noise[i]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
 	}
-	for (int i = 0; i < mymodel.Iref.size(); i++)
-	{
-		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Iref[i]),
-							   MULTIDIM_SIZE(mymodel.Iref[i]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
-	}
 
+	// Also broadcast Iref if that was set in initialiseSigma2Noise
+        if (fn_ref == "None")
+        {
+            for (int i = 0; i < mymodel.Iref.size(); i++)
+            {
+		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Iref[i]),
+                                       MULTIDIM_SIZE(mymodel.Iref[i]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
+            }
+        }
+        
 	// Initialise the data_versus_prior ratio to get the initial current_size right
 	if (iter == 0 && !do_initialise_bodies && !node->isLeader())
 		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
