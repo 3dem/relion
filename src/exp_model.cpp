@@ -797,7 +797,7 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 // Read from file
 bool Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
                       bool do_ignore_particle_name, bool do_ignore_group_name, bool do_preread_images,
-                      bool need_tiltpsipriors_for_helical_refine, bool set_offset_priors_to_offsets, int verb)
+                      bool need_tiltpsipriors_for_helical_refine, bool set_offset_priors_to_offsets, RFLOAT tomo_max_dose, int verb)
 {
 
 //#define DEBUG_READ
@@ -992,13 +992,13 @@ bool Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
                 for (int f = 0; f < fc; f++)
                 {
 
-                    if (!tomogram.isVisible(pos, f, ori_boxsize/2.)) continue;
+                    float dose = tomogram.getCumulativeDose(f);
+                    if (!tomogram.isVisible(pos, f, ori_boxsize/2.) || dose > tomo_max_dose) continue;
 
                     d4Matrix P = tomogram.projectionMatrices[f] * d4Matrix(A);
 
                     CTF ctf = tomogram.getCtf(f, pos);
 
-                    float dose = tomogram.getCumulativeDose(f);
                     addImageToParticle(part_id, f, &P, &ctf, dose);
                 }
             }
