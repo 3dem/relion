@@ -6360,9 +6360,12 @@ std::string RelionJob::getTomoInputCommmand(bool is_for_refine, std::string &com
             inputNodes.push_back(node2);
             command += " --tomograms " + joboptions["in_tomograms"].getString();
 
-            Node node3(joboptions["in_trajectories"].getString(), joboptions["in_trajectories"].node_type);
-            inputNodes.push_back(node2);
-            command += " --trajectories " + joboptions["in_trajectories"].getString();
+            if (joboptions["in_trajectories"].getString() != "")
+            {
+                Node node3(joboptions["in_trajectories"].getString(), joboptions["in_trajectories"].node_type);
+                inputNodes.push_back(node2);
+                command += " --trajectories " + joboptions["in_trajectories"].getString();
+            }
 
         }
         else
