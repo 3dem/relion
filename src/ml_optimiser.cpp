@@ -1007,7 +1007,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     auto_resolution_based_angles= parser.checkOption("--auto_resol_angles", "In auto-refinement, update angular sampling based on resolution-based required sampling. This makes convergence faster.");
     allow_coarser_samplings = parser.checkOption("--allow_coarser_sampling", "In 2D/3D classification, allow coarser angular and translational samplings if accuracies are bad (typically in earlier iterations.");
     do_trust_ref_size = parser.checkOption("--trust_ref_size", "Trust the pixel and box size of the input reference; by default the program will die if these are different from the first optics group of the data");
-    minimum_nr_particles_sigma2_noise = textToInteger(parser.getOption("--nr_parts_sigma2noise", "Number of particles (per optics group) for initial noise spectra estimation.", "1000"));
+    minimum_nr_particles_sigma2_noise = textToInteger(parser.getOption("--nr_parts_sigma2noise", "Number of particles (per optics group) for initial noise spectra estimation (default 1000 for SPA and 100 for STA).", "-1"));
     ///////////////// Special stuff for first iteration (only accessible via CL, not through readSTAR ////////////////////
 
     // When reading from the CL: always start at iteration 1 and subset 1
@@ -2536,6 +2536,11 @@ void MlOptimiser::initialiseGeneral(int rank)
 	}
 	else
 		blush_args = blush_args + " --gpu -1 ";
+
+    if (minimum_nr_particles_sigma2_noise < 0)
+    {
+        minimum_nr_particles_sigma2_noise = (mymodel.data_dim == 3 || mydata.is_tomo) ? 100 : 1000;
+    }
 
 #ifdef DEBUG
     std::cerr << "Leaving initialiseGeneral" << std::endl;
