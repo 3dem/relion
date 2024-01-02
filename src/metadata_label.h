@@ -652,7 +652,6 @@ enum EMDLabel
 	EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE,
 	EMDL_TOMO_NOMINAL_TILT_AXIS_ANGLE,
 	EMDL_TOMO_NOMINAL_DEFOCUS,
-
 	EMDL_TOMO_PARTICLES_FILE_NAME,
 	EMDL_TOMO_TOMOGRAMS_FILE_NAME,
 	EMDL_TOMO_MANIFOLDS_FILE_NAME,
@@ -661,6 +660,7 @@ enum EMDLabel
 	EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME,
 	EMDL_TOMO_REFERENCE_MASK_FILE_NAME,
 	EMDL_TOMO_REFERENCE_FSC_FILE_NAME,
+    EMDL_TOMO_VISIBLE_FRAMES,
 
 	EMDL_TOMO_IMPORT_OFFSET_X,
 	EMDL_TOMO_IMPORT_OFFSET_Y,
@@ -698,7 +698,7 @@ enum EMDLabel
 
 enum EMDLabelType
 {
-	EMDL_INT, EMDL_BOOL, EMDL_DOUBLE, EMDL_STRING, EMDL_DOUBLE_VECTOR, EMDL_UNKNOWN
+	EMDL_INT, EMDL_BOOL, EMDL_DOUBLE, EMDL_STRING, EMDL_INT_VECTOR, EMDL_DOUBLE_VECTOR, EMDL_UNKNOWN
 };
 
 class EMDL
@@ -727,7 +727,8 @@ public:
 	static bool isString(const EMDLabel &label);
 	static bool isDouble(const EMDLabel &label);
 	static bool isNumber(const EMDLabel &label);
-	static bool isDoubleVector(const EMDLabel &label);
+    static bool isIntVector(const EMDLabel &label);
+    static bool isDoubleVector(const EMDLabel &label);
 	static bool isVector(const EMDLabel &label);
 	static bool isUnknown(const EMDLabel &label);
 
@@ -1375,7 +1376,7 @@ private:
 		EMDL::addLabel(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE, EMDL_DOUBLE, "rlnTomoNominalStageTiltAngle", "Nominal value for the stage tilt angle");
 		EMDL::addLabel(EMDL_TOMO_NOMINAL_TILT_AXIS_ANGLE, EMDL_DOUBLE, "rlnTomoNominalTiltAxisAngle", "Nominal value for the angle of the tilt axis");
 		EMDL::addLabel(EMDL_TOMO_NOMINAL_DEFOCUS, EMDL_DOUBLE, "rlnTomoNominalDefocus", "Nominal value for the defocus in the tilt series image");
-
+        EMDL::addLabel(EMDL_TOMO_VISIBLE_FRAMES, EMDL_INT_VECTOR, "rlnTomoVisisbleFrames", "Frames fromt he tilt series that are included in the 2D stack of a pseudo-subtomogram");
 
 		EMDL::addLabel(EMDL_TOMO_IMPORT_OFFSET_X, EMDL_DOUBLE, "rlnTomoImportOffsetX", "X offset of a tomogram");
 		EMDL::addLabel(EMDL_TOMO_IMPORT_OFFSET_Y, EMDL_DOUBLE, "rlnTomoImportOffsetY", "Y offset of a tomogram");
