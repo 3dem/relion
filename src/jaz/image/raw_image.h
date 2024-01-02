@@ -63,7 +63,7 @@ class RawImage
 		const RawImage<T> getConstSliceRef(size_t z) const;
 		RawImage<T> getSlabRef(size_t z, size_t thickness);
 		const RawImage<T> getConstSlabRef(size_t z, size_t thickness);
-		
+
 		template <class T2>
 		void copySliceFrom(size_t z, const RawImage<T2>& src, size_t z_src = 0);
 		
@@ -493,7 +493,6 @@ void RawImage<T>::write(std::string fn, double pixelSize, bool writeFloat16) con
 		Image<T> img;
 		copyToN(img);
 		img.setSamplingRateInHeader(pixelSize);
-		img.write(fn);
 		img.write(fn, -1, false, WRITE_OVERWRITE, writeFloat16 ? Float16: Float);
 
 	}
