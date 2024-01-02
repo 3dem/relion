@@ -666,22 +666,12 @@ void MlOptimiser::parseInitial(int argc, char **argv)
         if (fn_data == "")
         {
             if (!optimisationSet.getValue(EMDL_TOMO_PARTICLES_FILE_NAME, fn_data))
-                REPORT_ERROR("No particles filename was found in file " + fn_OS);
+                REPORT_ERROR("No particles filename was found from command line or in optimisation_set " + fn_OS);
         }
         if (fn_tomo == "")
         {
             if (!optimisationSet.getValue(EMDL_TOMO_TOMOGRAMS_FILE_NAME, fn_tomo))
-                REPORT_ERROR("No tomograms filename was found in file " + fn_OS);
-        }
-        if (fn_motion == "")
-        {
-            if (!optimisationSet.getValue(EMDL_TOMO_TRAJECTORIES_FILE_NAME, fn_motion))
-                std::cout << " No motion trajectories were found in file " + fn_OS + ". Continuing without mask." << std::endl;
-        }
-        if (fn_mask == "None")
-        {
-            if (!optimisationSet.getValue(EMDL_TOMO_REFERENCE_MASK_FILE_NAME, fn_mask))
-                std::cout << " WARNING: No reference mask filename was found in file " + fn_OS + ". Continuing without mask." << std::endl;
+                REPORT_ERROR("No tomograms filename was found from command line or  in optimisation_set " + fn_OS);
         }
     }
 
@@ -1541,16 +1531,11 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
     }
 
     // Creating output tomo optimiser set, if required
-    if (do_join_random_halves && !optimisationSet.isEmpty())
+    if (do_write_data && (mymodel.data_dim == 3 || mydata.is_tomo) )
     {
         optimisationSet.setValue(EMDL_TOMO_PARTICLES_FILE_NAME, fn_root + "_data.star");
         optimisationSet.setValue(EMDL_TOMO_TOMOGRAMS_FILE_NAME, fn_tomo);
         optimisationSet.setValue(EMDL_TOMO_TRAJECTORIES_FILE_NAME, fn_motion);
-        optimisationSet.setValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, fn_root2 + "_half1_class001_unfil.mrc");
-        optimisationSet.setValue(EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME, fn_root2 + "_half2_class001_unfil.mrc");
-        optimisationSet.setValue(EMDL_TOMO_REFERENCE_MASK_FILE_NAME, fn_mask);
-        if (optimisationSet.containsLabel(EMDL_TOMO_REFERENCE_FSC_FILE_NAME))
-            optimisationSet.deactivateLabel(EMDL_TOMO_REFERENCE_FSC_FILE_NAME);
 
         optimisationSet.write(fn_root + "_optimisation_set.star");
     }

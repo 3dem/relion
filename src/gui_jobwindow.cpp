@@ -1197,6 +1197,9 @@ void JobWindow::initialiseClass2DWindow()
 	resetHeight();
 
 	place("fn_img", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY/2;
+
 	place("fn_cont", TOGGLE_REACTIVATE);
 
 	tab1->end();
@@ -1370,11 +1373,13 @@ void JobWindow::initialiseInimodelWindow()
 	tab1->label("I/O");
 	resetHeight();
 
-    place("fn_img", TOGGLE_DEACTIVATE);
     if (is_tomo)
-    {
-        place("fn_tomo", TOGGLE_DEACTIVATE);
-    }
+        placeTomoInput(true, true, true, false);
+    else
+        place("fn_img", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY/2;
+
 	place("fn_cont", TOGGLE_REACTIVATE);
 
 	tab1->end();
@@ -1411,6 +1416,13 @@ void JobWindow::initialiseInimodelWindow()
 	place("do_solvent", TOGGLE_DEACTIVATE);
 	place("sym_name", TOGGLE_DEACTIVATE);
 	place("do_run_C1", TOGGLE_DEACTIVATE);
+
+    if (is_tomo)
+    {
+        // Add a little spacer
+        current_y += STEPY/2;
+        place("sigma_tilt", TOGGLE_DEACTIVATE);
+    }
 
 	tab3->end();
 
@@ -1454,14 +1466,19 @@ void JobWindow::initialiseClass3DWindow()
 	tab1->label("I/O");
 	resetHeight();
 
-    place("fn_img", TOGGLE_DEACTIVATE);
     if (is_tomo)
-    {
-        place("fn_tomo", TOGGLE_DEACTIVATE);
-    }
+        placeTomoInput(true, true, true, false);
+    else
+        place("fn_img", TOGGLE_DEACTIVATE);
+
+    current_y += STEPY/2;
+
+    place("fn_ref", TOGGLE_DEACTIVATE);
+    place("fn_mask");
+
+	current_y += STEPY/2;
+
 	place("fn_cont", TOGGLE_REACTIVATE);
-	place("fn_ref", TOGGLE_DEACTIVATE);
-	place("fn_mask");
 
 	tab1->end();
 	tab2->begin();
@@ -1560,6 +1577,13 @@ void JobWindow::initialiseClass3DWindow()
 	current_y += STEPY/2;
 	place("allow_coarser");
 
+    if (is_tomo)
+    {
+        // Add a little spacer
+        current_y += STEPY/2;
+        place("sigma_tilt", TOGGLE_DEACTIVATE);
+    }
+
 	group3->end();
 	guientries["dont_skip_align"].cb_menu_i(); // to make default effective
 
@@ -1645,14 +1669,19 @@ void JobWindow::initialiseAutorefineWindow()
 	tab1->label("I/O");
 	resetHeight();
 
-	place("fn_img", TOGGLE_DEACTIVATE);
-	if (is_tomo)
-	{
-		place("fn_tomo", TOGGLE_DEACTIVATE);
-	}
+    if (is_tomo)
+        placeTomoInput(true, true, true, false);
+    else
+        place("fn_img", TOGGLE_DEACTIVATE);
+
+    current_y += STEPY/2;
+
+    place("fn_ref", TOGGLE_DEACTIVATE);
+    place("fn_mask");
+
+    current_y += STEPY/2;
+
 	place("fn_cont", TOGGLE_REACTIVATE);
-	place("fn_ref", TOGGLE_DEACTIVATE);
-	place("fn_mask");
 
 	tab1->end();
 	tab2->begin();
@@ -1714,6 +1743,13 @@ void JobWindow::initialiseAutorefineWindow()
 	place("relax_sym");
 	current_y += STEPY/2;
 	place("auto_faster");
+
+    if (is_tomo)
+    {
+        // Add a little spacer
+        current_y += STEPY/2;
+        place("sigma_tilt", TOGGLE_DEACTIVATE);
+    }
 
 	tab5->end();
 	tab6->begin();
@@ -2473,28 +2509,26 @@ void JobWindow::initialiseExternalWindow()
 }
 
 void JobWindow::placeTomoInput(bool has_tomograms, bool has_particles,
-							   bool has_trajectories, bool has_manifolds, bool has_halfmaps, bool has_postprocess)
+							   bool has_trajectories, bool has_manifolds)
 {
-	tab1->begin();
-	tab1->label("I/O");
-	resetHeight();
+
+    place("in_optimisation", TOGGLE_DEACTIVATE);
+
+    group0 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group0->end();
+    place("use_direct_entries", TOGGLE_DEACTIVATE, group0, false);
+    group0->begin();
 
 	if (has_particles) place("in_particles", TOGGLE_DEACTIVATE);
 	if (has_tomograms) place("in_tomograms", TOGGLE_DEACTIVATE);
 	if (has_trajectories) place("in_trajectories", TOGGLE_DEACTIVATE);
-
-    // Add a little spacer
-    current_y += STEPY/2;
-
     if (has_manifolds) place("in_manifolds", TOGGLE_DEACTIVATE);
-	if (has_halfmaps) place("in_halfmaps", TOGGLE_DEACTIVATE);
-	if (has_postprocess)
-	{
-		place("in_refmask", TOGGLE_DEACTIVATE);
-		place("in_post", TOGGLE_DEACTIVATE);
-	}
 
-	tab1->end();
+    group0->end();
+	guientries["use_direct_entries"].cb_menu_i(); // make default active
+
+    // Place a little spacer
+    current_y += STEPY /2 ;
 
 }
 
@@ -2794,7 +2828,13 @@ void JobWindow::initialiseTomoSubtomoWindow()
 {
 	setupTabs(2);
 
-	placeTomoInput(true, true, true, false, false, false);
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
+
+	placeTomoInput(true, true, true, false);
+
+	tab1->end();
 
 	tab2->begin();
 	tab2->label("Reconstruct");
@@ -2816,7 +2856,17 @@ void JobWindow::initialiseTomoCtfRefineWindow()
 {
 	setupTabs(3);
 
-	placeTomoInput(true, true, true, false, true, true);
+    tab1->begin();
+    tab1->label("I/O");
+    resetHeight();
+
+    placeTomoInput(true, true, true, false);
+
+    place("in_halfmaps", TOGGLE_DEACTIVATE);
+    place("in_refmask", TOGGLE_DEACTIVATE);
+    place("in_post", TOGGLE_DEACTIVATE);
+
+    tab1->end();
 
     tab2->begin();
 	tab2->label("Defocus");
@@ -2897,7 +2947,17 @@ void JobWindow::initialiseTomoAlignWindow()
 {
 	setupTabs(3);
 
-	placeTomoInput(true, true, true, false, true, true);
+    tab1->begin();
+    tab1->label("I/O");
+    resetHeight();
+
+	placeTomoInput(true, true, true, false);
+
+    place("in_halfmaps", TOGGLE_DEACTIVATE);
+    place("in_refmask", TOGGLE_DEACTIVATE);
+    place("in_post", TOGGLE_DEACTIVATE);
+
+    tab1->end();
 
 	tab2->begin();
 	tab2->label("Polish");
@@ -2944,7 +3004,7 @@ void JobWindow::initialiseTomoReconParWindow()
 {
 	setupTabs(2);
 
-	placeTomoInput(true, true, true, false, false, false);
+	placeTomoInput(true, true, true, false);
 
 	tab2->begin();
 	tab2->label("Average");
@@ -2954,7 +3014,6 @@ void JobWindow::initialiseTomoReconParWindow()
 	place("crop_size", TOGGLE_DEACTIVATE);
 	place("binning", TOGGLE_DEACTIVATE);
 	place("snr", TOGGLE_DEACTIVATE);
-	place("fn_mask", TOGGLE_DEACTIVATE);
 
 	current_y += STEPY /2 ;
 

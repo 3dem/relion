@@ -37,3 +37,8 @@ def combine_particle_annotations(
     df = pd.concat(dfs)
     output_file = output_directory / 'particles.star'
     starfile.write({'particles': df}, output_file, overwrite=True)
+
+    df2 = pd.DataFrame({'rlnTomoParticlesFile' : [output_file],
+                        'rlnTomoTomogramsFile' : [tilt_series_star_file]})
+    opt_file = output_directory / 'optimisation_set.star'
+    starfile.write({'optimisation_set': df2}, opt_file, overwrite=True)

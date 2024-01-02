@@ -201,12 +201,11 @@ void AlignProgram::performAlignment(
 
 	std::vector<double> initial = alignment.originalCoefficients;
 
-	alignment.devMode = debug;
-
+	//alignment.devMode = debug;
 
 	if (!debug && verbosity > 0 && per_tomogram_progress)
 	{
-		Log::beginProgress("Performing optimisation", num_iters);
+		Log::beginProgress("Performing optimisation ...", num_iters);
 	}
 
 	/*std::cout << "initial info: \n";

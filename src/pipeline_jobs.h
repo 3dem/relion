@@ -437,10 +437,10 @@ static bool do_allow_change_minimum_dedicated;
 #define LABEL_POST_MAP                 "DensityMap.mrc.relion.postprocess"
 #define LABEL_POST_MASKED              "DensityMap.mrc.relion.postprocess.masked"
 #define LABEL_POST_LOG                 "LogFile.pdf.relion.postprocess"
-#define LABEL_TOMO_OPTIMISATION        "ProcessData.star.relion.tomo.optimisation_set"
-#define LABEL_TOMO_TOMOGRAMS           "ProcessData.star.relion.tomo.relion.tomogram_set"
-#define LABEL_TOMO_TRAJECTORIES        "ProcessData.star.relion.tomo.relion.trajectory_set"
-#define LABEL_TOMO_MANIFOLDS           "ProcessData.star.relion.tomo.manifoldset"
+#define LABEL_TOMO_OPTIMISATION        "OptimisationSet.star.relion.tomo"
+#define LABEL_TOMO_TOMOGRAMS           "TomogramData.star.relion.tomo.tomogram_set"
+#define LABEL_TOMO_TRAJECTORIES        "TrajectoryData.star.relion.tomo"
+#define LABEL_TOMO_MANIFOLDS           "ManifoldData.star.relion.tomo"
 #define LABEL_TOMO_PARTS               "ParticlesData.star.relion.tomo"
 #define LABEL_TOMO_MAP                 "DensityMap.mrc.relion.tomo.subvolume"
 #define LABEL_TOMO_HALFMAP             "DensityMap.mrc.relion.tomo.halfmap"
@@ -448,7 +448,7 @@ static bool do_allow_change_minimum_dedicated;
 #define LABEL_TOMO_POST_LOG            "LogFile.pdf.relion.tomo.postprocess"
 #define LABEL_TOMO_FRAMEALIGN_LOG      "LogFile.pdf.relion.tomo.framealign"
 #define LABEL_TOMO_CTFREFINE_LOG       "LogFile.pdf.relion.tomo.ctfrefine"
-#define LABEL_TOMO_TILTSERIES          "ProcessData.star.relion.tomo.relion.tiltseries_set"
+#define LABEL_TOMO_TILTSERIES          "TomogramData.star.relion.tomo.tiltseries_set"
 
 
 static std::map<int, std::string> node_type2pipeliner_label = {{NODE_MOVIES_CPIPE, LABEL_MOVIES_CPIPE},
@@ -1314,9 +1314,10 @@ public:
 
 	// relion-3.2: add subtomogram averaging programs by Jasenko
 	void addTomoInputOptions(bool has_tomograms, bool has_particles,
-							 bool has_trajectories, bool has_manifolds=false, bool has_halfmaps=false, bool has_postprocess=false);
-	std::string getTomoInputCommmand(std::string &command, int has_tomograms, int has_particles,
-									 int has_trajectories, int has_manifolds=HAS_NOT, bool has_halfmaps=HAS_NOT, int has_postprocess=HAS_NOT);
+							 bool has_trajectories, bool has_manifolds=false);
+
+	std::string getTomoInputCommmand(bool is_for_refine, std::string &command, int has_tomograms, int has_particles,
+									 int has_trajectories, int has_manifolds=HAS_NOT);
 
 	void initialiseTomoImportJob();
 	bool getCommandsTomoImportJob(std::string &outputname, std::vector<std::string> &commands,
