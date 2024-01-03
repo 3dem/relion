@@ -4863,22 +4863,38 @@ bool MlOptimiser::setAverageCTF2(MultidimArray<RFLOAT> &avgctf2)
     if (mydata.hasCtfPremultiplied() && !fix_tau && !do_split_random_halves)
     {
         do_correct_tau2_by_avgctf2 = true;
-        MultidimArray<RFLOAT> sumw_multi;
+        MultidimArray<RFLOAT> sumw;
         avgctf2.initZeros(mymodel.sigma2_noise[0]);
-        sumw_multi.initZeros(mymodel.sigma2_noise[0]);
+        sumw.initZeros(mymodel.sigma2_noise[0]);
+
+        bool do_subtomo_correction = wsum_model.sumw_stMulti[0].sum() > 0.;
         for (int igroup = 0; igroup < mymodel.nr_optics_groups; igroup++)
         {
-            FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(avgctf2)
+            if (do_subtomo_correction)
             {
-                DIRECT_MULTIDIM_ELEM(avgctf2, n) += DIRECT_MULTIDIM_ELEM(wsum_model.sumw_ctf2[igroup], n);
-                DIRECT_MULTIDIM_ELEM(sumw_multi, n) += DIRECT_MULTIDIM_ELEM(wsum_model.sumw_stMulti[igroup], n);
+                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(avgctf2)
+                {
+                    DIRECT_MULTIDIM_ELEM(avgctf2, n) += DIRECT_MULTIDIM_ELEM(wsum_model.sumw_ctf2[igroup], n);
+                    DIRECT_MULTIDIM_ELEM(sumw, n) += DIRECT_MULTIDIM_ELEM(wsum_model.sumw_stMulti[igroup], n);
+                }
+            }
+            else
+            {
+                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(avgctf2)
+                {
+                    DIRECT_MULTIDIM_ELEM(avgctf2, n) += DIRECT_MULTIDIM_ELEM(wsum_model.sumw_ctf2[igroup], n);
+                    DIRECT_MULTIDIM_ELEM(sumw, n) += wsum_model.sumw_group[igroup] * DIRECT_MULTIDIM_ELEM(Npix_per_shell, n);
+                }
             }
         }
+
+        // Store the updated avgctf2 inside the wsum_model.sumw_ctf2 array of the first group
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(avgctf2)
         {
-            if (DIRECT_MULTIDIM_ELEM(sumw_multi, n) > 0.)
-                DIRECT_MULTIDIM_ELEM(avgctf2, n) /= DIRECT_MULTIDIM_ELEM(sumw_multi, n);
+            if (DIRECT_MULTIDIM_ELEM(sumw, n) > 0.)
+                DIRECT_MULTIDIM_ELEM(avgctf2, n) = DIRECT_MULTIDIM_ELEM(avgctf2, n) / DIRECT_MULTIDIM_ELEM(sumw, n);
         }
+
     }
 
     return do_correct_tau2_by_avgctf2;
@@ -5242,6 +5258,7 @@ void MlOptimiser::maximizationOtherParameters()
             }
         }
     }
+
     RCTOC(timer,RCT_7);
     RCTIC(timer,RCT_8);
     // After the first iteration the references are always CTF-corrected
