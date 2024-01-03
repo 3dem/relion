@@ -1533,6 +1533,11 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
     // Creating output tomo optimiser set, if required
     if (do_write_data && (mymodel.data_dim == 3 || mydata.is_tomo) )
     {
+        if (optimisationSet.numberOfObjects() == 0)
+        {
+            optimisationSet.addObject();
+            optimisationSet.setIsList(true);
+        }
         optimisationSet.setValue(EMDL_TOMO_PARTICLES_FILE_NAME, fn_root + "_data.star");
         optimisationSet.setValue(EMDL_TOMO_TOMOGRAMS_FILE_NAME, fn_tomo);
         optimisationSet.setValue(EMDL_TOMO_TRAJECTORIES_FILE_NAME, fn_motion);
@@ -2539,7 +2544,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 
     if (minimum_nr_particles_sigma2_noise < 0)
     {
-        minimum_nr_particles_sigma2_noise = (mymodel.data_dim == 3 || mydata.is_tomo) ? 100 : 1000;
+        minimum_nr_particles_sigma2_noise = (mymodel.data_dim == 3 || mydata.is_tomo) ? 10 : 1000;
     }
 
 #ifdef DEBUG
@@ -2777,6 +2782,9 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
         long int part_id = mydata.sorted_idx[part_id_sorted];
         long int optics_group = mydata.getOpticsGroup(part_id);
 
+        if (nr_particles_done_per_optics_group[optics_group] >= minimum_nr_particles_sigma2_noise)
+            continue;
+
         // Extract the relevant MetaDataTable row from MDimg
         MDimg = mydata.getMetaDataParticle(part_id);
 
@@ -2828,11 +2836,6 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
                 MultidimArray<RFLOAT> my_img;
                 wholestack.getImage(img_id, my_img);
                 img() = my_img;
-            }
-
-            if (nr_particles_done_per_optics_group[optics_group] >= minimum_nr_particles_sigma2_noise)
-            {
-                continue;
             }
 
             RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
