@@ -3004,7 +3004,13 @@ void JobWindow::initialiseTomoReconParWindow()
 {
 	setupTabs(2);
 
-	placeTomoInput(true, true, true, false);
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
+
+    placeTomoInput(true, true, true, false);
+
+    tab1->end();
 
 	tab2->begin();
 	tab2->label("Average");
