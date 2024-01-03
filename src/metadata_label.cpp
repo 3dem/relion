@@ -86,6 +86,10 @@ void EMDL::printDefinitions(std::ostream& out)
 		{
 			out << " (string) ";
 		}
+        else if (EMDL::isIntVector(names[strIt->first]))
+        {
+            out << " (vector<int>) ";
+        }
 		else if (EMDL::isDoubleVector(names[strIt->first]))
 		{
 			out << " (vector<double>) ";
