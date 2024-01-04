@@ -1094,7 +1094,7 @@ void MlModel::initialiseFromImages(
 		do_average_unaligned = true;
 		do_generate_seeds = false; // after SGD introduction, this is now done in the estimation of initial sigma2 step!
 		refs_are_ctf_corrected = true;
-		if (_is_3d_model || data_dim == 3)
+		if (_is_3d_model || data_dim == 3 || _mydata.is_tomo)
 		{
 			ref_dim = 3;
 			img().initZeros(ori_size, ori_size, ori_size);

@@ -3883,9 +3883,11 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
         else
 		{
 			command += " --ref " + joboptions["fn_ref"].getString();
-			Node node(joboptions["fn_ref"].getString(), joboptions["fn_ref"].node_type);
-			inputNodes.push_back(node);
-
+			if (joboptions["fn_ref"].getString() != "None")
+            {
+                Node node(joboptions["fn_ref"].getString(), joboptions["fn_ref"].node_type);
+                inputNodes.push_back(node);
+            }
 			if (!joboptions["ref_correct_greyscale"].getBoolean())
 				command += " --firstiter_cc";
 
@@ -4375,9 +4377,11 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
         else
 		{
 			command += " --ref " + joboptions["fn_ref"].getString();
-			Node node(joboptions["fn_ref"].getString(), joboptions["fn_ref"].node_type);
-			inputNodes.push_back(node);
-
+			if (joboptions["fn_ref"].getString() != "None")
+            {
+                Node node(joboptions["fn_ref"].getString(), joboptions["fn_ref"].node_type);
+                inputNodes.push_back(node);
+            }
 			if (!joboptions["ref_correct_greyscale"].getBoolean())
 				command += " --firstiter_cc";
 

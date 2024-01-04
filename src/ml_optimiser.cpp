@@ -709,8 +709,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
     // SHWS 25apr2023 for subtomogram averaging
     offset_range_x = textToFloat(parser.getOption("--offset_range_x", "Range for sampling offsets in X-direction (in Angstrom; default=auto)", "-1"));
-    offset_range_y = textToFloat(parser.getOption("--offset_range_y", "Range for sampling offsets in X-direction (in Angstrom; default=auto)", "-1"));
-    offset_range_z = textToFloat(parser.getOption("--offset_range_z", "Range for sampling offsets in X-direction (in Angstrom; default=auto)", "-1"));
+    offset_range_y = textToFloat(parser.getOption("--offset_range_y", "Range for sampling offsets in Y-direction (in Angstrom; default=auto)", "-1"));
+    offset_range_z = textToFloat(parser.getOption("--offset_range_z", "Range for sampling offsets in Z-direction (in Angstrom; default=auto)", "-1"));
 
     // Jun19,2015 - Shaoda, Helical refinement
     sampling.helical_offset_step = textToFloat(parser.getOption("--helical_offset_step", "Sampling rate (before oversampling) for offsets along helical axis (in Angstroms)", "-1"));
@@ -2677,7 +2677,7 @@ void MlOptimiser::initialiseReferences()
         // Low-pass filter the initial references
         initialLowPassFilterReferences();
 
-        if (do_init_blobs && fn_ref == "None")
+        if (do_init_blobs && fn_ref == "None" && !(mydata.is_tomo || mymodel.data_dim == 3))
         {
             bool is_helical_segment =
                     (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
