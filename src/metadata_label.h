@@ -642,7 +642,6 @@ enum EMDLabel
     EMDL_TOMO_SUBTOMOGRAM_STACK2D,
 	EMDL_TOMO_SUBTOMOGRAM_BINNING,
     EMDL_TOMO_TOMOGRAM_BINNING,
-    EMDL_TOMO_ORIGINAL_BOXSIZE,
     EMDL_TOMO_PARTICLE_NAME,
 	EMDL_TOMO_PARTICLE_ID,
 	EMDL_TOMO_MANIFOLD_INDEX,
@@ -1356,7 +1355,6 @@ private:
         EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_STACK2D, EMDL_BOOL, "rlnTomoSubTomosAre2DStacks", "This flag is set to true if subtomograms are saved as 2D image stacks");
 		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_BINNING, EMDL_DOUBLE, "rlnTomoSubtomogramBinning", "Binning level of a subtomogram");
         EMDL::addLabel(EMDL_TOMO_TOMOGRAM_BINNING, EMDL_DOUBLE, "rlnTomoTomogramBinning", "Binning level of a  reconstructed tomogram");
-        EMDL::addLabel(EMDL_TOMO_ORIGINAL_BOXSIZE, EMDL_INT, "rlnTomoOriginalBoxSize", "Original box size which with the particles was extracted from the tomogram");
         EMDL::addLabel(EMDL_TOMO_PARTICLE_NAME, EMDL_STRING, "rlnTomoParticleName", "Name of each individual particle");
 		EMDL::addLabel(EMDL_TOMO_PARTICLE_ID, EMDL_INT, "rlnTomoParticleId", "Unique particle index");
 
@@ -1376,7 +1374,7 @@ private:
 		EMDL::addLabel(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE, EMDL_DOUBLE, "rlnTomoNominalStageTiltAngle", "Nominal value for the stage tilt angle");
 		EMDL::addLabel(EMDL_TOMO_NOMINAL_TILT_AXIS_ANGLE, EMDL_DOUBLE, "rlnTomoNominalTiltAxisAngle", "Nominal value for the angle of the tilt axis");
 		EMDL::addLabel(EMDL_TOMO_NOMINAL_DEFOCUS, EMDL_DOUBLE, "rlnTomoNominalDefocus", "Nominal value for the defocus in the tilt series image");
-        EMDL::addLabel(EMDL_TOMO_VISIBLE_FRAMES, EMDL_INT_VECTOR, "rlnTomoVisisbleFrames", "Frames fromt he tilt series that are included in the 2D stack of a pseudo-subtomogram");
+        EMDL::addLabel(EMDL_TOMO_VISIBLE_FRAMES, EMDL_INT_VECTOR, "rlnTomoVisibleFrames", "Frames fromt he tilt series that are included in the 2D stack of a pseudo-subtomogram");
 
 		EMDL::addLabel(EMDL_TOMO_IMPORT_OFFSET_X, EMDL_DOUBLE, "rlnTomoImportOffsetX", "X offset of a tomogram");
 		EMDL::addLabel(EMDL_TOMO_IMPORT_OFFSET_Y, EMDL_DOUBLE, "rlnTomoImportOffsetY", "Y offset of a tomogram");

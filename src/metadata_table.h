@@ -471,7 +471,7 @@ void MetaDataTable::getValueSafely(EMDLabel label, T& value, long objectID) cons
 template<class T>
 bool MetaDataTable::setValue(EMDLabel label, const T &value, long int objectID)
 {
-	if (label < 0 || label >= EMDL_LAST_LABEL) return false;
+    if (label < 0 || label >= EMDL_LAST_LABEL) return false;
 	if (label == EMDL_UNKNOWN_LABEL)
 		REPORT_ERROR("MetaDataTable::setValue does not support unknown label.");
 
