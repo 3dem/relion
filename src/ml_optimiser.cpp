@@ -2832,7 +2832,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
         }
 
         MultidimArray<RFLOAT> wholestack;
-        if (mydata.is_tomo) wholestack = mydata.removeInvisibleTomoImages(part_id, img());
+        if (mydata.is_tomo) wholestack = img();
 
         for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++)
         {
@@ -4240,7 +4240,6 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
             std::cerr << " fn_img= " << fn_img << " part_id= " << part_id << std::endl;
 #endif
             img.readFromOpenFile(fn_img, hFile, -1, false);
-            if (mydata.is_tomo) img() = mydata.removeInvisibleTomoImages(part_id, img());
             img().setXmippOrigin();
             exp_imgs.push_back(img());
 

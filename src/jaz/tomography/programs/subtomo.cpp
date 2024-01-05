@@ -51,7 +51,8 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
     rescale_coords = textToDouble(parser.getOption("--rescale_coords", "Rescale input particles by this factor", "1."));
 	write_multiplicity = parser.checkOption("--multi", "Write out multiplicity volumes");
 	SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio (negative means use a heuristic)", "-1"));
-    min_frames = textToInteger(parser.getOption("--min_frames", "Minimum number of lowest-dose tilt series frames that needs to be inside the box (default is half the number of frames)", "-1"));
+    min_frames = textToInteger(parser.getOption("--min_frames", "Minimum number of lowest-dose tilt series frames that needs to be inside the box", "1"));
+    maxDose = textToDouble(parser.getOption("--max_dose", "Maximum dose (in e/A^2) of tilt series frames to be included (negative means use all frames)", "-1"));
 
 	do_cone_weight = parser.checkOption("--cone_weight", "Weight down a double cone along Z");
 	const double alpha = 0.5 * textToDouble(parser.getOption("--cone_angle", "Opening angle of the cone in degrees", "10"));
@@ -323,7 +324,18 @@ void SubtomoProgram::writeParticleSet(
             int my_min_frames = (min_frames < 0 ) ? tomogram.frameCount / 2 : min_frames;
 			if (tomogram.isVisibleFirstFrames(traj, boxSize / 2.0, my_min_frames))
 			{
-				const ParticleIndex new_id = copy.addParticle(particleSet, part_id);
+                // Get all the particle metadata
+                const ParticleIndex new_id = copy.addParticle(particleSet, part_id);
+
+                // Also set isVisible in the output particle STAR file
+                std::vector<bool> isVisible = tomogram.determineVisiblity(traj, boxSize / 2.0);
+                std::vector<int> isVisibleInt(isVisible.size(), 0);
+                if (maxDose > 0.)
+                    for (int f = 0; f < tomogram.frameCount; f++)
+                        if (tomogram.getCumulativeDose(f) > maxDose) isVisible[f] = false;
+                for (int f = 0; f < tomogram.frameCount; f++)
+                    if (isVisible[f]) isVisibleInt[f] = 1;
+                copy.partTable.setValue(EMDL_TOMO_VISIBLE_FRAMES, isVisibleInt);
 
 				const int opticsGroup = particleSet.getOpticsGroup(part_id);
 				const double tiltSeriesPixelSize = particleSet.getTiltSeriesPixelSize(opticsGroup);
@@ -386,7 +398,6 @@ void SubtomoProgram::writeParticleSet(
 		copy.optTable.setValue(EMDL_TOMO_SUBTOMOGRAM_BINNING, binning, og);
 		copy.optTable.setValue(EMDL_IMAGE_PIXEL_SIZE, ps_out, og);
 		copy.optTable.setValue(EMDL_IMAGE_SIZE, cropSize, og);
-        copy.optTable.setValue(EMDL_TOMO_ORIGINAL_BOXSIZE, boxSize, og);
 	}
 
 	copy.write(outDir + "particles.star");
@@ -512,7 +523,15 @@ void SubtomoProgram::processTomograms(
                 continue;
             }
 
-            const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s2D / 2.0);
+            std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s2D / 2.0);
+            // Also set isVisible to zero for frames that are over maxDose
+            if (maxDose > 0.)
+            {
+                for (int f = 0; f < fc; f++)
+                {
+                    if (tomogram.getCumulativeDose(f) > maxDose) isVisible[f] = false;
+                }
+            }
 
             std::vector<d4Matrix> projCut(fc), projPart(fc);
 
@@ -603,7 +622,8 @@ void SubtomoProgram::processTomograms(
             if (do_stack2d) {
 
                 BufferedImage<float> cropParticlesRS = Padding::unpadCenter2D_full(particlesRS, boundary);
-                cropParticlesRS.write(outData, binnedPixelSize, write_float16);
+                BufferedImage<float> cropParticlesRS2 = NewStackHelper::getVisibleSlices(cropParticlesRS, isVisible);
+                cropParticlesRS2.write(outData, binnedPixelSize, write_float16);
 
             } else {
 

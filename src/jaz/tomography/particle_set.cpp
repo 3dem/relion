@@ -637,6 +637,19 @@ double ParticleSet::getTiltSeriesPixelSize(int opticsGroup) const
 	return out;
 }
 
+std::vector<int> ParticleSet::getVisibleFrames(ParticleIndex particle_id) const
+{
+   	if (!partTable.containsLabel(EMDL_TOMO_VISIBLE_FRAMES))
+    {
+        REPORT_ERROR("ParticleSet::getVisibileFrames: frame visibility vector (rlnTomoVisibleFrames) missing from particles table");
+    }
+
+       std::vector<int> out;
+       partTable.getValue(EMDL_TOMO_VISIBLE_FRAMES, out, particle_id.value);
+       return out;
+
+}
+
 std::vector<d3Vector> ParticleSet::getTrajectoryInPixels(ParticleIndex particle_id, int fc, double pixelSize, bool from_original_coordinate) const
 {
 	const d3Vector p0 = (from_original_coordinate) ? getParticleCoord(particle_id) : getPosition(particle_id);

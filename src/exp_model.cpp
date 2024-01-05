@@ -183,7 +183,7 @@ void Experiment::addParticle(std::string img_name, int optics_group, long int gr
     return;
 }
 
-void Experiment::addImageToParticle(long int part_id, int _frame, d4Matrix *Aproj, CTF *ctf, float dose)
+void Experiment::addImageToParticle(long int part_id, d4Matrix *Aproj, CTF *ctf, float dose)
 {
 
     Matrix2D<RFLOAT> A(3,3);
@@ -211,7 +211,6 @@ void Experiment::addImageToParticle(long int part_id, int _frame, d4Matrix *Apro
     }
 
 	img.particle_id = part_id;
-    img.frame = _frame;
 	img.Aproj = A;
     img.dose = dose;
 
@@ -985,21 +984,22 @@ bool Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
                 d3Matrix A = particleSet.getSubtomogramMatrix(id);
                 const d3Vector pos = particleSet.getPosition(id);
 
-                // Add all images for this particle
-                const int fc = tomogram.frameCount;
-                int ori_boxsize;
-                obsModel.opticsMdt.getValue(EMDL_TOMO_ORIGINAL_BOXSIZE, ori_boxsize, optics_group);
-                for (int f = 0; f < fc; f++)
+
+                // Add only the visible images for this particle
+                std::vector<int> isVisible = particleSet.getVisibleFrames(id);
+                for (int f = 0; f < tomogram.frameCount; f++)
                 {
 
-                    float dose = tomogram.getCumulativeDose(f);
-                    if (!tomogram.isVisible(pos, f, ori_boxsize/2.) || dose > tomo_max_dose) continue;
+                    if (isVisible[f] > 0)
+                    {
+                        float dose = tomogram.getCumulativeDose(f);
 
-                    d4Matrix P = tomogram.projectionMatrices[f] * d4Matrix(A);
+                        d4Matrix P = tomogram.projectionMatrices[f] * d4Matrix(A);
 
-                    CTF ctf = tomogram.getCtf(f, pos);
+                        CTF ctf = tomogram.getCtf(f, pos);
 
-                    addImageToParticle(part_id, f, &P, &ctf, dose);
+                        addImageToParticle(part_id, &P, &ctf, dose);
+                    }
                 }
             }
             else
@@ -1019,8 +1019,7 @@ bool Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
                 if (is_tomo || is_3D)
                 {
                     img.read(img_name);
-                    if (is_tomo) particles[part_id].img = removeInvisibleTomoImages(part_id, img());
-                    else particles[part_id].img = img();
+                    particles[part_id].img = img();
                 }
                 else
                 {

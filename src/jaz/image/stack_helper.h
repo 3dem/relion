@@ -17,7 +17,10 @@ class NewStackHelper
 		
 		template <typename SrcType, typename DestType>
 		static void insertSliceZ(const RawImage<SrcType>& slice, RawImage<DestType>& dest, int z);
-		
+
+        template<class T>
+        static BufferedImage<T> getVisibleSlices(const BufferedImage<T> &input, std::vector<bool> isVisible);
+
 		template <typename T>
 		static void writeAsStack(const std::vector<RawImage<T>>& vec, std::string fn);
 		
@@ -139,6 +142,32 @@ void NewStackHelper::writeAsStack(const std::vector<RawImage<T>>& vec, std::stri
 	
 	out.write(fn);
 }
+
+template<class T>
+BufferedImage<T> NewStackHelper::getVisibleSlices(const BufferedImage<T> &input, std::vector<bool> isVisible)
+{
+    if (input.zdim != isVisible.size()) REPORT_ERROR("getVisibleSlices BUG: input vector isVisible is not the same size as the image");
+
+    long int zzdim = 0;
+    for (int z = 0; z < input.zdim; z++) if (isVisible[z]) zzdim++;
+
+    BufferedImage<T>  out(input.xdim,input.ydim,zzdim);
+
+    for (int z = 0, zz = 0; z < input.zdim; z++)
+    {
+        if (isVisible[z])
+        {
+            for (int y = 0; y < input.ydim; y++)
+                for (int x = 0; x < input.xdim; x++)
+                    out(x,y,zz) = input(x,y,z);
+            zz++;
+        }
+    }
+
+    return out;
+
+}
+
 
 template<typename T>
 void NewStackHelper::writeAsStack(const std::vector<BufferedImage<T>>& vec, std::string fn)

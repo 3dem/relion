@@ -76,6 +76,7 @@ class ParticleSet
 		
 		double getTiltSeriesPixelSize(int opticsGroup) const;
 
+		std::vector<int> getVisibleFrames(ParticleIndex particle_id) const;
 
 		std::vector<gravis::d3Vector> getTrajectoryInPixels(ParticleIndex particle_id, int fc, double pixelSize, bool from_original_coordinate = false) const;
 		void checkTrajectoryLengths(const std::vector<ParticleIndex> &tomogram_particles, int fc, std::string caller) const;
