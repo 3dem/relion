@@ -673,6 +673,13 @@ void MlOptimiser::parseInitial(int argc, char **argv)
             if (!optimisationSet.getValue(EMDL_TOMO_TOMOGRAMS_FILE_NAME, fn_tomo))
                 REPORT_ERROR("No tomograms filename was found from command line or  in optimisation_set " + fn_OS);
         }
+         if (fn_motion == "")
+        {
+            // Motions are optional!
+            if (optimisationSet.containsLabel(EMDL_TOMO_TRAJECTORIES_FILE_NAME))
+                optimisationSet.getValue(EMDL_TOMO_TRAJECTORIES_FILE_NAME, fn_motion);
+        }
+
     }
 
     // Perform cross-product comparison at first iteration
