@@ -2183,7 +2183,7 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 		}
 
 	}
-#ifdef DEBUG
+#ifdef DEBUG_DEEP
 	MDproc.write(std::cerr);
 #endif
 	MDproc.write(fh);
@@ -2211,7 +2211,7 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 			MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, nodeList[i].type);
 		}
 	}
-#ifdef DEBUG
+#ifdef DEBUG_DEEP
 	MDnode.write(std::cerr);
 #endif
 	MDnode.write(fh);
@@ -2240,7 +2240,7 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 			}
 		}
 	}
-#ifdef DEBUG
+#ifdef DEBUG_DEEP
 	MDedge1.write(std::cerr);
 #endif
 	MDedge1.write(fh);
@@ -2273,7 +2273,7 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 	if (fn_del != "")
 		MDedge2_del.write(fh_del);
 
-#ifdef DEBUG
+#ifdef DEBUG_DEEP
 	MDedge2.write(std::cerr);
 #endif
 

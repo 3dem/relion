@@ -7093,6 +7093,7 @@ void RelionJob::initialiseTomoSubtomoJob()
 	joboptions["box_size"] = JobOption("Box size (pix):", 128, 32, 512, 16, "The initial box size of the reconstruction. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
 	joboptions["crop_size"] = JobOption("Cropped box size (pix):", -1, -1, 512, 16, "If set to a positive value, after construction, the resulting pseudo subtomograms are cropped to this size. A smaller box size allows the (generally expensive) refinement using relion_refine to proceed more rapidly.");
 	joboptions["binning"] = JobOption("Binning factor:", 1, 1, 16, 1, "The tilt series images will be binned by this (real-valued) factor and then reconstructed in the specified box size above. Note that thereby the reconstructed region becomes larger when specifying binning factors larger than one.");
+	joboptions["max_dose"] = JobOption("Maximum dose (e/A^2):", -1, -1, 200, 1, "Tilt series frames with a dose higher than this maximum dose (in electrons per squared Angstroms) will not be included in the 3D pseudo-subtomogram, or in the 2D stack. For the latter, this will disc I/O operations and increase speed.");
 
 	joboptions["do_stack2d"] = JobOption("Write output as 2D stacks?", true ,"If set to Yes, this program will write output subtomograms as 2D substacks. This is new as of relion-4.1, and the preferred way of generating subtomograms. If set to No, then relion-4.0 3D pseudo-subtomograms will be written out. Either can be used in subsequent refinements and classifications.");
 	joboptions["do_float16"] = JobOption("Write output in float16?", true ,"If set to Yes, this program will write output images in float16 MRC format. This will save a factor of two in disk space compared to the default of writing in float32. Note that RELION and CCPEM will read float16 images, but other programs may not (yet) do so.");
@@ -7132,6 +7133,11 @@ bool RelionJob::getCommandsTomoSubtomoJob(std::string &outputname, std::vector<s
 	if (crop_size > 0.) command += " --crop " + joboptions["crop_size"].getString();
 
 	command += " --bin " + joboptions["binning"].getString();
+
+    float max_dose = joboptions["max_dose"].getNumber(error_message);
+    if (error_message != "") return false;
+	if (max_dose > 0.) command += " --max_dose " + joboptions["max_dose"].getString();
+
 
 	if (joboptions["do_float16"].getBoolean())
 	{
