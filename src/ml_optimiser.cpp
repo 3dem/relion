@@ -9258,9 +9258,6 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
     // P(X | X_1) / P(X | X_2) = exp ( |F_1 - F_2|^2 / (-2 sigma2) )
     // exp(-4.60517) = 0.01
     RFLOAT pvalue = 4.60517;
-    //SHWS 13dec2023: angular accuracies are way to low for tomography!
-    if (mymodel.data_dim == 3 || mydata.is_tomo)
-    	pvalue *= 2.;
 
     std::cout << " Estimating accuracies in the orientational assignment ... " << std::endl;
     int nr_particles = (my_last_part_id - my_first_part_id + 1);
