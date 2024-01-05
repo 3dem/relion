@@ -997,7 +997,7 @@ void MlOptimiserMpi::expectation()
 	MultidimArray<long int> first_last_nr_images(6);
 	int first_follower = 1;
 	// Use maximum of 100 particles for 3D and 10 particles for 2D estimations
-	int n_trials_acc = (mymodel.ref_dim==3 && mymodel.data_dim != 3) ? 100 : 10;
+	int n_trials_acc = (mymodel.ref_dim==3 && (mymodel.data_dim != 3|| mydata.is_tomo) ) ? 100 : 10;
 	n_trials_acc = XMIPP_MIN(n_trials_acc, mydata.numberOfParticles());
 	MPI_Status status;
 
