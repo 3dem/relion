@@ -23,16 +23,17 @@ def combine_particle_annotations(
         ..., help="directory into which 'particles.star' will be written."
     )
 ):
-    star = starfile.read(tilt_series_star_file)
-    global_table = star['global'].set_index('rlnTomoName')
+    global_df = starfile.read(tilt_series_star_file)
+    global_df = global_df.set_index('rlnTomoName')
     annotation_files = annotations_directory.glob('*_particles.star')
     dfs = []
     for file in annotation_files:
         df = starfile.read(file)
         tilt_series_id = '_'.join(file.name.split('_')[:-1])
-        scale_factor = float(global_table[tilt_series_id]['rlnTomoTomogramBinning'])
-        xyz = df[['rlnCoordinateX', 'rlnCoordinateY', 'rlnCoordinateZ']].to_numpy()
-        df[['rlnCoordinateX', 'rlnCoordinateY', 'rlnCoordinateZ']] = xyz * scale_factor
+        scale_factor = float(global_df.loc[tilt_series_id, 'rlnTomoTomogramBinning'])
+        xyz = df[['rlnCoordinateX', 'rlnCoordinateY', 'rlnCoordinateZ']]
+        xyz = xyz.to_numpy() * scale_factor
+        df[['rlnCoordinateX', 'rlnCoordinateY', 'rlnCoordinateZ']] = xyz
         dfs.append(df)
     df = pd.concat(dfs)
     output_file = output_directory / 'particles.star'
