@@ -199,9 +199,9 @@ void AlignProgram::performAlignment(
 		per_tomogram_progress && verbosity > 0,
 		min_frame, max_frame);
 
-	std::vector<double> initial = alignment.originalCoefficients;
+    std::vector<double> initial = alignment.originalCoefficients;
 
-	//alignment.devMode = debug;
+	alignment.devMode = debug;
 
 	if (!debug && verbosity > 0 && per_tomogram_progress)
 	{
@@ -212,7 +212,7 @@ void AlignProgram::performAlignment(
 	alignment.printDebuggingInfo(initial);*/
 
 	std::vector<double> opt = LBFGS::optimize(
-			initial, alignment, 0, num_iters, 1e-6, 1e-4);
+			initial, alignment, 1, num_iters, 1e-6, 1e-4);
 
 	/*std::cout << "final info: \n";
 	alignment.printDebuggingInfo(opt);*/
