@@ -78,7 +78,7 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 	write_normalised = parser.checkOption("--nrm", "Write multiplicity-normalised subtomograms");
 
     apply_offsets = !parser.checkOption("--dont_apply_offsets", "By default, rlnOriginX/Y/ZAngst are combined with rlnCoordinateX/Y/Z to construct the particles in their refined translations. Use this argument to skip that.");
-    apply_orientations = parser.checkOption("--apply_orientations", "rlnAngle<Rot/Tilt/Psi> are combined with rlnTomoSubtomogram<Rot/Tilt/Psi> to construct the particles in their refined orientations. This will also apply translations; No longer recommended in relion5!");
+    apply_orientations = parser.checkOption("--apply_orientations", "rlnAngle<Rot/Tilt/Psi> are combined with rlnTomoSubtomogram<Rot/Tilt/Psi> to construct the particles in their refined orientations. This will also apply translations!");
     if (apply_orientations) apply_offsets = true;
 
 	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process undone subtomograms");
@@ -127,7 +127,6 @@ void SubtomoProgram::run()
 {
 	TomogramSet tomogramSet(optimisationSet.tomograms, true);
 
-    // TODO: Introduce optics parameters from tomogramSet if they are not present yet in particleSet
 	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories, true, &tomogramSet);
 	std::vector<std::vector<ParticleIndex> > particles = particleSet.splitByTomogram(tomogramSet, true);
 	
@@ -328,14 +327,17 @@ void SubtomoProgram::writeParticleSet(
                 const ParticleIndex new_id = copy.addParticle(particleSet, part_id);
 
                 // Also set isVisible in the output particle STAR file
-                std::vector<bool> isVisible = tomogram.determineVisiblity(traj, boxSize / 2.0);
-                std::vector<int> isVisibleInt(isVisible.size(), 0);
-                if (maxDose > 0.)
+                if (do_stack2d)
+                {
+                    std::vector<bool> isVisible = tomogram.determineVisiblity(traj, boxSize / 2.0);
+                    std::vector<int> isVisibleInt(isVisible.size(), 0);
+                    if (maxDose > 0.)
+                        for (int f = 0; f < tomogram.frameCount; f++)
+                            if (tomogram.getCumulativeDose(f) > maxDose) isVisible[f] = false;
                     for (int f = 0; f < tomogram.frameCount; f++)
-                        if (tomogram.getCumulativeDose(f) > maxDose) isVisible[f] = false;
-                for (int f = 0; f < tomogram.frameCount; f++)
-                    if (isVisible[f]) isVisibleInt[f] = 1;
-                copy.partTable.setValue(EMDL_TOMO_VISIBLE_FRAMES, isVisibleInt);
+                        if (isVisible[f]) isVisibleInt[f] = 1;
+                    copy.partTable.setValue(EMDL_TOMO_VISIBLE_FRAMES, isVisibleInt);
+                }
 
 				const int opticsGroup = particleSet.getOpticsGroup(part_id);
 				const double tiltSeriesPixelSize = particleSet.getTiltSeriesPixelSize(opticsGroup);
@@ -572,17 +574,13 @@ void SubtomoProgram::processTomograms(
                     BufferedImage<float> ctfImg(sh2D, s2D);
                     ctf.draw(s2D, s2D, binnedPixelSize, gammaOffset, &ctfImg(0, 0, 0));
 
+                    // Apply doseWeigths until Nyquist frequency! Otherwise, convolution artefacts when do_circle_crop invFFT/FFT below
                     for (int y = 0; y < s2D; y++) {
-                        for (int x = 0; x < xRanges(y, f); x++) {
+                        for (int x = 0; x < sh2D; x++) {
                             const double c = ctfImg(x, y) * doseWeights(x, y, f);
 
                             particleStack(x, y, f) *= sign * c;
                             weightStack(x, y, f) = c * c;
-                        }
-                        // SHWS 23nov22: for writing out 2D stacks: need to set everything outside the xRanges to zero!
-                        for (int x = xRanges(y, f); x < sh2D; x++) {
-                            particleStack(x, y, f) = 0.;
-                            weightStack(x, y, f) = 0.;
                         }
                     }
                 } // end if do_ctf
