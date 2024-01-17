@@ -345,11 +345,12 @@ d3Vector ParticleSet::getPosition(ParticleIndex particle_id) const
 
 	d3Vector out = getParticleCoord(particle_id) - (A_subtomogram * getParticleOffset(particle_id)) / tiltSeriesPixelSize;
 
-    // /* SHWS & ABurt 19Jul2022: let's no longer do this in relion-4.1
-    //out.x += 1.0;
-	//out.y += 1.0;
-	//out.z += 1.0;
-	// */
+    // SHWS & ABurt 19Jul2022: let's no longer do this in relion-4.1 (also 25nov22)
+    // SHWS 17jan24: put '+1' back in because relion5 doesn't go as high resolution as tutorial data set as relion4....
+    out.x += 1.0;
+	out.y += 1.0;
+	out.z += 1.0;
+
 
 	return out;
 }
@@ -475,13 +476,10 @@ bool ParticleSet::hasHalfSets() const
 void ParticleSet::moveParticleTo(ParticleIndex particle_id, gravis::d3Vector pos)
 {
 	// SHWS 25nov22: as of relion-4.1, the origin is now at 0,0,0 again
-    //partTable.setValue(EMDL_IMAGE_COORD_X, pos.x - 1.0, particle_id.value);
-	//partTable.setValue(EMDL_IMAGE_COORD_Y, pos.y - 1.0, particle_id.value);
-	//partTable.setValue(EMDL_IMAGE_COORD_Z, pos.z - 1.0, particle_id.value);
-
-    partTable.setValue(EMDL_IMAGE_COORD_X, pos.x, particle_id.value);
-    partTable.setValue(EMDL_IMAGE_COORD_Y, pos.y, particle_id.value);
-    partTable.setValue(EMDL_IMAGE_COORD_Z, pos.z, particle_id.value);
+    // SHWS 17jan24: put '-1' back in because relion5 doesn't go as high resolution as tutorial data set as relion4....
+    partTable.setValue(EMDL_IMAGE_COORD_X, pos.x - 1.0, particle_id.value);
+	partTable.setValue(EMDL_IMAGE_COORD_Y, pos.y - 1.0, particle_id.value);
+	partTable.setValue(EMDL_IMAGE_COORD_Z, pos.z - 1.0, particle_id.value);
 
 	partTable.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, 0.0, particle_id.value);
 	partTable.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, 0.0, particle_id.value);

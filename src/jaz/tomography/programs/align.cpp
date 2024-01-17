@@ -375,14 +375,12 @@ void AlignProgram::writeTempAlignmentData(
 		temp_positions.addObject();
 
         // SHWS 25nov22: relion-4.1 has origins at 0,0,0, no longer at 1,1,1 like relion-4.0 and some old imod.
-        //temp_positions.setValue(EMDL_IMAGE_COORD_X, pos[p].x - 1, p);
-        //temp_positions.setValue(EMDL_IMAGE_COORD_Y, pos[p].y - 1, p);
-        //temp_positions.setValue(EMDL_IMAGE_COORD_Z, pos[p].z - 1, p);
+        // SHWS 17jan24: put '-1' back in because relion5 doesn't go as high resolution as tutorial data set as relion4....
+        temp_positions.setValue(EMDL_IMAGE_COORD_X, pos[p].x - 1, p);
+        temp_positions.setValue(EMDL_IMAGE_COORD_Y, pos[p].y - 1, p);
+        temp_positions.setValue(EMDL_IMAGE_COORD_Z, pos[p].z - 1, p);
 
-		temp_positions.setValue(EMDL_IMAGE_COORD_X, pos[p].x, p);
-		temp_positions.setValue(EMDL_IMAGE_COORD_Y, pos[p].y, p);
-		temp_positions.setValue(EMDL_IMAGE_COORD_Z, pos[p].z, p);
-	}
+    }
 
 	temp_positions.write(temp_filename_root + "_positions.star");
 	
