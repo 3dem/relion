@@ -3561,7 +3561,7 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	command2 += " --i " + fn_model;
 	command2 += " --o " + outputname + "initial_model.mrc";
 
-	if ( joboptions["do_run_C1"].getBoolean() && !(fn_sym.contains("C1") || fn_sym.contains("c1")) )
+	if ( joboptions["do_run_C1"].getBoolean() && !(fn_sym == "C1" || fn_sym == "c1") )
 	{
 		command2 += " --sym " + joboptions["sym_name"].getString();
 	}
