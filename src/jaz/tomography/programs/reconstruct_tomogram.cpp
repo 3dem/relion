@@ -69,6 +69,7 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
 	spacing = textToDouble(parser.getOption("--bin", "Binning", "1.0"));
     angpix_spacing = textToDouble(parser.getOption("--binned_angpix", "OR: desired pixel size after binning", "-1"));
 
+    tiltAngleOffset = textToDouble(parser.getOption("--tiltangle_offset", "Offset applied to all tilt angles (in deg)", "0"));
 	n_threads = textToInteger(parser.getOption("--j", "Number of threads", "1"));
 
 
@@ -123,6 +124,10 @@ void TomoBackprojectProgram::initialise(bool verbose)
         {
             std::cout << "  - " << tomogramSet.getTomogramName(tomoIndexTodo[idx]) << std::endl;
         }
+        if (fabs(tiltAngleOffset) > 0.)
+        {
+            std::cout << " + Applying a tilt angle offset of " << tiltAngleOffset << " degrees" << std::endl;
+        }
     }
 
 }
@@ -175,6 +180,16 @@ void TomoBackprojectProgram::writeOutput(bool do_all_metadata)
         tomogramSet.write(outFn + "tomograms.star");
 
         std::cout << " Written out: " << outFn << "tomograms.star" << std::endl;
+
+    }
+    else if (fabs(tiltAngleOffset) > 0.)
+    {
+        // Also write out the modified metadata file
+        int idx=tomoIndexTodo[0];
+        FileName fn_star;
+        tomogramSet.globalTable.getValue(EMDL_TOMO_TILT_SERIES_STARFILE, fn_star, idx);
+        FileName fn_newstar = getOutputFileWithNewUniqueDate(fn_star, outFn);
+        tomogramSet.tomogramTables[idx].write(fn_newstar);
 
     }
 
@@ -294,6 +309,11 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex, bool doEven, 
     if (angpix_spacing > 0.)
     {
         spacing = angpix_spacing / pixelSizeAct;
+    }
+
+    if (fabs(tiltAngleOffset) > 0.)
+    {
+        tomogramSet.applyTiltAngleOffset(tomoIndex, tiltAngleOffset);
     }
 
     if (!tomogram.hasMatrices) getProjectMatrices(tomogram, tomogramSet.tomogramTables[tomoIndex]);
@@ -465,6 +485,11 @@ void TomoBackprojectProgram::setMetaDataAllTomograms()
         Tomogram tomogram;
         tomogram = tomogramSet.loadTomogram(tomoIndex, false);
         if (!tomogram.hasMatrices) getProjectMatrices(tomogram, tomogramSet.tomogramTables[tomoIndex]);
+
+        if (fabs(tiltAngleOffset) > 0.)
+        {
+            tomogramSet.applyTiltAngleOffset(tomoIndex, tiltAngleOffset);
+        }
 
         double pixelSizeAct = tomogramSet.getTiltSeriesPixelSize(tomoIndex);
         if (angpix_spacing > 0.) spacing = angpix_spacing / pixelSizeAct;

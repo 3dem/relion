@@ -24,6 +24,7 @@ class TomoBackprojectProgram
             bool do_multiple, do_only_unfinished;
 	     	bool do_even_odd_tomograms;
 			double SNR;
+            double tiltAngleOffset;
 
             std::vector<long> tomoIndexTodo;
 			OptimisationSet optimisationSet;

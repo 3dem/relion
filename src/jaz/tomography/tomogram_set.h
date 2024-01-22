@@ -45,6 +45,7 @@ class TomogramSet
 		void setTiltSeriesFile(int tomogramIndex, const std::string& filename);
 		void setFiducialsFile(int tomogramIndex, const std::string& filename);
 		void setDefocusSlope(int tomogramIndex, double slope);
+        void applyTiltAngleOffset(int tomogramIndex, double offset);
 
 		void setDeformation(
 				int tomogramIndex,

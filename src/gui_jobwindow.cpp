@@ -2735,6 +2735,7 @@ void JobWindow::initialiseTomoReconstructTomogramsWindow()
 
     current_y += STEPY /2 ;
 
+    place ("tiltangle_offset");
     place("tomo_name");
 
 	tab2->end();

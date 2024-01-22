@@ -529,6 +529,17 @@ void TomogramSet::setDefocusSlope(int tomogramIndex, double slope)
 {
 	globalTable.setValue(EMDL_TOMO_DEFOCUS_SLOPE, slope, tomogramIndex);
 }
+void TomogramSet::applyTiltAngleOffset(int tomogramIndex, double offset)
+{
+    MetaDataTable& m = tomogramTables[tomogramIndex];
+
+    FOR_ALL_OBJECTS_IN_METADATA_TABLE(m) {
+        double tilt;
+        m.getValueSafely(EMDL_TOMO_YTILT, tilt);
+        tilt += offset;
+        m.setValue(EMDL_TOMO_YTILT, tilt);
+    }
+}
 
 void TomogramSet::setDeformation(
 	int tomogramIndex,

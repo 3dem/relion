@@ -6772,7 +6772,9 @@ void RelionJob::initialiseTomoReconstructTomogramsJob()
 
 	joboptions["in_tiltseries"] = JobOption("Input tilt series:", OUTNODE_TOMO_TILTSERIES, "", "STAR files (*.star)",  "Input global tilt series star file.");
 
-	joboptions["tomo_name"] = JobOption("Reconstruct only this tomogram:", std::string(""), "If not left empty, the program will only reconstruct this particular tomogram");
+	joboptions["tiltangle_offset"] = JobOption("Tilt angle offset (deg): ", 0., -25., 25, 1, "The tomogram tilt angles will all be changed by this value. This may be useful to reconstruct lamellae that are all milled under a given angle. All tomograms will be reconstructed with the same offset. Use the tomogram name option below to reconstruct only a single tomogram.");
+
+    joboptions["tomo_name"] = JobOption("Reconstruct only this tomogram:", std::string(""), "If not left empty, the program will only reconstruct this particular tomogram");
 	joboptions["generate_split_tomograms"] = JobOption("Generate tomograms for denoising?:", false, "Generate tomograms for input into a denoising job. For this option to work, Save images for denoising? should have been True during Motion Correction. Additionally, adjust zdim to minimise the amount of empty space without sample within the tomograms.");
 
 
@@ -6824,7 +6826,13 @@ bool RelionJob::getCommandsTomoReconstructTomogramsJob(std::string &outputname, 
 	// No CTF is on by default for now
 	command += " --noctf ";
 
-	// In new version of tilt series alignments by Alister Burt, the origin is again at normal 0,0,0 position
+    if (fabs(joboptions["tiltangle_offset"].getNumber(error_message)) > 0.)
+    {
+        command += " --tiltangle_offset " + joboptions["tiltangle_offset"].getString();
+    }
+    if (error_message != "") return false;
+
+    // In new version of tilt series alignments by Alister Burt, the origin is again at normal 0,0,0 position
 	command += " --x0 0 --y0 0 --z0 0 ";
 
 	Node node1(outputname+"tomograms.star", LABEL_TOMO_TOMOGRAMS);
