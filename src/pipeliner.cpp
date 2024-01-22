@@ -1930,14 +1930,22 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 
 	MetaDataTable MDgen, MDnode, MDproc, MDedge1, MDedge2;
 
-	// This if allows for older version of the pipeline without the jobcounter
-	// TODO: remove after alpha-testing
-	if (MDgen.readStar(in, "pipeline_general"))
-	{
-		MDgen.getValue(EMDL_PIPELINE_JOB_COUNTER, job_counter);
-		if (job_counter < 0)
-			REPORT_ERROR("PipeLine::read: rlnPipeLineJobCounter must not be negative!");
-	}
+	// There seem to be some file systems, where reading the starfile is not entirely robust. Let's try 3 times
+    bool has_read = false;
+    for (int i= 0; i < 3; i++)
+    {
+        if (MDgen.readStar(in, "pipeline_general"))
+        {
+            MDgen.getValue(EMDL_PIPELINE_JOB_COUNTER, job_counter);
+            if (job_counter < 0)
+                REPORT_ERROR("PipeLine::read: rlnPipeLineJobCounter must not be negative!");
+            has_read = true;
+            break;
+        }
+        //std::cerr <<" read has failed reading pipeline_general table from the default_pipeliner.star file, will sleep 0.5 seconds and try again; attempt "<< i << " out of 3" << std::endl;
+        sleep(0.5);
+    }
+    if (!has_read) REPORT_ERROR("ERROR: cannot read expected pipeline_general table from the default_pipeliner.star file...");
 
 	MDnode.readStar(in, "pipeline_nodes");
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDnode)
