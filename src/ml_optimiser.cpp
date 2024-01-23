@@ -2422,7 +2422,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 
 	if (myverb > 0)
 	{
-            std::cout << " Estimating initial noise spectra from " << total_nr_particles_todo << " particles " << std::endl;
+            std::cout << " Estimating initial noise spectra from at most " << total_nr_particles_todo << " particles " << std::endl;
 		init_progress_bar(total_nr_particles_todo);
 		barstep = XMIPP_MAX(1, total_nr_particles_todo / 60);
 	}
@@ -4446,11 +4446,11 @@ void MlOptimiser::symmetriseReconstructions()
 
 void MlOptimiser::applyLocalSymmetryForEachRef()
 {
-	if ( (fn_local_symmetry_masks.size() < 1) || (fn_local_symmetry_operators.size() < 1) )
+	if ( (fn_local_symmetry_masks.size() == 0) || (fn_local_symmetry_operators.size() == 0) )
 		return;
 
 	if (verb > 0)
-		std::cout << " Applying local symmetry in real space according to " << fn_local_symmetry_operators.size() << " operators..." << std::endl;
+		std::cout << " Applying local symmetry in real space..." << std::endl;
 
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{

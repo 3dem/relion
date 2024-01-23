@@ -2093,7 +2093,7 @@ void MlOptimiserMpi::maximization()
 					}
 
 					// Apply local symmetry according to a list of masks and their operators
-					if ( (fn_local_symmetry_masks.size() >= 1) && (fn_local_symmetry_operators.size() >= 1) && (!has_converged) )
+					if ( (fn_local_symmetry_masks.size() != 0) && (fn_local_symmetry_operators.size() != 0) && (!has_converged) )
 						applyLocalSymmetry(mymodel.Iref[ith_recons], fn_local_symmetry_masks, fn_local_symmetry_operators);
 
 					// Shaoda Jul26,2015 - Helical symmetry local refinement
@@ -2225,7 +2225,7 @@ void MlOptimiserMpi::maximization()
 							}
 
 							// Apply local symmetry according to a list of masks and their operators
-							if ( (fn_local_symmetry_masks.size() >= 1) && (fn_local_symmetry_operators.size() >= 1) && (!has_converged) )
+							if ( (fn_local_symmetry_masks.size() != 0) && (fn_local_symmetry_operators.size() != 0) && (!has_converged) )
 								applyLocalSymmetry(mymodel.Iref[ith_recons], fn_local_symmetry_masks, fn_local_symmetry_operators);
 
 							// Shaoda Jul26,2015 - Helical symmetry local refinement
@@ -2261,9 +2261,11 @@ void MlOptimiserMpi::maximization()
 										mymodel.helical_twist[ith_recons],
 										width_mask_edge);
 							}
-							helical_rise_half2 = mymodel.helical_rise[ith_recons];
-							helical_twist_half2 = mymodel.helical_twist[ith_recons];
 						} // end if !do_join_random_halves
+
+                        // Rank 2 still updates the estimated twist and rise
+                        helical_rise_half2 = mymodel.helical_rise[ith_recons];
+                        helical_twist_half2 = mymodel.helical_twist[ith_recons];
 
 						// But rank 2 always does the unfiltered reconstruction
 						if (do_auto_refine && has_converged)
@@ -3543,8 +3545,8 @@ void MlOptimiserMpi::iterate()
 		}
 		symmetriseReconstructions();
 
-		if ( (verb > 0) && (node->isLeader()) && (fn_local_symmetry_masks.size() >= 1) && (fn_local_symmetry_operators.size() >= 1) )
-			std::cout << " Applying local symmetry in real space according to " << fn_local_symmetry_operators.size() << " operators..." << std::endl;
+		if ( (verb > 0) && (node->isLeader()) && (fn_local_symmetry_masks.size() != 0) && (fn_local_symmetry_operators.size() != 0) )
+			std::cout << " Applying local symmetry in real space..." << std::endl;
 
 		// Write out data and weight arrays to disc in order to also do an unregularized reconstruction
 #ifndef DEBUG_RECONSTRUCTION

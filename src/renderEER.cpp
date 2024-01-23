@@ -448,7 +448,7 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 		else if (eer_upsampling == 1)
 			render4K(image, positions, symbols, n_electron);
 		else
-			REPORT_ERROR("Invalid EER upsamle");
+			REPORT_ERROR("Invalid EER upsample");
 		RCTOC(TIMING_RENDER_ELECTRONS);
 
 		total_n_electron += n_electron;
