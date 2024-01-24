@@ -1110,6 +1110,9 @@ void GuiMainWindow::fillStdOutAndErr()
 				REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_outtail + " does not exists" );
 			int err = textbuff_stdout->loadfile(fn_outtail.c_str());
 			in.close();
+            command = "rm -f " + fn_outtail;
+			res = system(command.c_str());
+
 		}
 		// Scroll to the bottom
 		disp_stdout->insert_position(textbuff_stdout->length());
@@ -1135,7 +1138,10 @@ void GuiMainWindow::fillStdOutAndErr()
 				REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_errtail + " does not exists" );
 			int err = textbuff_stderr->loadfile(fn_errtail.c_str());
 			in.close();
-		}
+            command = "rm -f " + fn_errtail;
+            res = system(command.c_str());
+
+        }
 		// Scroll to the bottom
 		disp_stderr->insert_position(textbuff_stderr->length());
 		disp_stderr->show_insert_position();
