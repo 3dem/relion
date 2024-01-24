@@ -2841,9 +2841,9 @@ void JobWindow::initialiseTomoSubtomoWindow()
 	tab2->label("Reconstruct");
 	resetHeight();
 
+    place("binning", TOGGLE_DEACTIVATE);
 	place("box_size", TOGGLE_DEACTIVATE);
 	place("crop_size", TOGGLE_DEACTIVATE);
-	place("binning", TOGGLE_DEACTIVATE);
 
     current_y += STEPY /2 ;
 
@@ -3021,9 +3021,12 @@ void JobWindow::initialiseTomoReconParWindow()
 	tab2->label("Average");
 	resetHeight();
 
+    place("binning", TOGGLE_DEACTIVATE);
 	place("box_size", TOGGLE_DEACTIVATE);
 	place("crop_size", TOGGLE_DEACTIVATE);
-	place("binning", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY /2 ;
+
 	place("snr", TOGGLE_DEACTIVATE);
 
 	current_y += STEPY /2 ;
