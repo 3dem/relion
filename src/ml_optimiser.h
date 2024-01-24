@@ -675,8 +675,6 @@ public:
 	bool normalised_subtomos;
 	// Threshold applied to multiplicity volume to mask edge voxels
 	RFLOAT subtomo_multi_thr;
-    // Maximum dose for reading stack2ds
-    RFLOAT tomo_max_dose;
 
 	/////////// Some internal stuff ////////////////////////
 

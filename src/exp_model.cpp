@@ -796,7 +796,7 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 // Read from file
 bool Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
                       bool do_ignore_particle_name, bool do_ignore_group_name, bool do_preread_images,
-                      bool need_tiltpsipriors_for_helical_refine, bool set_offset_priors_to_offsets, RFLOAT tomo_max_dose, int verb)
+                      bool need_tiltpsipriors_for_helical_refine, bool set_offset_priors_to_offsets, int verb)
 {
 
 //#define DEBUG_READ
