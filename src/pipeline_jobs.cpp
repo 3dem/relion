@@ -6988,15 +6988,29 @@ void RelionJob::initialiseTomoPickTomogramsJob()
 	// for filaments, cylinders and spheres
 	joboptions["particle_spacing"] = JobOption("Particle spacing (A):",-1,10,250,10, "Spacing (in Angstroms) between particles sampled on a sphere, on surfaces, or in filaments. This option will be ignored if you are picking individual particles");
 
+    joboptions["in_star_file"] = JobOption("Input particles.star:", "", "", "STAR files (*.star)", "HELP");
+
 }
 bool RelionJob::getCommandsTomoPickTomogramsJob(std::string &outputname, std::vector<std::string> &commands,
                                        std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
 	initialisePipeline(outputname, job_counter);
-	std::string command, command2;
+	std::string command0, command, command2;
 
 	if (error_message != "") return false;
+
+    if (joboptions["pick_mode"].getString() == "particles" && joboptions["in_star_file"].getString().length() > 0)
+    {
+        command0 = "`which relion_python_tomo_get_particle_poses`";
+        command0 += " split-particles";
+        command0 += " --tomograms-file " + joboptions["in_tomoset"].getString();
+        command0 += " --annotations-directory " + outputname + "annotations";
+        command0 += " --in-star-file " + joboptions["in_star_file"].getString();
+
+        command0 += " " + joboptions["other_args"].getString();
+        commands.push_back(command0);
+    }
 
 	command="`which relion_python_tomo_pick` ";
 
@@ -7028,7 +7042,7 @@ bool RelionJob::getCommandsTomoPickTomogramsJob(std::string &outputname, std::ve
 	commands.push_back(command);
 
 	command2 = "`which relion_python_tomo_get_particle_poses`";
-	command2 += " " + joboptions["pick_mode"].getString();
+	command2 += " combine-particles";
 	command2 += " --tilt-series-star-file " + joboptions["in_tomoset"].getString();
 	command2 += " --annotations-directory " + outputname + "annotations";
 	command2 += " --output-directory " + outputname;
