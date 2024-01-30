@@ -6988,7 +6988,10 @@ void RelionJob::initialiseTomoPickTomogramsJob()
 	// for filaments, cylinders and spheres
 	joboptions["particle_spacing"] = JobOption("Particle spacing (A):",-1,10,250,10, "Spacing (in Angstroms) between particles sampled on a sphere, on surfaces, or in filaments. This option will be ignored if you are picking individual particles");
 
-    joboptions["in_star_file"] = JobOption("Input particles.star:", "", "", "STAR files (*.star)", "HELP");
+    joboptions["in_star_file"] = JobOption("Input particles.star (optional):", OUTNODE_TOMO_PARTS, "", "Particle STAR file (*.star)", "\
+If Picking mode='particles', this star file is used to generate initial particle annotations on the input tomograms.\n\n\
+If for a given tomogram X, the 'X_particles.star' file already exists in the 'annotations' directory, new annotations will not be created.\n\n\
+For other picking modes, this file is ignored.");
 
 }
 bool RelionJob::getCommandsTomoPickTomogramsJob(std::string &outputname, std::vector<std::string> &commands,
