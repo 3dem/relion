@@ -134,4 +134,4 @@ def rlnOrigin_to_rlnCoordinate_row(df_row, pixel_size):
     coords = df_row[['rlnCoordinateX', 'rlnCoordinateY', 'rlnCoordinateZ']]
     offset = df_row[['rlnOriginXAngst', 'rlnOriginYAngst', 'rlnOriginZAngst']]
 
-    return coords - A_subtomo @ offset / pixel_size
+    return coords - A_subtomo.T @ offset / pixel_size
