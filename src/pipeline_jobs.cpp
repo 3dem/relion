@@ -7003,7 +7003,7 @@ bool RelionJob::getCommandsTomoPickTomogramsJob(std::string &outputname, std::ve
     if (joboptions["pick_mode"].getString() == "particles" && joboptions["in_star_file"].getString().length() > 0)
     {
         command0 = "`which relion_python_tomo_get_particle_poses`";
-        command0 += " split-particles";
+        command0 += " particles-from-star";
         command0 += " --tomograms-file " + joboptions["in_tomoset"].getString();
         command0 += " --annotations-directory " + outputname + "annotations";
         command0 += " --in-star-file " + joboptions["in_star_file"].getString();
@@ -7042,7 +7042,7 @@ bool RelionJob::getCommandsTomoPickTomogramsJob(std::string &outputname, std::ve
 	commands.push_back(command);
 
 	command2 = "`which relion_python_tomo_get_particle_poses`";
-	command2 += " combine-particles";
+	command2 += " " + joboptions["pick_mode"].getString();
 	command2 += " --tilt-series-star-file " + joboptions["in_tomoset"].getString();
 	command2 += " --annotations-directory " + outputname + "annotations";
 	command2 += " --output-directory " + outputname;

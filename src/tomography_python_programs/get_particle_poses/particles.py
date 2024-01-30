@@ -4,13 +4,14 @@ import pandas as pd
 import starfile
 import typer
 from rich.console import Console
+from scipy.spatial.transform import Rotation
 
 from ._cli import cli
 from .._utils.relion import relion_pipeline_job
 
 console = Console(record=True)
 
-@cli.command(name='combine-particles', no_args_is_help=True)
+@cli.command(name='particles', no_args_is_help=True)
 @relion_pipeline_job
 def combine_particle_annotations(
     tilt_series_star_file: Path = typer.Option(
@@ -40,14 +41,16 @@ def combine_particle_annotations(
     df = pd.concat(dfs)
     output_file = output_directory / 'particles.star'
     starfile.write({'particles': df}, output_file, overwrite=True)
+    console.log(f'  Wrote {output_file}')
 
     df2 = pd.DataFrame({'rlnTomoParticlesFile' : [output_file],
                         'rlnTomoTomogramsFile' : [tilt_series_star_file]})
     opt_file = output_directory / 'optimisation_set.star'
     starfile.write({'optimisation_set': df2}, opt_file, overwrite=True)
+    console.log(f'  Wrote {opt_file}')
 
 
-@cli.command(name='split-particles', no_args_is_help=True)
+@cli.command(name='particles-from-star', no_args_is_help=True)
 @relion_pipeline_job
 def create_annotations_from_previous_star_file(
     tomograms_file: Path = typer.Option(
@@ -66,8 +69,12 @@ def create_annotations_from_previous_star_file(
 
     star_data = starfile.read(in_star_file)
     tomo_data = starfile.read(tomograms_file)
-    optics_df = star_data['optics']
-    particles_df = star_data['particles']
+
+    if isinstance(star_data, pd.DataFrame):
+        particles_df = star_data
+    else:
+        particles_df = star_data['particles']
+
     tomo_names = particles_df.rlnTomoName.unique()
     console.log(f'  Tomograms found in the input star file: {tomo_names}.')
 
@@ -79,32 +86,52 @@ def create_annotations_from_previous_star_file(
             console.log(f'  {anno_file_name} already exists, moving on.')
             continue 
     
-        # TODO: take 'rlnOriginXAngst' into account when it exists
-
         tomo_df = particles_df.loc[particles_df['rlnTomoName'] == tomo_name]
         tomo_bin = tomo_data.rlnTomoTomogramBinning[
                 tomo_data.rlnTomoName == tomo_name
         ]
         assert(len(tomo_bin) == 1)
         tomo_bin = tomo_bin.iloc[0]
-        console.log(f'    tomo_bin = {tomo_bin}')
 
-        # TODO: first check if rlnOriginXAngst column exists 
-        tilt_series_pixel_size = optics_df.rlnTomoTiltSeriesPixelSize[
-                optics_df['rlnOpticsGroupName'] == tomo_name
-        ]
-        assert(len(tilt_series_pixel_size) == 1)
-        tilt_series_pixel_size = tilt_series_pixel_size.iloc[0]
+        if 'rlnOriginXAngst' in particles_df.columns:
+            tilt_series_pixel_size = tomo_data.rlnTomoTiltSeriesPixelSize[
+                    tomo_data['rlnTomoName'] == tomo_name
+            ]
+            assert(len(tilt_series_pixel_size) == 1)
+            pixel_size = tilt_series_pixel_size.iloc[0]
 
-        anno_df = pd.DataFrame({
-            # TODO: when doing the full thing,
-            # the division by tomo_bin comes last
-            'rlnTomoName'    : tomo_df['rlnTomoName'],
-            'rlnCoordinateX' : tomo_df['rlnCoordinateX'] / tomo_bin,
-            'rlnCoordinateY' : tomo_df['rlnCoordinateY'] / tomo_bin,
-            'rlnCoordinateZ' : tomo_df['rlnCoordinateZ'] / tomo_bin
-        })
+            new_coords = tomo_df.apply(
+                lambda df_row : rlnOrigin_to_rlnCoordinate_row(df_row, pixel_size), 
+                axis = 1
+            )
+        else:
+            new_coords = tomo_df[[ 
+                'rlnCoordinateX', 'rlnCoordinateY', 'rlnCoordinateZ'
+            ]]
 
-        starfile.write(anno_df, anno_file)
+        new_coords = new_coords / tomo_bin
+        new_coords.insert(loc=0, column='rlnTomoName', value=tomo_name)
 
+        starfile.write(new_coords, anno_file)
         console.log(f'  Wrote {anno_file_name}')
+
+
+def rlnOrigin_to_rlnCoordinate_row(df_row, pixel_size):
+    """Given a row of the particles DataFrame and the pixel size of the 
+    corresponding tilt series image, incorporate rlnOriginX/Y/ZAgst
+    coordinates into rlnCoordinateX/Y/Z."""
+
+    angles_subtomo = df_row[[
+        'rlnTomoSubtomogramRot', 
+        'rlnTomoSubtomogramTilt',
+        'rlnTomoSubtomogramPsi'
+    ]]
+
+    A_subtomo = Rotation.from_euler(
+            seq='ZYZ', angles=angles_subtomo, degrees=True
+    ).as_matrix()
+
+    coords = df_row[['rlnCoordinateX', 'rlnCoordinateY', 'rlnCoordinateZ']]
+    offset = df_row[['rlnOriginXAngst', 'rlnOriginYAngst', 'rlnOriginZAngst']]
+
+    return coords - A_subtomo @ offset / pixel_size
