@@ -712,16 +712,16 @@ static int get_node_type(std::string label)
 #define PROC_DYNAMIGHT_DIRNAME        "DynaMight"    // Johannes' DynaMight for modelling continuous heterogeneity
 #define PROC_MODELANGELO_DIRNAME      "ModelAngelo"  // Kiarash's ModelAngelo for automated model building
 #define PROC_TOMO_IMPORT_DIRNAME      "ImportTomo"              // Import for tomography GUI
-#define PROC_TOMO_SUBTOMO_DIRNAME     "PseudoSubtomo"           // Creation of pseudo-subtomograms from tilt series images
-#define PROC_TOMO_CTFREFINE_DIRNAME   "CtfRefineTomo"           // CTF refinement (defocus & aberrations) for tomography
+#define PROC_TOMO_SUBTOMO_DIRNAME     "Subtomograms"           // Creation of pseudo-subtomograms from tilt series images
+#define PROC_TOMO_CTFREFINE_DIRNAME   "CtfRefine"           // CTF refinement (defocus & aberrations) for tomography
 #define PROC_TOMO_EXCLUDE_TILT_IMAGES_DIRNAME   "ExcludeTiltImages"  // Exclusion of bad tilt-images from tilt-series
-#define PROC_TOMO_ALIGN_DIRNAME       "FrameAlignTomo"          // Frame alignment and particle polishing for subtomography
-#define PROC_TOMO_RECONSTRUCT_DIRNAME "ReconstructParticleTomo" // Calculation of particle average from the individual tilt series images
-#define PROC_TOMO_DENOISE_DIRNAME "DenoiseTomo" // Denoise tomograms
-#define PROC_TOMO_PICK_DIRNAME "PickTomo" // Pick particles in tomograms
+#define PROC_TOMO_ALIGN_DIRNAME       "FrameAlign"          // Frame alignment and particle polishing for subtomography
+#define PROC_TOMO_RECONSTRUCT_DIRNAME "Reconstruct" // Calculation of particle average from the individual tilt series images
+#define PROC_TOMO_DENOISE_DIRNAME "Denoise" // Denoise tomograms
+#define PROC_TOMO_PICK_DIRNAME "ManualPick" // Pick particles in tomograms
 #define PROC_EXTERNAL_DIRNAME         "External"     // For running non-relion programs
 #define PROC_TOMO_ALIGN_TILTSERIES_DIRNAME "AlignTiltSeries" // Tilt series alignment for tomogram reconstruction
-#define PROC_TOMO_RECONSTRUCT_TOMOGRAM_DIRNAME "ReconstructTomograms" // Reconstruction of tomograms for particle picking
+#define PROC_TOMO_RECONSTRUCT_TOMOGRAM_DIRNAME "Tomograms" // Reconstruction of tomograms for particle picking
 
 // All the directory names of the different types of jobs defined inside the pipeline
 #define PROC_IMPORT_LABELNEW           "relion.import"       // Import any file as a Node of a given type

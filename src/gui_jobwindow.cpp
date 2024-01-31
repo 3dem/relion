@@ -2848,6 +2848,7 @@ void JobWindow::initialiseTomoSubtomoWindow()
     current_y += STEPY /2 ;
 
     place ("max_dose", TOGGLE_DEACTIVATE);
+    place ("min_frames", TOGGLE_DEACTIVATE);
 
     current_y += STEPY /2 ;
 
