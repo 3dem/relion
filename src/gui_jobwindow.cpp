@@ -2865,7 +2865,7 @@ void JobWindow::initialiseTomoSubtomoWindow()
 
 void JobWindow::initialiseTomoCtfRefineWindow()
 {
-	setupTabs(3);
+	setupTabs(2);
 
     tab1->begin();
     tab1->label("I/O");
@@ -2923,11 +2923,13 @@ void JobWindow::initialiseTomoCtfRefineWindow()
 	guientries["do_scale"].cb_menu_i();
 
 	tab2->end();
-	tab3->begin();
+
+    /*
+    tab3->begin();
 	tab3->label("Aberrations");
 	resetHeight();
 
-	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group3->end();
 	place("do_odd_aberr", TOGGLE_DEACTIVATE, group3);
 
@@ -2952,6 +2954,7 @@ void JobWindow::initialiseTomoCtfRefineWindow()
 	guientries["do_even_aberr"].cb_menu_i();
 
 	tab3->end();
+    */
 }
 
 void JobWindow::initialiseTomoAlignWindow()
