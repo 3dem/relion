@@ -718,7 +718,7 @@ static int get_node_type(std::string label)
 #define PROC_TOMO_ALIGN_DIRNAME       "FrameAlign"          // Frame alignment and particle polishing for subtomography
 #define PROC_TOMO_RECONSTRUCT_DIRNAME "Reconstruct" // Calculation of particle average from the individual tilt series images
 #define PROC_TOMO_DENOISE_DIRNAME "Denoise" // Denoise tomograms
-#define PROC_TOMO_PICK_DIRNAME "ManualPick" // Pick particles in tomograms
+#define PROC_TOMO_PICK_DIRNAME "Picks" // Pick particles in tomograms
 #define PROC_EXTERNAL_DIRNAME         "External"     // For running non-relion programs
 #define PROC_TOMO_ALIGN_TILTSERIES_DIRNAME "AlignTiltSeries" // Tilt series alignment for tomogram reconstruction
 #define PROC_TOMO_RECONSTRUCT_TOMOGRAM_DIRNAME "Tomograms" // Reconstruction of tomograms for particle picking

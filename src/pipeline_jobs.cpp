@@ -7226,10 +7226,10 @@ void RelionJob::initialiseTomoCtfRefineJob()
 	joboptions["do_tomo_scale"] = JobOption("Refine scale per tomogram?", false, "If set to Yes, then estimate "\
 	"the beam luminance separately for each tilt series. This is not recommended.");
 
-	joboptions["do_even_aberr"] = JobOption("Refine even aberrations?", false, "If set to Yes, then estimates the even higher-order aberrations.");
-	joboptions["nr_even_aberr"] = JobOption("Order of even aberrations:", 4, 4, 8, 2, "The maximum order for the even aberrations to be estimated.");
-	joboptions["do_odd_aberr"] = JobOption("Refine odd aberrations?", false, "If set to Yes, then estimates the odd higher-order aberrations.");
-	joboptions["nr_odd_aberr"] = JobOption("Order of odd aberrations:", 3, 3, 7, 2, "The maximum order for the odd aberrations to be estimated.");
+	//joboptions["do_even_aberr"] = JobOption("Refine even aberrations?", false, "If set to Yes, then estimates the even higher-order aberrations.");
+	//joboptions["nr_even_aberr"] = JobOption("Order of even aberrations:", 4, 4, 8, 2, "The maximum order for the even aberrations to be estimated.");
+	//joboptions["do_odd_aberr"] = JobOption("Refine odd aberrations?", false, "If set to Yes, then estimates the odd higher-order aberrations.");
+	//joboptions["nr_odd_aberr"] = JobOption("Order of odd aberrations:", 3, 3, 7, 2, "The maximum order for the odd aberrations to be estimated.");
 }
 
 bool RelionJob::getCommandsTomoCtfRefineJob(std::string &outputname, std::vector<std::string> &commands,
@@ -7320,6 +7320,7 @@ bool RelionJob::getCommandsTomoCtfRefineJob(std::string &outputname, std::vector
 
 	}
 
+    /*
 	if (joboptions["do_even_aberr"].getBoolean())
 	{
 		command += " --do_even_aberrations --ne " + joboptions["nr_even_aberr"].getString();
@@ -7329,6 +7330,7 @@ bool RelionJob::getCommandsTomoCtfRefineJob(std::string &outputname, std::vector
 	{
 		command += " --do_odd_aberrations --no " + joboptions["nr_odd_aberr"].getString();
 	}
+     */
 
 	if (is_continue)
 	{
