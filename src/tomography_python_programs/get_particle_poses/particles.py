@@ -78,6 +78,20 @@ def create_annotations_from_previous_star_file(
     tomo_names = particles_df.rlnTomoName.unique()
     console.log(f'  Tomograms found in the input star file: {tomo_names}.')
 
+    if 'rlnOriginXAngst' not in particles_df.columns:
+        particles_df['rlnOriginXAngst'] = 0.0
+    if 'rlnOriginYAngst' not in particles_df.columns:
+        particles_df['rlnOriginYAngst'] = 0.0
+    if 'rlnOriginZAngst' not in particles_df.columns:
+        particles_df['rlnOriginZAngst'] = 0.0
+
+    if 'rlnTomoSubtomogramRot' not in particles_df.columns:
+        particles_df['rlnTomoSubtomogramRot'] = 0.0
+    if 'rlnTomoSubtomogramTilt' not in particles_df.columns:
+        particles_df['rlnTomoSubtomogramTilt'] = 0.0
+    if 'rlnTomoSubtomogramPsi' not in particles_df.columns:
+        particles_df['rlnTomoSubtomogramPsi'] = 0.0
+
     for tomo_name in tomo_names:
         anno_file_name = f'{tomo_name}_particles.star'
         anno_file = annotations_directory / anno_file_name
@@ -93,21 +107,16 @@ def create_annotations_from_previous_star_file(
         assert(len(tomo_bin) == 1)
         tomo_bin = tomo_bin.iloc[0]
 
-        if 'rlnOriginXAngst' in particles_df.columns:
-            tilt_series_pixel_size = tomo_data.rlnTomoTiltSeriesPixelSize[
-                    tomo_data['rlnTomoName'] == tomo_name
-            ]
-            assert(len(tilt_series_pixel_size) == 1)
-            pixel_size = tilt_series_pixel_size.iloc[0]
+        tilt_series_pixel_size = tomo_data.rlnTomoTiltSeriesPixelSize[
+                tomo_data['rlnTomoName'] == tomo_name
+        ]
+        assert(len(tilt_series_pixel_size) == 1)
+        pixel_size = tilt_series_pixel_size.iloc[0]
 
-            new_coords = tomo_df.apply(
-                lambda df_row : rlnOrigin_to_rlnCoordinate_row(df_row, pixel_size), 
-                axis = 1
-            )
-        else:
-            new_coords = tomo_df[[ 
-                'rlnCoordinateX', 'rlnCoordinateY', 'rlnCoordinateZ'
-            ]]
+        new_coords = tomo_df.apply(
+            lambda df_row : rlnOrigin_to_rlnCoordinate_row(df_row, pixel_size), 
+            axis = 1
+        )
 
         new_coords = new_coords / tomo_bin
         new_coords.insert(loc=0, column='rlnTomoName', value=tomo_name)
