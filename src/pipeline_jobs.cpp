@@ -7013,6 +7013,9 @@ bool RelionJob::getCommandsTomoPickTomogramsJob(std::string &outputname, std::ve
 
         command0 += " " + joboptions["other_args"].getString();
         commands.push_back(command0);
+
+        Node node(joboptions["in_star_file"].getString(), joboptions["in_star_file"].node_type);
+        inputNodes.push_back(node);
     }
 
 	command="`which relion_python_tomo_pick` ";
