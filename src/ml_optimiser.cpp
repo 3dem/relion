@@ -454,7 +454,6 @@ void MlOptimiser::parseContinue(int argc, char **argv)
     do_skip_subtomo_correction = parser.checkOption("--skip_subtomo_multi", "Skip subtomo multiplicity correction");
     ctf3d_squared = !parser.checkOption("--ctf3d_not_squared", "CTF3D files contain sqrt(CTF^2) patterns");
     subtomo_multi_thr = textToFloat(parser.getOption("--subtomo_multi_thr", "Threshold to remove marginal voxels during expectation", "0.01"));
-    tomo_max_dose =  textToFloat(parser.getOption("--tomo_max_dose", "Maximum dose (e-/A2) for subtomogram averaging with stack2d input", "9999."));
 
     int computation_section = parser.addSection("Computation");
 
@@ -889,7 +888,6 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     do_skip_subtomo_correction = parser.checkOption("--skip_subtomo_multi", "Skip subtomo multiplicity correction");
     ctf3d_squared = !parser.checkOption("--ctf3d_not_squared", "CTF3D files contain sqrt(CTF^2) patterns");
     subtomo_multi_thr = textToFloat(parser.getOption("--subtomo_multi_thr", "Threshold to remove marginal voxels during expectation", "0.01"));
-    tomo_max_dose =  textToFloat(parser.getOption("--tomo_max_dose", "Maximum dose (e-/A2) for subtomogram averaging with stack2d input", "9999."));
 
     // Computation stuff
     // The number of threads is always read from the command line
@@ -1304,7 +1302,7 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
     bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
 
     remove_offset_priors_again = mydata.read(fn_data, fn_tomo, fn_motion, false, false,
-                do_preread, is_helical_segment, offset_range_x > 0., tomo_max_dose);
+                do_preread, is_helical_segment, offset_range_x > 0.);
 
 #ifdef DEBUG_READ
     std::cerr<<"MlOptimiser::readStar before model."<<std::endl;
@@ -2049,7 +2047,7 @@ void MlOptimiser::initialiseGeneral(int rank)
         bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
         int myverb = (rank==0) ? 1 : 0;
         remove_offset_priors_again = mydata.read(fn_data, fn_tomo, fn_motion, true, false,
-                    do_preread, is_helical_segment, offset_range_x > 0., tomo_max_dose, myverb); // true means ignore original particle name
+                    do_preread, is_helical_segment, offset_range_x > 0., myverb); // true means ignore original particle name
 
         // Without this check, the program crashes later.
         if (mydata.numberOfParticles() == 0)
@@ -7491,7 +7489,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                                                 //std::cerr << " oversampled_rot[iover_rot]= " << oversampled_rot[iover_rot] << " oversampled_tilt[iover_rot]= " << oversampled_tilt[iover_rot] << " oversampled_psi[iover_rot]= " << oversampled_psi[iover_rot] << std::endl;
                                                 //std::cerr << " group_id= " << group_id << " myscale= " << myscale <<std::endl;
                                                 std::cerr << " itrans= " << itrans << " itrans * exp_nr_oversampled_trans +  iover_trans= " << itrans * exp_nr_oversampled_trans +  iover_trans << " ihidden= " << ihidden << std::endl;
-                                                std::cerr <<" img_id= "<<img_id<<" name= "<< mydata.particles[part_id].images[img_id].name << std::endl;
+                                                std::cerr <<" img_id= "<<img_id<<" name= "<< mydata.particles[part_id].name << std::endl;
 
                                                 //std::cerr << " myrank= "<< myrank<<std::endl;
                                                 //std::cerr << "Written Fimg_shift.spi and Fref.spi. Press any key to continue... part_id= " << part_id<< std::endl;

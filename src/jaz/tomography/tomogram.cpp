@@ -76,23 +76,23 @@ bool Tomogram::isVisibleAtAll(const std::vector<d3Vector> &trajectory, double ra
 	return !all_outside;
 }
 
-bool Tomogram::isVisibleFirstFrames(const std::vector<d3Vector> &trajectory, double radius, int min_frames) const
+bool Tomogram::getVisibilityMinFramesMaxDose(const std::vector<d3Vector> &trajectory, double radius, double max_dose, int min_frames, std::vector<bool> &isVisible) const
 {
-	std::vector<bool> vis = determineVisiblity(trajectory, radius);
 
-	bool all_inside = true;
-    std::vector<int> sorted_frames = IndexSort<double>::sortIndices(cumulativeDose);
+    if (min_frames < 0) REPORT_ERROR("ERROR: min_frames should be larger than zero!");
 
-    for (int i = 0; i < min_frames; i++)
-	{
-        if (!vis[sorted_frames[i]])
-		{
-			all_inside = false;
-			break;
-		}
-	}
+    isVisible = determineVisiblity(trajectory, radius);
 
-    return all_inside;
+    if (max_dose > 0.)
+        for (int f = 0; f < frameCount; f++)
+            if (getCumulativeDose(f) > max_dose) isVisible[f] = false;
+
+    int sum_is_visible = 0;
+    for (int f = 0; f < frameCount; f++)
+        if (isVisible[f]) sum_is_visible += 1;
+
+    return (sum_is_visible >= min_frames);
+
 }
 
 std::vector<bool> Tomogram::determineVisiblity(const std::vector<d3Vector>& trajectory, double radius) const

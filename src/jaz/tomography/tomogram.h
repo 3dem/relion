@@ -51,9 +51,9 @@ class Tomogram
 		bool isVisibleAtAll(
 				const std::vector<gravis::d3Vector>& trajectory, double radius) const;
 
-		bool isVisibleFirstFrames(
-				const std::vector<gravis::d3Vector>& trajectory, double radius, int min_frames) const;
-		
+        bool getVisibilityMinFramesMaxDose(
+                const std::vector<gravis::d3Vector> &trajectory, double radius, double max_dose, int min_frames, std::vector<bool> &isVisible) const;
+
 		std::vector<bool> determineVisiblity(
 				const std::vector<gravis::d3Vector>& trajectory, double radius) const;
 		

@@ -12,6 +12,7 @@
 class ParticleSet;
 class ParticleIndex;
 class TomogramSet;
+class Tomogram;
 class AberrationsCache;
 
 
@@ -96,8 +97,7 @@ class SubtomoProgram
 				BufferedImage<float>& sum_data,
 				BufferedImage<float>& sum_weights );
 
-
-	private:
+private:
 
 			bool directoriesPerTomogram;
 

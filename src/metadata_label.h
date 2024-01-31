@@ -1147,8 +1147,8 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_NR_ITER_WO_RESOL_GAIN, EMDL_INT, "rlnNumberOfIterWithoutResolutionGain", "Number of iterations that have passed without a gain in resolution");
 		EMDL::addLabel(EMDL_OPTIMISER_NR_ITER_WO_HIDDEN_VAR_CHANGES, EMDL_INT, "rlnNumberOfIterWithoutChangingAssignments", "Number of iterations that have passed without large changes in orientation and class assignments");
         EMDL::addLabel(EMDL_OPTIMISER_OFFSET_RANGE_X,EMDL_DOUBLE, "rlnOffsetRangeX", "Search range for offsets in the X-direction (in Angstrom)");
-        EMDL::addLabel(EMDL_OPTIMISER_OFFSET_RANGE_Y,EMDL_DOUBLE, "rlnOffsetRangeX", "Search range for offsets in the Y-direction (in Angstrom)");
-        EMDL::addLabel(EMDL_OPTIMISER_OFFSET_RANGE_Z,EMDL_DOUBLE, "rlnOffsetRangeX", "Search range for offsets in the Z-direction (in Angstrom)");
+        EMDL::addLabel(EMDL_OPTIMISER_OFFSET_RANGE_Y,EMDL_DOUBLE, "rlnOffsetRangeY", "Search range for offsets in the Y-direction (in Angstrom)");
+        EMDL::addLabel(EMDL_OPTIMISER_OFFSET_RANGE_Z,EMDL_DOUBLE, "rlnOffsetRangeZ", "Search range for offsets in the Z-direction (in Angstrom)");
         EMDL::addLabel(EMDL_OPTIMISER_OPTICS_STARFILE, EMDL_STRING, "rlnOpticsStarFile", "STAR file with metadata for the optical groups (new as of version 3.1)");
 		EMDL::addLabel(EMDL_OPTIMISER_OUTPUT_ROOTNAME, EMDL_STRING, "rlnOutputRootName", "Rootname for all output files (this may include a directory structure, which should then exist)");
 		EMDL::addLabel(EMDL_OPTIMISER_PARTICLE_DIAMETER, EMDL_DOUBLE, "rlnParticleDiameter", "Diameter of the circular mask to be applied to all experimental images (in Angstroms)");

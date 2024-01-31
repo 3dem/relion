@@ -375,7 +375,7 @@ public:
 		bool do_ignore_particle_name = false,
 		bool do_ignore_group_name = false, bool do_preread_images = false,
 		bool need_tiltpsipriors_for_helical_refine = false,
-        bool set_offset_priors_to_offsets = false, RFLOAT tomo_max_dose = 999., int verb = 0);
+        bool set_offset_priors_to_offsets = false, int verb = 0);
 
 	// Write
 	void write(FileName fn_root, bool remove_offset_priors = false);
