@@ -891,14 +891,11 @@ void Postprocessing::writeOutput()
 	delete plot2Dc;
 
 	FileName fn_log = fn_out.beforeLastOf("/") + "/logfile.pdf";
-	if (!exists(fn_log))
-	{
-		std::vector<FileName> fn_eps;
-		fn_eps.push_back(fn_out + "_fsc.eps");
-		fn_eps.push_back(fn_out + "_fsc_part.eps");
-		fn_eps.push_back(fn_out + "_guinier.eps");
-		joinMultipleEPSIntoSinglePDF(fn_log, fn_eps);
-	}
+	std::vector<FileName> fn_eps;
+	fn_eps.push_back(fn_out + "_fsc.eps");
+	fn_eps.push_back(fn_out + "_fsc_part.eps");
+	fn_eps.push_back(fn_out + "_guinier.eps");
+	joinMultipleEPSIntoSinglePDF(fn_log, fn_eps);
 
 	if (verb > 0)
 	{
