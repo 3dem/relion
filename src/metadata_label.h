@@ -185,7 +185,10 @@ enum EMDLabel
 	EMDL_IMAGE_MAG_MATRIX_10,
 	EMDL_IMAGE_MAG_MATRIX_11,
 
-	EMDL_IMAGE_COORD_X,
+    EMDL_IMAGE_CENT_COORD_X_ANGST,
+    EMDL_IMAGE_CENT_COORD_Y_ANGST,
+    EMDL_IMAGE_CENT_COORD_Z_ANGST,
+    EMDL_IMAGE_COORD_X,
 	EMDL_IMAGE_COORD_Y,
 	EMDL_IMAGE_COORD_Z,
 	EMDL_IMAGE_FRAME_NR,
@@ -897,6 +900,9 @@ private:
 		EMDL::addLabel(EMDL_IMAGE_MAG_MATRIX_10, EMDL_DOUBLE, "rlnMagMat10", "Anisotropic magnification matrix, element 2,1");
 		EMDL::addLabel(EMDL_IMAGE_MAG_MATRIX_11, EMDL_DOUBLE, "rlnMagMat11", "Anisotropic magnification matrix, element 2,2");
 
+        EMDL::addLabel(EMDL_IMAGE_CENT_COORD_X_ANGST, EMDL_DOUBLE, "rlnCenteredCoordinateXAngst", "X-Position of an image in a micrograph (in Angstroms, with the center being 0,0)");
+        EMDL::addLabel(EMDL_IMAGE_CENT_COORD_Y_ANGST, EMDL_DOUBLE, "rlnCenteredCoordinateYAngst", "Y-Position of an image in a micrograph (in Angstroms, with the center being 0,0)");
+        EMDL::addLabel(EMDL_IMAGE_CENT_COORD_Z_ANGST, EMDL_DOUBLE, "rlnCenteredCoordinateZAngst", "Z-Position of an image in a 3D micrograph, i.e. tomogram (in Angstroms, with the center being 0,0,0)");
 		EMDL::addLabel(EMDL_IMAGE_COORD_X, EMDL_DOUBLE, "rlnCoordinateX", "X-Position of an image in a micrograph (in pixels)");
 		EMDL::addLabel(EMDL_IMAGE_COORD_Y, EMDL_DOUBLE, "rlnCoordinateY", "Y-Position of an image in a micrograph (in pixels)");
 		EMDL::addLabel(EMDL_IMAGE_COORD_Z, EMDL_DOUBLE, "rlnCoordinateZ", "Z-Position of an image in a 3D micrograph, i.e. tomogram (in pixels)");
