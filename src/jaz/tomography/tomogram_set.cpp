@@ -337,6 +337,48 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
             }
         }
 
+        //2feb2024: try new way of Alister's rotations
+        RFLOAT xtilt, ytilt,zrot, xshift, yshift;
+        m.getValueSafely(EMDL_TOMO_XTILT, xtilt, f);
+        m.getValueSafely(EMDL_TOMO_YTILT, ytilt, f);
+        m.getValueSafely(EMDL_TOMO_ZROT, zrot, f);
+        m.getValueSafely(EMDL_TOMO_XSHIFT_ANGST, xshift, f);
+        m.getValueSafely(EMDL_TOMO_YSHIFT_ANGST, yshift, f);
+
+        // convert shifts to pixels
+        xshift /= out.optics.pixelSize;
+        yshift /= out.optics.pixelSize;
+        std::cerr << " xtilt= " << xtilt << " ytilt= " << ytilt << " zrot= " << zrot << std::endl;
+        Matrix2D< RFLOAT > T0, T1, Rx, Ry, Rz, Pp;
+        translation3DMatrix(1855, 1855, 680, T0);
+        translation3DMatrix(xshift-out.stack.xdim/2, yshift-out.stack.ydim/2, 0., T1);
+        rotation3DMatrix(xtilt, 'X', Rx);
+        rotation3DMatrix(ytilt, 'Y', Ry);
+        rotation3DMatrix(zrot, 'Z', Rz);
+
+        std::cerr << " T0= "<<T0 << std::endl;
+        std::cerr << " T1= "<<T1 << std::endl;
+        Pp = T1 * Rz * Ry * Rx * T0;
+
+        std::cerr << "Pp= "<< std::endl;
+        for (int i = 0; i < 4; i++)
+        {
+            for (int j = 0; j < 4; j++) {
+                std::cerr << Pp(i, j)<< " ";
+            }
+            std::cerr << std::endl;
+        }
+        std::cerr << "P= "<< std::endl;
+        for (int i = 0; i < 4; i++)
+        {
+            for (int j = 0; j < 4; j++) {
+                std::cerr << P(i, j)<< " ";
+            }
+            std::cerr << std::endl;
+        }
+
+        exit(0);
+
 		CTF& ctf = out.centralCTFs[f];
 
 		m.getValueSafely(EMDL_CTF_DEFOCUSU, ctf.DeltafU, f);
