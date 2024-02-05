@@ -712,7 +712,7 @@ static int get_node_type(std::string label)
 #define PROC_DYNAMIGHT_DIRNAME        "DynaMight"    // Johannes' DynaMight for modelling continuous heterogeneity
 #define PROC_MODELANGELO_DIRNAME      "ModelAngelo"  // Kiarash's ModelAngelo for automated model building
 #define PROC_TOMO_IMPORT_DIRNAME      "Import"              // Import for tomography GUI
-#define PROC_TOMO_SUBTOMO_DIRNAME     "Subtomograms"           // Creation of pseudo-subtomograms from tilt series images
+#define PROC_TOMO_SUBTOMO_DIRNAME     "Extract"           // Creation of pseudo-subtomograms from tilt series images
 #define PROC_TOMO_CTFREFINE_DIRNAME   "CtfRefine"           // CTF refinement (defocus & aberrations) for tomography
 #define PROC_TOMO_EXCLUDE_TILT_IMAGES_DIRNAME   "ExcludeTiltImages"  // Exclusion of bad tilt-images from tilt-series
 #define PROC_TOMO_ALIGN_DIRNAME       "FrameAlign"          // Frame alignment and particle polishing for subtomography
