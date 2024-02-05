@@ -138,8 +138,8 @@ include(${CMAKE_SOURCE_DIR}/cmake/BuildTypes.cmake)
 
 if(CUDA)
     # -----------------------------------------------------------------------------CUDA--
-    # DOC: http://www.cmake.org/cmake/help/v3.0/module/FindCUDA.html
-    FIND_PACKAGE(CUDA)
+    # DOC: https://cmake.org/cmake/help/v3.28/module/FindCUDA.html
+    FIND_PACKAGE(CUDAToolkit)
 endif()
 
 if(CUDA_FOUND)
