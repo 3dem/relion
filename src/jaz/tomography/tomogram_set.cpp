@@ -112,6 +112,12 @@ void TomogramSet::write(FileName filename)
         if (!exists(newdir)) mktree(newdir);
 
         // Write the individual tomogram starfile
+        // SHWS 2feb2024: deactivate the projection matrices
+        if (tomogramTables[t].containsLabel(EMDL_TOMO_PROJECTION_X)) tomogramTables[t].deactivateLabel(EMDL_TOMO_PROJECTION_X);
+        if (tomogramTables[t].containsLabel(EMDL_TOMO_PROJECTION_Y)) tomogramTables[t].deactivateLabel(EMDL_TOMO_PROJECTION_Y);
+        if (tomogramTables[t].containsLabel(EMDL_TOMO_PROJECTION_Z)) tomogramTables[t].deactivateLabel(EMDL_TOMO_PROJECTION_Z);
+        if (tomogramTables[t].containsLabel(EMDL_TOMO_PROJECTION_W)) tomogramTables[t].deactivateLabel(EMDL_TOMO_PROJECTION_W);
+
         tomogramTables[t].write(fn_newstar);
     }
 
@@ -268,7 +274,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
     }
 
 	out.imageSize = stackSize.xy();
-	out.centre = d3Vector(out.w0/2.0, out.h0/2.0, out.d0/2.0);
+    out.centre = d3Vector(out.w0/2.0, out.h0/2.0, out.d0/2.0);
 
 	globalTable.getValueSafely(EMDL_TOMO_HANDEDNESS, out.handedness, index);
 
@@ -307,77 +313,35 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
 	out.cumulativeDose.resize(out.frameCount);
 	out.centralCTFs.resize(out.frameCount);
 	out.projectionMatrices.resize(out.frameCount);
-	out.hasMatrices = (m.containsLabel(EMDL_TOMO_PROJECTION_X) &&
-                       m.containsLabel(EMDL_TOMO_PROJECTION_Y) &&
-                       m.containsLabel(EMDL_TOMO_PROJECTION_Z) &&
-                       m.containsLabel(EMDL_TOMO_PROJECTION_W));
+    out.xtilt.resize(out.frameCount);
+    out.ytilt.resize(out.frameCount);
+    out.zrot.resize(out.frameCount);
+    out.xshift_angst.resize(out.frameCount);
+    out.yshift_angst.resize(out.frameCount);
+    out.hasMatrices = (m.containsLabel(EMDL_TOMO_YTILT) &&
+                       m.containsLabel(EMDL_TOMO_ZROT) &&
+                       m.containsLabel(EMDL_TOMO_XSHIFT_ANGST) &&
+                       m.containsLabel(EMDL_TOMO_YSHIFT_ANGST));
 
 	for (int f = 0; f < out.frameCount; f++)
 	{
-		d4Matrix& P = out.projectionMatrices[f];
 
 		if (out.hasMatrices)
         {
-            // Old way of defining tilt series alignments, designed by Jasenko Zivanov
-            std::vector<EMDLabel> rows({
-                EMDL_TOMO_PROJECTION_X,
-                EMDL_TOMO_PROJECTION_Y,
-                EMDL_TOMO_PROJECTION_Z,
-                EMDL_TOMO_PROJECTION_W });
 
-             for (int i = 0; i < 4; i++)
-            {
-                std::vector<double> vals;
-                m.getValueSafely(rows[i], vals, f);
+            if (m.containsLabel(EMDL_TOMO_XTILT))
+                m.getValue(EMDL_TOMO_XTILT, out.xtilt[f], f);
+            else
+                out.xtilt[f] = 0.;
 
-                for (int j = 0; j < 4; j++)
-                {
-                    P(i,j) = vals[j];
-                }
-            }
+            m.getValueSafely(EMDL_TOMO_YTILT, out.ytilt[f], f);
+            m.getValueSafely(EMDL_TOMO_ZROT, out.zrot[f], f);
+            m.getValueSafely(EMDL_TOMO_XSHIFT_ANGST, out.xshift_angst[f], f);
+            m.getValueSafely(EMDL_TOMO_YSHIFT_ANGST, out.yshift_angst[f], f);
+
+            out.projectionMatrices[f] = out.getProjectionMatrix(f);
+
         }
-
-        //2feb2024: try new way of Alister's rotations
-        RFLOAT xtilt, ytilt,zrot, xshift, yshift;
-        m.getValueSafely(EMDL_TOMO_XTILT, xtilt, f);
-        m.getValueSafely(EMDL_TOMO_YTILT, ytilt, f);
-        m.getValueSafely(EMDL_TOMO_ZROT, zrot, f);
-        m.getValueSafely(EMDL_TOMO_XSHIFT_ANGST, xshift, f);
-        m.getValueSafely(EMDL_TOMO_YSHIFT_ANGST, yshift, f);
-
-        // convert shifts to pixels
-        xshift /= out.optics.pixelSize;
-        yshift /= out.optics.pixelSize;
-        std::cerr << " xtilt= " << xtilt << " ytilt= " << ytilt << " zrot= " << zrot << std::endl;
-        Matrix2D< RFLOAT > T0, T1, Rx, Ry, Rz, Pp;
-        translation3DMatrix(1855, 1855, 680, T0);
-        translation3DMatrix(xshift-out.stack.xdim/2, yshift-out.stack.ydim/2, 0., T1);
-        rotation3DMatrix(xtilt, 'X', Rx);
-        rotation3DMatrix(ytilt, 'Y', Ry);
-        rotation3DMatrix(zrot, 'Z', Rz);
-
-        std::cerr << " T0= "<<T0 << std::endl;
-        std::cerr << " T1= "<<T1 << std::endl;
-        Pp = T1 * Rz * Ry * Rx * T0;
-
-        std::cerr << "Pp= "<< std::endl;
-        for (int i = 0; i < 4; i++)
-        {
-            for (int j = 0; j < 4; j++) {
-                std::cerr << Pp(i, j)<< " ";
-            }
-            std::cerr << std::endl;
-        }
-        std::cerr << "P= "<< std::endl;
-        for (int i = 0; i < 4; i++)
-        {
-            for (int j = 0; j < 4; j++) {
-                std::cerr << P(i, j)<< " ";
-            }
-            std::cerr << std::endl;
-        }
-
-        exit(0);
 
 		CTF& ctf = out.centralCTFs[f];
 
@@ -455,89 +419,30 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
 	return out;
 }
 
-void TomogramSet::addTomogramFromIMODStack(
-		std::string tomoName, std::string stackFilename,
-		const std::vector<gravis::d4Matrix>& projections, 
-		int w, int h, int d, 
-		const std::vector<double>& dose,
-		double fractionalDose,
-		const std::vector<CTF>& ctfs, 
-		double handedness, 
-		double pixelSize)
-{
-	const int index = globalTable.numberOfObjects();
-	const int fc = projections.size();
-	
-	globalTable.addObject();
-	
-	globalTable.setValue(EMDL_TOMO_NAME, tomoName, index);
-	globalTable.setValue(EMDL_TOMO_TILT_SERIES_NAME, stackFilename, index);
-
-	globalTable.setValue(EMDL_TOMO_SIZE_X, w, index);
-	globalTable.setValue(EMDL_TOMO_SIZE_Y, h, index);
-	globalTable.setValue(EMDL_TOMO_SIZE_Z, d, index);	
-	globalTable.setValue(EMDL_TOMO_HANDEDNESS, handedness, index);
-
-    const CTF& ctf0 = ctfs[0];
-
-    globalTable.setValue(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, pixelSize, index);
-    globalTable.setValue(EMDL_CTF_VOLTAGE, ctf0.kV, index);
-    globalTable.setValue(EMDL_CTF_CS, ctf0.Cs, index);
-    globalTable.setValue(EMDL_CTF_Q0, ctf0.Q0, index);
-    globalTable.setValue(EMDL_TOMO_IMPORT_FRACT_DOSE, fractionalDose, index);
-
-
-	if (tomogramTables.size() != index)
-	{
-		REPORT_ERROR_STR("TomogramSet::add: corrupted tomogram set: tomogramTables.size() = "
-						 << tomogramTables.size() << ", globalTable.numberOfObjects() = " 
-						 << globalTable.numberOfObjects());
-	}
-	
-	tomogramTables.push_back(MetaDataTable());
-	MetaDataTable& m = tomogramTables[index];
-	m.setName(tomoName);
-		
-	for (int f = 0; f < fc; f++)
-	{
-		m.addObject();
-		
-		setProjection(index, f, projections[f]);
-		setCtf(index, f, ctfs[f]);	
-		setDose(index, f, dose[f]);
-	}
-}
-
 int TomogramSet::size() const
 {
 	return tomogramTables.size();
 }
 
-void TomogramSet::setProjections(int tomogramIndex, const std::vector<d4Matrix>& proj)
+void TomogramSet::setProjection(int tomogramIndex, int frame, RFLOAT xtilt, RFLOAT ytilt, RFLOAT zrot, RFLOAT xshift_angst, RFLOAT yshift_angst)
 {
 	MetaDataTable& m = tomogramTables[tomogramIndex];
-	
-	const int fc = proj.size();
-	
-	if (fc != m.numberOfObjects())
-	{
-		REPORT_ERROR_STR("TomogramSet::setProjections: frame count mismatch");
-	}
-	
-	for (int f = 0; f < fc; f++)
-	{
-		setProjection(tomogramIndex, f, proj[f]);
-	}
-}
 
-void TomogramSet::setProjection(int tomogramIndex, int frame, const d4Matrix& P)
+    m.setValue(EMDL_TOMO_XTILT, xtilt, frame);
+    m.setValue(EMDL_TOMO_YTILT, ytilt, frame);
+    m.setValue(EMDL_TOMO_ZROT, zrot, frame);
+    m.setValue(EMDL_TOMO_XSHIFT_ANGST, xshift_angst, frame);
+    m.setValue(EMDL_TOMO_YSHIFT_ANGST, yshift_angst, frame);
+}
+void TomogramSet::getProjection(int tomogramIndex, int frame, RFLOAT &xtilt, RFLOAT &ytilt, RFLOAT &zrot, RFLOAT &xshift_angst, RFLOAT &yshift_angst) const
 {
-	MetaDataTable& m = tomogramTables[tomogramIndex];
-	
-	m.setValue(EMDL_TOMO_PROJECTION_X, std::vector<double>{P(0,0), P(0,1), P(0,2), P(0,3)}, frame);
-	m.setValue(EMDL_TOMO_PROJECTION_Y, std::vector<double>{P(1,0), P(1,1), P(1,2), P(1,3)}, frame);
-	m.setValue(EMDL_TOMO_PROJECTION_Z, std::vector<double>{P(2,0), P(2,1), P(2,2), P(2,3)}, frame);
-	m.setValue(EMDL_TOMO_PROJECTION_W, std::vector<double>{P(3,0), P(3,1), P(3,2), P(3,3)}, frame);
+	const MetaDataTable& m = tomogramTables[tomogramIndex];
+    m.getValueSafely(EMDL_TOMO_XTILT, xtilt, frame);
+    m.getValueSafely(EMDL_TOMO_YTILT, ytilt, frame);
+    m.getValueSafely(EMDL_TOMO_ZROT, zrot, frame);
+    m.getValueSafely(EMDL_TOMO_XSHIFT_ANGST, xshift_angst, frame);
+    m.getValueSafely(EMDL_TOMO_YSHIFT_ANGST, yshift_angst, frame);
+
 }
 
 void TomogramSet::setCtf(int tomogramIndex, int frame, const CTF& ctf)
