@@ -43,7 +43,7 @@ class ParticleSet
 		std::vector<std::vector<ParticleIndex>> splitByTomogram(const TomogramSet& tomogramSet, bool verbose = true) const;
 		int getTotalParticleNumber() const;
 		
-		gravis::d3Vector getPosition(ParticleIndex particle_id) const;
+		gravis::d3Vector getPosition(ParticleIndex particle_id, bool apply_origin_shifts = true) const;
 		
 		gravis::d3Matrix getSubtomogramMatrix(ParticleIndex particle_id) const;
 		gravis::d3Matrix getParticleMatrix(ParticleIndex particle_id) const;
@@ -56,9 +56,6 @@ class ParticleSet
 		int getHalfSet(ParticleIndex particle_id) const;
         bool hasHalfSets() const;
 		
-		void moveParticleTo(ParticleIndex particle_id, gravis::d3Vector pos);
-		void shiftParticleBy(ParticleIndex particle_id, gravis::d3Vector shift);
-				
 		void write(const std::string& filename);
 		void writeTrajectories(const std::string& filename) const;
 		
@@ -67,8 +64,8 @@ class ParticleSet
 		gravis::d3Vector getParticleOffset(ParticleIndex particle_id) const;
 		void setParticleOffset(ParticleIndex particle_id, const gravis::d3Vector& v);
 		
-		gravis::d3Vector getParticleCoord(ParticleIndex particle_id) const;
-		void setParticleCoord(ParticleIndex particle_id, const gravis::d3Vector& v);
+		gravis::d3Vector getParticleCoordPixel(ParticleIndex particle_id, RFLOAT tiltSeriesPixelSize) const;
+		void setParticleCoordPixel(ParticleIndex particle_id, const gravis::d3Vector& v, RFLOAT tiltSeriesPixelSize);
 
 		int getOpticsGroup(ParticleIndex particle_id) const;
 		void setOpticsGroup(ParticleIndex particle_id, int zeroBasedId);

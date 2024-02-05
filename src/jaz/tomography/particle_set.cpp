@@ -335,21 +335,27 @@ int ParticleSet::getTotalParticleNumber() const
 	return partTable.numberOfObjects();
 }
 
-d3Vector ParticleSet::getPosition(ParticleIndex particle_id) const
+d3Vector ParticleSet::getPosition(ParticleIndex particle_id, bool apply_origin_shifts) const
 {
 	const int og = getOpticsGroup(particle_id);
 	
 	const double tiltSeriesPixelSize = getTiltSeriesPixelSize(og);
 
-	const d3Matrix A_subtomogram = getSubtomogramMatrix(particle_id);
+    d3Vector out = getParticleCoordPixel(particle_id, tiltSeriesPixelSize);
 
-	d3Vector out = getParticleCoord(particle_id) - (A_subtomogram * getParticleOffset(particle_id)) / tiltSeriesPixelSize;
+    if (apply_origin_shifts)
+    {
+        const d3Matrix A_subtomogram = getSubtomogramMatrix(particle_id);
+
+        out -= (A_subtomogram * getParticleOffset(particle_id)) / tiltSeriesPixelSize;
+    }
 
     // SHWS & ABurt 19Jul2022: let's no longer do this in relion-4.1 (also 25nov22)
     // SHWS 17jan24: put '+1' back in because relion5 doesn't go as high resolution as tutorial data set as relion4....
-    out.x += 1.0;
-	out.y += 1.0;
-	out.z += 1.0;
+    // SHWS 2feb24: we can't do this anymore now...
+    //out.x += 1.0;
+	//out.y += 1.0;
+	//out.z += 1.0;
 
 
 	return out;
@@ -405,32 +411,32 @@ d3Matrix ParticleSet::getMatrix3x3(ParticleIndex particle_id) const
 // This maps coordinates from particle space to tomogram space.
 d4Matrix ParticleSet::getMatrix4x4(ParticleIndex particle_id, double w, double h, double d) const
 {
-	d3Matrix A = getMatrix3x3(particle_id);
-	d3Vector pos = getPosition(particle_id);
-	
-	int cx = ((int)w) / 2;
-	int cy = ((int)h) / 2;
-	int cz = ((int)d) / 2;
-	
-	gravis::d4Matrix Tc(
-		1, 0, 0, -cx,
-		0, 1, 0, -cy,
-		0, 0, 1, -cz,
-		0, 0, 0, 1);
-	
-	d4Matrix R(
-		A(0,0), A(0,1), A(0,2), 0.0,
-		A(1,0), A(1,1), A(1,2), 0.0,
-		A(2,0), A(2,1), A(2,2), 0.0,
-		0.0,    0.0,    0.0,    1.0   );
-	
-	d4Matrix Ts(
-		1, 0, 0, pos.x,
-		0, 1, 0, pos.y,
-		0, 0, 1, pos.z,
-		0, 0, 0, 1);
-	
-	return Ts * R * Tc;
+        d3Matrix A = getMatrix3x3(particle_id);
+        d3Vector pos = getPosition(particle_id);
+
+        int cx = ((int)w) / 2;
+        int cy = ((int)h) / 2;
+        int cz = ((int)d) / 2;
+
+        gravis::d4Matrix Tc(
+                1, 0, 0, -cx,
+                0, 1, 0, -cy,
+                0, 0, 1, -cz,
+                0, 0, 0, 1);
+
+        d4Matrix R(
+                A(0,0), A(0,1), A(0,2), 0.0,
+                A(1,0), A(1,1), A(1,2), 0.0,
+                A(2,0), A(2,1), A(2,2), 0.0,
+                0.0,    0.0,    0.0,    1.0   );
+
+        d4Matrix Ts(
+                1, 0, 0, pos.x,
+                0, 1, 0, pos.y,
+                0, 0, 1, pos.z,
+                0, 0, 0, 1);
+
+        return Ts * R * Tc;
 }
 
 t4Vector<d3Matrix> ParticleSet::getMatrixDerivativesOverParticleAngles(
@@ -471,32 +477,6 @@ int ParticleSet::getHalfSet(ParticleIndex particle_id) const
 bool ParticleSet::hasHalfSets() const
 {
     return partTable.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET);
-}
-
-void ParticleSet::moveParticleTo(ParticleIndex particle_id, gravis::d3Vector pos)
-{
-	// SHWS 25nov22: as of relion-4.1, the origin is now at 0,0,0 again
-    // SHWS 17jan24: put '-1' back in because relion5 doesn't go as high resolution as tutorial data set as relion4....
-    partTable.setValue(EMDL_IMAGE_COORD_X, pos.x - 1.0, particle_id.value);
-	partTable.setValue(EMDL_IMAGE_COORD_Y, pos.y - 1.0, particle_id.value);
-	partTable.setValue(EMDL_IMAGE_COORD_Z, pos.z - 1.0, particle_id.value);
-
-	partTable.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, 0.0, particle_id.value);
-	partTable.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, 0.0, particle_id.value);
-	partTable.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, 0.0, particle_id.value);
-}
-
-void ParticleSet::shiftParticleBy(ParticleIndex particle_id, gravis::d3Vector shift)
-{
-	double x, y, z;
-	
-	partTable.getValueSafely(EMDL_IMAGE_COORD_X, x, particle_id.value);
-	partTable.getValueSafely(EMDL_IMAGE_COORD_Y, y, particle_id.value);
-	partTable.getValueSafely(EMDL_IMAGE_COORD_Z, z, particle_id.value);
-	
-	partTable.setValue(EMDL_IMAGE_COORD_X, x + shift.x, particle_id.value);
-	partTable.setValue(EMDL_IMAGE_COORD_Y, y + shift.y, particle_id.value);
-	partTable.setValue(EMDL_IMAGE_COORD_Z, z + shift.z, particle_id.value);
 }
 
 void ParticleSet::write(const std::string& filename)
@@ -583,22 +563,24 @@ void ParticleSet::setParticleOffset(ParticleIndex particle_id, const d3Vector& v
 	partTable.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, v.z, particle_id.value);
 }
 
-d3Vector ParticleSet::getParticleCoord(ParticleIndex particle_id) const
+d3Vector ParticleSet::getParticleCoordPixel(ParticleIndex particle_id, RFLOAT tiltSeriesPixelSize) const
 {
 	d3Vector out;
-	
-	partTable.getValueSafely(EMDL_IMAGE_COORD_X, out.x, particle_id.value);
-	partTable.getValueSafely(EMDL_IMAGE_COORD_Y, out.y, particle_id.value);
-	partTable.getValueSafely(EMDL_IMAGE_COORD_Z, out.z, particle_id.value);
-	
+
+    partTable.getValueSafely(EMDL_IMAGE_CENT_COORD_X_ANGST, out.x, particle_id.value);
+    partTable.getValueSafely(EMDL_IMAGE_CENT_COORD_Y_ANGST, out.y, particle_id.value);
+    partTable.getValueSafely(EMDL_IMAGE_CENT_COORD_Z_ANGST, out.z, particle_id.value);
+
+    out /=  tiltSeriesPixelSize;
+
 	return out;
 }
 
-void ParticleSet::setParticleCoord(ParticleIndex particle_id, const d3Vector& v)
+void ParticleSet::setParticleCoordPixel(ParticleIndex particle_id, const d3Vector& v, RFLOAT tiltSeriesPixelSize)
 {
-	partTable.setValue(EMDL_IMAGE_COORD_X, v.x, particle_id.value);
-	partTable.setValue(EMDL_IMAGE_COORD_Y, v.y, particle_id.value);
-	partTable.setValue(EMDL_IMAGE_COORD_Z, v.z, particle_id.value);
+	partTable.setValue(EMDL_IMAGE_CENT_COORD_X_ANGST, tiltSeriesPixelSize * v.x, particle_id.value);
+	partTable.setValue(EMDL_IMAGE_CENT_COORD_Y_ANGST, tiltSeriesPixelSize * v.y, particle_id.value);
+	partTable.setValue(EMDL_IMAGE_CENT_COORD_Z_ANGST, tiltSeriesPixelSize * v.z, particle_id.value);
 }
 
 int ParticleSet::getOpticsGroup(ParticleIndex particle_id) const
@@ -650,7 +632,7 @@ std::vector<int> ParticleSet::getVisibleFrames(ParticleIndex particle_id) const
 
 std::vector<d3Vector> ParticleSet::getTrajectoryInPixels(ParticleIndex particle_id, int fc, double pixelSize, bool from_original_coordinate) const
 {
-	const d3Vector p0 = (from_original_coordinate) ? getParticleCoord(particle_id) : getPosition(particle_id);
+    const d3Vector p0 = getPosition(particle_id, !from_original_coordinate);
 
 	if (hasMotion)
 	{
