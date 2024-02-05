@@ -262,11 +262,12 @@ void SubtomoProgram::initialise(
             {
                 const ParticleIndex part_id = particles[t][p];
 
-                d3Vector pos = particleSet.getParticleCoord(part_id);
+                // just rescaling coordinates, so pixel size doesn't really matter
+                d3Vector pos = particleSet.getParticleCoordPixel(part_id, 1.);
 
                 pos *= rescale_coords;
 
-                particleSet.setParticleCoord(part_id, pos);
+                particleSet.setParticleCoordPixel(part_id, pos, 1.);
             }
         }
     }
@@ -351,10 +352,9 @@ void SubtomoProgram::writeParticleSet(
 
                 if (apply_offsets)
                 {
-                    const d3Matrix A_subtomogram = particleSet.getSubtomogramMatrix(part_id);
-                    const d3Vector pos = particleSet.getParticleCoord(part_id) - (A_subtomogram * particleSet.getParticleOffset(part_id)) / tiltSeriesPixelSize;
+                    const d3Vector pos = particleSet.getPosition(part_id, true);
                     copy.setParticleOffset(new_id, d3Vector(0,0,0));
-                    copy.setParticleCoord(new_id, pos);
+                    copy.setParticleCoordPixel(new_id, pos, tiltSeriesPixelSize);
                 }
 
 				if (apply_orientations)
@@ -556,8 +556,7 @@ void SubtomoProgram::processTomograms(
                 projPart[f] = projCut[f] * d4Matrix(A);
 
                 if (do_ctf) {
-                    const d3Vector pos = (apply_offsets) ? particleSet.getPosition(part_id)
-                                                         : particleSet.getParticleCoord(part_id);
+                    const d3Vector pos = particleSet.getPosition(part_id, apply_offsets);
 
                     CTF ctf = tomogram.getCtf(f, pos);
                     BufferedImage<float> ctfImg(sh2D, s2D);
