@@ -323,7 +323,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
                        m.containsLabel(EMDL_TOMO_PROJECTION_W));
     if (!out.hasMatrices && has_old_matrix)
     {
-        std::cout << " Warning: tomogram has old definition of projection matrices; converting now... " << std::endl;
+        std::cout << " Warning: tomogram has relion-4 definition of projection matrices; converting them now... " << std::endl;
         out.hasMatrices = true;
     }
 
@@ -367,6 +367,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
                     P(i,j) = vals[j];
                 }
             }
+
         }
 
 		CTF& ctf = out.centralCTFs[f];
