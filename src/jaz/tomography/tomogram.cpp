@@ -35,7 +35,6 @@ void Tomogram::setProjectionMatrix(int f, RFLOAT xtilt, RFLOAT ytilt, RFLOAT zro
  *
  */
 
-    std::cerr << "TODO: check correction of this code!!!!" << std::endl;
     if (optics.pixelSize < 0.001)
         REPORT_ERROR("BUG: Tomogram::getProjectionMatrix encountered pixel size of zero");
 
@@ -43,7 +42,7 @@ void Tomogram::setProjectionMatrix(int f, RFLOAT xtilt, RFLOAT ytilt, RFLOAT zro
 
     // Get specimen center
     t3Vector<double> specimen_center((double)int(w0/2), (double)int(h0/2), (double)int(d0/2) );
-    s0 = s0. translation(-specimen_center);
+    s0 = s0.translation(-specimen_center);
 
     // Get specimen shifts (in pixels)
     t3Vector<double> specimen_shifts(xshift_angst / optics.pixelSize, yshift_angst / optics.pixelSize, 0.);
@@ -60,26 +59,7 @@ void Tomogram::setProjectionMatrix(int f, RFLOAT xtilt, RFLOAT ytilt, RFLOAT zro
     r1 = r1.rotation(yaxis, ytilt);
     r2 = r2.rotation(zaxis, zrot);
 
-    projectionMatrices[f] = s2 * s1 * r2 * r1 * r0 * s0;
-
-    /*
-    Matrix2D< RFLOAT > T0, T, T1, Rx, Ry, Rz, All;
-    translation3DMatrix(-w0/2, -h0/2, -d0/2, T0);
-    translation3DMatrix(xshift, yshift, 0., T);
-    translation3DMatrix(stack.xdim/2, stack.ydim/2, 0., T1);
-    rotation3DMatrix(xtilt, 'X', Rx);
-    rotation3DMatrix(ytilt, 'Y', Ry);
-    rotation3DMatrix(zrot, 'Z', Rz);
-    //All = T1 * T * Rz * Ry * Rx * T0;
-    All = T * Rz * Ry * Rx;
-
-    d4Matrix result;
-    for (int i = 0; i < 4; i++)
-        for (int j = 0; j < 4; j++)
-            result(i,j) = All(i, j);
-
-    return result;
-     */
+    projectionMatrices[f] = s1 * s2 * r2 * r1 * r0 * s0;
 
 }
 
@@ -89,9 +69,9 @@ void Tomogram::getProjectionAnglesFromMatrix(int frame, const gravis::d4Matrix &
 
     // From https://www.geometrictools.com/Documentation/EulerAngles.pdf
     RFLOAT thetaX, thetaY, thetaZ;
-    if (A(2,0) < 0.99999)
+    if (A(2,0) < 1.)
     {
-        if (A(2,0) > -0.99999)
+        if (A(2,0) > -1.)
         {
             thetaX = atan2(A(2,1), A(2,2));
             thetaY = asin (-A(2,0));
@@ -115,22 +95,24 @@ void Tomogram::getProjectionAnglesFromMatrix(int frame, const gravis::d4Matrix &
     ytilt = RAD2DEG(thetaY);
     zrot  = RAD2DEG(thetaZ);
 
-    // Get center of tomogram
-    d4Vector specimen_center(centre.x, centre.y, centre.z, 1. );
+    // Get also the shifts in centered Angstroms in the tilt series images
+    d4Matrix s0, s1, s2, r0, r1, r2;
 
-    // Get tilt image center
+    d3Vector specimen_center(centre.x, centre.y, centre.z);
     std::vector<long int> tilt_image_center_int = stack.getSizeVector();
-    d4Vector tilt_image_center((double)int(tilt_image_center_int[0]/2), (double)int(tilt_image_center_int[1]/2), 0., 1.);
+    d3Vector tilt_image_center((double)int(tilt_image_center_int[0]/2), (double)int(tilt_image_center_int[1]/2), 0.);
+    s0 = s0.translation(specimen_center);
+    s2 = s2.translation(-tilt_image_center);
 
-    d4Vector specimen_shift(A(0,3), A(1,3), A(2,3), 1.);
-    specimen_shift -= specimen_center;
-    d4Vector image_shift = A * specimen_shift;
+    t3Vector<double> xaxis(1., 0., 0.), yaxis(0., 1., 0.), zaxis(0., 0., 1.);
+    r0 = r0.rotation(xaxis, -xtilt);
+    r1 = r1.rotation(yaxis, -ytilt);
+    r2 = r2.rotation(zaxis, -zrot);
 
-    image_shift += tilt_image_center;
-    image_shift *= optics.pixelSize;
-
-    xshift_angst = image_shift[0];
-    yshift_angst = image_shift[1];
+    // invert operation above in setProjectionMatrix
+    s1 = A * s0 * r0 * r1 * r2 * s2;
+    xshift_angst = optics.pixelSize * s1(0,3);
+    yshift_angst = optics.pixelSize * s1(1,3);
 
 }
 
