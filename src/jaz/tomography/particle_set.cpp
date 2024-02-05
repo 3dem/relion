@@ -487,6 +487,12 @@ void ParticleSet::write(const std::string& filename)
     genTable.setValue(EMDL_TOMO_SUBTOMOGRAM_STACK2D, is_stack2d);
     genTable.write(ofs);
 	optTable.write(ofs);
+
+    // Remove spurious uncentered coordinates in pixels from relion-4 files
+    if (partTable.containsLabel(EMDL_IMAGE_COORD_X)) partTable.deactivateLabel(EMDL_IMAGE_COORD_X);
+    if (partTable.containsLabel(EMDL_IMAGE_COORD_Y)) partTable.deactivateLabel(EMDL_IMAGE_COORD_Y);
+    if (partTable.containsLabel(EMDL_IMAGE_COORD_Z)) partTable.deactivateLabel(EMDL_IMAGE_COORD_Z);
+
 	partTable.write(ofs);
 }
 
@@ -567,13 +573,29 @@ d3Vector ParticleSet::getParticleCoordDecenteredPixel(ParticleIndex particle_id,
 {
 	d3Vector out;
 
-    partTable.getValueSafely(EMDL_IMAGE_CENT_COORD_X_ANGST, out.x, particle_id.value);
-    partTable.getValueSafely(EMDL_IMAGE_CENT_COORD_Y_ANGST, out.y, particle_id.value);
-    partTable.getValueSafely(EMDL_IMAGE_CENT_COORD_Z_ANGST, out.z, particle_id.value);
+    if (partTable.containsLabel(EMDL_IMAGE_CENT_COORD_X_ANGST) &&
+        partTable.containsLabel(EMDL_IMAGE_CENT_COORD_Y_ANGST) &&
+        partTable.containsLabel(EMDL_IMAGE_CENT_COORD_Z_ANGST))
+    {
+        partTable.getValue(EMDL_IMAGE_CENT_COORD_X_ANGST, out.x, particle_id.value);
+        partTable.getValue(EMDL_IMAGE_CENT_COORD_Y_ANGST, out.y, particle_id.value);
+        partTable.getValue(EMDL_IMAGE_CENT_COORD_Z_ANGST, out.z, particle_id.value);
 
-    // Inside Jasenko's code, all coordinates are in decentered pixels, convert now from centered Angstroms (centre_tomo is in pixels)
-    out /= tiltSeriesPixelSize;
-    out += tomo_centre;
+        // Inside Jasenko's code, all coordinates are in decentered pixels, convert now from centered Angstroms (centre_tomo is in pixels)
+        out /= tiltSeriesPixelSize;
+        out += tomo_centre;
+    }
+    else if (partTable.containsLabel(EMDL_IMAGE_COORD_X) &&
+             partTable.containsLabel(EMDL_IMAGE_COORD_Y) &&
+             partTable.containsLabel(EMDL_IMAGE_COORD_Z))
+    {
+        // Maintain backwards compatibility with relion-4
+        partTable.getValue(EMDL_IMAGE_COORD_X, out.x, particle_id.value);
+        partTable.getValue(EMDL_IMAGE_COORD_Y, out.y, particle_id.value);
+        partTable.getValue(EMDL_IMAGE_COORD_Z, out.z, particle_id.value);
+    }
+    else
+        REPORT_ERROR("Cannot find particle coordinates (rlnCenteredCoordinateX/Y/ZAngst) in particle star file");
 
 	return out;
 }
