@@ -11,7 +11,96 @@ using namespace gravis;
 
 Tomogram::Tomogram()
 {
-	
+
+}
+
+d4Matrix Tomogram::getProjectionMatrix(int f) const
+{
+
+    std::cerr << "TODO: check correction of this code!!!!" << std::endl;
+    if (optics.pixelSize < 0.001)
+        REPORT_ERROR("BUG: Tomogram::getProjectionMatrix encountered pixel size of zero");
+
+    d4Matrix s0, s1, s2, r0, r1, r2;
+
+    // Get specimen center
+    t3Vector<double> specimen_center((double)int(w0/2), (double)int(h0/2), (double)int(d0/2) );
+    s0 = s0. translation(-specimen_center);
+
+    // Get specimen shifts (in pixels)
+    t3Vector<double> specimen_shifts(xshift_angst[f] / optics.pixelSize, yshift_angst[f] / optics.pixelSize, 0.);
+    s1 = s1.translation(specimen_shifts);
+
+    // Get tilt image center
+    std::vector<long int> tilt_image_center_int = stack.getSizeVector();
+    t3Vector<double> tilt_image_center((double)int(tilt_image_center_int[0]/2), (double)int(tilt_image_center_int[1]/2), 0.);
+    s2 = s2.translation(tilt_image_center);
+
+    // Get rotation matrices
+    t3Vector<double> xaxis(1., 0., 0.), yaxis(0., 1., 0.), zaxis(0., 0., 1.);
+    r0 = r0.rotation(xaxis, xtilt[f]);
+    r1 = r1.rotation(yaxis, ytilt[f]);
+    r2 = r2.rotation(zaxis, zrot[f]);
+
+    return s2 * s1 * r2 * r1 * r0 * s0;
+
+    /*
+    Matrix2D< RFLOAT > T0, T, T1, Rx, Ry, Rz, All;
+    translation3DMatrix(-w0/2, -h0/2, -d0/2, T0);
+    translation3DMatrix(xshift, yshift, 0., T);
+    translation3DMatrix(stack.xdim/2, stack.ydim/2, 0., T1);
+    rotation3DMatrix(xtilt, 'X', Rx);
+    rotation3DMatrix(ytilt, 'Y', Ry);
+    rotation3DMatrix(zrot, 'Z', Rz);
+    //All = T1 * T * Rz * Ry * Rx * T0;
+    All = T * Rz * Ry * Rx;
+
+    d4Matrix result;
+    for (int i = 0; i < 4; i++)
+        for (int j = 0; j < 4; j++)
+            result(i,j) = All(i, j);
+
+    return result;
+     */
+
+}
+void Tomogram::setProjectionAnglesFromMatrix(int f)
+{
+
+    RFLOAT abs_sb, sign_sb;
+    d4Matrix& A = projectionMatrices[f];
+
+    // From https://www.geometrictools.com/Documentation/EulerAngles.pdf
+    RFLOAT thetaX, thetaY, thetaZ;
+    if (A(2,0) < 0.99999)
+    {
+        if (A(2,0) > -0.99999)
+        {
+            thetaX = atan2(A(2,1), A(2,2));
+            thetaY = asin (-A(2,0));
+            thetaZ = atan2(A(1,0), A(0,0));
+        }
+        else // A(2,0) = -1
+        {
+            thetaX = 0.;
+            thetaY = PI/2.;
+            thetaZ = -atan2(-A(1,2), A(1,1));
+        }
+    }
+    else // A(2,0) = +1
+    {
+            thetaX = 0.;
+            thetaY = -PI/2.;
+            thetaZ = atan2(-A(1,2), A(1,1));
+    }
+
+    xtilt[f] = RAD2DEG(thetaX);
+    ytilt[f] = RAD2DEG(thetaY);
+    zrot[f] = RAD2DEG(thetaZ);
+
+    // Also get centers
+
+
 }
 
 d2Vector Tomogram::projectPoint(const d3Vector& p, int frame) const
@@ -52,8 +141,12 @@ d2Vector Tomogram::projectPointDebug(const d3Vector &p, int frame) const
 
 bool Tomogram::isVisible(const d3Vector& p, int frame, double radius) const
 {
-	const d2Vector q = projectPoint(p, frame);
-	
+	d2Vector q = projectPoint(p, frame);
+
+    // SHWS 2feb24: now q is in centered coordinates, so add half the imageSize!
+    //q.x += imageSize.x/2.;
+    //q.y += imageSize.y/2.;
+
 	return     q.x > radius && q.x < imageSize.x - radius
 			&& q.y > radius && q.y < imageSize.y - radius;
 }
@@ -166,9 +259,11 @@ double Tomogram::getDepthOffset(int frame, d3Vector position) const
 {
 	const d4Matrix& projFrame = projectionMatrices[frame];
 	d4Vector pos2D = projFrame * d4Vector(position);
-	d4Vector cent2D = projFrame * d4Vector(centre);
-
+    // SHWS 2feb24: undo centering in relion5
+    d4Vector cent2D = projFrame * d4Vector(centre);
 	return pos2D.z - cent2D.z;
+
+    //return pos2D.z;
 }
 
 CTF Tomogram::getCtf(int frame, d3Vector position) const
