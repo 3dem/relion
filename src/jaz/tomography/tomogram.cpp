@@ -156,10 +156,6 @@ bool Tomogram::isVisible(const d3Vector& p, int frame, double radius) const
 {
 	d2Vector q = projectPoint(p, frame);
 
-    // SHWS 2feb24: now q is in centered coordinates, so add half the imageSize!
-    //q.x += imageSize.x/2.;
-    //q.y += imageSize.y/2.;
-
 	return     q.x > radius && q.x < imageSize.x - radius
 			&& q.y > radius && q.y < imageSize.y - radius;
 }
@@ -272,11 +268,10 @@ double Tomogram::getDepthOffset(int frame, d3Vector position) const
 {
 	const d4Matrix& projFrame = projectionMatrices[frame];
 	d4Vector pos2D = projFrame * d4Vector(position);
-    // SHWS 2feb24: undo centering in relion5
     d4Vector cent2D = projFrame * d4Vector(centre);
+
 	return pos2D.z - cent2D.z;
 
-    //return pos2D.z;
 }
 
 CTF Tomogram::getCtf(int frame, d3Vector position) const

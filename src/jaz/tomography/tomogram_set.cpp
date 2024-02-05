@@ -112,7 +112,6 @@ void TomogramSet::write(FileName filename)
         if (!exists(newdir)) mktree(newdir);
 
         // Write the individual tomogram starfile
-        // SHWS 2feb2024: deactivate the projection matrices
         if (tomogramTables[t].containsLabel(EMDL_TOMO_PROJECTION_X)) tomogramTables[t].deactivateLabel(EMDL_TOMO_PROJECTION_X);
         if (tomogramTables[t].containsLabel(EMDL_TOMO_PROJECTION_Y)) tomogramTables[t].deactivateLabel(EMDL_TOMO_PROJECTION_Y);
         if (tomogramTables[t].containsLabel(EMDL_TOMO_PROJECTION_Z)) tomogramTables[t].deactivateLabel(EMDL_TOMO_PROJECTION_Z);
