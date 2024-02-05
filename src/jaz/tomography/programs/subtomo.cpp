@@ -376,7 +376,14 @@ void SubtomoProgram::writeParticleSet(
 		copy.optTable.setValue(EMDL_IMAGE_SIZE, cropSize, og);
 	}
 
-	copy.write(outDir + "particles.star");
+    if (copy.partTable.containsLabel(EMDL_IMAGE_COORD_X)) copy.partTable.deactivateLabel(EMDL_IMAGE_COORD_X);
+    if (copy.partTable.containsLabel(EMDL_IMAGE_COORD_Y)) copy.partTable.deactivateLabel(EMDL_IMAGE_COORD_Y);
+    if (copy.partTable.containsLabel(EMDL_IMAGE_COORD_Z)) copy.partTable.deactivateLabel(EMDL_IMAGE_COORD_Z);
+
+    // remove CTF image name that could be there from old pseudo-subtomo jobs if we're writing 2D stacks
+    if (do_stack2d && copy.partTable.containsLabel(EMDL_CTF_IMAGE))  copy.partTable.deactivateLabel(EMDL_CTF_IMAGE);
+
+    copy.write(outDir + "particles.star");
 
 	if (copy.hasMotion && particles_removed > 0)
 	{
