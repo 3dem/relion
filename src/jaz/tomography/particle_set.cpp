@@ -335,13 +335,13 @@ int ParticleSet::getTotalParticleNumber() const
 	return partTable.numberOfObjects();
 }
 
-d3Vector ParticleSet::getPosition(ParticleIndex particle_id, bool apply_origin_shifts) const
+d3Vector ParticleSet::getPosition(ParticleIndex particle_id, const gravis::d3Vector &tomo_centre, bool apply_origin_shifts) const
 {
 	const int og = getOpticsGroup(particle_id);
 	
 	const double tiltSeriesPixelSize = getTiltSeriesPixelSize(og);
 
-    d3Vector out = getParticleCoordPixel(particle_id, tiltSeriesPixelSize);
+    d3Vector out = getParticleCoordDecenteredPixel(particle_id, tomo_centre, tiltSeriesPixelSize);
 
     if (apply_origin_shifts)
     {
@@ -409,10 +409,10 @@ d3Matrix ParticleSet::getMatrix3x3(ParticleIndex particle_id) const
 
 
 // This maps coordinates from particle space to tomogram space.
-d4Matrix ParticleSet::getMatrix4x4(ParticleIndex particle_id, double w, double h, double d) const
+d4Matrix ParticleSet::getMatrix4x4(ParticleIndex particle_id, const gravis::d3Vector &tomo_centre, double w, double h, double d) const
 {
         d3Matrix A = getMatrix3x3(particle_id);
-        d3Vector pos = getPosition(particle_id);
+        d3Vector pos = getPosition(particle_id, tomo_centre, true);
 
         int cx = ((int)w) / 2;
         int cy = ((int)h) / 2;
@@ -563,7 +563,7 @@ void ParticleSet::setParticleOffset(ParticleIndex particle_id, const d3Vector& v
 	partTable.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, v.z, particle_id.value);
 }
 
-d3Vector ParticleSet::getParticleCoordPixel(ParticleIndex particle_id, RFLOAT tiltSeriesPixelSize) const
+d3Vector ParticleSet::getParticleCoordDecenteredPixel(ParticleIndex particle_id, const gravis::d3Vector &tomo_centre, RFLOAT tiltSeriesPixelSize) const
 {
 	d3Vector out;
 
@@ -571,16 +571,23 @@ d3Vector ParticleSet::getParticleCoordPixel(ParticleIndex particle_id, RFLOAT ti
     partTable.getValueSafely(EMDL_IMAGE_CENT_COORD_Y_ANGST, out.y, particle_id.value);
     partTable.getValueSafely(EMDL_IMAGE_CENT_COORD_Z_ANGST, out.z, particle_id.value);
 
-    out /=  tiltSeriesPixelSize;
+    // Inside Jasenko's code, all coordinates are in decentered pixels, convert now from centered Angstroms (centre_tomo is in pixels)
+    out /= tiltSeriesPixelSize;
+    out += tomo_centre;
 
 	return out;
 }
 
-void ParticleSet::setParticleCoordPixel(ParticleIndex particle_id, const d3Vector& v, RFLOAT tiltSeriesPixelSize)
+void ParticleSet::setParticleCoordDecenteredPixel(ParticleIndex particle_id, d3Vector v, const gravis::d3Vector &tomo_centre, RFLOAT tiltSeriesPixelSize)
 {
-	partTable.setValue(EMDL_IMAGE_CENT_COORD_X_ANGST, tiltSeriesPixelSize * v.x, particle_id.value);
-	partTable.setValue(EMDL_IMAGE_CENT_COORD_Y_ANGST, tiltSeriesPixelSize * v.y, particle_id.value);
-	partTable.setValue(EMDL_IMAGE_CENT_COORD_Z_ANGST, tiltSeriesPixelSize * v.z, particle_id.value);
+
+    // Inside Jasenko's code all coordinates are in decentered pixels, convert now to centered Angstroms (centre_tomo is in pixels)
+    v -= tomo_centre;
+    v *= tiltSeriesPixelSize;
+
+	partTable.setValue(EMDL_IMAGE_CENT_COORD_X_ANGST, v.x, particle_id.value);
+	partTable.setValue(EMDL_IMAGE_CENT_COORD_Y_ANGST, v.y, particle_id.value);
+	partTable.setValue(EMDL_IMAGE_CENT_COORD_Z_ANGST, v.z, particle_id.value);
 }
 
 int ParticleSet::getOpticsGroup(ParticleIndex particle_id) const
@@ -630,9 +637,9 @@ std::vector<int> ParticleSet::getVisibleFrames(ParticleIndex particle_id) const
 
 }
 
-std::vector<d3Vector> ParticleSet::getTrajectoryInPixels(ParticleIndex particle_id, int fc, double pixelSize, bool from_original_coordinate) const
+std::vector<d3Vector> ParticleSet::getTrajectoryInPixels(ParticleIndex particle_id, int fc, const gravis::d3Vector &tomo_centre, double pixelSize, bool from_original_coordinate) const
 {
-    const d3Vector p0 = getPosition(particle_id, !from_original_coordinate);
+    const d3Vector p0 = getPosition(particle_id, tomo_centre, !from_original_coordinate);
 
 	if (hasMotion)
 	{

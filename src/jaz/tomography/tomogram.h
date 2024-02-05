@@ -27,8 +27,6 @@ class Tomogram
 			
 			BufferedImage<float> stack;
 			std::vector<gravis::d4Matrix> projectionMatrices;
-            std::vector<RFLOAT> xtilt, ytilt, zrot, xshift_angst, yshift_angst;
-
 
 			std::vector<std::shared_ptr<Deformation2D>> imageDeformations;
 			
@@ -41,9 +39,8 @@ class Tomogram
 			double defocusSlope;
 
 
-        gravis::d4Matrix getProjectionMatrix(int frame) const;
-
-        void setProjectionAnglesFromMatrix(int frame);
+        void setProjectionMatrix(int frame, RFLOAT xtilt, RFLOAT ytilt, RFLOAT zrot, RFLOAT xshift_angst, RFLOAT yshift_angst);
+        void getProjectionAnglesFromMatrix(int frame, const gravis::d4Matrix &P, RFLOAT &xtilt, RFLOAT &ytilt, RFLOAT &zrot, RFLOAT &xshift_angst, RFLOAT &yshift_angst) const;
 
 		gravis::d2Vector projectPoint(
 				const gravis::d3Vector& p, int frame) const;

@@ -28,9 +28,8 @@ class TomogramSet
 		Tomogram loadTomogram(int index, bool loadImageData, bool loadEvenFrames = false, bool loadOddFrames = false) const;
 
 		int size() const;
+        void setProjectionAngles(int tomogramIndex, int frame, RFLOAT xtilt, RFLOAT ytilt, RFLOAT zrot, RFLOAT xshift_angst, RFLOAT yshift_angst);
 
-    void setProjection(int tomogramIndex, int frame, RFLOAT xtilt, RFLOAT ytilt, RFLOAT zrot, RFLOAT xshift_angst, RFLOAT yshift_angst);
-    void getProjection(int tomogramIndex, int frame, RFLOAT &xtilt, RFLOAT &ytilt, RFLOAT &zrot, RFLOAT &xshift_angst, RFLOAT &yshift_angst) const;
 		void setCtf(int tomogramIndex, int frame, const CTF& ctf);
 		void setDose(int tomogramIndex, int frame, double dose);
 		void setTiltSeriesFile(int tomogramIndex, const std::string& filename);

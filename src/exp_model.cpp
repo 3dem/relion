@@ -982,7 +982,7 @@ bool Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
                 // Pre-orientation of this particle in the tomogram
                 ParticleIndex id(part_id);
                 d3Matrix A = particleSet.getSubtomogramMatrix(id);
-                const d3Vector pos = particleSet.getPosition(id);
+                const d3Vector pos = particleSet.getPosition(id, tomogram.centre, true);
 
 
                 // Add only the visible images for this particle

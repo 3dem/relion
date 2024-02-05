@@ -72,7 +72,7 @@ BufferedImage<double> FCC::compute3(
 		
 		const ParticleIndex part_id = partIndices[p];
 		
-		const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(part_id, fc, tomogram.optics.pixelSize);
+		const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(part_id, fc, tomogram.centre, tomogram.optics.pixelSize);
 		const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
 		
 		d4Matrix projCut;
@@ -91,8 +91,9 @@ BufferedImage<double> FCC::compute3(
 
 			BufferedImage<fComplex> prediction = Prediction::predictModulated(
 					part_id, dataSet, projCut, s,
-					tomogram.getCtf(f, dataSet.getPosition(part_id)),
-					tomogram.optics.pixelSize,
+					tomogram.getCtf(f, dataSet.getPosition(part_id, tomogram.centre, true)),
+					tomogram.centre,
+                    tomogram.optics.pixelSize,
 					aberrationsCache,
 					referenceFS,
 					Prediction::OppositeHalf,

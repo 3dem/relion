@@ -571,7 +571,7 @@ void CtfRefinementProgram::updateScale(
 		const ParticleIndex part_id = particles[t][p];
 
 		const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
-					part_id, fc, tomogram.optics.pixelSize);
+					part_id, fc, tomogram.centre, tomogram.optics.pixelSize);
 		
 		const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
 
@@ -588,13 +588,13 @@ void CtfRefinementProgram::updateScale(
 				tomogram.stack, f, s, 1.0, tomogram, traj[f],
 				observation, projCut, 1, true);
 
-			CTF ctf = tomogram.getCtf(f, particleSet.getPosition(part_id));
+			CTF ctf = tomogram.getCtf(f, particleSet.getPosition(part_id, tomogram.centre, true));
 
 			const RawImage<float> doseSlice = doseWeights.getConstSliceRef(f);
 
 			BufferedImage<fComplex> prediction = Prediction::predictModulated(
 				part_id, particleSet, tomogram.projectionMatrices[f], s,
-				ctf, tomogram.optics.pixelSize, aberrationsCache,
+				ctf, tomogram.centre, tomogram.optics.pixelSize, aberrationsCache,
 				referenceMap.image_FS,
 				Prediction::OwnHalf,
 				Prediction::AmplitudeModulated,
