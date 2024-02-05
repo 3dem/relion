@@ -34,7 +34,6 @@ class TomoBackprojectProgram
 		void initialise(bool verbose = true);
         void run(int rank = 0, int size = 1);
         void writeOutput(bool do_all_metadata = false);
-        void getProjectMatrices(Tomogram &tomogram, MetaDataTable &tomogramTable);
         void reconstructOneTomogram(int tomoIndex, bool doEven, bool doOdd);
         void setMetaDataAllTomograms();
     private:
