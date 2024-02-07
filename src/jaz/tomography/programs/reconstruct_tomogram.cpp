@@ -57,14 +57,9 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
 	taperFalloff = textToDouble(parser.getOption("--tf", "Tapering falloff", "0.0"));
 
     // SHWS & Aburt 19Jul2022: use zero-origins from relion-4.1 onwards....
-	//x0 = textToDouble(parser.getOption("--x0", "X origin", "1.0"));
-	//y0 = textToDouble(parser.getOption("--y0", "Y origin", "1.0"));
-	//z0 = textToDouble(parser.getOption("--z0", "Z origin", "1.0"));
-
     x0 = textToDouble(parser.getOption("--x0", "X origin", "0.0"));
     y0 = textToDouble(parser.getOption("--y0", "Y origin", "0.0"));
     z0 = textToDouble(parser.getOption("--z0", "Z origin", "0.0"));
-
 
 	spacing = textToDouble(parser.getOption("--bin", "Binning", "1.0"));
     angpix_spacing = textToDouble(parser.getOption("--binned_angpix", "OR: desired pixel size after binning", "-1"));
@@ -201,15 +196,15 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex, bool doEven, 
 
     if (doEven)
     {
-    	tomogram = tomogramSet.loadTomogram(tomoIndex, true, true, false);
+    	tomogram = tomogramSet.loadTomogram(tomoIndex, true, true, false, w, h, d);
     }
     else if (doOdd)
     {
-    	tomogram = tomogramSet.loadTomogram(tomoIndex, true, false, true);
+    	tomogram = tomogramSet.loadTomogram(tomoIndex, true, false, true, w, h, d);
     }
     else
     {
-        tomogram = tomogramSet.loadTomogram(tomoIndex, true);
+        tomogram = tomogramSet.loadTomogram(tomoIndex, true, false, false, w, h, d);
     }
     
 	if (zeroDC) Normalization::zeroDC_stack(tomogram.stack);

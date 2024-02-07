@@ -25,7 +25,7 @@ class TomogramSet
         void write(FileName filename);
 
         // If max_dose is positive, then only images with cumulativeDose less than or equal to max_dose will be loaded.
-		Tomogram loadTomogram(int index, bool loadImageData, bool loadEvenFrames = false, bool loadOddFrames = false) const;
+		Tomogram loadTomogram(int index, bool loadImageData, bool loadEvenFrames = false, bool loadOddFrames = false, int w0 = -999, int h0 =-999, int d0 = -999 ) const;
 
 		int size() const;
         void setProjectionAngles(int tomogramIndex, int frame, RFLOAT xtilt, RFLOAT ytilt, RFLOAT zrot, RFLOAT xshift_angst, RFLOAT yshift_angst);

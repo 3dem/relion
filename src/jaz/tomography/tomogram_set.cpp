@@ -125,7 +125,8 @@ void TomogramSet::write(FileName filename)
 
 }
 
-Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenFramesOnly, bool loadOddFramesOnly) const //Set loadEven/OddFramesOnly to True to loadImageData from rlnTomoMicrographNameEven/Odd rather than rlnMicrographName
+Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenFramesOnly, bool loadOddFramesOnly,
+                                   int _w0, int _h0, int _d0) const //Set loadEven/OddFramesOnly to True to loadImageData from rlnTomoMicrographNameEven/Odd rather than rlnMicrographName
 {
 	Tomogram out;
 
@@ -145,7 +146,9 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
     }
     else
     {
-        out.w0 = out.h0 = out.d0 = -999;
+        out.w0 = _w0;
+        out.h0 = _h0;
+        out.d0 = _d0;
     }
 
     // Select only a subset of the tilt series images with the lowest dose
@@ -320,16 +323,37 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
                        m.containsLabel(EMDL_TOMO_PROJECTION_Y) &&
                        m.containsLabel(EMDL_TOMO_PROJECTION_Z) &&
                        m.containsLabel(EMDL_TOMO_PROJECTION_W));
-    if (!out.hasMatrices && has_old_matrix)
+    if (has_old_matrix)
     {
-        std::cout << " Warning: tomogram has relion-4 definition of projection matrices; converting them now... " << std::endl;
+        std::cerr << " WARNING: tomogram " << tomoName << " has relion-4 definition of projection matrices; converting them now... " << std::endl;
         out.hasMatrices = true;
     }
 
 	for (int f = 0; f < out.frameCount; f++)
 	{
 
-		if (out.hasMatrices)
+        if (has_old_matrix)
+        {
+            d4Matrix& P = out.projectionMatrices[f];
+            std::vector<EMDLabel> rows({
+                                               EMDL_TOMO_PROJECTION_X,
+                                               EMDL_TOMO_PROJECTION_Y,
+                                               EMDL_TOMO_PROJECTION_Z,
+                                               EMDL_TOMO_PROJECTION_W });
+
+            for (int i = 0; i < 4; i++)
+            {
+                std::vector<double> vals;
+                m.getValueSafely(rows[i], vals, f);
+
+                for (int j = 0; j < 4; j++)
+                {
+                    P(i,j) = vals[j];
+                }
+            }
+
+        }
+        else if (out.hasMatrices)
         {
 
             RFLOAT xtilt, ytilt, zrot, xshift_angst, yshift_angst;
@@ -345,27 +369,6 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
             m.getValueSafely(EMDL_TOMO_YSHIFT_ANGST, yshift_angst, f);
 
             out.setProjectionMatrix(f, xtilt, ytilt, zrot, xshift_angst, yshift_angst);
-
-        }
-        else if (has_old_matrix)
-        {
-            d4Matrix& P = out.projectionMatrices[f];
-            std::vector<EMDLabel> rows({
-                EMDL_TOMO_PROJECTION_X,
-                EMDL_TOMO_PROJECTION_Y,
-                EMDL_TOMO_PROJECTION_Z,
-                EMDL_TOMO_PROJECTION_W });
-
-            for (int i = 0; i < 4; i++)
-            {
-                std::vector<double> vals;
-                m.getValueSafely(rows[i], vals, f);
-
-                for (int j = 0; j < 4; j++)
-                {
-                    P(i,j) = vals[j];
-                }
-            }
 
         }
 
