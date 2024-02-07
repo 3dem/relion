@@ -1634,7 +1634,7 @@ void CtfRefinementProgram::writeDefocusEps(const MetaDataTable& table, const std
 	}
 
 	plot2D.SetXAxisTitle("frame");
-	plot2D.SetYAxisTitle("defocus");
+	plot2D.SetYAxisTitle("defocus U & V");
 	plot2D.OutputPostScriptPlot(root_name + ".eps");
 
 
