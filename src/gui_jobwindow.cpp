@@ -2540,6 +2540,15 @@ void JobWindow::initialiseTomoImportWindow()
 	tab1->label("General");
 	resetHeight();
 
+    place("movie_files", TOGGLE_DEACTIVATE);
+    place("images_are_motion_corrected", TOGGLE_DEACTIVATE);
+    place("mdoc_files", TOGGLE_DEACTIVATE);
+    place("optics_group_name", TOGGLE_DEACTIVATE);
+    place("prefix", TOGGLE_DEACTIVATE);
+
+    // Add a little spacer
+    current_y += STEPY/2;
+
     place("angpix", TOGGLE_DEACTIVATE);
 	place("kV", TOGGLE_DEACTIVATE);
 	place("Cs", TOGGLE_DEACTIVATE);
@@ -2551,12 +2560,6 @@ void JobWindow::initialiseTomoImportWindow()
 	tab2->label("Tilt series");
 	resetHeight();
 
-    place("movie_files", TOGGLE_DEACTIVATE);
-    place("mdoc_files", TOGGLE_DEACTIVATE);
-    place("prefix", TOGGLE_DEACTIVATE);
-
-    // Add a little spacer
-    current_y += STEPY/2;
     place("dose_rate", TOGGLE_DEACTIVATE);
     place("dose_is_per_movie_frame", TOGGLE_DEACTIVATE);
 
@@ -2564,7 +2567,6 @@ void JobWindow::initialiseTomoImportWindow()
     place("tilt_axis_angle", TOGGLE_DEACTIVATE);
     place("mtf_file", TOGGLE_DEACTIVATE);
     place("flip_tiltseries_hand", TOGGLE_DEACTIVATE);
-    place("images_are_motion_corrected", TOGGLE_DEACTIVATE);
 
 	tab2->end();
 }

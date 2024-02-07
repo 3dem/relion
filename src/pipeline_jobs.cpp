@@ -6419,7 +6419,9 @@ void RelionJob::initialiseTomoImportJob()
 	joboptions["movie_files"] = JobOption("Tilt image files:", (std::string)"frames/*.mrc","File pattern matching all tilt image files. These can be multi-frame micrographs or single 2D images.");
 	joboptions["mdoc_files"] = JobOption("mdoc files:", (std::string)"mdoc/*.mdoc","File pattern pointing to the mdoc files.");
 	joboptions["prefix"] = JobOption("Prefix:", (std::string)"","Optional prefix added to avoid tilt-series name collisions when dealing with multiple datasets.");
-	joboptions["tilt_axis_angle"] = JobOption("Tilt axis angle (deg):", 85.0, 0.0, 180.0, 1.0 , "Nominal value for the tilt-axis rotation angle (positive is CCW from Y)");
+	joboptions["optics_group_name"] = JobOption("Optics group name:", (std::string)"", "All imported tomograms will have this optics group. When left empty, each tomogram will be its own optics group, with the tomogram name as the optics group name");
+
+    joboptions["tilt_axis_angle"] = JobOption("Tilt axis angle (deg):", 85.0, 0.0, 180.0, 1.0 , "Nominal value for the tilt-axis rotation angle (positive is CCW from Y)");
 	joboptions["mtf_file"] = JobOption("MTF file:", (std::string)"","MTF file for the detector");
 	joboptions["flip_tiltseries_hand"] = JobOption("Invert defocus handedness?", true, "Specify Yes to flip the handedness of the defocus geometry (default = Yes (value -1 in the STAR file), the same as the tutorial dataset: EMPIAR-10164)");
 	joboptions["images_are_motion_corrected"] = JobOption("Movies already motion corrected?", false, "Select Yes if your input images in 'Tilt image movie files' have already been motion corrected and/or are summed single frame images. Make sure the image file names match the corresponding image file names under SubFramePath in the mdoc files");
@@ -6441,6 +6443,8 @@ bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<st
     command += " --voltage " + joboptions["kV"].getString();
     command += " --spherical-aberration " + joboptions["Cs"].getString();
     command += " --amplitude-contrast " + joboptions["Q0"].getString();
+    command += " --tilt-image-movie-pattern \"" + joboptions["movie_files"].getString() + "\"";
+    command += " --optics-group-name \"" + joboptions["optics_group_name"].getString() + "\"";
 
     if (joboptions["dose_is_per_movie_frame"].getBoolean())
         command += " --dose-per-movie-frame " + joboptions["dose_rate"].getString();

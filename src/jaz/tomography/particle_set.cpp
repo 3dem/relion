@@ -42,28 +42,45 @@ bool ParticleSet::read(std::string filename, std::string motionFilename, bool ve
     if (optTable.numberOfObjects() == 0)
     {
 
+        // If the tomogramSet globalTable contains opticsGroupName, then use those groups, otherwise each tomogram is its own optics_group
+        std::map<std::string, std::string> tomoname_to_opticsgroupname;
+        size_t nr_tomos = tomogramSet->globalTable.numberOfObjects();
+        for (size_t t = 0; t < nr_tomos; t++)
+        {
+            std::string tomo_name, optics_group_name;
+            tomogramSet->globalTable.getValue(EMDL_TOMO_NAME, tomo_name, t);
+            if (tomogramSet->globalTable.containsLabel(EMDL_IMAGE_OPTICS_GROUP_NAME))
+                tomogramSet->globalTable.getValue(EMDL_IMAGE_OPTICS_GROUP_NAME, optics_group_name, t);
+            else
+                optics_group_name = tomo_name;
+            tomoname_to_opticsgroupname.insert(std::make_pair(tomo_name, optics_group_name));
+        }
+
         // Check which tomo_names are present in the partTable
-        std::vector<std::string> tomo_names;
+        std::vector<std::string> present_optics_groupnames;
         std::string my_prev_name="";
-        std::map<std::string, int> tomoname_to_optics_group;
+        std::map<std::string, int> opticsgroupname_to_opticsgroup;
+        std::map<std::string, std::string> presentopticsgroupname_to_firsttomoname;
         FOR_ALL_OBJECTS_IN_METADATA_TABLE(partTable)
         {
-            std::string myname;
+            std::string myname, myopticsgroupname;
             partTable.getValue(EMDL_TOMO_NAME, myname);
-            if (myname != my_prev_name)
+            myopticsgroupname = tomoname_to_opticsgroupname[myname];
+            if (myopticsgroupname != my_prev_name)
             {
                 bool is_new = true;
-                for (size_t i = 0; i < tomo_names.size(); i++)
+                for (size_t i = 0; i < present_optics_groupnames.size(); i++)
                 {
-                    if (myname == tomo_names[i]) is_new = false;
+                    if (myopticsgroupname == present_optics_groupnames[i]) is_new = false;
                 }
                 if (is_new)
                 {
-                    tomo_names.push_back(myname);
-                    tomoname_to_optics_group.insert(std::make_pair(myname, tomo_names.size()));
+                    present_optics_groupnames.push_back(myopticsgroupname);
+                    opticsgroupname_to_opticsgroup.insert(std::make_pair(myopticsgroupname, present_optics_groupnames.size()));
+                    presentopticsgroupname_to_firsttomoname.insert(std::make_pair(myopticsgroupname, myname));
                 }
             }
-            my_prev_name = myname;
+            my_prev_name = myopticsgroupname;
         }
 
         // construct optics table with those tomo_names that are present in the partTable
@@ -76,9 +93,9 @@ bool ParticleSet::read(std::string filename, std::string motionFilename, bool ve
             REPORT_ERROR("ERROR: tomogramSet->globalTable does not contain rlnSphericalAberration label");
         if (!tomogramSet->globalTable.containsLabel(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE))
             REPORT_ERROR("ERROR: tomogramSet->globalTable does not contain rlnTomoTiltSeriesPixelSize label");
-        for (size_t i = 0; i < tomo_names.size(); i++)
+        for (size_t i = 0; i < present_optics_groupnames.size(); i++)
         {
-            int idx = tomogramSet->getTomogramIndex(tomo_names[i]);
+            int idx = tomogramSet->getTomogramIndex(presentopticsgroupname_to_firsttomoname[present_optics_groupnames[i] ]);
             double Q0, Cs, kV, tiltSeriesPixelSize;
             tomogramSet->globalTable.getValue(EMDL_CTF_VOLTAGE, kV, idx);
             tomogramSet->globalTable.getValue(EMDL_CTF_CS, Cs, idx);
@@ -90,8 +107,8 @@ bool ParticleSet::read(std::string filename, std::string motionFilename, bool ve
             optTable.setValue(EMDL_CTF_CS, Cs);
             optTable.setValue(EMDL_CTF_Q0, Q0);
             optTable.setValue(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, tiltSeriesPixelSize);
-            optTable.setValue(EMDL_IMAGE_OPTICS_GROUP, tomoname_to_optics_group[ tomo_names[i] ]);
-            optTable.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME, tomo_names[i]);
+            optTable.setValue(EMDL_IMAGE_OPTICS_GROUP, opticsgroupname_to_opticsgroup[ present_optics_groupnames[i] ]);
+            optTable.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME, present_optics_groupnames[i]);
         }
 
         // Now also set optics groups in partTable
@@ -99,7 +116,7 @@ bool ParticleSet::read(std::string filename, std::string motionFilename, bool ve
         {
             std::string myname;
             partTable.getValue(EMDL_TOMO_NAME, myname);
-            partTable.setValue(EMDL_IMAGE_OPTICS_GROUP, tomoname_to_optics_group[myname]);
+            partTable.setValue(EMDL_IMAGE_OPTICS_GROUP, opticsgroupname_to_opticsgroup[tomoname_to_opticsgroupname[myname] ]);
         }
 
     }
