@@ -2534,7 +2534,7 @@ void JobWindow::placeTomoInput(bool has_tomograms, bool has_particles,
 
 void JobWindow::initialiseTomoImportWindow()
 {
-	setupTabs(5);
+	setupTabs(2);
 
     tab1->begin();
 	tab1->label("General");
@@ -2551,11 +2551,6 @@ void JobWindow::initialiseTomoImportWindow()
 	tab2->label("Tilt series");
 	resetHeight();
 
-    group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group4->end();
-	place("do_tiltseries", TOGGLE_DEACTIVATE, group4, false);
-	group4->begin();
-
     place("movie_files", TOGGLE_DEACTIVATE);
     place("mdoc_files", TOGGLE_DEACTIVATE);
     place("prefix", TOGGLE_DEACTIVATE);
@@ -2571,79 +2566,7 @@ void JobWindow::initialiseTomoImportWindow()
     place("flip_tiltseries_hand", TOGGLE_DEACTIVATE);
     place("images_are_motion_corrected", TOGGLE_DEACTIVATE);
 
-    group4->end();
-    guientries["do_tiltseries"].cb_menu_i(); // make default active
-
-	tab3->begin();
-	tab3->label("Tomograms");
-	resetHeight();
-
-	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group1->end();
-	place("do_tomo", TOGGLE_DEACTIVATE, group1, false);
-	group1->begin();
-
-	place("tomo_star", TOGGLE_DEACTIVATE);
-	place("io_tomos", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	place("order_list", TOGGLE_DEACTIVATE);
-	place("do_flipYZ", TOGGLE_DEACTIVATE);
-	place("do_flipZ", TOGGLE_DEACTIVATE);
-	place("hand", TOGGLE_DEACTIVATE);
-
-	group1->end();
-	guientries["do_tomo"].cb_menu_i(); // make default active
-
-	tab3->end();
-
-	tab4->begin();
-	tab4->label("Coordinates");
-	resetHeight();
-
-	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group2->end();
-	place("do_coords", TOGGLE_DEACTIVATE, group2, false);
-	group2->begin();
-
-	place("part_star", TOGGLE_DEACTIVATE);
-	place("part_tomos", TOGGLE_DEACTIVATE);
-	// Add a little spacer
-	current_y += STEPY/2;
-	place("do_coords_flipZ", TOGGLE_DEACTIVATE);
-
-	group2->end();
-	guientries["do_coords"].cb_menu_i(); // make default active
-
-	tab4->end();
-
-	tab5->begin();
-	tab5->label("Others");
-	resetHeight();
-
-	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group3->end();
-
-	place("do_other", TOGGLE_DEACTIVATE, group3, false);
-	group3->begin();
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	place("fn_in_other", TOGGLE_DEACTIVATE);
-	place("node_type", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	place("optics_group_particles", TOGGLE_DEACTIVATE);
-
-	group3->end();
-	guientries["do_other"].cb_menu_i(); // make default active
-
-	tab5->end();
+	tab2->end();
 }
 
 void JobWindow::initialiseTomoAlignTiltseriesWindow()

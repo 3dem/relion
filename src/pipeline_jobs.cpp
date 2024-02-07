@@ -6416,7 +6416,6 @@ void RelionJob::initialiseTomoImportJob()
 	joboptions["dose_rate"] = JobOption("Dose rate per tilt-image:", 3, 0, 20, 1, "Electron dose (in e/A^2) per image in the tilt series. If the option below is set to true, then you can provide the dose rate per movie frame here.");
 	joboptions["dose_is_per_movie_frame"] = JobOption("Is dose rate per movie frame?", false, "If set to true, the dose tate above is taken per movie frame, otherwise the dose rate is assumed to be per tilt image.");
 
-	joboptions["do_tiltseries"]= JobOption("Import tilt-series?", true, "Set this to Yes for importing tilt movies from SerialEM  mdoc format metadata.");
 	joboptions["movie_files"] = JobOption("Tilt image files:", (std::string)"frames/*.mrc","File pattern matching all tilt image files. These can be multi-frame micrographs or single 2D images.");
 	joboptions["mdoc_files"] = JobOption("mdoc files:", (std::string)"mdoc/*.mdoc","File pattern pointing to the mdoc files.");
 	joboptions["prefix"] = JobOption("Prefix:", (std::string)"","Optional prefix added to avoid tilt-series name collisions when dealing with multiple datasets.");
@@ -6425,39 +6424,6 @@ void RelionJob::initialiseTomoImportJob()
 	joboptions["flip_tiltseries_hand"] = JobOption("Invert defocus handedness?", true, "Specify Yes to flip the handedness of the defocus geometry (default = Yes (value -1 in the STAR file), the same as the tutorial dataset: EMPIAR-10164)");
 	joboptions["images_are_motion_corrected"] = JobOption("Movies already motion corrected?", false, "Select Yes if your input images in 'Tilt image movie files' have already been motion corrected and/or are summed single frame images. Make sure the image file names match the corresponding image file names under SubFramePath in the mdoc files");
 
-	joboptions["do_tomo"] = JobOption("Import tomograms?", false, "Set this to Yes for importing tomogram directories from IMOD.");
-	joboptions["io_tomos"] = JobOption("Append to tomograms set: ", OUTNODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "The imported tomograms will be output into this tomogram set. If any tomograms were already in this tomogram set, then the newly imported ones will be added to those.");
-	joboptions["tomo_star"] = JobOption("STAR file with tomograms description: ", "", "Input file (*.star)", ".", "Provide a STAR file with the basic following information to import tomogsrams: \n\n"
-	  " - rlnTomoImportImodDir: path to the IMOD directory.\n"
-	  " - rlnTomoImportCtfFindFile or rlnTomoImportCtfPlotterFile: path to the initial CTF estimate from either CTFFind or CtfPlotter, respectively.\n"
-	  " - rlnTomoTiltSeriesName: path to the actual tilt series file. Note if the filename ends with .st, this needs to be specificed with an .st:mrc ending to tell RELION  to interpret it as an mrc file.\n\n"
-	  "The following additional columns may also be present:\n\n"
-	  " - rlnTomoName: The tomogram name. If not specified rlnTomoTiltSeriesName will be used instead.\n"
-	  " - rlnTomoImportFractionalDose: the electron dose corresponding to one tilt image. If omitted, the value of the --fd argument will be used.\n"
-	  " - rlnTomoImportOrderList: path to a two-column csv text file specifying the chronological order in which the images were acquired. The first number counts up from 1, while the second describes the sequence of tilt angles.\n"
-	  " - rlnOpticsGroupName: an arbitrary name for an optics group. This allows the set of tilt series to be separated into subsets that share the same optical aberrations. This is useful if the data have been collected in multiple sessions that might exhibit different aberrations. If omitted, all tilt series will be assigned to the same default optics group.\n"
-	  " - rlnTomoImportOffset<X/Y/Z>: an arbitrary offset to the 3D coordinate system. This is useful if particles have already been picked in tomograms that have been cropped after reconstruction by IMOD. If the IMOD-internal SHIFT command has been used to apply offsets, then this will be handled internally and does not need to be specified here. If omitted, then the values of the --off<x/y/z> command line arguments will be used instead (which default to 0).\n"
-	  " - rlnTomoImportCulledFile: output file name for a new tilt series with the excluded frames missing. This is only needed if tilt images have been excluded using IMOD’s EXCLUDE, EXCLUDELIST or EXCLUDELIST2 commands. In that case, this becomes a mandatory parameter.");
-	joboptions["order_list"] = JobOption("Ordered list:", (std::string)"", "", ".", "A 2-column, comma-separated file with the frame-order list of the tilt series, where the first column is the frame (image) number (starting at 1) and the second column is the tilt angle (in degrees). If this values varies among the input tomograms, then specify it using its own column (rlnTomoImportOrderList) in the input tomogram description STAR file.");
-	joboptions["do_flipYZ"] = JobOption("Flip YZ?", true, "Set this to Yes if you want to interchange the Y and Z coordinates.  If this values varies among the input tomograms, then append opposite values to tomogram set using another Import tomo job.");
-	joboptions["do_flipZ"] = JobOption("Flip Z?", true, "Set this to Yes if you want to change the sign of the Z coordinates.  If this values varies among the input tomograms, then append opposite values to tomogram set using another Import tomo job.");
-	joboptions["hand"] = JobOption("Tilt handedness:", (std::string)"", "Set this to indicate the handedness of the tilt geometry (default=-1). The value of this parameter is either +1 or -1, and it describes whether the focus increases or decreases as a function of Z distance. It has to be determined experimentally. In our experiments, it has always been -1. Y If this values varies among the input tomograms, then append opposite values to tomogram set using another Import tomo job.");
-
-	joboptions["do_coords"] = JobOption("Import coordinates?", false, "Set this to Yes for importing particle coordinates.");
-	joboptions["part_star"] = JobOption("STAR file with coordinates: ", "", "Input file (*.star)", ".", "Provide a STAR file with the following information to input particles: \n \n rlnTomoName: Name of the tomogram to which a particle belongs \n \n rlnCoordinate<X/Y/Z>: the 3D coordinates within that tomogram. \n \n If the input file also contains the particle angle columns rlnAngle<Rot/Tilt/Psi>, or any other column, they are also imported.");
-	joboptions["part_tomos"] = JobOption("Tomograms star:", OUTNODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "The tomograms set or global tilt series star from which these particles were picked.");
-	joboptions["do_coords_flipZ"] = JobOption("Flip Z coordinates?", false, "Set this to Yes if you want to flip particles Z coordinate. Use it in case imported tomograms Z axis are flipped compared to tomograms used for picking.");
-
-	joboptions["do_other"] = JobOption("Import other node types?", false, "Set this to Yes  if you plan to import anything else than movies or micrographs");
-	joboptions["fn_in_other"] = JobOption("Input file:", "ref.mrc", "Input file (*.*)", ".", "Select any file(s) to import. \n \n \
-	Note that for importing coordinate files, one has to give a Linux wildcard, where the *-symbol is before the coordinate-file suffix, e.g. if the micrographs are called mic1.mrc and the coordinate files mic1.box or mic1_autopick.star, one HAS to give '*.box' or '*_autopick.star', respectively.\n \n \
-	Also note that micrographs, movies and coordinate files all need to be in the same directory (with the same rootnames, e.g.mic1 in the example above) in order to be imported correctly. 3D masks or references can be imported from anywhere. \n \n \
-	Note that movie-particle STAR files cannot be imported from a previous version of RELION, as the way movies are handled has changed in RELION-2.0. \n \n \
-	For the import of a particle, 2D references or micrograph STAR file or of a 3D reference or mask, only a single file can be imported at a time. \n \n \
-	Note that due to a bug in a fltk library, you cannot import from directories that contain a substring  of the current directory, e.g. dont important from /home/betagal if your current directory is called /home/betagal_r2. In this case, just change one of the directory names.");
-
-	joboptions["node_type"] = JobOption("Node type:", job_nodetype_options_tomo, 0, "Select the type of Node this is.");
-	joboptions["optics_group_particles"] = JobOption("Rename optics group for particles:", (std::string)"", "Only for the import of a particles STAR file with a single, or no, optics groups defined: rename the optics group for the imported particles to this string.");
 }
 
 bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<std::string> &commands,
@@ -6467,194 +6433,32 @@ bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<st
 	initialisePipeline(outputname, job_counter);
 	std::string command;
 
-	// Some code here was copied from the SPA import job...
-	bool do_tiltseries = joboptions["do_tiltseries"].getBoolean();
-	bool do_tomo = joboptions["do_tomo"].getBoolean();
-		bool do_coords = joboptions["do_coords"].getBoolean();
-	bool do_other = joboptions["do_other"].getBoolean();
+    command = "relion_python_tomo_import SerialEM ";
+    command += " --tilt-image-movie-pattern \"" + joboptions["movie_files"].getString() + "\"";
+    command += " --mdoc-file-pattern \"" + joboptions["mdoc_files"].getString() + "\"";
+    command += " --nominal-tilt-axis-angle " + joboptions["tilt_axis_angle"].getString();
+    command += " --nominal-pixel-size " + joboptions["angpix"].getString();
+    command += " --voltage " + joboptions["kV"].getString();
+    command += " --spherical-aberration " + joboptions["Cs"].getString();
+    command += " --amplitude-contrast " + joboptions["Q0"].getString();
 
-	int i = 0;
-	if (do_tiltseries) i++;
-	if (do_tomo) i++;
-	if (do_coords) i++;
-	if (do_other) i++;
+    if (joboptions["dose_is_per_movie_frame"].getBoolean())
+        command += " --dose-per-movie-frame " + joboptions["dose_rate"].getString();
+    else
+        command += " --dose-per-tilt-image " + joboptions["dose_rate"].getString();
+    if (joboptions["prefix"].getString() != "")
+        command += " --prefix " + joboptions["prefix"].getString();
+    if (joboptions["mtf_file"].getString() != "")
+        command += " --mtf-file " + joboptions["mtf_file"].getString();
+    if (joboptions["flip_tiltseries_hand"].getBoolean())
+        command += " --invert-defocus-handedness ";
+    if (joboptions["images_are_motion_corrected"].getBoolean())
+        command += " --images-are-motion-corrected ";
 
-	if (i != 1)
-	{
-		error_message = "ERROR: you can only select ONE of tilt series, tomograms, import particles, or import other nodes.";
-	return false;
-	}
+    command += " --output-directory " + outputname;
 
-	if (do_tiltseries)
-	{
-		// TODO: rename command to relion_tomo_import_tiltseries?
-		command = "relion_python_tomo_import SerialEM ";
-		command += " --tilt-image-movie-pattern \"" + joboptions["movie_files"].getString() + "\"";
-		command += " --mdoc-file-pattern \"" + joboptions["mdoc_files"].getString() + "\"";
-		command += " --nominal-tilt-axis-angle " + joboptions["tilt_axis_angle"].getString();
-		command += " --nominal-pixel-size " + joboptions["angpix"].getString();
-		command += " --voltage " + joboptions["kV"].getString();
-		command += " --spherical-aberration " + joboptions["Cs"].getString();
-		command += " --amplitude-contrast " + joboptions["Q0"].getString();
-
-		if (joboptions["dose_is_per_movie_frame"].getBoolean())
-			command += " --dose-per-movie-frame " + joboptions["dose_rate"].getString();
-		else
-			command += " --dose-per-tilt-image " + joboptions["dose_rate"].getString();
-		if (joboptions["prefix"].getString() != "")
-			command += " --prefix " + joboptions["prefix"].getString();
-		if (joboptions["mtf_file"].getString() != "")
-			command += " --mtf-file " + joboptions["mtf_file"].getString();
-		if (joboptions["flip_tiltseries_hand"].getBoolean())
-			command += " --invert-defocus-handedness ";
-		if (joboptions["images_are_motion_corrected"].getBoolean())
-			command += " --images-are-motion-corrected ";
-		command += " --output-directory " + outputname;
-		Node node(outputname+"tilt_series.star", LABEL_TOMO_TILTSERIES);
-		outputNodes.push_back(node);
-	}
-	else if (do_tomo)
-		{
-
-		if (joboptions["tomo_star"].getString() == "")
-		{
-			error_message = "ERROR: you need to provide an input STAR file with information about the tomograms to be imported";
-			return false;
-		}
-
-		// TODO: insert call to relion_tomo_import_tomograms here
-		command = "relion_python_tomo_import_tomograms ";
-
-		command += " --i " + joboptions["tomo_star"].getString();
-		command += " --o " + outputname+"tomograms.star";
-		if (joboptions["io_tomos"].getString() != "") command += " --t " + joboptions["io_tomos"].getString();
-
-		Node node(outputname+"tomograms.star", LABEL_TOMO_TOMOGRAMS);
-		outputNodes.push_back(node);
-
-		if (joboptions["angpix"].getString() != "") command += " --angpix " + joboptions["angpix"].getString();
-		if (joboptions["kV"].getString() != "") command += " --voltage " + joboptions["kV"].getString();
-		if (joboptions["Cs"].getString() != "") command += " --Cs " + joboptions["Cs"].getString();
-		if (joboptions["Q0"].getString() != "") command += " --Q0 " + joboptions["Q0"].getString();
-		if (joboptions["dose"].getString() != "") command += " --fd " + joboptions["dose"].getString();
-		if (joboptions["order_list"].getString() != "") command += " --ol " + joboptions["order_list"].getString();
-		if (joboptions["do_flipYZ"].getBoolean()) command += " --flipYZ ";
-		if (joboptions["do_flipZ"].getBoolean()) command += " --flipZ ";
-		if (joboptions["hand"].getString() != "") command += " --hand " + joboptions["hand"].getString();
-
-
-	}
-	else if (do_coords)
-	{
-
-		if (joboptions["part_star"].getString() == "")
-		{
-			error_message = "ERROR: you need to provide an input STAR file with information about the tomograms to be imported.";
-			return false;
-		}
-
-		if (joboptions["part_tomos"].getString() == "")
-		{
-			error_message = "ERROR: you need to provide an input tomograms set with information about the tomograms from which they particles originate.";
-			return false;
-		}
-
-		command = "relion_tomo_import_particles ";
-
-		command += " --i " + joboptions["part_star"].getString();
-		command += " --o " + outputname;
-		command += " --t " + joboptions["part_tomos"].getString();
-
-		if (joboptions["do_coords_flipZ"].getBoolean())
-		{
-			command += " --flipZ";
-		}
-
-		Node node(outputname+"particles.star", LABEL_TOMO_PARTS);
-		outputNodes.push_back(node);
-	}
-	else if (do_other)
-	{
-		FileName fn_out, fn_in;
-		command = "relion_import ";
-
-		fn_in = joboptions["fn_in_other"].getString();
-		std::string node_type = joboptions["node_type"].getString();
-
-		fn_out = "/" + fn_in;
-		fn_out = fn_out.afterLastOf("/");
-
-		std::string mynodetype;
-		if (node_type == "Particles STAR file (.star)")
-			mynodetype = LABEL_TOMO_PARTS;
-		else if (node_type == "Set of tiltseries STAR file (.star)")
-			mynodetype = LABEL_TOMO_TILTSERIES;
-		else if (node_type == "Set of tomograms STAR file (.star)")
-			mynodetype = LABEL_TOMO_TOMOGRAMS;
-		else if (node_type == "Multiple (2D or 3D) references (.star or .mrcs)")
-			mynodetype = LABEL_2DIMGS_CPIPE;
-		else if (node_type == "3D reference (.mrc)")
-			mynodetype = LABEL_MAP_CPIPE;
-		else if (node_type == "3D mask (.mrc)")
-			mynodetype = LABEL_MASK_CPIPE;
-		else if (node_type == "Unfiltered half-map (unfil.mrc)")
-			mynodetype = LABEL_TOMO_HALFMAP;
-		else
-		{
-			error_message = "Unrecognized menu option for node_type = " + node_type;
-			return false;
-		}
-
-		Node node(outputname + fn_out, mynodetype);
-		outputNodes.push_back(node);
-
-		// Also get the other half-map
-		if (mynodetype == LABEL_TOMO_HALFMAP)
-		{
-			FileName fn_inb = "/" + fn_in;
-			size_t pos = fn_inb.find("half1");
-			if (pos != std::string::npos)
-			{
-				fn_inb.replace(pos, 5, "half2");
-			}
-			else
-			{
-				pos = fn_inb.find("half2");
-				if (pos != std::string::npos)
-				{
-					fn_inb.replace(pos, 5, "half1");
-				}
-			}
-			fn_inb = fn_inb.afterLastOf("/");
-			Node node2(outputname + fn_inb, mynodetype);
-			outputNodes.push_back(node2);
-			command += " --do_halfmaps";
-		}
-		else if (mynodetype == LABEL_TOMO_PARTS)
-		{
-			command += " --do_particles";
-			FileName optics_group = joboptions["optics_group_particles"].getString();
-			if (optics_group != "")
-			{
-				if (!optics_group.validateCharactersStrict())
-				{
-					error_message = "ERROR: an optics group name may contain only numbers, alphabets and hyphen(-).";
-					return false;
-				}
-				command += " --particles_optics_group_name \"" + optics_group + "\"";
-			}
-		}
-		else
-		{
-			command += " --do_other";
-		}
-
-		// Now finish the command call to relion_import program, which does the actual copying
-		command += " --i \"" + fn_in + "\"";
-		command += " --odir " + outputname;
-		command += " --ofile " + fn_out;
-
-	}
+    Node node(outputname+"tilt_series.star", LABEL_TOMO_TILTSERIES);
+    outputNodes.push_back(node);
 
 	// Other arguments for extraction
 	command += " " + joboptions["other_args"].getString();
