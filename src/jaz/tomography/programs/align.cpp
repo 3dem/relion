@@ -381,9 +381,14 @@ void AlignProgram::writeTempAlignmentData(
         //temp_positions.setValue(EMDL_IMAGE_COORD_X, pos[p].x - 1, p);
         //temp_positions.setValue(EMDL_IMAGE_COORD_Y, pos[p].y - 1, p);
         //temp_positions.setValue(EMDL_IMAGE_COORD_Z, pos[p].z - 1, p);
-        temp_positions.setValue(EMDL_IMAGE_COORD_X, pos[p].x , p);
-        temp_positions.setValue(EMDL_IMAGE_COORD_Y, pos[p].y , p);
-        temp_positions.setValue(EMDL_IMAGE_COORD_Z, pos[p].z , p);
+
+        // Better write already in centered coordinates in Angstroms, now that we still have tomogram
+        d3Vector posA = pos[p] - tomogram.centre;
+        posA *= tomogram.optics.pixelSize;
+
+        temp_positions.setValue(EMDL_IMAGE_CENT_COORD_X_ANGST, posA.x , p);
+        temp_positions.setValue(EMDL_IMAGE_CENT_COORD_Y_ANGST, posA.y , p);
+        temp_positions.setValue(EMDL_IMAGE_CENT_COORD_Z_ANGST, posA.z , p);
 
     }
 
@@ -457,13 +462,13 @@ void AlignProgram::readTempData(int t)
 	{
 		d3Vector imgCoord;
 
-		imgCoord.x = temp_positions.getDouble(EMDL_IMAGE_COORD_X, p);
-		imgCoord.y = temp_positions.getDouble(EMDL_IMAGE_COORD_Y, p);
-		imgCoord.z = temp_positions.getDouble(EMDL_IMAGE_COORD_Z, p);
+		imgCoord.x = temp_positions.getDouble(EMDL_IMAGE_CENT_COORD_X_ANGST, p);
+		imgCoord.y = temp_positions.getDouble(EMDL_IMAGE_CENT_COORD_Y_ANGST, p);
+		imgCoord.z = temp_positions.getDouble(EMDL_IMAGE_CENT_COORD_Z_ANGST, p);
 
-		particleSet.partTable.setValue(EMDL_IMAGE_COORD_X, imgCoord.x, particles[t][p].value);
-		particleSet.partTable.setValue(EMDL_IMAGE_COORD_Y, imgCoord.y, particles[t][p].value);
-		particleSet.partTable.setValue(EMDL_IMAGE_COORD_Z, imgCoord.z, particles[t][p].value);
+		particleSet.partTable.setValue(EMDL_IMAGE_CENT_COORD_X_ANGST, imgCoord.x, particles[t][p].value);
+		particleSet.partTable.setValue(EMDL_IMAGE_CENT_COORD_Y_ANGST, imgCoord.y, particles[t][p].value);
+		particleSet.partTable.setValue(EMDL_IMAGE_CENT_COORD_Z_ANGST, imgCoord.z, particles[t][p].value);
 
 		particleSet.partTable.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, 0.0, particles[t][p].value);
 		particleSet.partTable.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, 0.0, particles[t][p].value);
