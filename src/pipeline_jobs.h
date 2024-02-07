@@ -715,7 +715,7 @@ static int get_node_type(std::string label)
 #define PROC_TOMO_SUBTOMO_DIRNAME     "Extract"           // Creation of pseudo-subtomograms from tilt series images
 #define PROC_TOMO_CTFREFINE_DIRNAME   "CtfRefine"           // CTF refinement (defocus & aberrations) for tomography
 #define PROC_TOMO_EXCLUDE_TILT_IMAGES_DIRNAME   "ExcludeTiltImages"  // Exclusion of bad tilt-images from tilt-series
-#define PROC_TOMO_ALIGN_DIRNAME       "FrameAlign"          // Frame alignment and particle polishing for subtomography
+#define PROC_TOMO_ALIGN_DIRNAME       "MotionRefine"  // Frame alignment and particle polishing for subtomography
 #define PROC_TOMO_RECONSTRUCT_DIRNAME "Reconstruct" // Calculation of particle average from the individual tilt series images
 #define PROC_TOMO_DENOISE_DIRNAME "Denoise" // Denoise tomograms
 #define PROC_TOMO_PICK_DIRNAME "Picks" // Pick particles in tomograms
