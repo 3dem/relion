@@ -136,7 +136,13 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
     globalTable.getValueSafely(EMDL_TOMO_NAME, tomoName, index);
     const MetaDataTable& m = tomogramTables[index];
 
-    if (globalTable.containsLabel(EMDL_TOMO_SIZE_X) &&
+    if (_w0 != -999 && _h0 != -999 && _d0 != -999)
+    {
+        out.w0 = _w0;
+        out.h0 = _h0;
+        out.d0 = _d0;
+    }
+    else if (globalTable.containsLabel(EMDL_TOMO_SIZE_X) &&
         globalTable.containsLabel(EMDL_TOMO_SIZE_Y) &&
         globalTable.containsLabel(EMDL_TOMO_SIZE_Z))
     {
@@ -146,9 +152,9 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
     }
     else
     {
-        out.w0 = _w0;
-        out.h0 = _h0;
-        out.d0 = _d0;
+        out.w0 = -999;
+        out.h0 = -999;
+        out.d0 = -999;
     }
 
     // Select only a subset of the tilt series images with the lowest dose
