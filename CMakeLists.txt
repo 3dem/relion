@@ -136,10 +136,11 @@ endif()
  #This *has* to be AFTER project()
 include(${CMAKE_SOURCE_DIR}/cmake/BuildTypes.cmake)
 
-if(CUDA)
-    # -----------------------------------------------------------------------------CUDA--
-    # DOC: https://cmake.org/cmake/help/v3.28/module/FindCUDA.html
-    FIND_PACKAGE(CUDAToolkit)
+if(CMAKE_VERSION VERSION_LESS 3.10)
+	FIND_PACKAGE(CUDA)
+else(CMAKE_VERSION)
+	# newer version of CMake use a different module name
+	FIND_PACKAGE(CUDAToolkit)
 endif()
 
 if(CUDA_FOUND)
