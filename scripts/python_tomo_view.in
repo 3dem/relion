@@ -27,7 +27,7 @@ if [ ! -x "$python_executable" ]; then
 fi
 
 # Run the Python script with forwarded arguments
-"$python_executable" -c "from tomography_python_programs.view cli; exit(cli())" "$@"
+"$python_executable" -c "from tomography_python_programs.view import cli; exit(cli())" "$@"
 
 # Check the return status of the python command
 if [ $? -ne 0 ]; then
