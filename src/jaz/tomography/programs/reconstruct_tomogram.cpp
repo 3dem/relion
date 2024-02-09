@@ -190,6 +190,23 @@ void TomoBackprojectProgram::writeOutput(bool do_all_metadata)
 
 }
 
+void TomoBackprojectProgram::initialiseCtfScaleFactors(int tomoIndex, Tomogram &tomogram)
+{
+    // Skip initialisation of scale factor if it is already present in the tilt series star file
+    if (tomogramSet.tomogramTables[tomoIndex].containsLabel(EMDL_CTF_SCALEFACTOR))
+        return;
+
+    const int fc = tomogram.frameCount;
+    for (int f = 0; f < fc; f++)
+    {
+        RFLOAT ytilt;
+        tomogramSet.tomogramTables[tomoIndex].getValueSafely(EMDL_TOMO_YTILT, ytilt, f);
+        RFLOAT scale = cos(DEG2RAD(ytilt));
+        tomogramSet.tomogramTables[tomoIndex].setValue(EMDL_CTF_SCALEFACTOR, scale, f);
+        tomogram.centralCTFs[f].scale = scale;
+    }
+}
+
 void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex, bool doEven, bool doOdd)
 {
     Tomogram tomogram;
@@ -206,7 +223,10 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex, bool doEven, 
     {
         tomogram = tomogramSet.loadTomogram(tomoIndex, true, false, false, w, h, d);
     }
-    
+
+    // Initialise CTF scale factors to cosine(tilt) if they're not present yet
+    initialiseCtfScaleFactors(tomoIndex, tomogram);
+
 	if (zeroDC) Normalization::zeroDC_stack(tomogram.stack);
 	
 	const int fc = tomogram.frameCount;
