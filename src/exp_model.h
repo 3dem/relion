@@ -50,7 +50,7 @@ public:
     Matrix2D<RFLOAT> Aproj;
 
     // CTF information for defocus adjustment of tilt seriers
-    float defU, defV, defAngle, dose;
+    float defU, defV, defAngle, scale, dose;
 
     // Empty Constructor
 	ExpImage() {}
@@ -66,6 +66,7 @@ public:
         defU = copy.defU;
         defV = copy.defV;
         defAngle = copy.defAngle;
+        scale = copy.scale;
         dose = copy.dose;
 	}
 
@@ -78,6 +79,7 @@ public:
         defU = copy.defU;
         defV = copy.defV;
         defAngle = copy.defAngle;
+        scale = copy.scale;
         dose = copy.dose;
 		return *this;
 	}

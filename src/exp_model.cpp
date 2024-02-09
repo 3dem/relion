@@ -212,6 +212,7 @@ void Experiment::addImageToParticle(long int part_id, d4Matrix *Aproj, CTF *ctf,
 
 	img.particle_id = part_id;
 	img.Aproj = A;
+    img.scale = ctf->scale;
     img.dose = dose;
 
 	// Push back this particle in the particles vector

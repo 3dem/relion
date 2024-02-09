@@ -3012,7 +3012,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
                                 mydata.particles[part_id].images[img_id].defV,
                                 mydata.particles[part_id].images[img_id].defAngle,
                                 0.,
-                                1.,
+                                mydata.particles[part_id].images[img_id].scale,
                                 0.,
                                 mydata.particles[part_id].images[img_id].dose);
                     }
@@ -6449,7 +6449,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
                             mydata.particles[part_id].images[img_id].defV,
                             mydata.particles[part_id].images[img_id].defAngle,
                             0.,
-                            1.,
+                            mydata.particles[part_id].images[img_id].scale,
                             0.,
                             mydata.particles[part_id].images[img_id].dose);
                 else
@@ -9374,7 +9374,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
                                     mydata.particles[part_id].images[img_id].defV,
                                     mydata.particles[part_id].images[img_id].defAngle,
                                     0.,
-                                    1.,
+                                    mydata.particles[part_id].images[img_id].scale,
                                     0.,
                                     mydata.particles[part_id].images[img_id].dose);
                         else
