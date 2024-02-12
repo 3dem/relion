@@ -823,7 +823,7 @@ void getFourierTransformsAndCtfs(long int part_id,
                         baseMLO->mydata.particles[part_id].images[img_id].defV,
                         baseMLO->mydata.particles[part_id].images[img_id].defAngle,
                         0.,
-                        1.,
+                        baseMLO->mydata.particles[part_id].images[img_id].scale,
                         0.,
                         baseMLO->mydata.particles[part_id].images[img_id].dose);
                 else

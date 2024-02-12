@@ -6640,9 +6640,6 @@ bool RelionJob::getCommandsTomoReconstructTomogramsJob(std::string &outputname, 
     }
     if (error_message != "") return false;
 
-    // In new version of tilt series alignments by Alister Burt, the origin is again at normal 0,0,0 position
-	command += " --x0 0 --y0 0 --z0 0 ";
-
 	Node node1(outputname+"tomograms.star", LABEL_TOMO_TOMOGRAMS);
 	outputNodes.push_back(node1);
 
