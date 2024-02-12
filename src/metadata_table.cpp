@@ -2076,11 +2076,14 @@ MetaDataTable subsetMetaDataTable(MetaDataTable &MDin, EMDLabel label, std::stri
 MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label, RFLOAT threshold, RFLOAT origin_scale, FileName fn_removed, bool verb)
 {
 	// Sanity check
-	if (!MDin.containsLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM) || !MDin.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM))
-		REPORT_ERROR("You need rlnOriginXAngst and rlnOriginYAngst to remove duplicated particles");
+    if (!MDin.containsLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM) || !MDin.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM))
+        REPORT_ERROR("You need rlnOriginXAngst and rlnOriginYAngst to remove duplicated particles");
 
-	if (!MDin.containsLabel(EMDL_IMAGE_COORD_X) && !MDin.containsLabel(EMDL_IMAGE_COORD_Y))
-		REPORT_ERROR("You need rlnCoordinateX, rlnCoordinateY to remove duplicated particles");
+    if (mic_label == EMDL_MICROGRAPH_NAME && !MDin.containsLabel(EMDL_IMAGE_COORD_X) && !MDin.containsLabel(EMDL_IMAGE_COORD_Y))
+        REPORT_ERROR("You need rlnCoordinateX, rlnCoordinateY to remove duplicated particles");
+
+    if (mic_label == EMDL_TOMO_NAME && !MDin.containsLabel(EMDL_IMAGE_CENT_COORD_X_ANGST) && !MDin.containsLabel(EMDL_IMAGE_CENT_COORD_Y_ANGST))
+        REPORT_ERROR("You need rlnCenteredCoordinateXAngst, rlnCenteredCoordinateYAngst to remove duplicated particles");
 
 	if (!MDin.containsLabel(mic_label))
 		REPORT_ERROR("STAR file does not contain " + EMDL::label2Str(mic_label));
@@ -2091,12 +2094,12 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
     std::vector<RFLOAT> zs;
 
     bool dataIs3D = false;
-    if (MDin.containsLabel(EMDL_IMAGE_COORD_Z))
+    if (MDin.containsLabel(EMDL_IMAGE_CENT_COORD_Z_ANGST))
     {
         if (!MDin.containsLabel(EMDL_ORIENT_ORIGIN_Z_ANGSTROM))
             REPORT_ERROR("You need rlnOriginZAngst to remove duplicated 3D particles");
         dataIs3D = true;
-         zs.resize(MDin.numberOfObjects(), 0.0);
+        zs.resize(MDin.numberOfObjects(), 0.0);
     }
 
     RFLOAT threshold_sq = threshold * threshold;
@@ -2109,17 +2112,29 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
 		MDin.getValue(mic_label, mic_name);
 
 		RFLOAT val1, val2;
-		MDin.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, val1);
-		MDin.getValue(EMDL_IMAGE_COORD_X, val2);
-		xs[current_object] = -val1 * origin_scale + val2;
-		MDin.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, val1);
-		MDin.getValue(EMDL_IMAGE_COORD_Y, val2);
-		ys[current_object] = -val1 * origin_scale + val2;
-
+        if (mic_label == EMDL_MICROGRAPH_NAME)
+        {
+		    MDin.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, val1);
+            MDin.getValue(EMDL_IMAGE_COORD_X, val2);
+            xs[current_object] = -val1 * origin_scale + val2;
+            MDin.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, val1);
+            MDin.getValue(EMDL_IMAGE_COORD_Y, val2);
+            ys[current_object] = -val1 * origin_scale + val2;
+        }
+        if (mic_label == EMDL_TOMO_NAME)
+        {
+		    MDin.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, val1);
+            MDin.getValue(EMDL_IMAGE_CENT_COORD_X_ANGST, val2);
+            xs[current_object] = -val1 * origin_scale + val2;
+            MDin.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, val1);
+            MDin.getValue(EMDL_IMAGE_CENT_COORD_Y_ANGST, val2);
+            ys[current_object] = -val1 * origin_scale + val2;
+        }
 		if (dataIs3D)
         {
             MDin.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, val1);
-            MDin.getValue(EMDL_IMAGE_COORD_Z, val2);
+            if (mic_label == EMDL_MICROGRAPH_NAME) MDin.getValue(EMDL_IMAGE_COORD_Z, val2);
+            if (mic_label == EMDL_TOMO_NAME) MDin.getValue(EMDL_IMAGE_CENT_COORD_Z_ANGST, val2);
             zs[current_object] = -val1 * origin_scale + val2;
         }
 
