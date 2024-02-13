@@ -6631,8 +6631,6 @@ bool RelionJob::getCommandsTomoReconstructTomogramsJob(std::string &outputname, 
 	command += " --d " + joboptions["zdim"].getString();
 
 	command += " --binned_angpix " + joboptions["binned_angpix"].getString();
-	// No CTF is on by default for now
-	command += " --noctf ";
 
     if (fabs(joboptions["tiltangle_offset"].getNumber(error_message)) > 0.)
     {

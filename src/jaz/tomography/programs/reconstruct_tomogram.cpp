@@ -331,7 +331,9 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex, bool doEven, 
 				const double xA = x / box_size_x;
 				const double yA = (y < h_stackAct/2? y : y - h_stackAct) / box_size_y;
 				
-				const float c = ctf.getCTF(xA, yA);
+                const float c = ctf.getCTF(xA, yA, false, false,
+                                           true, false, 0.0, false);
+
 				
 				ctf2ImageFS(x,y) = fComplex(c*c,0);
 				frameFS(x,y) *= c;
