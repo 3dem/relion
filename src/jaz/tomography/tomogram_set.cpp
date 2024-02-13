@@ -160,6 +160,11 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
     // Select only a subset of the tilt series images with the lowest dose
     out.frameCount = tomogramTables[index].numberOfObjects();
 
+    if (globalTable.containsLabel(EMDL_CTF_BFACTOR_PERELECTRONDOSE))
+        globalTable.getValue(EMDL_CTF_BFACTOR_PERELECTRONDOSE, out.BfactorPerElectronDose, index);
+    else
+        out.BfactorPerElectronDose = 0.;
+
     if (globalTable.containsLabel(EMDL_TOMO_TILT_SERIES_NAME))
     {
         // option A: Kino's original IMOD import functionality
@@ -392,6 +397,28 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
 		{
 			ctf.scale = m.getDouble(EMDL_CTF_SCALEFACTOR, f);
 		}
+        else
+        {
+            ctf.scale = 1.;
+        }
+
+        if (m.containsLabel(EMDL_CTF_BFACTOR))
+        {
+            ctf.Bfac = m.getDouble(EMDL_CTF_BFACTOR, f);
+        }
+        else
+        {
+            ctf.Bfac = 0.;
+        }
+
+        if (m.containsLabel(EMDL_CTF_PHASESHIFT))
+        {
+            ctf.phase_shift = m.getDouble(EMDL_CTF_PHASESHIFT, f);
+        }
+        else
+        {
+            ctf.phase_shift = 0.;
+        }
 
 		ctf.initialise();
 

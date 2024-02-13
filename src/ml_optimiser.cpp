@@ -3011,9 +3011,9 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
                                 mydata.particles[part_id].images[img_id].defU,
                                 mydata.particles[part_id].images[img_id].defV,
                                 mydata.particles[part_id].images[img_id].defAngle,
-                                0.,
+                                mydata.particles[part_id].images[img_id].bfactor,
                                 mydata.particles[part_id].images[img_id].scale,
-                                0.,
+                                mydata.particles[part_id].images[img_id].phase_shift,
                                 mydata.particles[part_id].images[img_id].dose);
                     }
                     else
@@ -6448,9 +6448,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(
                             mydata.particles[part_id].images[img_id].defU,
                             mydata.particles[part_id].images[img_id].defV,
                             mydata.particles[part_id].images[img_id].defAngle,
-                            0.,
+                            mydata.particles[part_id].images[img_id].bfactor,
                             mydata.particles[part_id].images[img_id].scale,
-                            0.,
+                            mydata.particles[part_id].images[img_id].phase_shift,
                             mydata.particles[part_id].images[img_id].dose);
                 else
                     ctf.setValuesByGroup(
@@ -9373,9 +9373,9 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
                                     mydata.particles[part_id].images[img_id].defU,
                                     mydata.particles[part_id].images[img_id].defV,
                                     mydata.particles[part_id].images[img_id].defAngle,
-                                    0.,
+                                    mydata.particles[part_id].images[img_id].bfactor,
                                     mydata.particles[part_id].images[img_id].scale,
-                                    0.,
+                                    mydata.particles[part_id].images[img_id].phase_shift,
                                     mydata.particles[part_id].images[img_id].dose);
                         else
                             ctf.setValuesByGroup(

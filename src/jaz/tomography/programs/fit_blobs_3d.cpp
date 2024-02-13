@@ -153,7 +153,7 @@ void FitBlobs3DProgram::processTomogram(
 	Damage::applyWeight(
 			preweighted_stack,
 			tomogram_binned.optics.pixelSize,
-			tomogram_binned.cumulativeDose, num_threads);
+			tomogram_binned.cumulativeDose, num_threads, tomogram_binned.BfactorPerElectronDose);
 	
 	std::vector<std::vector<double>> all_blob_coeffs;
 	Mesh blob_meshes;
