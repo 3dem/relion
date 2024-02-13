@@ -65,7 +65,8 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
     angpix_spacing = textToDouble(parser.getOption("--binned_angpix", "OR: desired pixel size after binning", "-1"));
 
     tiltAngleOffset = textToDouble(parser.getOption("--tiltangle_offset", "Offset applied to all tilt angles (in deg)", "0"));
-	n_threads = textToInteger(parser.getOption("--j", "Number of threads", "1"));
+    BfactorPerElectronDose = textToDouble(parser.getOption("--bfactor_per_edose", "B-factor dose-weighting per electron/A^2 dose (default is use Niko's model)", "0"));
+    n_threads = textToInteger(parser.getOption("--j", "Number of threads", "1"));
 
 
 	Log::readParams(parser);
@@ -300,7 +301,7 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex, bool doEven, 
 	out.fill(0.f);
 	
 	BufferedImage<float> psfStack;
-	
+
 	if (applyCtf)
 	{
 		// modulate stackAct with CTF (mind the spacing)
@@ -430,6 +431,10 @@ void TomoBackprojectProgram::setMetaDataAllTomograms()
         tomogramSet.globalTable.setValue(EMDL_TOMO_SIZE_X, w, tomoIndex);
         tomogramSet.globalTable.setValue(EMDL_TOMO_SIZE_Y, h, tomoIndex);
         tomogramSet.globalTable.setValue(EMDL_TOMO_SIZE_Z, d, tomoIndex);
+
+        // And the Bfactor per e/A^2 dose, if provided
+        if (BfactorPerElectronDose > 0.)
+            tomogramSet.globalTable.setValue(EMDL_CTF_BFACTOR_PERELECTRONDOSE, BfactorPerElectronDose, tomoIndex);
 
         if (do_even_odd_tomograms)
         {
