@@ -50,7 +50,7 @@ public:
     Matrix2D<RFLOAT> Aproj;
 
     // CTF information for defocus adjustment of tilt seriers
-    float defU, defV, defAngle, scale, dose;
+    float defU, defV, defAngle, scale, dose, bfactor, phase_shift;
 
     // Empty Constructor
 	ExpImage() {}
@@ -68,6 +68,8 @@ public:
         defAngle = copy.defAngle;
         scale = copy.scale;
         dose = copy.dose;
+        bfactor = copy.bfactor;
+        phase_shift = copy.phase_shift;
 	}
 
 	// Define assignment operator in terms of the copy constructor
@@ -81,6 +83,8 @@ public:
         defAngle = copy.defAngle;
         scale = copy.scale;
         dose = copy.dose;
+        bfactor = copy.bfactor;
+        phase_shift = copy.phase_shift;
 		return *this;
 	}
 };
@@ -331,7 +335,7 @@ public:
 	void addParticle(std::string img_name, int optics_group, long int group_id, int random_subset = 0, int tomogram_id = 0);
 
  	// Add an image to the given particle
-	void addImageToParticle(long int part_id, d4Matrix *Aproj = NULL, CTF *ctf = NULL, float dose = 0.);
+	void addImageToParticle(long int part_id, d4Matrix *Aproj = NULL, CTF *ctf = NULL, float dose = 0., double BfactorPerElectronDose = 0.);
 
 	// Add a group
 	long int addGroup(std::string mic_name, int optics_group);

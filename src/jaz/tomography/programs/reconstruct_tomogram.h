@@ -25,6 +25,7 @@ class TomoBackprojectProgram
 	     	bool do_even_odd_tomograms;
 			double SNR;
             double tiltAngleOffset;
+            double BfactorPerElectronDose;
 
             std::vector<long> tomoIndexTodo;
 			OptimisationSet optimisationSet;

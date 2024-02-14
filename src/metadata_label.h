@@ -140,6 +140,7 @@ enum EMDLabel
 
 	EMDL_CTF_ASTIGMATISM,
 	EMDL_CTF_BFACTOR, ///< B-factor
+    EMDL_CTF_BFACTOR_PERELECTRONDOSE, // Relative B-factor dose-weighting per e/A^2 dose
 	EMDL_CTF_MAXRES, ///< Maximum resolution with Thon rings
 	EMDL_CTF_VALIDATIONSCORE, ///< Gctf-based validation score for CTF fit
 	EMDL_CTF_SCALEFACTOR, ///< linear scale-factor
@@ -855,7 +856,8 @@ private:
         EMDL::addLabel(EMDL_CLASS_PREDICTED_SCORE, EMDL_DOUBLE, "rlnPredictedClassScore", "2D class merit scores predicted by RELION model.");
 
 		EMDL::addLabel(EMDL_CTF_ASTIGMATISM, EMDL_DOUBLE, "rlnCtfAstigmatism", "Absolute value of the difference between defocus in U- and V-direction (in A)");
-		EMDL::addLabel(EMDL_CTF_BFACTOR, EMDL_DOUBLE, "rlnCtfBfactor", "B-factor (in A^2) that describes CTF power spectrum fall-off");
+        EMDL::addLabel(EMDL_CTF_BFACTOR, EMDL_DOUBLE, "rlnCtfBfactor", "B-factor (in A^2) that describes CTF power spectrum fall-off");
+        EMDL::addLabel(EMDL_CTF_BFACTOR_PERELECTRONDOSE, EMDL_DOUBLE, "rlnCtfBfactorPerElectronDose", "Relative factor with which to multiply B-factors per e/A^2 dose");
 		EMDL::addLabel(EMDL_CTF_MAXRES, EMDL_DOUBLE, "rlnCtfMaxResolution", "Estimated maximum resolution (in A) of significant CTF Thon rings");
 		EMDL::addLabel(EMDL_CTF_VALIDATIONSCORE, EMDL_DOUBLE, "rlnCtfValidationScore", "Gctf-based validation score for the quality of the CTF fit");
 		EMDL::addLabel(EMDL_CTF_SCALEFACTOR, EMDL_DOUBLE, "rlnCtfScalefactor", "Linear scale-factor on the CTF (values between 0 and 1)");

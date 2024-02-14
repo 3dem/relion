@@ -224,7 +224,7 @@ BufferedImage<float> Tomogram::computeDoseWeight(int boxSize, double binning) co
 {
 	// @TODO: add support for B/k factors
 	
-	return Damage::weightStack_GG(cumulativeDose, optics.pixelSize * binning, boxSize);
+	return Damage::weightStack_GG(cumulativeDose, optics.pixelSize * binning, boxSize, BfactorPerElectronDose);
 }
 
 BufferedImage<float> Tomogram::computeNoiseWeight(int boxSize, double binning, double overlap) const

@@ -183,7 +183,7 @@ void Experiment::addParticle(std::string img_name, int optics_group, long int gr
     return;
 }
 
-void Experiment::addImageToParticle(long int part_id, d4Matrix *Aproj, CTF *ctf, float dose)
+void Experiment::addImageToParticle(long int part_id, d4Matrix *Aproj, CTF *ctf, float dose, double BfactorPerElectronDose)
 {
 
     Matrix2D<RFLOAT> A(3,3);
@@ -213,7 +213,18 @@ void Experiment::addImageToParticle(long int part_id, d4Matrix *Aproj, CTF *ctf,
 	img.particle_id = part_id;
 	img.Aproj = A;
     img.scale = ctf->scale;
-    img.dose = dose;
+    img.phase_shift = ctf->phase_shift;
+
+    if (BfactorPerElectronDose > 0.)
+    {
+        img.dose = -999.;
+        img.bfactor = BfactorPerElectronDose * dose;
+    }
+    else
+    {
+        img.dose = dose;
+        img.bfactor = 0.;
+    }
 
 	// Push back this particle in the particles vector
 	particles[part_id].images.push_back(img);
@@ -999,7 +1010,7 @@ bool Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
 
                         CTF ctf = tomogram.getCtf(f, pos);
 
-                        addImageToParticle(part_id, &P, &ctf, dose);
+                        addImageToParticle(part_id, &P, &ctf, dose, tomogram.BfactorPerElectronDose);
                     }
                 }
             }

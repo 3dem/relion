@@ -32,6 +32,7 @@ class Tomogram
 			
 			std::vector<CTF> centralCTFs;
 			std::vector<double> cumulativeDose;
+            double BfactorPerElectronDose;
             gravis::d3Vector centre;
 			int w0, h0, d0;
 			std::vector<int> frameSequence;
