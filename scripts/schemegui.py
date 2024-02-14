@@ -1,4 +1,5 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python 
+
 """
 relion_it.py
 ============
@@ -23,9 +24,9 @@ import traceback
 import ast 
 import collections
 from shutil import copytree
-import Tkinter as tk
+import tkinter as tk
 #from Tkinter import scrolledtext 
-import tkMessageBox
+from tkinter import messagebox
 
 OPTIONS_FILE = 'relion_it_options.py'
 IS_RUNNING = False
@@ -316,8 +317,8 @@ class SchemeGui(object):
         self.set_current_node()
 
     def unlock_scheme(self, *args_ignored, **kwargs_ignored):
-        if tkMessageBox.askokcancel("Confirm unlock", 'Use:\n\nps -ef | grep relion_schemer \n\nto confirm this schemer is no longer running. \n\nOK to unlock?', 
-                                    icon='warning', default=tkMessageBox.CANCEL):
+        if messagebox.askokcancel("Confirm unlock", 'Use:\n\nps -ef | grep relion_schemer \n\nto confirm this schemer is no longer running. \n\nOK to unlock?', 
+                                    icon='warning', default=messagebox.CANCEL):
             lockname = ".relion_lock_scheme_" + self.schemename
             command = 'rm -rf ' + lockname
             print(' RELION_IT: excuting: ', command)
