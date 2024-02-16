@@ -233,14 +233,22 @@ bool PipeLine::touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist)
 	{
 		// Make subdirectory for each type of node
 		FileName fn_label = node.type;
-        std::string fn_type = (node.type_depth == 1) ? fn_label.beforeFirstOf(".") : fn_label.beforeNthOf('.', node.type_depth);
-        fn_type += "/";
+        std::string fn_type = fn_label.beforeFirstOf(".") + "/";
 
 		FileName mydir = fn_dir + fn_type + fnt.substr(0, fnt.rfind("/") + 1);
 		FileName mynode = fn_dir + fn_type + fnt;
-
-		mktree(mydir);
+        mktree(mydir);
 		touch(mynode);
+
+        // For deeper levels, also touch the deeper file
+        if (node.type_depth > 1)
+        {
+            std::string fn_type2 = fn_label.beforeNthOf('.', node.type_depth) + "/";
+            FileName mydir2 = fn_dir + fn_type2 + fnt.substr(0, fnt.rfind("/") + 1);
+            FileName mynode2 = fn_dir + fn_type2 + fnt;
+            mktree(mydir2);
+            touch(mynode2);
+        }
 		return true;
 	}
 	else
