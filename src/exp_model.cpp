@@ -201,19 +201,20 @@ void Experiment::addImageToParticle(long int part_id, d4Matrix *Aproj, CTF *ctf,
 	ExpImage img;
     if (ctf == NULL)
     {
-        img.defU = img.defV = img.defAngle = 0.;
+        img.defU = img.defV = img.defAngle = img.phase_shift = 0.;
+        img.scale = 1.;
     }
     else
     {
         img.defU = ctf->DeltafU;
         img.defV = ctf->DeltafV;
         img.defAngle = ctf->azimuthal_angle;
+        img.scale = ctf->scale;
+        img.phase_shift = ctf->phase_shift;
     }
 
 	img.particle_id = part_id;
 	img.Aproj = A;
-    img.scale = ctf->scale;
-    img.phase_shift = ctf->phase_shift;
 
     if (BfactorPerElectronDose > 0.)
     {
