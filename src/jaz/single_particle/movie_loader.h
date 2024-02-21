@@ -183,16 +183,13 @@ BufferedImage<T> MovieLoader::readEER(
 
 		RawImage<T> muGraphFrame(muGraphFrame_xmipp);
 
-		if (useGain)
+		#pragma omp parallel for num_threads(num_threads)
+		for (long int i = 0; i < pixCt; i++)
 		{
-			#pragma omp parallel for num_threads(num_threads)
-			for (long int i = 0; i < pixCt; i++)
-			{
-				const RFLOAT val = muGraphFrame[i];
-				const RFLOAT gain = useGain? (*gainRef)[i] : 1.0;
+			const RFLOAT val = muGraphFrame[i];
+			const RFLOAT gain = useGain? (*gainRef)[i] : 1.0;
 
-				muGraphFrame[i] = -gain * val;
-			}
+			muGraphFrame[i] = -gain * val;
 		}
 
 		if (do_fixDefect)
