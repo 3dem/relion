@@ -730,6 +730,7 @@ void Scheme::read(bool do_lock, FileName fn)
 	MD.getValue(EMDL_SCHEME_GENERAL_NAME, name);
 	MD.getValue(EMDL_SCHEME_GENERAL_CURRENT_NODE, current_node);
 	MD.clear();
+        if (name[name.size() - 1] != '/') name += '/';
 
 	MD.readStar(in, "scheme_floats");
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)

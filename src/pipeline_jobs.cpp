@@ -4334,10 +4334,6 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 	{
 		command += " --auto_refine --split_random_halves";
 
-		if (joboptions["do_blush"].getBoolean())
-		{
-			command += " --blush ";
-		}
 
         if (is_tomo)
         {
@@ -4398,7 +4394,12 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 
 	}
 
-	// Always do compute stuff
+    if (joboptions["do_blush"].getBoolean())
+    {
+        command += " --blush ";
+    }
+
+    // Always do compute stuff
 	if (!joboptions["do_combine_thru_disc"].getBoolean())
 		command += " --dont_combine_weights_via_disc";
 	if (!joboptions["do_parallel_discio"].getBoolean())
@@ -4720,11 +4721,6 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 			outputNodes = getOutputNodesRefine(outputname + "run", "MultiBody", -1, 1, 3, nr_bodies, is_tomo);
 			command += " --solvent_correct_fsc --multibody_masks " + joboptions["fn_bodies"].getString();
 
-			if (joboptions["do_blush"].getBoolean())
-			{
-				command += " --blush ";
-			}
-
 			Node node(joboptions["fn_in"].getString(), LABEL_REFINE3D_OPT);
 			inputNodes.push_back(node);
 
@@ -4748,6 +4744,9 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 			command += " --offset_step " + floatToString(joboptions["offset_step"].getNumber(error_message) * pow(2., iover));
 			if (error_message != "") return false;
 		}
+
+        if (joboptions["do_blush"].getBoolean())
+            command += " --blush ";
 
 		if (joboptions["do_subtracted_bodies"].getBoolean())
 			command += " --reconstruct_subtracted_bodies ";
