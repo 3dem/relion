@@ -109,7 +109,10 @@ class PickIsolatedParticlesWidget(QWidget):
         if not self.current_particle_star_file.exists():
             raise FileNotFoundError
         df = starfile.read(self.current_particle_star_file)
-        zyx = df[['rlnCoordinateZ', 'rlnCoordinateY', 'rlnCoordinateX']].to_numpy()
+        zyx = df[['rlnCoordinateZ',
+            'rlnCoordinateY',
+            'rlnCoordinateX']].to_numpy()
+
         return N3dPoints(data=zyx)
 
     def _open_save_dialog(self):

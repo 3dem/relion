@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
 import starfile
 import typer
 from rich.console import Console
@@ -34,9 +35,13 @@ def combine_particle_annotations(
         df = starfile.read(file)
         tilt_series_id = '_'.join(file.name.split('_')[:-1])
         scale_factor = float(global_df.loc[tilt_series_id, 'rlnTomoTomogramBinning'])
-        xyz = df[['rlnCoordinateX', 'rlnCoordinateY', 'rlnCoordinateZ']]
+        xyz = df[['rlnCoordinateX',
+            'rlnCoordinateY',
+            'rlnCoordinateZ']]
         xyz = xyz.to_numpy() * scale_factor
-        df[['rlnCoordinateX', 'rlnCoordinateY', 'rlnCoordinateZ']] = xyz
+        df[['rlnCoordinateX',
+            'rlnCoordinateY',
+            'rlnCoordinateZ']] = xyz
         dfs.append(df)
     df = pd.concat(dfs)
     output_file = output_directory / 'particles.star'
@@ -104,8 +109,18 @@ def create_annotations_from_previous_star_file(
         tomo_bin = tomo_data.rlnTomoTomogramBinning[
                 tomo_data.rlnTomoName == tomo_name
         ]
+        tomo_x = tomo_data.rlnTomoSizeX[tomo_data.rlnTomoName == tomo_name]
+        tomo_y = tomo_data.rlnTomoSizeY[tomo_data.rlnTomoName == tomo_name]
+        tomo_z = tomo_data.rlnTomoSizeZ[tomo_data.rlnTomoName == tomo_name]
         assert(len(tomo_bin) == 1)
+        assert(len(tomo_x) == 1)
+        assert(len(tomo_y) == 1)
+        assert(len(tomo_z) == 1)
         tomo_bin = tomo_bin.iloc[0]
+        tomo_x = tomo_x.iloc[0]
+        tomo_y = tomo_y.iloc[0]
+        tomo_z = tomo_z.iloc[0]
+        shift = np.array([tomo_x, tomo_y, tomo_z]) / 2
 
         tilt_series_pixel_size = tomo_data.rlnTomoTiltSeriesPixelSize[
                 tomo_data['rlnTomoName'] == tomo_name
@@ -114,18 +129,23 @@ def create_annotations_from_previous_star_file(
         pixel_size = tilt_series_pixel_size.iloc[0]
 
         new_coords = tomo_df.apply(
-            lambda df_row : rlnOrigin_to_rlnCoordinate_row(df_row, pixel_size), 
+            lambda df_row : rlnOrigin_to_rlnCenteredCoordAngst_row(df_row, pixel_size), 
             axis = 1
         )
 
-        new_coords = new_coords / tomo_bin
+        new_coords = (new_coords + shift) / tomo_bin
         new_coords.insert(loc=0, column='rlnTomoName', value=tomo_name)
-
+        new_coords.rename(columns={
+            'rlnCenteredCoordinateXAngst' : 'rlnCoordinateX',
+            'rlnCenteredCoordinateYAngst' : 'rlnCoordinateY',
+            'rlnCenteredCoordinateZAngst' : 'rlnCoordinateZ'
+        }, inplace=True)
+    
         starfile.write(new_coords, anno_file)
         console.log(f'  Wrote {anno_file_name}')
 
 
-def rlnOrigin_to_rlnCoordinate_row(df_row, pixel_size):
+def rlnOrigin_to_rlnCenteredCoordAngst_row(df_row, pixel_size):
     """Given a row of the particles DataFrame and the pixel size of the 
     corresponding tilt series image, incorporate rlnOriginX/Y/ZAgst
     coordinates into rlnCoordinateX/Y/Z."""
@@ -140,7 +160,10 @@ def rlnOrigin_to_rlnCoordinate_row(df_row, pixel_size):
             seq='ZYZ', angles=angles_subtomo, degrees=True
     ).as_matrix()
 
-    coords = df_row[['rlnCoordinateX', 'rlnCoordinateY', 'rlnCoordinateZ']]
+    coords = df_row[['rlnCenteredCoordinateXAngst',
+            'rlnCenteredCoordinateYAngst',
+            'rlnCenteredCoordinateZAngst']]
+
     offset = df_row[['rlnOriginXAngst', 'rlnOriginYAngst', 'rlnOriginZAngst']]
 
-    return coords - A_subtomo.T @ offset / pixel_size
+    return coords / pixel_size - A_subtomo.T @ offset / pixel_size
