@@ -125,7 +125,7 @@ def create_annotations_from_previous_star_file(
         pixel_size = tilt_series_pixel_size.iloc[0]
 
         new_coords = tomo_df.apply(
-            lambda df_row : rlnOrigin_to_rlnCenteredCoordAngst_row(df_row, pixel_size), 
+            lambda df_row : rlnOrigin_to_rlnCoordinate_row(df_row, pixel_size),
             axis = 1
         )
 
@@ -141,7 +141,7 @@ def create_annotations_from_previous_star_file(
         console.log(f'  Wrote {anno_file_name}')
 
 
-def rlnOrigin_to_rlnCenteredCoordAngst_row(df_row, pixel_size):
+def rlnOrigin_to_rlnCoordinate_row(df_row, pixel_size):
     """Given a row of the particles DataFrame and the pixel size of the 
     corresponding tilt series image, incorporate rlnOriginX/Y/ZAgst
     coordinates into rlnCoordinateX/Y/Z."""
