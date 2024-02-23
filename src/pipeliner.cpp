@@ -232,17 +232,23 @@ bool PipeLine::touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist)
 	if (exists(node.name) || touch_even_if_not_exist)
 	{
 		// Make subdirectory for each type of node
-		// Only at the highest level, so before the first "."
-        //FileName fn_label = get_node_label(node.type);
-        // PIPELINER
 		FileName fn_label = node.type;
-		FileName fn_type = fn_label.beforeFirstOf(".") + "/";
+        std::string fn_type = fn_label.beforeFirstOf(".") + "/";
 
 		FileName mydir = fn_dir + fn_type + fnt.substr(0, fnt.rfind("/") + 1);
 		FileName mynode = fn_dir + fn_type + fnt;
-
-		mktree(mydir);
+        mktree(mydir);
 		touch(mynode);
+
+        // For deeper levels, also touch the deeper file
+        if (node.type_depth > 1)
+        {
+            std::string fn_type2 = fn_label.beforeNthOf('.', node.type_depth) + "/";
+            FileName mydir2 = fn_dir + fn_type2 + fnt.substr(0, fnt.rfind("/") + 1);
+            FileName mynode2 = fn_dir + fn_type2 + fnt;
+            mktree(mydir2);
+            touch(mynode2);
+        }
 		return true;
 	}
 	else
@@ -1163,15 +1169,18 @@ void PipeLine::getOutputNodesFromStarFile(int this_job)
 
 		FileName nodename;
 		std::string nodetypelabel;
+        int nodetypedepth = 1;
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDnodes)
 		{
 			MDnodes.getValue(EMDL_PIPELINE_NODE_NAME, nodename);
 			MDnodes.getValue(EMDL_PIPELINE_NODE_TYPE_LABEL, nodetypelabel);
+            if (MDnodes.containsLabel(EMDL_PIPELINE_NODE_TYPE_DEPTH))
+                MDnodes.getValue(EMDL_PIPELINE_NODE_TYPE_DEPTH, nodetypedepth);
 
 			// if this node does not exist yet, then add it to the pipeline
 			if (findNodeByName(nodename) < 0 )
 			{
-				Node node(nodename, nodetypelabel);
+				Node node(nodename, nodetypelabel, nodetypedepth);
 				addNewOutputEdge(this_job, node);
 			}
 		}
@@ -1955,7 +1964,7 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 	{
 		std::string name, label;
 		// PIPELINER
-		int type;
+		int type, type_depth;
 		if (!MDnode.getValue(EMDL_PIPELINE_NODE_NAME, name) )
 			REPORT_ERROR("PipeLine::read: cannot find name in pipeline_nodes table");
 
@@ -1972,9 +1981,15 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 			REPORT_ERROR("PipeLine::read: cannot find type in pipeline_nodes table");
 		}
 
+        // new in relion5: use different type-depths for the type_labels for easier compatibility with ccpem pipeliner
+        if (MDnode.containsLabel(EMDL_PIPELINE_NODE_TYPE_DEPTH))
+                MDnode.getValue(EMDL_PIPELINE_NODE_TYPE_DEPTH, type_depth);
+        else
+            type_depth = 1;
+
 		//Node newNode(name, get_node_type(label));
 		// PIPELINER
-		Node newNode(name, label);
+		Node newNode(name, label, type_depth);
 		nodeList.push_back(newNode);
 	}
 
@@ -2212,6 +2227,7 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 			//MDnode.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, get_node_label(nodeList[i].type));
 			// PIPELINER
 			MDnode.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, nodeList[i].type);
+            MDnode.setValue(EMDL_PIPELINE_NODE_TYPE_DEPTH, nodeList[i].type_depth);
 		}
 		else
 		{
@@ -2220,6 +2236,7 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 			//MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, get_node_label(nodeList[i].type));
 			// PIPELINER
 			MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, nodeList[i].type);
+            MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE_DEPTH, nodeList[i].type_depth);
 		}
 	}
 #ifdef DEBUG_DEEP

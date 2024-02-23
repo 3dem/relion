@@ -140,12 +140,13 @@ JobOption::JobOption(std::string _label, std::string  _default_value, std::strin
 }
 
 // InputNode constructor
-JobOption::JobOption(std::string _label, int _nodetype, std::string _default_value, std::string _pattern, std::string _helptext)
+JobOption::JobOption(std::string _label, int _nodetype, std::string _default_value, std::string _pattern, std::string _helptext, int _node_type_depth)
 {
 	clear();
 	initialise(_label, _default_value, _helptext);
 	joboption_type = JOBOPTION_INPUTNODE;
 	pattern = _pattern;
+    node_type_depth = _node_type_depth;
 	node_type = get_node_label(_nodetype);
 }
 
@@ -7007,7 +7008,7 @@ void RelionJob::initialiseTomoCtfRefineJob()
 
 	addTomoInputOptions(true, true, true, false);
 
-    joboptions["in_halfmaps"] = JobOption("One of the 2 reference half-maps:", OUTNODE_TOMO_HALFMAP, "", "MRC map files (*half1*.mrc)", "Provide one of the two reference half-reconstructions. Both maps will be passed with a --ref1 and --ref2 arguments to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
+    joboptions["in_halfmaps"] = JobOption("One of the 2 reference half-maps:", OUTNODE_TOMO_HALFMAP, "", "MRC map files (*half1*.mrc)", "Provide one of the two reference half-reconstructions. Both maps will be passed with a --ref1 and --ref2 arguments to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.", 99);
     joboptions["in_refmask"] = JobOption("Reference mask: ", NODE_MASK_CPIPE, "", "Image Files (*.mrc)", "Input reference mask. This will be passed with a --mask argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
     joboptions["in_post"] = JobOption("Input postprocess STAR: ", OUTNODE_TOMO_POST, "", "Postprocess STAR file (postprocess.star)", "Input STAR file from a relion_postprocess job. This will be passed with a --fsc argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
 
@@ -7156,7 +7157,7 @@ void RelionJob::initialiseTomoAlignJob()
 
 	addTomoInputOptions(true, true, true, false);
 
-    joboptions["in_halfmaps"] = JobOption("One of the 2 reference half-maps:", OUTNODE_TOMO_HALFMAP, "", "MRC map files (*half1*.mrc)", "Provide one of the two reference half-reconstructions. Both maps will be passed with a --ref1 and --ref2 arguments to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
+    joboptions["in_halfmaps"] = JobOption("One of the 2 reference half-maps:", OUTNODE_TOMO_HALFMAP, "", "MRC map files (*half1*.mrc)", "Provide one of the two reference half-reconstructions. Both maps will be passed with a --ref1 and --ref2 arguments to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.", 99);
     joboptions["in_refmask"] = JobOption("Reference mask: ", NODE_MASK_CPIPE, "", "Image Files (*.mrc)", "Input reference mask. This will be passed with a --mask argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
     joboptions["in_post"] = JobOption("Input postprocess STAR: ", OUTNODE_TOMO_POST, "", "Postprocess STAR file (postprocess.star)", "Input STAR file from a relion_postprocess job. This will be passed with a --fsc argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
 
@@ -7336,7 +7337,7 @@ bool RelionJob::getCommandsTomoReconPartJob(std::string &outputname, std::vector
 
     Node node1(outputname+"merged.mrc", LABEL_TOMO_MAP);
     outputNodes.push_back(node1);
-    Node node2(outputname+"half1.mrc", LABEL_TOMO_HALFMAP);
+    Node node2(outputname+"half1.mrc", LABEL_TOMO_HALFMAP, 99);
     outputNodes.push_back(node2);
     Node node3(outputname+"optimisation_set.star", LABEL_TOMO_OPTIMISATION);
     outputNodes.push_back(node3);

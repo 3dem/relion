@@ -246,6 +246,8 @@ public:
 	 */
 	bool contains(const std::string& str) const;
 
+	FileName beforeNthOf(const char& chr, const int N) const;
+
 	/** Return substring before first instance of argument (as in Bsoft)
 	 *
 	  * @code
