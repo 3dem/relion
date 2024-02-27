@@ -61,5 +61,5 @@ def align_single_tilt_series(
             etomo_output) * pixel_spacing_angstroms
         RlnTiltSeries(name=tilt_series.name, data=df).write_star_file(
             metadata_directory / f'{tilt_series.name}.star')
-    except RuntimeError:
-        error_console.log(f'ERROR: alignment for {tilt_series.name} failed')
+    except RuntimeError as e:
+        error_console.log(f'ERROR: alignment for {tilt_series.name} failed with error:{str(e)}')
