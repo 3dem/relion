@@ -265,9 +265,9 @@ void CtffindRunner::initialise(bool is_leader)
 		if (continue_old)
 		{
 			FileName fn_microot = fn_mic_ctf_given_all[imic].withoutExtension();
-			RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep, maxres=-1., valscore = -1., phaseshift = 0.;
+			RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep, maxres=-1., valscore = -1., phaseshift = 0., icering = 0.;
 			if (getCtffindResults(fn_microot, defU, defV, defAng, CC,
-			     HT, CS, AmpCnst, XMAG, DStep, maxres, valscore, phaseshift, false)) // false: dont warn if not found Final values
+			     HT, CS, AmpCnst, XMAG, DStep, maxres, valscore, phaseshift, icering, false)) // false: dont warn if not found Final values
 			{
 				process_this = false; // already done
 			}
@@ -415,9 +415,9 @@ void CtffindRunner::joinCtffindResults()
 	{
 		FileName fn_microot = fn_micrographs_ctf_all[imic].withoutExtension();
 		RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep;
-		RFLOAT maxres = -999., valscore = -999., phaseshift = -999.;
+		RFLOAT maxres = -999., valscore = -999., phaseshift = -999., icering = 0.;
 		bool has_this_ctf = getCtffindResults(fn_microot, defU, defV, defAng, CC,
-		                                      HT, CS, AmpCnst, XMAG, DStep, maxres, valscore, phaseshift);
+		                                      HT, CS, AmpCnst, XMAG, DStep, maxres, valscore, phaseshift, icering);
 
 		if (!has_this_ctf)
 		{
@@ -449,6 +449,9 @@ void CtffindRunner::joinCtffindResults()
 				MDctf.setValue(EMDL_CTF_PHASESHIFT, phaseshift);
 			if (fabs(valscore + 999.) > 0.)
 				MDctf.setValue(EMDL_CTF_VALIDATIONSCORE, valscore);
+
+            if (icering > 0.)
+                MDctf.setValue(EMDL_CTF_ICERINGDENSITY, icering);
 
             if (is_tomo)
             {
@@ -490,7 +493,8 @@ void CtffindRunner::joinCtffindResults()
 	plot_labels.push_back(EMDL_CTF_MAXRES);
 	plot_labels.push_back(EMDL_CTF_PHASESHIFT);
 	plot_labels.push_back(EMDL_CTF_FOM);
-	plot_labels.push_back(EMDL_CTF_VALIDATIONSCORE);
+    plot_labels.push_back(EMDL_CTF_VALIDATIONSCORE);
+    plot_labels.push_back(EMDL_CTF_ICERINGDENSITY);
 	FileName fn_eps, fn_eps_root = fn_out+"micrographs_ctf";
 	std::vector<FileName> all_fn_eps;
 	for (int i = 0; i < plot_labels.size(); i++)
@@ -765,16 +769,17 @@ void CtffindRunner::executeCtffind4(long int imic)
 
 bool CtffindRunner::getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
 		RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
-		RFLOAT &maxres, RFLOAT &valscore, RFLOAT &phaseshift, bool do_warn)
+		RFLOAT &maxres, RFLOAT &valscore, RFLOAT &phaseshift, RFLOAT &icering, bool do_warn)
 {
 	if (is_ctffind4)
 	{
 		return getCtffind4Results(fn_microot, defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep,
-		                          maxres, phaseshift, do_warn);
+		                          maxres, phaseshift, icering, do_warn);
 	}
 	else
 	{
-		return getCtffind3Results(fn_microot, defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep,
+		icering = 0.;
+        return getCtffind3Results(fn_microot, defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep,
 		                          maxres, phaseshift, valscore, do_warn);
 	}
 }
@@ -856,7 +861,7 @@ bool CtffindRunner::getCtffind3Results(FileName fn_microot, RFLOAT &defU, RFLOAT
 
 bool CtffindRunner::getCtffind4Results(FileName fn_microot, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
 		RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
-		RFLOAT &maxres, RFLOAT &phaseshift, bool do_warn)
+		RFLOAT &maxres, RFLOAT &phaseshift, RFLOAT &icering, bool do_warn)
 {
 	FileName fn_root = getOutputFileWithNewUniqueDate(fn_microot, fn_out);
 	FileName fn_log = fn_root + "_ctffind4.log";
@@ -940,6 +945,40 @@ bool CtffindRunner::getCtffind4Results(FileName fn_microot, RFLOAT &defU, RFLOAT
 	}
 
 	in2.close();
+
+    // Also try and get rlnIceRingDensity, as suggested by Rafael Leiro from the CNIO in Madrid
+    FileName fn_avrot = fn_root + "_avrot.txt";
+    std::ifstream av(fn_avrot.data(), std::ios_base::in);
+	icering = 0.;
+    if (!av.fail())
+    {
+        std::string s1, s2;
+        //skip 5 lines
+        for(int i = 0; i < 5; ++i)
+            std::getline(av, s1);
+
+        // Now get lines 6 and 7
+        std::getline(av,s1);
+        tokenize(s1, words);
+        int imin = -999;
+        int imax = -999;
+        for (int i = 0; i < words.size(); i++)
+            if (imin < 0 && textToFloat(words[i]) >= 0.25) {
+                imin = i;
+                break;
+            }
+        for (int i = imin; i < words.size(); i++)
+            if (imax < 0 && imin > 0 && textToFloat(words[i]) > 0.28) {
+                imax = i;
+                break;
+            }
+        std::getline(av,s2);
+        tokenize(s2, words);
+        for (int i = imin; i < imax; i++)
+        {
+            icering += fabs(textToFloat(words[i]));
+        }
+    }
 
 	return Final_is_found;
 }
