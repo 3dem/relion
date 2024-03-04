@@ -577,12 +577,14 @@ bool RelionJob::saveJobSubmissionScript(std::string newfilename, std::string out
 
 		float fnodes = (float)ncores / (float)ndedi;
 		int nnodes = CEIL(fnodes);
-		if (fmod(fnodes, 1) > 0)
+		/*
+        if (fmod(fnodes, 1) > 0)
 		{
 			std:: cout << std::endl;
 			std::cout << " Warning! You're using " << nmpi << " MPI processes with " << nthr << " threads each (i.e. " << ncores << " cores), while asking for " << nnodes << " nodes with " << ndedi << " cores." << std::endl;
 			std::cout << " It is more efficient to make the number of cores (i.e. mpi*threads) a multiple of the minimum number of dedicated cores per node " << std::endl;
 		}
+        */
 
 		fh.clear(); // reset eof if happened...
 		fh.seekg(0, std::ios::beg);
@@ -6662,9 +6664,9 @@ void RelionJob::initialiseTomoDenoiseTomogramsJob()
 	joboptions["in_tomoset"] = JobOption("Input tomograms.star:", OUTNODE_TOMO_TOMOGRAMS, "", "STAR files (*.star)",  "Input global tomograms star file. Must contain rlnTomoReconstructedTomogramHalf1 and rlnTomoReconstructedTomogramHalf2 labels denoting the tomogram halves generated for denoising in a Reconstruct tomograms job.");
 
 	joboptions["do_cryocare_train"] = JobOption("Train denoising model:", false, "Select Yes to train cryoCARE denoising model.");
-
-	joboptions["tomograms_for_training"] = JobOption("Tomograms for model training:", std::string(""), "List the tomograms to be used to train the denoising model. Ideally, these should cover the defocus range of your tomograms. List the tomograms according to their rlnTomoName, and separate the tomograms using ':'. For exampple, input should look something like: TS_01:TS_02 "); 
-	joboptions["number_training_subvolumes"] = JobOption("Number of sub-volumes per tomogram:",1200,100,2000,100, "Number of sub-volumes to be extracted per training tomogram. Corresponds to num_slices in cryoCARE_extract_train_data.py.");
+    joboptions["cryocare_path"] = JobOption("Directory with cryoCARE executables:", std::string("/public/EM/cryoCARE"), "Provide the directory where your cryoCARE executables (cryoCARE_extract_train_data.py, cryoCARE_train.py & cryoCARE_predict.py) are located. You can leave this empty if the executables are already in your PATH. \n It might be necessary to write small script that launches the conda environment. For example, for cryoCARE_predict.py we use: \n\n #!/bin/bash \n source /public/EM/anaconda3/bin/activate cryocare_11\n cryoCARE_predict.py $@\n");
+    joboptions["tomograms_for_training"] = JobOption("Tomograms for model training:", std::string(""), "List the tomograms to be used to train the denoising model. Ideally, these should cover the defocus range of your tomograms. List the tomograms according to their rlnTomoName, and separate the tomograms using ':'. For exampple, input should look something like: TS_01:TS_02 ");
+    joboptions["number_training_subvolumes"] = JobOption("Number of sub-volumes per tomogram:",1200,100,2000,100, "Number of sub-volumes to be extracted per training tomogram. Corresponds to num_slices in cryoCARE_extract_train_data.py.");
 	joboptions["subvolume_dimensions"] = JobOption("Sub-volume dimensions (px):",72,64,256,1, "Dimensions (XYZ) in pixels of the sub-volumes to be extracted from the training tomograms. Corresponds to patch_size in cryoCARE_extract_train_data.py.");
 
 	joboptions["do_cryocare_predict"] = JobOption("Generate denoised tomograms:", false, "Use the cryoCARE denoising model generated in cryoCARE:train to denoise your tomograms.");
@@ -6731,7 +6733,10 @@ bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std:
 	}
 	command += " --tomogram-star-file " + joboptions["in_tomoset"].getString();
 	Node node(joboptions["in_tomoset"].getString(), joboptions["in_tomoset"].node_type);
-	inputNodes.push_back(node); 
+	inputNodes.push_back(node);
+
+    if (joboptions["cryocare_path"].getString() != "")
+        command += " --cryocare-path "  + joboptions["cryocare_path"].getString();
 
 	command += " --output-directory " + outputname;
 	Node node2(outputname+"tomograms.star", LABEL_TOMO_TOMOGRAMS);
