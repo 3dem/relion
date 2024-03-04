@@ -2679,6 +2679,7 @@ void JobWindow::initialiseTomoDenoiseTomogramsWindow()
 
     current_y += STEPY/2;
     
+    place("cryocare_path");
     place("gpu_ids");
 
     tab2->begin();
