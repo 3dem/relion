@@ -42,28 +42,45 @@ bool ParticleSet::read(std::string filename, std::string motionFilename, bool ve
     if (optTable.numberOfObjects() == 0)
     {
 
+        // If the tomogramSet globalTable contains opticsGroupName, then use those groups, otherwise each tomogram is its own optics_group
+        std::map<std::string, std::string> tomoname_to_opticsgroupname;
+        size_t nr_tomos = tomogramSet->globalTable.numberOfObjects();
+        for (size_t t = 0; t < nr_tomos; t++)
+        {
+            std::string tomo_name, optics_group_name;
+            tomogramSet->globalTable.getValue(EMDL_TOMO_NAME, tomo_name, t);
+            if (tomogramSet->globalTable.containsLabel(EMDL_IMAGE_OPTICS_GROUP_NAME))
+                tomogramSet->globalTable.getValue(EMDL_IMAGE_OPTICS_GROUP_NAME, optics_group_name, t);
+            else
+                optics_group_name = tomo_name;
+            tomoname_to_opticsgroupname.insert(std::make_pair(tomo_name, optics_group_name));
+        }
+
         // Check which tomo_names are present in the partTable
-        std::vector<std::string> tomo_names;
+        std::vector<std::string> present_optics_groupnames;
         std::string my_prev_name="";
-        std::map<std::string, int> tomoname_to_optics_group;
+        std::map<std::string, int> opticsgroupname_to_opticsgroup;
+        std::map<std::string, std::string> presentopticsgroupname_to_firsttomoname;
         FOR_ALL_OBJECTS_IN_METADATA_TABLE(partTable)
         {
-            std::string myname;
+            std::string myname, myopticsgroupname;
             partTable.getValue(EMDL_TOMO_NAME, myname);
-            if (myname != my_prev_name)
+            myopticsgroupname = tomoname_to_opticsgroupname[myname];
+            if (myopticsgroupname != my_prev_name)
             {
                 bool is_new = true;
-                for (size_t i = 0; i < tomo_names.size(); i++)
+                for (size_t i = 0; i < present_optics_groupnames.size(); i++)
                 {
-                    if (myname == tomo_names[i]) is_new = false;
+                    if (myopticsgroupname == present_optics_groupnames[i]) is_new = false;
                 }
                 if (is_new)
                 {
-                    tomo_names.push_back(myname);
-                    tomoname_to_optics_group.insert(std::make_pair(myname, tomo_names.size()));
+                    present_optics_groupnames.push_back(myopticsgroupname);
+                    opticsgroupname_to_opticsgroup.insert(std::make_pair(myopticsgroupname, present_optics_groupnames.size()));
+                    presentopticsgroupname_to_firsttomoname.insert(std::make_pair(myopticsgroupname, myname));
                 }
             }
-            my_prev_name = myname;
+            my_prev_name = myopticsgroupname;
         }
 
         // construct optics table with those tomo_names that are present in the partTable
@@ -76,9 +93,9 @@ bool ParticleSet::read(std::string filename, std::string motionFilename, bool ve
             REPORT_ERROR("ERROR: tomogramSet->globalTable does not contain rlnSphericalAberration label");
         if (!tomogramSet->globalTable.containsLabel(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE))
             REPORT_ERROR("ERROR: tomogramSet->globalTable does not contain rlnTomoTiltSeriesPixelSize label");
-        for (size_t i = 0; i < tomo_names.size(); i++)
+        for (size_t i = 0; i < present_optics_groupnames.size(); i++)
         {
-            int idx = tomogramSet->getTomogramIndex(tomo_names[i]);
+            int idx = tomogramSet->getTomogramIndex(presentopticsgroupname_to_firsttomoname[present_optics_groupnames[i] ]);
             double Q0, Cs, kV, tiltSeriesPixelSize;
             tomogramSet->globalTable.getValue(EMDL_CTF_VOLTAGE, kV, idx);
             tomogramSet->globalTable.getValue(EMDL_CTF_CS, Cs, idx);
@@ -90,8 +107,8 @@ bool ParticleSet::read(std::string filename, std::string motionFilename, bool ve
             optTable.setValue(EMDL_CTF_CS, Cs);
             optTable.setValue(EMDL_CTF_Q0, Q0);
             optTable.setValue(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, tiltSeriesPixelSize);
-            optTable.setValue(EMDL_IMAGE_OPTICS_GROUP, tomoname_to_optics_group[ tomo_names[i] ]);
-            optTable.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME, tomo_names[i]);
+            optTable.setValue(EMDL_IMAGE_OPTICS_GROUP, opticsgroupname_to_opticsgroup[ present_optics_groupnames[i] ]);
+            optTable.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME, present_optics_groupnames[i]);
         }
 
         // Now also set optics groups in partTable
@@ -99,7 +116,7 @@ bool ParticleSet::read(std::string filename, std::string motionFilename, bool ve
         {
             std::string myname;
             partTable.getValue(EMDL_TOMO_NAME, myname);
-            partTable.setValue(EMDL_IMAGE_OPTICS_GROUP, tomoname_to_optics_group[myname]);
+            partTable.setValue(EMDL_IMAGE_OPTICS_GROUP, opticsgroupname_to_opticsgroup[tomoname_to_opticsgroupname[myname] ]);
         }
 
     }
@@ -335,21 +352,27 @@ int ParticleSet::getTotalParticleNumber() const
 	return partTable.numberOfObjects();
 }
 
-d3Vector ParticleSet::getPosition(ParticleIndex particle_id) const
+d3Vector ParticleSet::getPosition(ParticleIndex particle_id, const gravis::d3Vector &tomo_centre, bool apply_origin_shifts) const
 {
 	const int og = getOpticsGroup(particle_id);
 	
 	const double tiltSeriesPixelSize = getTiltSeriesPixelSize(og);
 
-	const d3Matrix A_subtomogram = getSubtomogramMatrix(particle_id);
+    d3Vector out = getParticleCoordDecenteredPixel(particle_id, tomo_centre, tiltSeriesPixelSize);
 
-	d3Vector out = getParticleCoord(particle_id) - (A_subtomogram * getParticleOffset(particle_id)) / tiltSeriesPixelSize;
+    if (apply_origin_shifts)
+    {
+        const d3Matrix A_subtomogram = getSubtomogramMatrix(particle_id);
+
+        out -= (A_subtomogram * getParticleOffset(particle_id)) / tiltSeriesPixelSize;
+    }
 
     // SHWS & ABurt 19Jul2022: let's no longer do this in relion-4.1 (also 25nov22)
     // SHWS 17jan24: put '+1' back in because relion5 doesn't go as high resolution as tutorial data set as relion4....
-    out.x += 1.0;
-	out.y += 1.0;
-	out.z += 1.0;
+    // SHWS 2feb24: we can't do this anymore now...
+    //out.x += 1.0;
+	//out.y += 1.0;
+	//out.z += 1.0;
 
 
 	return out;
@@ -403,34 +426,34 @@ d3Matrix ParticleSet::getMatrix3x3(ParticleIndex particle_id) const
 
 
 // This maps coordinates from particle space to tomogram space.
-d4Matrix ParticleSet::getMatrix4x4(ParticleIndex particle_id, double w, double h, double d) const
+d4Matrix ParticleSet::getMatrix4x4(ParticleIndex particle_id, const gravis::d3Vector &tomo_centre, double w, double h, double d) const
 {
-	d3Matrix A = getMatrix3x3(particle_id);
-	d3Vector pos = getPosition(particle_id);
-	
-	int cx = ((int)w) / 2;
-	int cy = ((int)h) / 2;
-	int cz = ((int)d) / 2;
-	
-	gravis::d4Matrix Tc(
-		1, 0, 0, -cx,
-		0, 1, 0, -cy,
-		0, 0, 1, -cz,
-		0, 0, 0, 1);
-	
-	d4Matrix R(
-		A(0,0), A(0,1), A(0,2), 0.0,
-		A(1,0), A(1,1), A(1,2), 0.0,
-		A(2,0), A(2,1), A(2,2), 0.0,
-		0.0,    0.0,    0.0,    1.0   );
-	
-	d4Matrix Ts(
-		1, 0, 0, pos.x,
-		0, 1, 0, pos.y,
-		0, 0, 1, pos.z,
-		0, 0, 0, 1);
-	
-	return Ts * R * Tc;
+        d3Matrix A = getMatrix3x3(particle_id);
+        d3Vector pos = getPosition(particle_id, tomo_centre, true);
+
+        int cx = ((int)w) / 2;
+        int cy = ((int)h) / 2;
+        int cz = ((int)d) / 2;
+
+        gravis::d4Matrix Tc(
+                1, 0, 0, -cx,
+                0, 1, 0, -cy,
+                0, 0, 1, -cz,
+                0, 0, 0, 1);
+
+        d4Matrix R(
+                A(0,0), A(0,1), A(0,2), 0.0,
+                A(1,0), A(1,1), A(1,2), 0.0,
+                A(2,0), A(2,1), A(2,2), 0.0,
+                0.0,    0.0,    0.0,    1.0   );
+
+        d4Matrix Ts(
+                1, 0, 0, pos.x,
+                0, 1, 0, pos.y,
+                0, 0, 1, pos.z,
+                0, 0, 0, 1);
+
+        return Ts * R * Tc;
 }
 
 t4Vector<d3Matrix> ParticleSet::getMatrixDerivativesOverParticleAngles(
@@ -473,32 +496,6 @@ bool ParticleSet::hasHalfSets() const
     return partTable.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET);
 }
 
-void ParticleSet::moveParticleTo(ParticleIndex particle_id, gravis::d3Vector pos)
-{
-	// SHWS 25nov22: as of relion-4.1, the origin is now at 0,0,0 again
-    // SHWS 17jan24: put '-1' back in because relion5 doesn't go as high resolution as tutorial data set as relion4....
-    partTable.setValue(EMDL_IMAGE_COORD_X, pos.x - 1.0, particle_id.value);
-	partTable.setValue(EMDL_IMAGE_COORD_Y, pos.y - 1.0, particle_id.value);
-	partTable.setValue(EMDL_IMAGE_COORD_Z, pos.z - 1.0, particle_id.value);
-
-	partTable.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, 0.0, particle_id.value);
-	partTable.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, 0.0, particle_id.value);
-	partTable.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, 0.0, particle_id.value);
-}
-
-void ParticleSet::shiftParticleBy(ParticleIndex particle_id, gravis::d3Vector shift)
-{
-	double x, y, z;
-	
-	partTable.getValueSafely(EMDL_IMAGE_COORD_X, x, particle_id.value);
-	partTable.getValueSafely(EMDL_IMAGE_COORD_Y, y, particle_id.value);
-	partTable.getValueSafely(EMDL_IMAGE_COORD_Z, z, particle_id.value);
-	
-	partTable.setValue(EMDL_IMAGE_COORD_X, x + shift.x, particle_id.value);
-	partTable.setValue(EMDL_IMAGE_COORD_Y, y + shift.y, particle_id.value);
-	partTable.setValue(EMDL_IMAGE_COORD_Z, z + shift.z, particle_id.value);
-}
-
 void ParticleSet::write(const std::string& filename)
 {
 	std::ofstream ofs(filename);
@@ -507,6 +504,12 @@ void ParticleSet::write(const std::string& filename)
     genTable.setValue(EMDL_TOMO_SUBTOMOGRAM_STACK2D, is_stack2d);
     genTable.write(ofs);
 	optTable.write(ofs);
+
+    // Remove spurious uncentered coordinates in pixels from relion-4 files
+    if (partTable.containsLabel(EMDL_IMAGE_COORD_X)) partTable.deactivateLabel(EMDL_IMAGE_COORD_X);
+    if (partTable.containsLabel(EMDL_IMAGE_COORD_Y)) partTable.deactivateLabel(EMDL_IMAGE_COORD_Y);
+    if (partTable.containsLabel(EMDL_IMAGE_COORD_Z)) partTable.deactivateLabel(EMDL_IMAGE_COORD_Z);
+
 	partTable.write(ofs);
 }
 
@@ -583,22 +586,52 @@ void ParticleSet::setParticleOffset(ParticleIndex particle_id, const d3Vector& v
 	partTable.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, v.z, particle_id.value);
 }
 
-d3Vector ParticleSet::getParticleCoord(ParticleIndex particle_id) const
+d3Vector ParticleSet::getParticleCoordDecenteredPixel(ParticleIndex particle_id, const gravis::d3Vector &tomo_centre, RFLOAT tiltSeriesPixelSize) const
 {
 	d3Vector out;
-	
-	partTable.getValueSafely(EMDL_IMAGE_COORD_X, out.x, particle_id.value);
-	partTable.getValueSafely(EMDL_IMAGE_COORD_Y, out.y, particle_id.value);
-	partTable.getValueSafely(EMDL_IMAGE_COORD_Z, out.z, particle_id.value);
-	
+
+    if (partTable.containsLabel(EMDL_IMAGE_CENT_COORD_X_ANGST) &&
+        partTable.containsLabel(EMDL_IMAGE_CENT_COORD_Y_ANGST) &&
+        partTable.containsLabel(EMDL_IMAGE_CENT_COORD_Z_ANGST))
+    {
+        partTable.getValue(EMDL_IMAGE_CENT_COORD_X_ANGST, out.x, particle_id.value);
+        partTable.getValue(EMDL_IMAGE_CENT_COORD_Y_ANGST, out.y, particle_id.value);
+        partTable.getValue(EMDL_IMAGE_CENT_COORD_Z_ANGST, out.z, particle_id.value);
+
+        // Inside Jasenko's code, all coordinates are in decentered pixels, convert now from centered Angstroms (centre_tomo is in pixels)
+        out /= tiltSeriesPixelSize;
+        out += tomo_centre;
+    }
+    else if (partTable.containsLabel(EMDL_IMAGE_COORD_X) &&
+             partTable.containsLabel(EMDL_IMAGE_COORD_Y) &&
+             partTable.containsLabel(EMDL_IMAGE_COORD_Z))
+    {
+        // Maintain backwards compatibility with relion-4
+        partTable.getValue(EMDL_IMAGE_COORD_X, out.x, particle_id.value);
+        partTable.getValue(EMDL_IMAGE_COORD_Y, out.y, particle_id.value);
+        partTable.getValue(EMDL_IMAGE_COORD_Z, out.z, particle_id.value);
+
+        // The imod corner is at (1,1,1) instead of (0,0,0), and this was used in relion-4
+        out.x += 1.0;
+        out.y += 1.0;
+        out.z += 1.0;
+    }
+    else
+        REPORT_ERROR("Cannot find particle coordinates (rlnCenteredCoordinateX/Y/ZAngst) in particle star file");
+
 	return out;
 }
 
-void ParticleSet::setParticleCoord(ParticleIndex particle_id, const d3Vector& v)
+void ParticleSet::setParticleCoordDecenteredPixel(ParticleIndex particle_id, d3Vector v, const gravis::d3Vector &tomo_centre, RFLOAT tiltSeriesPixelSize)
 {
-	partTable.setValue(EMDL_IMAGE_COORD_X, v.x, particle_id.value);
-	partTable.setValue(EMDL_IMAGE_COORD_Y, v.y, particle_id.value);
-	partTable.setValue(EMDL_IMAGE_COORD_Z, v.z, particle_id.value);
+
+    // Inside Jasenko's code all coordinates are in decentered pixels, convert now to centered Angstroms (centre_tomo is in pixels)
+    v -= tomo_centre;
+    v *= tiltSeriesPixelSize;
+
+	partTable.setValue(EMDL_IMAGE_CENT_COORD_X_ANGST, v.x, particle_id.value);
+	partTable.setValue(EMDL_IMAGE_CENT_COORD_Y_ANGST, v.y, particle_id.value);
+	partTable.setValue(EMDL_IMAGE_CENT_COORD_Z_ANGST, v.z, particle_id.value);
 }
 
 int ParticleSet::getOpticsGroup(ParticleIndex particle_id) const
@@ -648,9 +681,9 @@ std::vector<int> ParticleSet::getVisibleFrames(ParticleIndex particle_id) const
 
 }
 
-std::vector<d3Vector> ParticleSet::getTrajectoryInPixels(ParticleIndex particle_id, int fc, double pixelSize, bool from_original_coordinate) const
+std::vector<d3Vector> ParticleSet::getTrajectoryInPixels(ParticleIndex particle_id, int fc, const gravis::d3Vector &tomo_centre, double pixelSize, bool from_original_coordinate) const
 {
-	const d3Vector p0 = (from_original_coordinate) ? getParticleCoord(particle_id) : getPosition(particle_id);
+    const d3Vector p0 = getPosition(particle_id, tomo_centre, !from_original_coordinate);
 
 	if (hasMotion)
 	{

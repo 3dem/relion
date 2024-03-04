@@ -180,13 +180,13 @@ public:
 	// Get micrograph metadata
 	bool getCtffindResults(FileName fn_mic, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
 			RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
-			RFLOAT &maxres, RFLOAT &valscore, RFLOAT &phaseshift, bool do_warn = true);
+			RFLOAT &maxres, RFLOAT &valscore, RFLOAT &phaseshift, RFLOAT &icering, bool do_warn = true);
 	bool getCtffind3Results(FileName fn_mic, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
 			RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
 			RFLOAT &maxres, RFLOAT &phaseshift, RFLOAT &valscore, bool do_warn = true);
 	bool getCtffind4Results(FileName fn_mic, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
 			RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
-			RFLOAT &maxres, RFLOAT &phaseshift, bool do_warn = true);
+			RFLOAT &maxres, RFLOAT &phaseshift, RFLOAT &icering, bool do_warn = true);
 };
 
 

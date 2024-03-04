@@ -27,17 +27,21 @@ class Tomogram
 			
 			BufferedImage<float> stack;
 			std::vector<gravis::d4Matrix> projectionMatrices;
-			
+
 			std::vector<std::shared_ptr<Deformation2D>> imageDeformations;
 			
 			std::vector<CTF> centralCTFs;
 			std::vector<double> cumulativeDose;
-			gravis::d3Vector centre;
+            double BfactorPerElectronDose;
+            gravis::d3Vector centre;
 			int w0, h0, d0;
 			std::vector<int> frameSequence;
 			std::string name, tiltSeriesFilename, opticsGroupName, fiducialsFilename;
 			double defocusSlope;
-		
+
+
+        void setProjectionMatrix(int frame, RFLOAT xtilt, RFLOAT ytilt, RFLOAT zrot, RFLOAT xshift_angst, RFLOAT yshift_angst);
+        void getProjectionAnglesFromMatrix(int frame, const gravis::d4Matrix &P, RFLOAT &xtilt, RFLOAT &ytilt, RFLOAT &zrot, RFLOAT &xshift_angst, RFLOAT &yshift_angst) const;
 
 		gravis::d2Vector projectPoint(
 				const gravis::d3Vector& p, int frame) const;

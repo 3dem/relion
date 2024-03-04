@@ -183,7 +183,7 @@ void Experiment::addParticle(std::string img_name, int optics_group, long int gr
     return;
 }
 
-void Experiment::addImageToParticle(long int part_id, d4Matrix *Aproj, CTF *ctf, float dose)
+void Experiment::addImageToParticle(long int part_id, d4Matrix *Aproj, CTF *ctf, float dose, double BfactorPerElectronDose)
 {
 
     Matrix2D<RFLOAT> A(3,3);
@@ -201,18 +201,31 @@ void Experiment::addImageToParticle(long int part_id, d4Matrix *Aproj, CTF *ctf,
 	ExpImage img;
     if (ctf == NULL)
     {
-        img.defU = img.defV = img.defAngle = 0.;
+        img.defU = img.defV = img.defAngle = img.phase_shift = 0.;
+        img.scale = 1.;
     }
     else
     {
         img.defU = ctf->DeltafU;
         img.defV = ctf->DeltafV;
         img.defAngle = ctf->azimuthal_angle;
+        img.scale = ctf->scale;
+        img.phase_shift = ctf->phase_shift;
     }
 
 	img.particle_id = part_id;
 	img.Aproj = A;
-    img.dose = dose;
+
+    if (BfactorPerElectronDose > 0.)
+    {
+        img.dose = -999.;
+        img.bfactor = BfactorPerElectronDose * dose;
+    }
+    else
+    {
+        img.dose = dose;
+        img.bfactor = 0.;
+    }
 
 	// Push back this particle in the particles vector
 	particles[part_id].images.push_back(img);
@@ -982,7 +995,7 @@ bool Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
                 // Pre-orientation of this particle in the tomogram
                 ParticleIndex id(part_id);
                 d3Matrix A = particleSet.getSubtomogramMatrix(id);
-                const d3Vector pos = particleSet.getPosition(id);
+                const d3Vector pos = particleSet.getPosition(id, tomogram.centre, true);
 
 
                 // Add only the visible images for this particle
@@ -998,7 +1011,7 @@ bool Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
 
                         CTF ctf = tomogram.getCtf(f, pos);
 
-                        addImageToParticle(part_id, &P, &ctf, dose);
+                        addImageToParticle(part_id, &P, &ctf, dose, tomogram.BfactorPerElectronDose);
                     }
                 }
             }

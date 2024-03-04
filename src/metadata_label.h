@@ -140,6 +140,7 @@ enum EMDLabel
 
 	EMDL_CTF_ASTIGMATISM,
 	EMDL_CTF_BFACTOR, ///< B-factor
+    EMDL_CTF_BFACTOR_PERELECTRONDOSE, // Relative B-factor dose-weighting per e/A^2 dose
 	EMDL_CTF_MAXRES, ///< Maximum resolution with Thon rings
 	EMDL_CTF_VALIDATIONSCORE, ///< Gctf-based validation score for CTF fit
 	EMDL_CTF_SCALEFACTOR, ///< linear scale-factor
@@ -155,6 +156,7 @@ enum EMDLabel
 	EMDL_CTF_ENERGY_LOSS, ///< Energy loss
 	EMDL_CTF_FOM, ///< ctffind FOM (CC) for quality of CTF-fit
 	EMDL_CTF_IMAGE, ///< name of an image describing the CTF model
+	EMDL_CTF_ICERINGDENSITY, ///< sum of image power in ice ring
 	EMDL_CTF_LENS_STABILITY, ///< Lens stability
 	EMDL_CTF_MAGNIFICATION, ///< Magnification used for CTF-determination (deprecated)
 	EMDL_CTF_PHASESHIFT, ///< Phase-shift from a phase plate
@@ -185,7 +187,10 @@ enum EMDLabel
 	EMDL_IMAGE_MAG_MATRIX_10,
 	EMDL_IMAGE_MAG_MATRIX_11,
 
-	EMDL_IMAGE_COORD_X,
+    EMDL_IMAGE_CENT_COORD_X_ANGST,
+    EMDL_IMAGE_CENT_COORD_Y_ANGST,
+    EMDL_IMAGE_CENT_COORD_Z_ANGST,
+    EMDL_IMAGE_COORD_X,
 	EMDL_IMAGE_COORD_Y,
 	EMDL_IMAGE_COORD_Z,
 	EMDL_IMAGE_FRAME_NR,
@@ -503,7 +508,8 @@ enum EMDLabel
 	EMDL_PIPELINE_JOB_COUNTER,
 	EMDL_PIPELINE_NODE_NAME,
 	EMDL_PIPELINE_NODE_TYPE,
-	EMDL_PIPELINE_NODE_TYPE_LABEL,
+    EMDL_PIPELINE_NODE_TYPE_LABEL,
+    EMDL_PIPELINE_NODE_TYPE_DEPTH,
 	EMDL_PIPELINE_PROCESS_ALIAS,
 	EMDL_PIPELINE_PROCESS_NAME,
 	EMDL_PIPELINE_PROCESS_TYPE,
@@ -852,7 +858,8 @@ private:
         EMDL::addLabel(EMDL_CLASS_PREDICTED_SCORE, EMDL_DOUBLE, "rlnPredictedClassScore", "2D class merit scores predicted by RELION model.");
 
 		EMDL::addLabel(EMDL_CTF_ASTIGMATISM, EMDL_DOUBLE, "rlnCtfAstigmatism", "Absolute value of the difference between defocus in U- and V-direction (in A)");
-		EMDL::addLabel(EMDL_CTF_BFACTOR, EMDL_DOUBLE, "rlnCtfBfactor", "B-factor (in A^2) that describes CTF power spectrum fall-off");
+        EMDL::addLabel(EMDL_CTF_BFACTOR, EMDL_DOUBLE, "rlnCtfBfactor", "B-factor (in A^2) that describes CTF power spectrum fall-off");
+        EMDL::addLabel(EMDL_CTF_BFACTOR_PERELECTRONDOSE, EMDL_DOUBLE, "rlnCtfBfactorPerElectronDose", "Relative factor with which to multiply B-factors per e/A^2 dose");
 		EMDL::addLabel(EMDL_CTF_MAXRES, EMDL_DOUBLE, "rlnCtfMaxResolution", "Estimated maximum resolution (in A) of significant CTF Thon rings");
 		EMDL::addLabel(EMDL_CTF_VALIDATIONSCORE, EMDL_DOUBLE, "rlnCtfValidationScore", "Gctf-based validation score for the quality of the CTF fit");
 		EMDL::addLabel(EMDL_CTF_SCALEFACTOR, EMDL_DOUBLE, "rlnCtfScalefactor", "Linear scale-factor on the CTF (values between 0 and 1)");
@@ -867,7 +874,8 @@ private:
 		EMDL::addLabel(EMDL_CTF_ENERGY_LOSS, EMDL_DOUBLE, "rlnEnergyLoss", "Energy loss (in eV)");
 		EMDL::addLabel(EMDL_CTF_FOM, EMDL_DOUBLE, "rlnCtfFigureOfMerit", "Figure of merit for the fit of the CTF (not used inside relion_refine)");
 		EMDL::addLabel(EMDL_CTF_IMAGE, EMDL_STRING, "rlnCtfImage", "Name of an image with all CTF values");
-		EMDL::addLabel(EMDL_CTF_LENS_STABILITY, EMDL_DOUBLE, "rlnLensStability", "Lens stability (in ppm)");
+		EMDL::addLabel(EMDL_CTF_ICERINGDENSITY, EMDL_DOUBLE, "rlnCtfIceRingDensity", "Power of the image in the ice ring frequency range (0.25-0.28 A-1)");
+        EMDL::addLabel(EMDL_CTF_LENS_STABILITY, EMDL_DOUBLE, "rlnLensStability", "Lens stability (in ppm)");
 		EMDL::addLabel(EMDL_CTF_MAGNIFICATION, EMDL_DOUBLE, "rlnMagnification", "Magnification at the detector (in times)");
 		EMDL::addLabel(EMDL_CTF_PHASESHIFT, EMDL_DOUBLE, "rlnPhaseShift", "Phase-shift from a phase-plate (in degrees)");
 		EMDL::addLabel(EMDL_CTF_CONVERGENCE_CONE, EMDL_DOUBLE, "rlnConvergenceCone", "Convergence cone (in mrad)");
@@ -897,6 +905,9 @@ private:
 		EMDL::addLabel(EMDL_IMAGE_MAG_MATRIX_10, EMDL_DOUBLE, "rlnMagMat10", "Anisotropic magnification matrix, element 2,1");
 		EMDL::addLabel(EMDL_IMAGE_MAG_MATRIX_11, EMDL_DOUBLE, "rlnMagMat11", "Anisotropic magnification matrix, element 2,2");
 
+        EMDL::addLabel(EMDL_IMAGE_CENT_COORD_X_ANGST, EMDL_DOUBLE, "rlnCenteredCoordinateXAngst", "X-Position of an image in a micrograph (in Angstroms, with the center being 0,0)");
+        EMDL::addLabel(EMDL_IMAGE_CENT_COORD_Y_ANGST, EMDL_DOUBLE, "rlnCenteredCoordinateYAngst", "Y-Position of an image in a micrograph (in Angstroms, with the center being 0,0)");
+        EMDL::addLabel(EMDL_IMAGE_CENT_COORD_Z_ANGST, EMDL_DOUBLE, "rlnCenteredCoordinateZAngst", "Z-Position of an image in a 3D micrograph, i.e. tomogram (in Angstroms, with the center being 0,0,0)");
 		EMDL::addLabel(EMDL_IMAGE_COORD_X, EMDL_DOUBLE, "rlnCoordinateX", "X-Position of an image in a micrograph (in pixels)");
 		EMDL::addLabel(EMDL_IMAGE_COORD_Y, EMDL_DOUBLE, "rlnCoordinateY", "Y-Position of an image in a micrograph (in pixels)");
 		EMDL::addLabel(EMDL_IMAGE_COORD_Z, EMDL_DOUBLE, "rlnCoordinateZ", "Z-Position of an image in a 3D micrograph, i.e. tomogram (in pixels)");
@@ -1218,7 +1229,8 @@ private:
 		EMDL::addLabel(EMDL_PIPELINE_JOB_COUNTER, EMDL_INT, "rlnPipeLineJobCounter", "Number of the last job in the pipeline");
 		EMDL::addLabel(EMDL_PIPELINE_NODE_NAME, EMDL_STRING , "rlnPipeLineNodeName", "Name of a Node in the pipeline");
 		EMDL::addLabel(EMDL_PIPELINE_NODE_TYPE, EMDL_INT, "rlnPipeLineNodeType", "Type of a Node in the pipeline");
-		EMDL::addLabel(EMDL_PIPELINE_NODE_TYPE_LABEL, EMDL_STRING, "rlnPipeLineNodeTypeLabel", "Name for the Node Type in the pipeline");
+        EMDL::addLabel(EMDL_PIPELINE_NODE_TYPE_LABEL, EMDL_STRING, "rlnPipeLineNodeTypeLabel", "Name for the Node Type in the pipeline");
+        EMDL::addLabel(EMDL_PIPELINE_NODE_TYPE_DEPTH, EMDL_INT, "rlnPipeLineNodeTypeLabelDepth", "How many levels down to use for .Nodes directory (only 1 by default)");
 		EMDL::addLabel(EMDL_PIPELINE_PROCESS_ALIAS, EMDL_STRING , "rlnPipeLineProcessAlias", "Alias of a Process in the pipeline");
 		EMDL::addLabel(EMDL_PIPELINE_PROCESS_NAME, EMDL_STRING , "rlnPipeLineProcessName", "Name of a Process in the pipeline");
 		EMDL::addLabel(EMDL_PIPELINE_PROCESS_TYPE, EMDL_INT, "rlnPipeLineProcessType", "Type of a Process in the pipeline");

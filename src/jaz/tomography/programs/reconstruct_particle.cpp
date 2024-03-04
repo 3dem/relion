@@ -338,9 +338,9 @@ void ReconstructParticleProgram::processTomograms(
 
 			const ParticleIndex part_id = particles[t][p];
 
-			const d3Vector pos = particleSet.getPosition(part_id);
+			const d3Vector pos = particleSet.getPosition(part_id, tomogram.centre);
 			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
-						part_id, fc, tomogram.optics.pixelSize);
+						part_id, fc, tomogram.centre, tomogram.optics.pixelSize);
 			std::vector<d4Matrix> projCut(fc), projPart(fc);
 
 			const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
@@ -352,7 +352,7 @@ void ReconstructParticleProgram::processTomograms(
 					particleStack[th], projCut, inner_threads, circle_crop);
 
 
-			const d4Matrix particleToTomo = particleSet.getMatrix4x4(part_id, s,s,s);
+			const d4Matrix particleToTomo = particleSet.getMatrix4x4(part_id, tomogram.centre, s,s,s);
 
             const int halfSet = (particleSet.hasHalfSets()) ? particleSet.getHalfSet(part_id) : 0;
 

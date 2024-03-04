@@ -712,10 +712,10 @@ static int get_node_type(std::string label)
 #define PROC_DYNAMIGHT_DIRNAME        "DynaMight"    // Johannes' DynaMight for modelling continuous heterogeneity
 #define PROC_MODELANGELO_DIRNAME      "ModelAngelo"  // Kiarash's ModelAngelo for automated model building
 #define PROC_TOMO_IMPORT_DIRNAME      "Import"              // Import for tomography GUI
-#define PROC_TOMO_SUBTOMO_DIRNAME     "Subtomograms"           // Creation of pseudo-subtomograms from tilt series images
+#define PROC_TOMO_SUBTOMO_DIRNAME     "Extract"           // Creation of pseudo-subtomograms from tilt series images
 #define PROC_TOMO_CTFREFINE_DIRNAME   "CtfRefine"           // CTF refinement (defocus & aberrations) for tomography
 #define PROC_TOMO_EXCLUDE_TILT_IMAGES_DIRNAME   "ExcludeTiltImages"  // Exclusion of bad tilt-images from tilt-series
-#define PROC_TOMO_ALIGN_DIRNAME       "FrameAlign"          // Frame alignment and particle polishing for subtomography
+#define PROC_TOMO_ALIGN_DIRNAME       "Polish"  // Frame alignment and particle polishing for subtomography
 #define PROC_TOMO_RECONSTRUCT_DIRNAME "Reconstruct" // Calculation of particle average from the individual tilt series images
 #define PROC_TOMO_DENOISE_DIRNAME "Denoise" // Denoise tomograms
 #define PROC_TOMO_PICK_DIRNAME "Picks" // Pick particles in tomograms
@@ -1024,14 +1024,16 @@ class Node
 	public:
 	std::string name; // what's my name?
 	std::string type; // which type of node am I
+    int type_depth; // how far deep does the .Nodes directory go
 	std::vector<long int> inputForProcessList; 	  //list of processes that use this Node as input
 	long int outputFromProcess;   //Which process made this Node
 
 	// Constructor
-	Node(std::string _name, std::string _type)
+	Node(std::string _name, std::string _type, int _type_depth = 1)
 	{
 		name = _name;
 		type = _type;
+        type_depth = _type_depth;
 		outputFromProcess = -1;
 	}
 
@@ -1070,6 +1072,7 @@ public:
 	float max_value;
 	float step_value;
 	std::string node_type;
+    int node_type_depth;
 	std::string pattern;
 	std::string directory;
 	std::vector<std::string> radio_options;
@@ -1083,7 +1086,7 @@ public:
 	JobOption(std::string _label, std::string  _default_value, std::string _pattern, std::string _directory, std::string _helptext);
 
 	// InputNode constructor
-	JobOption(std::string _label, int _nodetype, std::string _default_value, std::string _pattern, std::string _helptext);
+	JobOption(std::string _label, int _nodetype, std::string _default_value, std::string _pattern, std::string _helptext, int _node_type_depth = 1);
 
 	// Radio constructor
 	JobOption(std::string _label, std::vector<std::string> radio_options, int ioption,  std::string _helptext);

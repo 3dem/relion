@@ -11,7 +11,109 @@ using namespace gravis;
 
 Tomogram::Tomogram()
 {
-	
+
+}
+
+void Tomogram::setProjectionMatrix(int f, RFLOAT xtilt, RFLOAT ytilt, RFLOAT zrot, RFLOAT xshift_angst, RFLOAT yshift_angst)
+{
+
+ /* From Alister Burt
+ *
+ * tilt_image_center = tilt_image_dimensions / 2
+ * specimen_center = tomogram_dimensions / 2
+ *
+ * # Transformations, defined in order of application
+ * s0 = S(-specimen_center)  # put specimen center-of-rotation at the origin
+ * r0 = Rx(euler_angles['rlnTomoXTilt'])  # rotate specimen around X-axis
+ * r1 = Ry(euler_angles['rlnTomoYTilt'])  # rotate specimen around Y-axis
+ * r2 = Rz(euler_angles['rlnTomoZRot'])  # rotate specimen around Z-axis
+ * s1 = S(specimen_shifts)  # shift projected specimen in xy (camera) plane
+ * s2 = S(tilt_image_center)  # move specimen back into tilt-image coordinate system
+ *
+ * # compose matrices
+ * transformations = s2 @ s1 @ r2 @ r1 @ r0 @ s0
+ *
+ */
+
+    if (optics.pixelSize < 0.001)
+        REPORT_ERROR("BUG: Tomogram::getProjectionMatrix encountered pixel size of zero");
+
+    d4Matrix s0, s1, s2, r0, r1, r2;
+
+    // Get specimen center
+    t3Vector<double> specimen_center((double)int(w0/2), (double)int(h0/2), (double)int(d0/2) );
+    s0 = s0.translation(-specimen_center);
+
+    // Get specimen shifts (in pixels)
+    t3Vector<double> specimen_shifts(xshift_angst / optics.pixelSize, yshift_angst / optics.pixelSize, 0.);
+    s1 = s1.translation(specimen_shifts);
+
+    // Get tilt image center
+    std::vector<long int> tilt_image_center_int = stack.getSizeVector();
+    t3Vector<double> tilt_image_center((double)int(tilt_image_center_int[0]/2), (double)int(tilt_image_center_int[1]/2), 0.);
+    s2 = s2.translation(tilt_image_center);
+
+    // Get rotation matrices
+    t3Vector<double> xaxis(1., 0., 0.), yaxis(0., 1., 0.), zaxis(0., 0., 1.);
+    r0 = r0.rotation(xaxis, xtilt);
+    r1 = r1.rotation(yaxis, ytilt);
+    r2 = r2.rotation(zaxis, zrot);
+
+    projectionMatrices[f] = s1 * s2 * r2 * r1 * r0 * s0;
+
+}
+
+void Tomogram::getProjectionAnglesFromMatrix(int frame, const gravis::d4Matrix &A, RFLOAT &xtilt, RFLOAT &ytilt, RFLOAT &zrot, RFLOAT &xshift_angst, RFLOAT &yshift_angst) const
+{
+
+
+    // From https://www.geometrictools.com/Documentation/EulerAngles.pdf
+    RFLOAT thetaX, thetaY, thetaZ;
+    if (A(2,0) < 1.)
+    {
+        if (A(2,0) > -1.)
+        {
+            thetaX = atan2(A(2,1), A(2,2));
+            thetaY = asin (-A(2,0));
+            thetaZ = atan2(A(1,0), A(0,0));
+        }
+        else // A(2,0) = -1
+        {
+            thetaX = 0.;
+            thetaY = PI/2.;
+            thetaZ = -atan2(-A(1,2), A(1,1));
+        }
+    }
+    else // A(2,0) = +1
+    {
+        thetaX = 0.;
+        thetaY = -PI/2.;
+        thetaZ = atan2(-A(1,2), A(1,1));
+    }
+
+    xtilt = RAD2DEG(thetaX);
+    ytilt = RAD2DEG(thetaY);
+    zrot  = RAD2DEG(thetaZ);
+
+    // Get also the shifts in centered Angstroms in the tilt series images
+    d4Matrix s0, s1, s2, r0, r1, r2;
+
+    d3Vector specimen_center(centre.x, centre.y, centre.z);
+    std::vector<long int> tilt_image_center_int = stack.getSizeVector();
+    d3Vector tilt_image_center((double)int(tilt_image_center_int[0]/2), (double)int(tilt_image_center_int[1]/2), 0.);
+    s0 = s0.translation(specimen_center);
+    s2 = s2.translation(-tilt_image_center);
+
+    t3Vector<double> xaxis(1., 0., 0.), yaxis(0., 1., 0.), zaxis(0., 0., 1.);
+    r0 = r0.rotation(xaxis, -xtilt);
+    r1 = r1.rotation(yaxis, -ytilt);
+    r2 = r2.rotation(zaxis, -zrot);
+
+    // invert operation above in setProjectionMatrix
+    s1 = A * s0 * r0 * r1 * r2 * s2;
+    xshift_angst = optics.pixelSize * s1(0,3);
+    yshift_angst = optics.pixelSize * s1(1,3);
+
 }
 
 d2Vector Tomogram::projectPoint(const d3Vector& p, int frame) const
@@ -52,8 +154,8 @@ d2Vector Tomogram::projectPointDebug(const d3Vector &p, int frame) const
 
 bool Tomogram::isVisible(const d3Vector& p, int frame, double radius) const
 {
-	const d2Vector q = projectPoint(p, frame);
-	
+	d2Vector q = projectPoint(p, frame);
+
 	return     q.x > radius && q.x < imageSize.x - radius
 			&& q.y > radius && q.y < imageSize.y - radius;
 }
@@ -122,7 +224,7 @@ BufferedImage<float> Tomogram::computeDoseWeight(int boxSize, double binning) co
 {
 	// @TODO: add support for B/k factors
 	
-	return Damage::weightStack_GG(cumulativeDose, optics.pixelSize * binning, boxSize);
+	return Damage::weightStack_GG(cumulativeDose, optics.pixelSize * binning, boxSize, BfactorPerElectronDose);
 }
 
 BufferedImage<float> Tomogram::computeNoiseWeight(int boxSize, double binning, double overlap) const
@@ -166,9 +268,10 @@ double Tomogram::getDepthOffset(int frame, d3Vector position) const
 {
 	const d4Matrix& projFrame = projectionMatrices[frame];
 	d4Vector pos2D = projFrame * d4Vector(position);
-	d4Vector cent2D = projFrame * d4Vector(centre);
+    d4Vector cent2D = projFrame * d4Vector(centre);
 
 	return pos2D.z - cent2D.z;
+
 }
 
 CTF Tomogram::getCtf(int frame, d3Vector position) const
@@ -202,7 +305,7 @@ d3Vector Tomogram::computeCentreOfMass(
 	for (int p = 0; p < pc; p++)
 	{
 		const ParticleIndex particle_id = particle_indices[p];
-		const d3Vector pos = particleSet.getPosition(particle_id);
+		const d3Vector pos = particleSet.getPosition(particle_id, centre);
 		centre_of_mass += pos;
 	}
 

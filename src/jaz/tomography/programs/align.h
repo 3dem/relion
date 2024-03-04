@@ -73,6 +73,7 @@ class AlignProgram : public RefinementProgram
 		void writeTempAlignmentData(
 				const std::vector<gravis::d4Matrix>& proj,
 				const std::vector<gravis::d3Vector>& pos,
+                const Tomogram &tomogram,
 				int t);
 		
 		void writeTempMotionData(
@@ -236,7 +237,7 @@ void AlignProgram::performAlignment(
 	std::vector<gravis::d4Matrix> projections = alignment.getProjections(opt, tomogram.frameSequence);
 	std::vector<gravis::d3Vector> positions = alignment.getParticlePositions(opt);
 	
-	writeTempAlignmentData(projections, positions, tomo_index);
+	writeTempAlignmentData(projections, positions, tomogram, tomo_index);
 	
 	if (do_motion)
 	{

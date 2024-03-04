@@ -35,8 +35,7 @@ class SubtomoProgram
 			double 
 				SNR,
 				binning,
-                rescale_coords,
-				taper, 
+				taper,
 				env_sigma,
 				cone_slope,
 				cone_sig0,

@@ -822,9 +822,9 @@ void getFourierTransformsAndCtfs(long int part_id,
                         baseMLO->mydata.particles[part_id].images[img_id].defU,
                         baseMLO->mydata.particles[part_id].images[img_id].defV,
                         baseMLO->mydata.particles[part_id].images[img_id].defAngle,
-                        0.,
-                        1.,
-                        0.,
+                        baseMLO->mydata.particles[part_id].images[img_id].bfactor,
+                        baseMLO->mydata.particles[part_id].images[img_id].scale,
+                        baseMLO->mydata.particles[part_id].images[img_id].phase_shift,
                         baseMLO->mydata.particles[part_id].images[img_id].dose);
                 else
                     ctf.setValuesByGroup(

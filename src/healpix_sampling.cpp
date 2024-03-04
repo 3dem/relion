@@ -2039,7 +2039,9 @@ void HealpixSampling::writeBildFileOrientationalDistribution(MultidimArray<RFLOA
 			{
 				// In multi-body refinement, the rotations are relative to (rot,tilt)=(0,90) to prevent problems with psi-prior!!!
 				Matrix2D<RFLOAT> A;
-				rotation3DMatrix(90., 'Y', A, false);
+                //SHWS 2feb2024: found bug in rotation around Y: reverse direction!
+                //rotation3DMatrix(90., 'Y', A, false);
+                rotation3DMatrix(-90., 'Y', A, false);
 				v = (*Aorient).transpose() * A * v;
 			}
 

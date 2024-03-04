@@ -2143,7 +2143,9 @@ void MlOptimiser::initialiseGeneral(int rank)
         // This creates a rotation matrix for (rot,tilt,psi) = (0,90,0)
         // It will be used to make all Abody orientation matrices relative to (0,90,0) instead of the more logical (0,0,0)
         // This is useful, as psi-priors are ill-defined around tilt=0, as rot becomes the same as -psi!!
-        rotation3DMatrix(-90., 'Y', A_rot90, false);
+        //SHWS 2feb2024: found bug in rotation around Y: reverse direction!
+        //rotation3DMatrix(-90., 'Y', A_rot90, false);
+        rotation3DMatrix(90., 'Y', A_rot90, false);
         A_rot90T = A_rot90.transpose();
     }
 
@@ -3009,9 +3011,9 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
                                 mydata.particles[part_id].images[img_id].defU,
                                 mydata.particles[part_id].images[img_id].defV,
                                 mydata.particles[part_id].images[img_id].defAngle,
-                                0.,
-                                1.,
-                                0.,
+                                mydata.particles[part_id].images[img_id].bfactor,
+                                mydata.particles[part_id].images[img_id].scale,
+                                mydata.particles[part_id].images[img_id].phase_shift,
                                 mydata.particles[part_id].images[img_id].dose);
                     }
                     else
@@ -6446,9 +6448,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(
                             mydata.particles[part_id].images[img_id].defU,
                             mydata.particles[part_id].images[img_id].defV,
                             mydata.particles[part_id].images[img_id].defAngle,
-                            0.,
-                            1.,
-                            0.,
+                            mydata.particles[part_id].images[img_id].bfactor,
+                            mydata.particles[part_id].images[img_id].scale,
+                            mydata.particles[part_id].images[img_id].phase_shift,
                             mydata.particles[part_id].images[img_id].dose);
                 else
                     ctf.setValuesByGroup(
@@ -9371,9 +9373,9 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
                                     mydata.particles[part_id].images[img_id].defU,
                                     mydata.particles[part_id].images[img_id].defV,
                                     mydata.particles[part_id].images[img_id].defAngle,
-                                    0.,
-                                    1.,
-                                    0.,
+                                    mydata.particles[part_id].images[img_id].bfactor,
+                                    mydata.particles[part_id].images[img_id].scale,
+                                    mydata.particles[part_id].images[img_id].phase_shift,
                                     mydata.particles[part_id].images[img_id].dose);
                         else
                             ctf.setValuesByGroup(

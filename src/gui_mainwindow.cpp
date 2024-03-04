@@ -465,7 +465,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
         nr_browse_tabs++;
 
         browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Make subtomos");
+		browser->add("Extract subtomos");
 		gui_jobwindows[nr_browse_tabs] = new JobWindow();
 		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_SUBTOMO);
 		browse_grp[nr_browse_tabs]->end();
@@ -577,7 +577,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 		nr_browse_tabs++;
 
 		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Motion refinement");
+		browser->add("Bayesian polishing");
 		gui_jobwindows[nr_browse_tabs] = new JobWindow();
 		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_ALIGN);
 		browse_grp[nr_browse_tabs]->end();
@@ -623,13 +623,16 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 	browse_grp[nr_browse_tabs]->end();
 	nr_browse_tabs++;
 
-	browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Particle subtraction");
-	gui_jobwindows[nr_browse_tabs] = new JobWindow();
-	gui_jobwindows[nr_browse_tabs]->initialise(PROC_SUBTRACT);
-	browse_grp[nr_browse_tabs]->end();
-	nr_browse_tabs++;
-
+	if (!_do_tomo)
+    {
+        browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+        browser->add("Particle subtraction");
+        gui_jobwindows[nr_browse_tabs] = new JobWindow();
+        gui_jobwindows[nr_browse_tabs]->initialise(PROC_SUBTRACT);
+        browse_grp[nr_browse_tabs]->end();
+        nr_browse_tabs++;
+    }
+    
 	browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Post-processing");
 	gui_jobwindows[nr_browse_tabs] = new JobWindow();

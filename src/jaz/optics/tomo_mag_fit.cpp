@@ -70,7 +70,7 @@ d2Vector TomoIsoMagFit::computeErrorAndSlope(
 	for (int p = 0; p < pc; p++)
 	{
 		const ParticleIndex particle_id = particle_indices[p];
-		const d3Vector pos = particleSet.getPosition(particle_id);
+		const d3Vector pos = particleSet.getPosition(particle_id, tomogram.centre, true);
 		centre_of_mass += pos;
 	}
 
@@ -94,9 +94,9 @@ d2Vector TomoIsoMagFit::computeErrorAndSlope(
 
 		const ParticleIndex particle_id = particle_indices[p];
 
-		const d3Vector pos = particleSet.getPosition(particle_id);
+		const d3Vector pos = particleSet.getPosition(particle_id, tomogram.centre, true);
 		const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
-					particle_id, fc, pixelSize0);
+					particle_id, fc, tomogram.centre, pixelSize0);
 		
 		const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
 
@@ -118,7 +118,7 @@ d2Vector TomoIsoMagFit::computeErrorAndSlope(
 
 
 			const d4Matrix particleToTomo = particleSet.getMatrix4x4(
-					particle_id, s, s, s);
+					particle_id, tomogram.centre, s, s, s);
 
 			d4Matrix projPart;
 
@@ -280,9 +280,9 @@ BufferedImage<Equation2x2> TomoAnisoMagFit::computeEquations()
 
 		const ParticleIndex particle_id = particle_indices[p];
 
-		const d3Vector pos = particleSet.getPosition(particle_id);
+		const d3Vector pos = particleSet.getPosition(particle_id, tomogram.centre, true);
 		const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
-					particle_id, fc, pixelSize);
+					particle_id, fc, tomogram.centre, pixelSize);
 		
 		const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
 
@@ -301,7 +301,7 @@ BufferedImage<Equation2x2> TomoAnisoMagFit::computeEquations()
 			observation *= -1.f;
 
 			const d4Matrix particleToTomo = particleSet.getMatrix4x4(
-					particle_id, s, s, s);
+					particle_id, tomogram.centre, s, s, s);
 
 			d4Matrix projPart = projCut * particleToTomo;
 
@@ -369,9 +369,9 @@ std::vector<BufferedImage<Equation2x2>> TomoAnisoMagFit::computeEquations_even_o
 
 		const ParticleIndex particle_id = particle_indices[p];
 
-		const d3Vector pos = particleSet.getPosition(particle_id);
+		const d3Vector pos = particleSet.getPosition(particle_id, tomogram.centre, true);
 		const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
-					particle_id, fc, pixelSize);
+					particle_id, fc, tomogram.centre, pixelSize);
 		
 		const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
 
@@ -390,7 +390,7 @@ std::vector<BufferedImage<Equation2x2>> TomoAnisoMagFit::computeEquations_even_o
 			observation *= -1.f;
 
 			const d4Matrix particleToTomo = particleSet.getMatrix4x4(
-					particle_id, s, s, s);
+					particle_id, tomogram.centre, s, s, s);
 
 			d4Matrix projPart = projCut * particleToTomo;
 
@@ -490,9 +490,9 @@ double TomoAnisoMagFit::evaluateMag(const d2Matrix& M)
 
 		const ParticleIndex particle_id = particle_indices[p];
 
-		const d3Vector pos = particleSet.getPosition(particle_id);
+		const d3Vector pos = particleSet.getPosition(particle_id, tomogram.centre, true);
 		const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
-					particle_id, fc, pixelSize);
+					particle_id, fc, tomogram.centre, pixelSize);
 		
 		const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
 
@@ -509,7 +509,7 @@ double TomoAnisoMagFit::evaluateMag(const d2Matrix& M)
 					traj[f], observation, projCut, 1, true);
 
 			const d4Matrix particleToTomo = particleSet.getMatrix4x4(
-					particle_id, s, s, s);
+					particle_id, tomogram.centre, s, s, s);
 
 			d4Matrix projPart = M4t * projCut * particleToTomo;
 
