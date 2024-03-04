@@ -1895,6 +1895,9 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 			if (iwait == 3)
 			{
 				std::cout << " WARNING: trying to read pipeline.star, but directory " << dir_lock << " exists (which protects against simultaneous writing by multiple instances of the GUI)" << std::endl;
+                std::cout << " WARNING: Perhaps the GUI or one of RELION's programs crashed unexpectedly? " << std::endl;
+                std::cout << " WARNING: You may want to check if your default_pipeline.star in this directory has been corrupted in the process." << std::endl;
+                std::cout << " WARNING: If so, you can copy a backup from the directory of the last job you executed. " << std::endl;
 			}
 			sleep(3);
 			status =  mkdir(dir_lock.c_str(), S_IRWXU);
@@ -1903,10 +1906,10 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 #endif
 
 			iwait++;
-			if (iwait > 40)
+			if (iwait > 20)
 			{
 
-				REPORT_ERROR("ERROR: PipeLine::read has waited for 2 minutes for lock directory to disappear. You may want to manually remove the file: " + fn_lock);
+				REPORT_ERROR("ERROR: PipeLine::read has waited for 1 minute for lock directory to disappear.You may want to manually remove the lock file: " + fn_lock);
 			}
 
 		}

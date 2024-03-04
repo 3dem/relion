@@ -465,7 +465,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
         nr_browse_tabs++;
 
         browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Make pseudo-subtomos");
+		browser->add("Make subtomos");
 		gui_jobwindows[nr_browse_tabs] = new JobWindow();
 		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_SUBTOMO);
 		browse_grp[nr_browse_tabs]->end();
@@ -563,21 +563,21 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 	if (_do_tomo)
 	{
 		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Tomo reconstruct particle");
+		browser->add("Reconstruct particle");
 		gui_jobwindows[nr_browse_tabs] = new JobWindow();
 		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_RECONSTRUCT);
 		browse_grp[nr_browse_tabs]->end();
 		nr_browse_tabs++;
         
 		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Tomo CTF refinement");
+		browser->add("CTF refinement");
 		gui_jobwindows[nr_browse_tabs] = new JobWindow();
 		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_CTFREFINE);
 		browse_grp[nr_browse_tabs]->end();
 		nr_browse_tabs++;
 
 		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Tomo frame alignment");
+		browser->add("Motion refinement");
 		gui_jobwindows[nr_browse_tabs] = new JobWindow();
 		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_ALIGN);
 		browse_grp[nr_browse_tabs]->end();
@@ -1110,6 +1110,9 @@ void GuiMainWindow::fillStdOutAndErr()
 				REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_outtail + " does not exists" );
 			int err = textbuff_stdout->loadfile(fn_outtail.c_str());
 			in.close();
+            command = "rm -f " + fn_outtail;
+			res = system(command.c_str());
+
 		}
 		// Scroll to the bottom
 		disp_stdout->insert_position(textbuff_stdout->length());
@@ -1135,7 +1138,10 @@ void GuiMainWindow::fillStdOutAndErr()
 				REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_errtail + " does not exists" );
 			int err = textbuff_stderr->loadfile(fn_errtail.c_str());
 			in.close();
-		}
+            command = "rm -f " + fn_errtail;
+            res = system(command.c_str());
+
+        }
 		// Scroll to the bottom
 		disp_stderr->insert_position(textbuff_stderr->length());
 		disp_stderr->show_insert_position();

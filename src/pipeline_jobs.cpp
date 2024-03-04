@@ -6988,15 +6988,35 @@ void RelionJob::initialiseTomoPickTomogramsJob()
 	// for filaments, cylinders and spheres
 	joboptions["particle_spacing"] = JobOption("Particle spacing (A):",-1,10,250,10, "Spacing (in Angstroms) between particles sampled on a sphere, on surfaces, or in filaments. This option will be ignored if you are picking individual particles");
 
+    joboptions["in_star_file"] = JobOption("Input particles.star (optional):", OUTNODE_TOMO_PARTS, "", "Particle STAR file (*.star)", "\
+If Picking mode='particles', this star file is used to generate initial particle annotations on the input tomograms.\n\n\
+If for a given tomogram X, the 'X_particles.star' file already exists in the 'annotations' directory, new annotations will not be created.\n\n\
+For other picking modes, this file is ignored.");
+
 }
 bool RelionJob::getCommandsTomoPickTomogramsJob(std::string &outputname, std::vector<std::string> &commands,
                                        std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
 	initialisePipeline(outputname, job_counter);
-	std::string command, command2;
+	std::string command0, command, command2;
 
 	if (error_message != "") return false;
+
+    if (joboptions["pick_mode"].getString() == "particles" && joboptions["in_star_file"].getString().length() > 0)
+    {
+        command0 = "`which relion_python_tomo_get_particle_poses`";
+        command0 += " particles-from-star";
+        command0 += " --tomograms-file " + joboptions["in_tomoset"].getString();
+        command0 += " --annotations-directory " + outputname + "annotations";
+        command0 += " --in-star-file " + joboptions["in_star_file"].getString();
+
+        command0 += " " + joboptions["other_args"].getString();
+        commands.push_back(command0);
+
+        Node node(joboptions["in_star_file"].getString(), joboptions["in_star_file"].node_type);
+        inputNodes.push_back(node);
+    }
 
 	command="`which relion_python_tomo_pick` ";
 
@@ -7098,10 +7118,12 @@ void RelionJob::initialiseTomoSubtomoJob()
 
     addTomoInputOptions(true, true, true, false);
 
-	joboptions["box_size"] = JobOption("Box size (pix):", 128, 32, 512, 16, "The initial box size of the reconstruction. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
-	joboptions["crop_size"] = JobOption("Cropped box size (pix):", -1, -1, 512, 16, "If set to a positive value, after construction, the resulting pseudo subtomograms are cropped to this size. A smaller box size allows the (generally expensive) refinement using relion_refine to proceed more rapidly.");
-	joboptions["binning"] = JobOption("Binning factor:", 1, 1, 16, 1, "The tilt series images will be binned by this (real-valued) factor and then reconstructed in the specified box size above. Note that thereby the reconstructed region becomes larger when specifying binning factors larger than one.");
-	joboptions["max_dose"] = JobOption("Maximum dose (e/A^2):", -1, -1, 200, 1, "Tilt series frames with a dose higher than this maximum dose (in electrons per squared Angstroms) will not be included in the 3D pseudo-subtomogram, or in the 2D stack. For the latter, this will disc I/O operations and increase speed.");
+    joboptions["binning"] = JobOption("Binning factor:", 1, 1, 16, 1, "The tilt series images will be binned by this (real-valued) factor and then reconstructed in the specified box size above. Note that thereby the reconstructed region becomes larger when specifying binning factors larger than one.");
+	joboptions["box_size"] = JobOption("Box size (binned pix):", 128, 32, 512, 16, "The initial box size of the reconstruction. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
+	joboptions["crop_size"] = JobOption("Cropped box size (binned pix):", -1, -1, 512, 16, "If set to a positive value, after construction, the resulting pseudo subtomograms are cropped to this size. A smaller box size allows the (generally expensive) refinement using relion_refine to proceed more rapidly.");
+
+    joboptions["max_dose"] = JobOption("Maximum dose (e/A^2):", -1, -1, 200, 1, "Tilt series frames with a dose higher than this maximum dose (in electrons per squared Angstroms) will not be included in the 3D pseudo-subtomogram, or in the 2D stack. For the latter, this will disc I/O operations and increase speed.");
+    joboptions["min_frames"] = JobOption("Minimum nr. frames:", 1, 1, 40, 1, "Each selected pseudo-subtomogram need to be visible in at least this number of tilt series frames with doses below the maximum dose");
 
 	joboptions["do_stack2d"] = JobOption("Write output as 2D stacks?", true ,"If set to Yes, this program will write output subtomograms as 2D substacks. This is new as of relion-4.1, and the preferred way of generating subtomograms. If set to No, then relion-4.0 3D pseudo-subtomograms will be written out. Either can be used in subsequent refinements and classifications.");
 	joboptions["do_float16"] = JobOption("Write output in float16?", true ,"If set to Yes, this program will write output images in float16 MRC format. This will save a factor of two in disk space compared to the default of writing in float32. Note that RELION and CCPEM will read float16 images, but other programs may not (yet) do so.");
@@ -7146,6 +7168,9 @@ bool RelionJob::getCommandsTomoSubtomoJob(std::string &outputname, std::vector<s
     if (error_message != "") return false;
 	if (max_dose > 0.) command += " --max_dose " + joboptions["max_dose"].getString();
 
+    float min_frames = joboptions["min_frames"].getNumber(error_message);
+    if (error_message != "") return false;
+    if (min_frames > 0.) command += " --min_frames " + joboptions["min_frames"].getString();
 
 	if (joboptions["do_float16"].getBoolean())
 	{
@@ -7201,10 +7226,10 @@ void RelionJob::initialiseTomoCtfRefineJob()
 	joboptions["do_tomo_scale"] = JobOption("Refine scale per tomogram?", false, "If set to Yes, then estimate "\
 	"the beam luminance separately for each tilt series. This is not recommended.");
 
-	joboptions["do_even_aberr"] = JobOption("Refine even aberrations?", true, "If set to Yes, then estimates the even higher-order aberrations.");
-	joboptions["nr_even_aberr"] = JobOption("Order of even aberrations:", 4, 4, 8, 2, "The maximum order for the even aberrations to be estimated.");
-	joboptions["do_odd_aberr"] = JobOption("Refine odd aberrations?", true, "If set to Yes, then estimates the odd higher-order aberrations.");
-	joboptions["nr_odd_aberr"] = JobOption("Order of odd aberrations:", 3, 3, 7, 2, "The maximum order for the odd aberrations to be estimated.");
+	//joboptions["do_even_aberr"] = JobOption("Refine even aberrations?", false, "If set to Yes, then estimates the even higher-order aberrations.");
+	//joboptions["nr_even_aberr"] = JobOption("Order of even aberrations:", 4, 4, 8, 2, "The maximum order for the even aberrations to be estimated.");
+	//joboptions["do_odd_aberr"] = JobOption("Refine odd aberrations?", false, "If set to Yes, then estimates the odd higher-order aberrations.");
+	//joboptions["nr_odd_aberr"] = JobOption("Order of odd aberrations:", 3, 3, 7, 2, "The maximum order for the odd aberrations to be estimated.");
 }
 
 bool RelionJob::getCommandsTomoCtfRefineJob(std::string &outputname, std::vector<std::string> &commands,
@@ -7295,6 +7320,7 @@ bool RelionJob::getCommandsTomoCtfRefineJob(std::string &outputname, std::vector
 
 	}
 
+    /*
 	if (joboptions["do_even_aberr"].getBoolean())
 	{
 		command += " --do_even_aberrations --ne " + joboptions["nr_even_aberr"].getString();
@@ -7304,6 +7330,7 @@ bool RelionJob::getCommandsTomoCtfRefineJob(std::string &outputname, std::vector
 	{
 		command += " --do_odd_aberrations --no " + joboptions["nr_odd_aberr"].getString();
 	}
+     */
 
 	if (is_continue)
 	{
@@ -7468,9 +7495,9 @@ void RelionJob::initialiseTomoReconPartJob()
 
 	addTomoInputOptions(true, true, true, false);
 
-	joboptions["box_size"] = JobOption("Box size (pix):", 128, 32, 512, 16, "Box size of the reconstruction. Note that this is independent of the box size that has been used to refine the particle. This allows the user to construct a 3D map of arbitrary size to gain an overview of the structure surrounding the particle. A sufficiently large box size also allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
-	joboptions["crop_size"] = JobOption("Cropped box size (pix):", -1, -1, 512, 16, "If set to a positive value, the program will output an additional set of maps that have been cropped to this size. This is useful if a map is desired that is smaller than the box size required to retrieve the CTF-delocalised signal.");
-	joboptions["binning"] = JobOption("Binning factor:", 1, 1, 16, 1, "The tilt series images will be binned by this (real-valued) factor and then reconstructed in the specified box size above. Note that thereby the reconstructed region becomes larger when specifying binning factors larger than one.");
+    joboptions["binning"] = JobOption("Binning factor:", 1, 1, 16, 1, "The tilt series images will be binned by this (real-valued) factor and then reconstructed in the specified box size above. Note that thereby the reconstructed region becomes larger when specifying binning factors larger than one.");
+	joboptions["box_size"] = JobOption("Box size (binned pix):", 128, 32, 512, 16, "Box size of the reconstruction. Note that this is independent of the box size that has been used to refine the particle. This allows the user to construct a 3D map of arbitrary size to gain an overview of the structure surrounding the particle. A sufficiently large box size also allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
+	joboptions["crop_size"] = JobOption("Cropped box size (binned pix):", -1, -1, 512, 16, "If set to a positive value, the program will output an additional set of maps that have been cropped to this size. This is useful if a map is desired that is smaller than the box size required to retrieve the CTF-delocalised signal.");
 	joboptions["snr"] = JobOption("Wiener SNR constant:", 0, 0, 0.0001, 0.00001, "If set to a positive value, apply a Wiener filter with this signal-to-noise ratio. If omitted, the reconstruction will use a heuristic to prevent divisions by excessively small numbers. Please note that using a low (even though realistic) SNR might wash out the higher frequencies, which could make the map unsuitable to be used for further refinement.");
 	joboptions["sym_name"] = JobOption("Symmetry:", std::string("C1"), "If the molecule is asymmetric, \
 set Symmetry group to C1. Note their are multiple possibilities for icosahedral symmetry: \n \

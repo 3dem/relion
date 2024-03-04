@@ -271,7 +271,7 @@ void SubtomoProgram::initialise(
         }
     }
 
-	if (verbose) writeParticleSet(particleSet, particles, tomogramSet);
+    if (verbose) writeParticleSet(particleSet, particles, tomogramSet);
 }
 
 std::string SubtomoProgram::getOutputFilename(
@@ -320,20 +320,19 @@ void SubtomoProgram::writeParticleSet(
 			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
 						part_id, tomogram.frameCount, tomogram.optics.pixelSize, !apply_offsets);
 
-            int my_min_frames = (min_frames < 0 ) ? tomogram.frameCount / 2 : min_frames;
-			if (tomogram.isVisibleFirstFrames(traj, boxSize / 2.0, my_min_frames))
-			{
+            //SHWS 24jan2024 only for debugging: // int my_min_frames = (min_frames < 0 ) ? tomogram.frameCount / 2 : min_frames;
+			//SHWS 24jan2024 only for debugging: // if (tomogram.isVisibleFirstFrames(traj, boxSize / 2.0, my_min_frames))
+			std::vector<bool> isVisible;
+            if (tomogram.getVisibilityMinFramesMaxDose(traj, binning * cropSize / 2.0, maxDose, min_frames, isVisible))
+            {
+
                 // Get all the particle metadata
                 const ParticleIndex new_id = copy.addParticle(particleSet, part_id);
 
                 // Also set isVisible in the output particle STAR file
                 if (do_stack2d)
                 {
-                    std::vector<bool> isVisible = tomogram.determineVisiblity(traj, boxSize / 2.0);
                     std::vector<int> isVisibleInt(isVisible.size(), 0);
-                    if (maxDose > 0.)
-                        for (int f = 0; f < tomogram.frameCount; f++)
-                            if (tomogram.getCumulativeDose(f) > maxDose) isVisible[f] = false;
                     for (int f = 0; f < tomogram.frameCount; f++)
                         if (isVisible[f]) isVisibleInt[f] = 1;
                     copy.partTable.setValue(EMDL_TOMO_VISIBLE_FRAMES, isVisibleInt);
@@ -481,8 +480,7 @@ void SubtomoProgram::processTomograms(
 		// @TODO: define input and output pixel sizes!
 
 		const double binnedPixelSize = tomogram.optics.pixelSize * binning;
-
-		if (verbosity > 0)
+ 		if (verbosity > 0)
 		{
             Log::beginProgress(
 				"Extracting particles",
@@ -520,20 +518,9 @@ void SubtomoProgram::processTomograms(
             const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
                     part_id, fc, tomogram.optics.pixelSize, !apply_offsets);
 
-            int my_min_frames = (min_frames < 0 ) ? tomogram.frameCount / 2 : min_frames;
-            if (!tomogram.isVisibleFirstFrames(traj, s2D / 2.0, my_min_frames)) {
+            std::vector<bool> isVisible;
+            if (!tomogram.getVisibilityMinFramesMaxDose(traj, binning * cropSize / 2.0, maxDose, min_frames, isVisible))
                 continue;
-            }
-
-            std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s2D / 2.0);
-            // Also set isVisible to zero for frames that are over maxDose
-            if (maxDose > 0.)
-            {
-                for (int f = 0; f < fc; f++)
-                {
-                    if (tomogram.getCumulativeDose(f) > maxDose) isVisible[f] = false;
-                }
-            }
 
             std::vector<d4Matrix> projCut(fc), projPart(fc);
 
@@ -543,6 +530,8 @@ void SubtomoProgram::processTomograms(
             TomoExtraction::extractAt3D_Fourier(
                     tomogram.stack, s02D, binning, tomogram, traj, isVisible,
                     particleStack, projCut, inner_thread_num, do_circle_precrop);
+
+
 
             if (!do_ctf) weightStack.fill(1.f);
 
@@ -760,8 +749,8 @@ void SubtomoProgram::processTomograms(
                     Reconstruction::taper(dataImgDivRS, taper, do_center, inner_thread_num);
                     dataImgDivRS.write(outDiv, binnedPixelSize, write_float16);
                 }
-            }
-        } // end if do_stack2d
+            } // end if do_stack2d
+        } // end loop particles p
 
 		if (verbosity > 0)
 		{

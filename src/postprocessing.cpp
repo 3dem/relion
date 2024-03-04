@@ -570,6 +570,8 @@ void Postprocessing::calculateFSCtrue(MultidimArray<RFLOAT> &fsc_true, MultidimA
 	// Sometimes FSc at origin becomes -1!
 	if (DIRECT_A1D_ELEM(fsc_masked, 0) <= 0.)
 		DIRECT_A1D_ELEM(fsc_masked, 0) = 1.;
+	if (DIRECT_A1D_ELEM(fsc_unmasked, 0) <= 0.)
+		DIRECT_A1D_ELEM(fsc_unmasked, 0) = 1.;
 	if (DIRECT_A1D_ELEM(fsc_random_masked, 0) <= 0.)
 		DIRECT_A1D_ELEM(fsc_random_masked, 0) = 1.;
 
@@ -589,6 +591,7 @@ void Postprocessing::calculateFSCtrue(MultidimArray<RFLOAT> &fsc_true, MultidimA
 			DIRECT_A1D_ELEM(fsc_true, i) = (fsct - fscn) / (1. - fscn);
 		}
 	}
+    
 }
 
 void Postprocessing::calculateFSCpart(const MultidimArray<RFLOAT> fsc_unmasked, RFLOAT fraction, MultidimArray<RFLOAT> &fsc_part)
