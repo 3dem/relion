@@ -31,6 +31,11 @@ def fiducials_cli(
         filename=tilt_series_star_file, tilt_series_id=tomogram_name
     )
     for global_data, tilt_series in tilt_series_set:
+        aligned_tilt_series_star_file = output_directory / 'tilt_series' / f'{tilt_series.name}.star'
+        if aligned_tilt_series_star_file.exists():
+            console.log(f'tilt_series/{tilt_series.name}.star already exists, skipping...')
+            continue
+
         console.log(f'Aligning {tilt_series.name}...')
         align_single_tilt_series(
             tilt_series=tilt_series,
