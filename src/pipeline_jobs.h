@@ -263,7 +263,7 @@ static bool do_allow_change_minimum_dedicated;
 #define LABEL_CTFREFINE_ANISOPARTS     "ParticleGroupMetadata.star.relion.anisomagrefine"
 #define LABEL_POLISH_PARTS             "ParticleGroupMetadata.star.relion.polished"
 #define LABEL_POLISH_LOG               "LogFile.pdf.relion.polish"
-#define LABEL_POLISH_PARAMS            "ParamsData.txt.relion.polish.params"
+#define LABEL_POLISH_PARAMS            "ParamsData.txt.relion.polish"
 #define LABEL_POST_POST                "ProcessData.star.relion.postprocess"
 #define LABEL_POST_MAP                 "DensityMap.mrc.relion.postprocess"
 #define LABEL_POST_MASKED              "DensityMap.mrc.relion.postprocess.masked"
