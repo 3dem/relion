@@ -296,8 +296,6 @@ void PipeLine::deleteTemporaryNodeFile(Node &node)
 	else
 		fnt = node.name;
 
-    //FileName fn_type = get_node_label(node.type) + "/";
-	// PIPELINER
     FileName fn_type = node.type;
     fn_type = fn_type.beforeFirstOf(".") + "/";
 	FileName fn = fn_dir + fn_type + fnt;
@@ -1873,6 +1871,35 @@ bool PipeLine::importPipeline(std::string _name)
 	return imported;
 }
 
+
+std::string PipeLine::convertOldNodeTypeLabel(std::string input_label)
+{
+    FileName output_label = input_label;
+    if (output_label.contains("ParticlesData"))
+        output_label.replaceAllSubstrings("ParticlesData","ParticleGroupMetadata");
+    else if (output_label.contains("MicrographMoviesData"))
+        output_label.replaceAllSubstrings("MicrographMoviesData","MicrographMovieGroupMetadata");
+    else if (output_label.contains("MicrographsData"))
+        output_label.replaceAllSubstrings("MicrographsData","MicrographGroupMetadata");
+    else if (output_label.contains("MicrographsCoords"))
+        output_label.replaceAllSubstrings("MicrographsCoords","MicrographCoordsGroup");
+    else if (output_label.contains("ImagesData"))
+        output_label.replaceAllSubstrings("ImagesData","Image2DGroupMetadata");
+    else if (output_label.contains("OptimisationSet"))
+        output_label.replaceAllSubstrings("OptimisationSet","TomoOptimisationSet");
+    else if (output_label.contains("TomogramData"))
+        output_label.replaceAllSubstrings("TomogramData","TomogramGroupMetadata");
+    else if (output_label.contains("TrajectoryData"))
+        output_label.replaceAllSubstrings("TrajectoryData","TomoTrajectoryData");
+    else if (output_label.contains("ProcessData.star.relion.tomo.relion.tiltseries_set"))
+        output_label.replaceAllSubstrings("ProcessData.star.relion.tomo.relion.tiltseries_set","TomogramGroupMetadata.star.relion.tomo");
+    else if (output_label.contains("ProcessData.star.relion.tomo.relion.tomogram_set"))
+        output_label.replaceAllSubstrings("ProcessData.star.relion.tomo.relion.tomogram_set","TomogramGroupMetadata.star.relion.tomo");
+
+    return output_label;
+}
+
+
 // Read pipeline from STAR file
 void PipeLine::read(bool do_lock, std::string lock_message)
 {
@@ -1960,26 +1987,17 @@ void PipeLine::read(bool do_lock, std::string lock_message)
     if (!has_read) REPORT_ERROR("ERROR: cannot read expected pipeline_general table from the default_pipeliner.star file...");
 
 	MDnode.readStar(in, "pipeline_nodes");
+    bool do_convert = (MDnode.getVersion() < 50001);
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDnode)
 	{
 		std::string name, label;
-		// PIPELINER
 		int type, type_depth;
 		if (!MDnode.getValue(EMDL_PIPELINE_NODE_NAME, name) )
 			REPORT_ERROR("PipeLine::read: cannot find name in pipeline_nodes table");
 
-		if (MDnode.containsLabel(EMDL_PIPELINE_NODE_TYPE_LABEL))
-		{
-			MDnode.getValue(EMDL_PIPELINE_NODE_TYPE_LABEL, label);
-		}
-		else if (MDnode.getValue(EMDL_PIPELINE_NODE_TYPE, type))
-		{
-			label = get_node_label(type);
-		}
-		else
-		{
-			REPORT_ERROR("PipeLine::read: cannot find type in pipeline_nodes table");
-		}
+        MDnode.getValue(EMDL_PIPELINE_NODE_TYPE_LABEL, label);
+        // convert from pre-relion50001 version metadata files
+        if (do_convert) label = convertOldNodeTypeLabel(label);
 
         // new in relion5: use different type-depths for the type_labels for easier compatibility with ccpem pipeliner
         if (MDnode.containsLabel(EMDL_PIPELINE_NODE_TYPE_DEPTH))
@@ -2112,6 +2130,7 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 	in.close();
 }
 
+
 void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode, std::vector<bool> deleteProcess)
 {
 	if (do_read_only)
@@ -2224,7 +2243,6 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 		{
 			MDnode.addObject();
 			MDnode.setValue(EMDL_PIPELINE_NODE_NAME, nodeList[i].name);
-			//MDnode.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, get_node_label(nodeList[i].type));
 			// PIPELINER
 			MDnode.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, nodeList[i].type);
             MDnode.setValue(EMDL_PIPELINE_NODE_TYPE_DEPTH, nodeList[i].type_depth);
@@ -2233,7 +2251,6 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 		{
 			MDnode_del.addObject();
 			MDnode_del.setValue(EMDL_PIPELINE_NODE_NAME, nodeList[i].name);
-			//MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, get_node_label(nodeList[i].type));
 			// PIPELINER
 			MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, nodeList[i].type);
             MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE_DEPTH, nodeList[i].type_depth);

@@ -1384,8 +1384,7 @@ void GuiMainWindow::cb_display_io_node_i()
 	std::string command;
 
 	// Second line for backward compatibility with earlier alpha versions of relion-4.0....
-	if (pipeline.nodeList[mynode].type.find(LABEL_COORDS_CPIPE) != std::string::npos ||
-		pipeline.nodeList[mynode].type.find(NODE_MIC_COORDS_LABEL) != std::string::npos )
+	if (pipeline.nodeList[mynode].type.find(LABEL_COORDS_CPIPE) != std::string::npos)
 	{
 
 		// TODO: write error message saying this is no longer possible: use Continue to pick more/inspect results!
@@ -1479,7 +1478,11 @@ void GuiMainWindow::cb_display_io_node_i()
 		// Other arguments for extraction
 		command += " " + manualpickjob.joboptions["other_args"].getString() + " &";
 	}
-    else if (pipeline.nodeList[mynode].type.find(LABEL_TOMO_TILTSERIES) != std::string::npos )
+    else if (pipeline.nodeList[mynode].type.find(LABEL_IMPORT_TOMOGRAMS) != std::string::npos ||
+            pipeline.nodeList[mynode].type.find(LABEL_MOCORR_TOMOGRAMS) != std::string::npos ||
+            pipeline.nodeList[mynode].type.find(LABEL_CTFFIND_TOMOGRAMS) != std::string::npos ||
+            pipeline.nodeList[mynode].type.find(LABEL_TILTALIGN_TOMOGRAMS) != std::string::npos ||
+            pipeline.nodeList[mynode].type.find(LABEL_EXCLUDE_TOMOGRAMS) != std::string::npos )
     {
 
         command = "relion_python_tomo_view tilt-series --tilt-series-star-file " + pipeline.nodeList[mynode].name;
@@ -1498,7 +1501,10 @@ void GuiMainWindow::cb_display_io_node_i()
         command += " &";
 
     }
-    else if (pipeline.nodeList[mynode].type.find(LABEL_TOMO_TOMOGRAMS) != std::string::npos )
+    else if (pipeline.nodeList[mynode].type.find(LABEL_RECONSTRUCT_TOMOGRAMS) != std::string::npos ||
+             pipeline.nodeList[mynode].type.find(LABEL_DENOISE_TOMOGRAMS) != std::string::npos ||
+             pipeline.nodeList[mynode].type.find(LABEL_CTFREFINE_TOMOGRAMS) != std::string::npos ||
+             pipeline.nodeList[mynode].type.find(LABEL_FRAMEALIGN_TOMOGRAMS) != std::string::npos )
     {
 
         command = "relion_python_tomo_view tomograms --tilt-series-star-file " + pipeline.nodeList[mynode].name;
@@ -1517,8 +1523,7 @@ void GuiMainWindow::cb_display_io_node_i()
         command += " &";
 
     }
-	else if (pipeline.nodeList[mynode].type.find(LABEL_LOGFILE_CPIPE) != std::string::npos ||
-			 pipeline.nodeList[mynode].type.find(NODE_PDF_LOGFILE_LABEL) != std::string::npos )
+	else if (pipeline.nodeList[mynode].type.find(LABEL_LOGFILE_CPIPE) != std::string::npos )
 	{
 		const char * default_pdf_viewer = getenv ("RELION_PDFVIEWER_EXECUTABLE");
 		char mydefault[]=DEFAULTPDFVIEWER;
@@ -1529,13 +1534,11 @@ void GuiMainWindow::cb_display_io_node_i()
 		std::string myviewer(default_pdf_viewer);
 		command = myviewer + " " + pipeline.nodeList[mynode].name + "&";
 	}
-	else if (pipeline.nodeList[mynode].type.find(LABEL_POLISH_PARAMS) != std::string::npos ||
-			 pipeline.nodeList[mynode].type.find(NODE_POLISH_PARAMS_LABEL) != std::string::npos )
+	else if (pipeline.nodeList[mynode].type.find(LABEL_POLISH_PARAMS) != std::string::npos )
 	{
 		command = "cat " + pipeline.nodeList[mynode].name;
 	}
-	else if (pipeline.nodeList[mynode].type.find(LABEL_POST) == std::string::npos &&
-			 pipeline.nodeList[mynode].type.find(NODE_POST_LABEL) == std::string::npos)
+	else
 	{
 		command = "relion_display --gui --i " + pipeline.nodeList[mynode].name + " &";
 	}
