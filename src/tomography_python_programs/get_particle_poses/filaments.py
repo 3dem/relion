@@ -32,12 +32,12 @@ def get_poses_along_filament_backbones(
                    "during refinement."
     )
 ):
-    global_df = starfile.read(tilt_series_star_file)
+    global_df = starfile.read(tilt_series_star_file, parse_as_string=['rlnTomoName'])
     global_df = global_df.set_index('rlnTomoName')
     annotation_files = annotations_directory.glob('*_filaments.star')
     dfs = []
     for file in annotation_files:
-        filament_df = starfile.read(file)
+        filament_df = starfile.read(file, parse_as_string=['rlnTomoName'])
         tilt_series_id = '_'.join(file.name.split('_')[:-1])
         pixel_size = float(
             global_df.loc[tilt_series_id, 'rlnTomoTiltSeriesPixelSize']

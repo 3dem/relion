@@ -174,7 +174,7 @@ def view_particles(
     )
 ):
     # read in particle STAR file and get particle dataframe per tomogram
-    star = starfile.read(particle_star_file, always_dict=True)
+    star = starfile.read(particle_star_file, always_dict=True, parse_as_string=['rlnTomoName'])
     particle_df = star['particles']
     if 'optics' in star:
         particle_df = particle_df.merge(star['optics'], on='rlnOpticsGroup')
@@ -182,7 +182,7 @@ def view_particles(
 
     # if requested, read in tomogram STAR file and get dataframe per tomogram
     if tilt_series_star_file is not None:
-        tomogram_df = starfile.read(tilt_series_star_file)
+        tomogram_df = starfile.read(tilt_series_star_file, parse_as_string=['rlnTomoName'])
         tomogram_df_grouped = tomogram_df.groupby('rlnTomoName')
 
     # construct a widget for switching between different tomograms

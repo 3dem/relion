@@ -36,7 +36,7 @@ class RlnTiltSeriesSet(BaseModel):
             filename: os.PathLike,
             tilt_series_id: Optional[str] = None
     ):
-        star = starfile.read(filename, always_dict=True)
+        star = starfile.read(filename, always_dict=True, parse_as_string=['rlnTomoName'])
         global_df = star['global'].set_index('rlnTomoName', drop=False)
         if tilt_series_id is not None:  # get single tilt-series
             global_df = global_df.loc[tilt_series_id]
