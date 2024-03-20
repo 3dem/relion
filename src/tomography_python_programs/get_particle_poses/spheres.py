@@ -37,16 +37,23 @@ def derive_poses_on_spheres(
         tilt_series_id = '_'.join(file.name.split('_')[:-1])
         pixel_size = float(
             global_df.loc[tilt_series_id, 'rlnTomoTiltSeriesPixelSize'])
-        scale_factor = float(
-            global_df.loc[tilt_series_id, 'rlnTomoTomogramBinning'])
+
+        tomo_size = global_df.loc[tilt_series_id][
+            ['rlnTomoSizeX', 'rlnTomoSizeY', 'rlnTomoSizeZ']
+        ].to_numpy().astype(float)
+        tomo_center = (tomo_size / 2 - 1) * pixel_size
+
+        scale_factor = pixel_size * \
+            float(global_df.loc[tilt_series_id, 'rlnTomoTomogramBinning'])
         centers = sphere_df[['rlnCoordinateX',
-                             'rlnCoordinateY', 'rlnCoordinateZ']]
-        centers = centers.to_numpy() * scale_factor
+                             'rlnCoordinateY',
+                             'rlnCoordinateZ']]
+        centers = centers.to_numpy() * scale_factor - tomo_center
         radii = sphere_df['rlnSphereRadius'].to_numpy() * scale_factor
+
         for center, radius in zip(centers, radii):
             sphere = Sphere(center=center, radius=radius)
-            sampler = sphere_samplers.PoseSampler(
-                spacing=spacing_angstroms / pixel_size)
+            sampler = sphere_samplers.PoseSampler(spacing=spacing_angstroms)
             poses = sampler.sample(sphere)
 
             # rot/psi are locked when tilt==0
@@ -61,9 +68,9 @@ def derive_poses_on_spheres(
 
             data = {
                 'rlnTomoName': [tilt_series_id] * len(poses),
-                'rlnCoordinateX': poses.positions[:, 0],
-                'rlnCoordinateY': poses.positions[:, 1],
-                'rlnCoordinateZ': poses.positions[:, 2],
+                'rlnCenteredCoordinateXAngst': poses.positions[:, 0],
+                'rlnCenteredCoordinateYAngst': poses.positions[:, 1],
+                'rlnCenteredCoordinateZAngst': poses.positions[:, 2],
                 'rlnTomoSubtomogramRot': eulers[:, 0],
                 'rlnTomoSubtomogramTilt': eulers[:, 1],
                 'rlnTomoSubtomogramPsi': eulers[:, 2],
