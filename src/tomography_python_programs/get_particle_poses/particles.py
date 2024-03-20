@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pandas as pd
-import numpy as np
 import starfile
 import typer
 from rich.console import Console
@@ -26,7 +25,7 @@ def combine_particle_annotations(
         ..., help="directory into which 'particles.star' will be written."
     )
 ):
-    console.log("Running get_particle_poses combine-particles.")
+    console.log("Running get_particle_poses particles.")
 
     global_df = starfile.read(tilt_series_star_file)
     global_df = global_df.set_index('rlnTomoName')
@@ -35,11 +34,28 @@ def combine_particle_annotations(
     for file in annotation_files:
         df = starfile.read(file)
         tilt_series_id = '_'.join(file.name.split('_')[:-1])
-        scale_factor = float(
-            global_df.loc[tilt_series_id, 'rlnTomoTomogramBinning'])
+        pixel_size = float(
+            global_df.loc[tilt_series_id, 'rlnTomoTiltSeriesPixelSize'])
+
+        tomo_size = global_df.loc[tilt_series_id][
+            ['rlnTomoSizeX', 'rlnTomoSizeY', 'rlnTomoSizeZ']
+        ].to_numpy().astype(float)
+        tomo_center = (tomo_size / 2 - 1) * pixel_size
+
+        scale_factor = pixel_size * \
+            float(global_df.loc[tilt_series_id, 'rlnTomoTomogramBinning'])
+
         xyz = df[['rlnCoordinateX', 'rlnCoordinateY', 'rlnCoordinateZ']]
-        xyz = xyz.to_numpy() * scale_factor
+        xyz = xyz.to_numpy() * scale_factor - tomo_center
+
         df[['rlnCoordinateX', 'rlnCoordinateY', 'rlnCoordinateZ']] = xyz
+
+        df.rename(columns={
+            'rlnCoordinateX': 'rlnCenteredCoordinateXAngst',
+            'rlnCoordinateY': 'rlnCenteredCoordinateYAngst',
+            'rlnCoordinateZ': 'rlnCenteredCoordinateZAngst'
+        }, inplace=True)
+
         dfs.append(df)
     df = pd.concat(dfs)
     output_file = output_directory / 'particles.star'
@@ -66,12 +82,13 @@ def create_annotations_from_previous_star_file(
         None, help='STAR file with particles to annotate on the tomogram'
     )
 ):
-    console.log("Running get_particle_poses split-particles.")
+    console.log("Running get_particle_poses particles-from-star.")
 
     annotations_directory.mkdir(parents=True, exist_ok=True)
 
     star_data = starfile.read(in_star_file)
     tomo_data = starfile.read(tomograms_file)
+    tomo_data = tomo_data.set_index('rlnTomoName')
 
     if isinstance(star_data, pd.DataFrame):
         particles_df = star_data
@@ -104,27 +121,15 @@ def create_annotations_from_previous_star_file(
             continue
 
         tomo_df = particles_df.loc[particles_df['rlnTomoName'] == tomo_name]
-        tomo_bin = tomo_data.rlnTomoTomogramBinning[
-            tomo_data.rlnTomoName == tomo_name
-        ]
-        tomo_x = tomo_data.rlnTomoSizeX[tomo_data.rlnTomoName == tomo_name]
-        tomo_y = tomo_data.rlnTomoSizeY[tomo_data.rlnTomoName == tomo_name]
-        tomo_z = tomo_data.rlnTomoSizeZ[tomo_data.rlnTomoName == tomo_name]
-        assert (len(tomo_bin) == 1)
-        assert (len(tomo_x) == 1)
-        assert (len(tomo_y) == 1)
-        assert (len(tomo_z) == 1)
-        tomo_bin = tomo_bin.iloc[0]
-        tomo_x = tomo_x.iloc[0]
-        tomo_y = tomo_y.iloc[0]
-        tomo_z = tomo_z.iloc[0]
-        shift = np.array([tomo_x, tomo_y, tomo_z]) / 2
+        tomo_bin = tomo_data.loc[tomo_name, 'rlnTomoTomogramBinning']
 
-        tilt_series_pixel_size = tomo_data.rlnTomoTiltSeriesPixelSize[
-            tomo_data['rlnTomoName'] == tomo_name
-        ]
-        assert (len(tilt_series_pixel_size) == 1)
-        pixel_size = tilt_series_pixel_size.iloc[0]
+        tomo_size = tomo_data.loc[tomo_name][
+            ['rlnTomoSizeX', 'rlnTomoSizeY', 'rlnTomoSizeZ']
+        ].to_numpy().astype(float)
+        shift = tomo_size / 2
+
+        pixel_size = float(
+            tomo_data.loc[tomo_name, 'rlnTomoTiltSeriesPixelSize'])
 
         new_coords = tomo_df.apply(
             lambda df_row: rlnOrigin_to_rlnCoordinate_row(df_row, pixel_size),
@@ -144,7 +149,7 @@ def create_annotations_from_previous_star_file(
 
 
 def rlnOrigin_to_rlnCoordinate_row(df_row, pixel_size):
-    """Given a row of the particles DataFrame and the pixel size of the 
+    """Given a row of the particles DataFrame and the pixel size of the
     corresponding tilt series image, incorporate rlnOriginX/Y/ZAgst
     coordinates into rlnCoordinateX/Y/Z."""
 
