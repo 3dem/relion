@@ -35,20 +35,25 @@ def derive_poses_on_spheres(
     for file in annotation_files:
         sphere_df = starfile.read(file)
         tilt_series_id = '_'.join(file.name.split('_')[:-1])
-        pixel_size = float(global_df.loc[tilt_series_id, 'rlnTomoTiltSeriesPixelSize'])
-        scale_factor = float(global_df.loc[tilt_series_id, 'rlnTomoTomogramBinning'])
-        centers = sphere_df[['rlnCoordinateX', 'rlnCoordinateY', 'rlnCoordinateZ']]
+        pixel_size = float(
+            global_df.loc[tilt_series_id, 'rlnTomoTiltSeriesPixelSize'])
+        scale_factor = float(
+            global_df.loc[tilt_series_id, 'rlnTomoTomogramBinning'])
+        centers = sphere_df[['rlnCoordinateX',
+                             'rlnCoordinateY', 'rlnCoordinateZ']]
         centers = centers.to_numpy() * scale_factor
         radii = sphere_df['rlnSphereRadius'].to_numpy() * scale_factor
         for center, radius in zip(centers, radii):
             sphere = Sphere(center=center, radius=radius)
-            sampler = sphere_samplers.PoseSampler(spacing=spacing_angstroms / pixel_size)
+            sampler = sphere_samplers.PoseSampler(
+                spacing=spacing_angstroms / pixel_size)
             poses = sampler.sample(sphere)
 
             # rot/psi are locked when tilt==0
             # rotate particles 90 degrees around the Y-axis so that tilt ~=90
             # during refinement
-            rotated_basis = R.from_euler('y', angles=90, degrees=True).as_matrix()
+            rotated_basis = R.from_euler(
+                'y', angles=90, degrees=True).as_matrix()
             rotated_orientations = poses.orientations @ rotated_basis
             eulers = R.from_matrix(rotated_orientations).inv().as_euler(
                 seq='ZYZ', degrees=True,
@@ -76,7 +81,7 @@ def derive_poses_on_spheres(
     output_file = output_directory / 'particles.star'
     starfile.write({'particles': df}, output_file, overwrite=True)
 
-    df2 = pd.DataFrame({'rlnTomoParticlesFile' : [output_file],
-                        'rlnTomoTomogramsFile' : [tilt_series_star_file]})
+    df2 = pd.DataFrame({'rlnTomoParticlesFile': [output_file],
+                        'rlnTomoTomogramsFile': [tilt_series_star_file]})
     opt_file = output_directory / 'optimisation_set.star'
     starfile.write({'optimisation_set': df2}, opt_file, overwrite=True)
