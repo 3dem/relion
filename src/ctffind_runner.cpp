@@ -372,49 +372,49 @@ void CtffindRunner::run()
 
 	if (!do_only_join_results)
 	{
-				int barstep;
-				if (verb > 0)
-				{
-		            if (is_ctffind4)
-		                std::cout << " Estimating CTF parameters using Alexis Rohou's and Niko Grigorieff's CTFFIND4.1 ..." << std::endl;
-		            else if (is_ctffind5)
-		                std::cout << " Estimating CTF parameters using CTFFIND5 from cisTEM ..." << std::endl;
-		            else
-		                std::cout << " Estimating CTF parameters using Niko Grigorieff's CTFFIND ..." << std::endl;
-					init_progress_bar(fn_micrographs.size());
-					barstep = XMIPP_MAX(1, fn_micrographs.size() / 60);
-				}
+		int barstep;
+		if (verb > 0)
+		{
+			if (is_ctffind4)
+				std::cout << " Estimating CTF parameters using Alexis Rohou's and Niko Grigorieff's CTFFIND4.1 ..." << std::endl;
+			else if (is_ctffind5)
+				std::cout << " Estimating CTF parameters using CTFFIND5 from cisTEM ..." << std::endl;
+			else
+				std::cout << " Estimating CTF parameters using Niko Grigorieff's CTFFIND ..." << std::endl;
+			init_progress_bar(fn_micrographs.size());
+			barstep = XMIPP_MAX(1, fn_micrographs.size() / 60);
+		}
 
 				std::vector<std::string> allmicnames;
 		for (long int imic = 0; imic < fn_micrographs.size(); imic++)
 		{
 
 			// Abort through the pipeline_control system
-						if (pipeline_control_check_abort_job())
-							exit(RELION_EXIT_ABORTED);
+			if (pipeline_control_check_abort_job())
+				exit(RELION_EXIT_ABORTED);
 
-						// Get angpix and voltage from the optics groups:
-						obsModel.opticsMdt.getValue(EMDL_CTF_CS, Cs, optics_group_micrographs[imic]-1);
-						obsModel.opticsMdt.getValue(EMDL_CTF_VOLTAGE, Voltage, optics_group_micrographs[imic]-1);
-						obsModel.opticsMdt.getValue(EMDL_CTF_Q0, AmplitudeConstrast, optics_group_micrographs[imic]-1);
-			            EMDLabel mylabel = (is_tomo) ? EMDL_TOMO_TILT_SERIES_PIXEL_SIZE : EMDL_MICROGRAPH_PIXEL_SIZE;
-			            obsModel.opticsMdt.getValue(mylabel, angpix, optics_group_micrographs[imic]-1);
+			// Get angpix and voltage from the optics groups:
+			obsModel.opticsMdt.getValue(EMDL_CTF_CS, Cs, optics_group_micrographs[imic]-1);
+			obsModel.opticsMdt.getValue(EMDL_CTF_VOLTAGE, Voltage, optics_group_micrographs[imic]-1);
+			obsModel.opticsMdt.getValue(EMDL_CTF_Q0, AmplitudeConstrast, optics_group_micrographs[imic]-1);
+			EMDLabel mylabel = (is_tomo) ? EMDL_TOMO_TILT_SERIES_PIXEL_SIZE : EMDL_MICROGRAPH_PIXEL_SIZE;
+			obsModel.opticsMdt.getValue(mylabel, angpix, optics_group_micrographs[imic]-1);
 
-						if (is_ctffind4)
-						{
-							executeCtffind4(imic);
-						}
-						else if (is_ctffind5)
-						{
-							executeCtffind5(imic);
-						}
-						else
-						{
-							executeCtffind3(imic);
-						}
+			if (is_ctffind4)
+			{
+				executeCtffind4(imic);
+			}
+			else if (is_ctffind5)
+			{
+				executeCtffind5(imic);
+			}
+			else
+			{
+				executeCtffind3(imic);
+			}
 
-						if (verb > 0 && imic % barstep == 0)
-							progress_bar(imic);
+			if (verb > 0 && imic % barstep == 0)
+				progress_bar(imic);
 		}
 
 		if (verb > 0)
