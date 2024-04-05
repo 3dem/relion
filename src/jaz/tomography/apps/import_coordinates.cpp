@@ -150,6 +150,7 @@ int main(int argc, char *argv[])
 		FileName inStarFn, tomoFn, outDir;
 		bool is_centered, is_angst;
         RFLOAT angpix;
+        std::string remove_substring, remove_substring2;
 
 		try
 		{
@@ -162,6 +163,8 @@ int main(int argc, char *argv[])
 			is_centered = parser.checkOption("--centered", "Are the coordinates relative to the center of the tomogram?");
             is_angst = parser.checkOption("--in_angstrom", "Are the coordinates in Angstroms?");
             angpix = textToFloat(parser.getOption("--angpix", "Pixel size for conversion from/to coordinates in Angstroms", "1.0"));
+            remove_substring = parser.getOption("--remove_substring", "Remove this substring from the coordinate filenames to get the tomogram names", "");
+            remove_substring2 = parser.getOption("--remove_substring2", "Remove also this substring from the coordinate filenames to get the tomogram names", "");
 
 			Log::readParams(parser);
 
@@ -201,17 +204,19 @@ int main(int argc, char *argv[])
             {
                 // If the partfile is a STAR file, see if it contains a rlnTomoName and use that one
                 MetaDataTable MDpart;
-                std::string tomoname = "None";
+                FileName tomoname = "None";
                 if (!(MDpart.read(fns_partfiles[i]) && MDpart.containsLabel(EMDL_TOMO_NAME)))
+                {
                     tomoname = (fns_partfiles[i].afterLastOf("/")).beforeLastOf(".");
+                    tomoname.replaceAllSubstrings(remove_substring, "");
+                    tomoname.replaceAllSubstrings(remove_substring2, "");
+                }
                 MDin.addObject();
                 MDin.setValue(EMDL_TOMO_NAME, tomoname);
                 MDin.setValue(EMDL_TOMO_IMPORT_PARTICLE_FILE, fns_partfiles[i]);
             }
 
         }
-
-        MDin.write(std::cerr);
 
         if (!MDin.containsLabel(EMDL_TOMO_NAME))
             REPORT_ERROR("Input star file " + inStarFn + " does not contain tomogram names (rlnTomoName)");

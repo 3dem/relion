@@ -2584,6 +2584,8 @@ void JobWindow::initialiseTomoImportWindow()
     place("is_center", TOGGLE_DEACTIVATE);
     place("in_angst", TOGGLE_DEACTIVATE);
     place("angpix", TOGGLE_DEACTIVATE);
+    place("remove_substring", TOGGLE_DEACTIVATE);
+    place("remove_substring2", TOGGLE_DEACTIVATE);
     group1->end();
     guientries["do_coords"].cb_menu_i(); // make default active
 

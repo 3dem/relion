@@ -6438,7 +6438,8 @@ void RelionJob::initialiseTomoImportJob()
 	joboptions["is_center"] = JobOption("Text files contain centered coordinates?", true, "Specify Yes if coordinates in the input text files are relative to the center of the tomogram. If set to No, coordinates are assumed to be relative to the upper corner of the tomograms.");
     joboptions["in_angst"] = JobOption("Text files contain coordinates in Angstroms?", true, "Specify Yes if coordinates in the input text files are in Angstroms. If set to No, coordinates are assumed to be in pixels.");
     joboptions["angpix"] = JobOption("Pixel size:", 1, 0, 20, 1, "Pixel size (in Angstrom) used for the conversion described under the Input coordinates option above.");
-
+    joboptions["remove_substring"] = JobOption("Remove substring from filenames: ", (std::string)"", "If specified, this substring is removed from the coordinate filenames to get the tomogram names");
+    joboptions["remove_substring2"] = JobOption("Second substring to remove: ", (std::string)"", "If specified, this substring is removed from the coordinate filenames to get the tomogram names");
 }
 
 bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<std::string> &commands,
@@ -6459,6 +6460,10 @@ bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<st
         if (joboptions["in_angst"].getBoolean())
             command += " --in_angstrom ";
         command += " --angpix " + joboptions["angpix"].getString();
+        if (joboptions["remove_substring"].getString() != "")
+            command += " --remove_substring " + joboptions["remove_substring"].getString();
+        if (joboptions["remove_substring2"].getString() != "")
+            command += " --remove_substring2 " + joboptions["remove_substring2"].getString();
 
         Node node(outputname + "particles.star", LABEL_IMPORT_TOMO_COORDS);
         outputNodes.push_back(node);
