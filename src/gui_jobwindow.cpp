@@ -2534,7 +2534,7 @@ void JobWindow::placeTomoInput(bool has_tomograms, bool has_particles,
 
 void JobWindow::initialiseTomoImportWindow()
 {
-	setupTabs(2);
+	setupTabs(3);
 
     tab1->begin();
 	tab1->label("General");
@@ -2569,6 +2569,28 @@ void JobWindow::initialiseTomoImportWindow()
     place("flip_tiltseries_hand", TOGGLE_DEACTIVATE);
 
 	tab2->end();
+
+    tab3->begin();
+    tab3->label("Coordinates");
+    resetHeight();
+
+    group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group1->end();
+
+    place("do_coords", TOGGLE_DEACTIVATE, group1, false);
+
+    group1->begin();
+    place("in_coords", TOGGLE_DEACTIVATE);
+    place("is_center", TOGGLE_DEACTIVATE);
+    place("in_angst", TOGGLE_DEACTIVATE);
+    place("angpix", TOGGLE_DEACTIVATE);
+    place("remove_substring", TOGGLE_DEACTIVATE);
+    place("remove_substring2", TOGGLE_DEACTIVATE);
+    group1->end();
+    guientries["do_coords"].cb_menu_i(); // make default active
+
+    tab3->end();
+
 }
 
 void JobWindow::initialiseTomoAlignTiltseriesWindow()

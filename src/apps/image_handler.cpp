@@ -24,6 +24,7 @@
 #include <src/fftw.h>
 #include <src/time.h>
 #include <src/symmetries.h>
+#include <src/postprocessing.h>
 #include <src/jaz/single_particle/obs_model.h>
 #ifdef HAVE_PNG
 #include <src/jaz/gravis/tImage.h>
@@ -36,10 +37,10 @@ class image_handler_parameters
 	public:
    	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_mask, fn_fsc, fn_adjust_power, fn_correct_ampl, fn_fourfilter, fn_cosDPhi;
 	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr, my_new_box_size;
-	bool do_add_edge, do_invert_hand, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan, do_average_all_frames, do_power, do_ignore_optics, do_optimise_scale_subtract, write_float16;
+	bool do_add_edge, do_invert_hand, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan, do_average_all_frames, do_power, do_guinier, do_ignore_optics, do_optimise_scale_subtract, write_float16;
 	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, requested_angpix, real_angpix, force_header_angpix, lowpass, highpass, logfilter, bfactor, shift_x, shift_y, shift_z, replace_nan, randomize_at, optimise_bfactor_subtract;
 	// PNG options
-	RFLOAT minval, maxval, sigma_contrast;
+	RFLOAT minval, maxval, sigma_contrast, guinier_fit_minres, guinier_fit_maxres;
 	int color_scheme; // There is a global variable called colour_scheme in displayer.h!
 
 	std::string directional;
@@ -89,7 +90,10 @@ class image_handler_parameters
 		fn_add = parser.getOption("--add", "Add the pixel values in this image to the input image(s) ", "");
 		fn_subtract = parser.getOption("--subtract", "Subtract the pixel values in this image to the input image(s) ", "");
 		fn_fsc = parser.getOption("--fsc", "Calculate FSC curve of the input image with this image", "");
-		do_power = parser.checkOption("--power", "Calculate power spectrum (|F|^2) of the input image");
+        do_power = parser.checkOption("--power", "Calculate power spectrum (|F|^2) of the input image");
+        do_guinier = parser.checkOption("--guinier", "Calculate Guinier plot and determine B-factor of the input image");
+        guinier_fit_minres = textToFloat(parser.getOption("--guinier_minres", "Lowest resolution (in A) to include in fitting of the B-factor", "10."));
+        guinier_fit_maxres = textToFloat(parser.getOption("--guinier_maxres", "Highest resolution (in A) to include in fitting of the B-factor", "0.01"));
 		fn_adjust_power = parser.getOption("--adjust_power", "Adjust the power spectrum of the input image to be the same as this image ", "");
 		fn_fourfilter = parser.getOption("--fourier_filter", "Multiply the Fourier transform of the input image(s) with this one image ", "");
 
@@ -165,7 +169,7 @@ class image_handler_parameters
 		if (parser.checkForErrors())
 			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 
-		verb = (do_stats || do_calc_com || fn_fsc !="" || fn_cosDPhi != "" | do_power) ? 0 : 1;
+		verb = (do_stats || do_calc_com || fn_fsc !="" || fn_cosDPhi != "" || do_power || do_guinier) ? 0 : 1;
 
 		if (fn_out == "" && verb == 1)
 			REPORT_ERROR("Please specify the output file name with --o.");
@@ -181,7 +185,7 @@ class image_handler_parameters
 			REPORT_ERROR("You can only write a 2D image to a PNG file.");
 
 		if (angpix < 0 && (requested_angpix > 0 || fn_fsc != "" || randomize_at > 0 ||
-		                   do_power || fn_cosDPhi != "" || fn_correct_ampl != "" ||
+		                   do_power || do_guinier || fn_cosDPhi != "" || fn_correct_ampl != "" ||
 		                   fabs(bfactor) > 0 || logfilter > 0 || lowpass > 0 || highpass > 0 || fabs(optimise_bfactor_subtract) > 0))
 		{
 			angpix = Iin.samplingRateX();
@@ -407,22 +411,89 @@ class image_handler_parameters
 		}
 		else if (do_power)
 		{
-			MultidimArray<RFLOAT> spectrum;
-			getSpectrum(Iout(), spectrum, POWER_SPECTRUM);
+			MultidimArray<RFLOAT> power_spectrum, ampl_spectrum;
+            getSpectrum(Iout(), power_spectrum, POWER_SPECTRUM);
+            getSpectrum(Iout(), ampl_spectrum, AMPLITUDE_SPECTRUM);
 			MetaDataTable MDpower;
 			MDpower.setName("power");
-			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(spectrum)
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(power_spectrum)
 			{
 				if (i > XSIZE(Iout()) / 2 + 1) break; // getSpectrum returns beyond Nyquist!!
 
 				MDpower.addObject();
 				RFLOAT res = (i > 0) ? (XSIZE(Iout()) * angpix / (RFLOAT)i) : 999.;
 				MDpower.setValue(EMDL_SPECTRAL_IDX, (int)i);
-				MDpower.setValue(EMDL_RESOLUTION, 1./res);
+                MDpower.setValue(EMDL_RESOLUTION, 1./res);
+                MDpower.setValue(EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, 1./(res*res));
 				MDpower.setValue(EMDL_RESOLUTION_ANGSTROM, res);
-				MDpower.setValue(EMDL_MLMODEL_POWER_REF, DIRECT_A1D_ELEM(spectrum, i));
+				MDpower.setValue(EMDL_MLMODEL_POWER_REF, DIRECT_A1D_ELEM(power_spectrum, i));
+                MDpower.setValue(EMDL_POSTPROCESS_GUINIER_VALUE_IN, log(DIRECT_A1D_ELEM(ampl_spectrum, i)));
 			}
 			MDpower.write(std::cout);
+		}
+		else if (do_guinier)
+		{
+
+            std::vector<fit_point2D>  guinier;
+            MultidimArray<Complex > FT;
+            FourierTransformer transformer;
+            transformer.FourierTransform(Iout(), FT, true);
+
+
+            MultidimArray<int> radial_count(XSIZE(FT));
+            MultidimArray<RFLOAT> lnF(XSIZE(FT));
+            fit_point2D      onepoint;
+
+            FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
+                    {
+                        int r2 = kp * kp + ip * ip + jp * jp;
+                        int ires = ROUND(sqrt((RFLOAT)r2));
+                        if (ires < XSIZE(radial_count))
+                        {
+                            lnF(ires) += abs(DIRECT_A3D_ELEM(FT, k, i, j));
+                            radial_count(ires)++;
+                        }
+                    }
+
+            RFLOAT xsize = XSIZE(Iout());
+            guinier.clear();
+            FOR_ALL_ELEMENTS_IN_ARRAY1D(radial_count)
+            {
+
+                RFLOAT res = (xsize * angpix)/(RFLOAT)i; // resolution in Angstrom
+                if (res >= angpix * 2.) // Apply B-factor sharpening until Nyquist, then low-pass filter later on (with a soft edge)
+                {
+                    onepoint.x = 1. / (res * res);
+                    if (DIRECT_A1D_ELEM(lnF, i) > 0.)
+                    {
+                        onepoint.y = log ( DIRECT_A1D_ELEM(lnF, i) / DIRECT_A1D_ELEM(radial_count, i) );
+                        if (res <= guinier_fit_minres && res >= guinier_fit_maxres)
+                        {
+                            onepoint.w = 1.;
+                        }
+                        else
+                        {
+                            onepoint.w = 0.;
+                        }
+                    }
+                    else
+                    {
+                        onepoint.y = -99.;
+                        onepoint.w = 0.;
+                    }
+                    //std::cerr << " onepoint.x= " << onepoint.x << " onepoint.y= " << onepoint.y << " onepoint.w= " << onepoint.w << std::endl;
+                    guinier.push_back(onepoint);
+                }
+            }
+
+            RFLOAT slope, intercept, corr_coeff, bfactor;
+            fitStraightLine(guinier, slope, intercept, corr_coeff);
+            bfactor = 4. * slope;
+            std::cout.width(35); std::cout << std::left  <<"  + slope of fit: "; std::cout << slope << std::endl;
+			std::cout.width(35); std::cout << std::left  <<"  + intercept of fit: "; std::cout << intercept << std::endl;
+			std::cout.width(35); std::cout << std::left  <<"  + correlation of fit: "; std::cout << corr_coeff << std::endl;
+            std::cout.width(35); std::cout << std::left  <<"  + bfactor: "; std::cout << -bfactor << std::endl;
+
 		}
 		else if (fn_adjust_power != "")
 		{

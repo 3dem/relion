@@ -6430,6 +6430,16 @@ void RelionJob::initialiseTomoImportJob()
 	joboptions["flip_tiltseries_hand"] = JobOption("Invert defocus handedness?", true, "Specify Yes to flip the handedness of the defocus geometry (default = Yes (value -1 in the STAR file), the same as the tutorial dataset: EMPIAR-10164)");
 	joboptions["images_are_motion_corrected"] = JobOption("Movies already motion corrected?", false, "Select Yes if your input images in 'Tilt image movie files' have already been motion corrected and/or are summed single frame images. Make sure the image file names match the corresponding image file names under SubFramePath in the mdoc files");
 
+    joboptions["do_coords"] = JobOption("Or Import coordinates instead?", false, "Set this to Yes for importing particle coordinates.");
+    joboptions["in_coords"] = JobOption("Input coordinates: ", "", "Input file (*.star)", ".", "You can provide a 2-column STAR file (with columns rlnTomoName and  rlnTomoImportParticleFile for the tomogram names and their corrsesponding particle coordinate files, OR you can provide a linux wildcard to all the particle coordinate files. \
+ The coordinate files can be in RELION STAR format, or in ASCII text files. Input STAR file should contain either rlnCoordinateX/Y/Z columns with non-centered coordinates in binned pixels, or rlnCenteredCoordinateX/Y/ZAngst column with coordinates in Angstroms from the center of the tomograms). \
+ ASCII files may contain headers, but all lines where the first 3 columns contain numbers will be interpreted as data lines. The first 3 columns are assumed to be X, Y and Z coordinates. If 6 columns are present, columns 4,5 and 6 are assumed to be the rlnTomoSubtomogramRot/Tilt/Psi. \
+ For text files, the options below are used to indicate whether the coordinates are relative to the centre of the tomogram, whether they are in Angstroms. If the coordinates are centered, but in pixels, the coordinates will be multiplied with the pixel size below. If the coordinates are not centered, then they should be pixels of the binned tomograms. If they aren't, a division by the pixel size below can be used for this conversion.");
+	joboptions["is_center"] = JobOption("Text files contain centered coordinates?", true, "Specify Yes if coordinates in the input text files are relative to the center of the tomogram. If set to No, coordinates are assumed to be relative to the upper corner of the tomograms.");
+    joboptions["in_angst"] = JobOption("Text files contain coordinates in Angstroms?", true, "Specify Yes if coordinates in the input text files are in Angstroms. If set to No, coordinates are assumed to be in pixels.");
+    joboptions["angpix"] = JobOption("Pixel size:", 1, 0, 20, 1, "Pixel size (in Angstrom) used for the conversion described under the Input coordinates option above.");
+    joboptions["remove_substring"] = JobOption("Remove substring from filenames: ", (std::string)"", "If specified, this substring is removed from the coordinate filenames to get the tomogram names");
+    joboptions["remove_substring2"] = JobOption("Second substring to remove: ", (std::string)"", "If specified, this substring is removed from the coordinate filenames to get the tomogram names");
 }
 
 bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<std::string> &commands,
@@ -6439,34 +6449,59 @@ bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<st
 	initialisePipeline(outputname, job_counter);
 	std::string command;
 
-    command = "relion_python_tomo_import SerialEM ";
-    command += " --tilt-image-movie-pattern \"" + joboptions["movie_files"].getString() + "\"";
-    command += " --mdoc-file-pattern \"" + joboptions["mdoc_files"].getString() + "\"";
-    command += " --nominal-tilt-axis-angle " + joboptions["tilt_axis_angle"].getString();
-    command += " --nominal-pixel-size " + joboptions["angpix"].getString();
-    command += " --voltage " + joboptions["kV"].getString();
-    command += " --spherical-aberration " + joboptions["Cs"].getString();
-    command += " --amplitude-contrast " + joboptions["Q0"].getString();
-    command += " --tilt-image-movie-pattern \"" + joboptions["movie_files"].getString() + "\"";
-    command += " --optics-group-name \"" + joboptions["optics_group_name"].getString() + "\"";
+    if (joboptions["do_coords"].getBoolean())
+    {
 
-    if (joboptions["dose_is_per_movie_frame"].getBoolean())
-        command += " --dose-per-movie-frame " + joboptions["dose_rate"].getString();
+        command = "relion_tomo_import_coordinates ";
+        command += " --i \"" + joboptions["in_coords"].getString() + "\"";
+        command += " --o " + outputname;
+        if (joboptions["is_center"].getBoolean())
+            command += " --centered ";
+        if (joboptions["in_angst"].getBoolean())
+            command += " --in_angstrom ";
+        command += " --angpix " + joboptions["angpix"].getString();
+        if (joboptions["remove_substring"].getString() != "")
+            command += " --remove_substring " + joboptions["remove_substring"].getString();
+        if (joboptions["remove_substring2"].getString() != "")
+            command += " --remove_substring2 " + joboptions["remove_substring2"].getString();
+
+        Node node(outputname + "particles.star", LABEL_IMPORT_TOMO_COORDS);
+        outputNodes.push_back(node);
+
+    }
     else
-        command += " --dose-per-tilt-image " + joboptions["dose_rate"].getString();
-    if (joboptions["prefix"].getString() != "")
-        command += " --prefix " + joboptions["prefix"].getString();
-    if (joboptions["mtf_file"].getString() != "")
-        command += " --mtf-file " + joboptions["mtf_file"].getString();
-    if (joboptions["flip_tiltseries_hand"].getBoolean())
-        command += " --invert-defocus-handedness ";
-    if (joboptions["images_are_motion_corrected"].getBoolean())
-        command += " --images-are-motion-corrected ";
+    {
 
-    command += " --output-directory " + outputname;
+        command = "relion_python_tomo_import SerialEM ";
+        command += " --tilt-image-movie-pattern \"" + joboptions["movie_files"].getString() + "\"";
+        command += " --mdoc-file-pattern \"" + joboptions["mdoc_files"].getString() + "\"";
+        command += " --nominal-tilt-axis-angle " + joboptions["tilt_axis_angle"].getString();
+        command += " --nominal-pixel-size " + joboptions["angpix"].getString();
+        command += " --voltage " + joboptions["kV"].getString();
+        command += " --spherical-aberration " + joboptions["Cs"].getString();
+        command += " --amplitude-contrast " + joboptions["Q0"].getString();
+        command += " --tilt-image-movie-pattern \"" + joboptions["movie_files"].getString() + "\"";
+        command += " --optics-group-name \"" + joboptions["optics_group_name"].getString() + "\"";
 
-    Node node(outputname+"tilt_series.star", LABEL_IMPORT_TOMOGRAMS);
-    outputNodes.push_back(node);
+        if (joboptions["dose_is_per_movie_frame"].getBoolean())
+            command += " --dose-per-movie-frame " + joboptions["dose_rate"].getString();
+        else
+            command += " --dose-per-tilt-image " + joboptions["dose_rate"].getString();
+        if (joboptions["prefix"].getString() != "")
+            command += " --prefix " + joboptions["prefix"].getString();
+        if (joboptions["mtf_file"].getString() != "")
+            command += " --mtf-file " + joboptions["mtf_file"].getString();
+        if (joboptions["flip_tiltseries_hand"].getBoolean())
+            command += " --invert-defocus-handedness ";
+        if (joboptions["images_are_motion_corrected"].getBoolean())
+            command += " --images-are-motion-corrected ";
+
+        command += " --output-directory " + outputname;
+
+        Node node(outputname + "tilt_series.star", LABEL_IMPORT_TOMOGRAMS);
+        outputNodes.push_back(node);
+
+    }
 
 	// Other arguments for extraction
 	command += " " + joboptions["other_args"].getString();
