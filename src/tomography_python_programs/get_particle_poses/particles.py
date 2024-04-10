@@ -56,6 +56,8 @@ def combine_particle_annotations(
             'rlnCoordinateZ': 'rlnCenteredCoordinateZAngst'
         }, inplace=True)
 
+        df.insert(loc=0, column='rlnTomoName', value=tilt_series_id)
+
         dfs.append(df)
     df = pd.concat(dfs)
     output_file = output_directory / 'particles.star'
