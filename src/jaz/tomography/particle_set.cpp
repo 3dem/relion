@@ -611,10 +611,6 @@ d3Vector ParticleSet::getParticleCoordDecenteredPixel(ParticleIndex particle_id,
         partTable.getValue(EMDL_IMAGE_COORD_Y, out.y, particle_id.value);
         partTable.getValue(EMDL_IMAGE_COORD_Z, out.z, particle_id.value);
 
-        // The imod corner is at (1,1,1) instead of (0,0,0), and this was used in relion-4
-        out.x += 1.0;
-        out.y += 1.0;
-        out.z += 1.0;
     }
     else
         REPORT_ERROR("Cannot find particle coordinates (rlnCenteredCoordinateX/Y/ZAngst) in particle star file");

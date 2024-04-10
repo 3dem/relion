@@ -2581,11 +2581,16 @@ void JobWindow::initialiseTomoImportWindow()
 
     group1->begin();
     place("in_coords", TOGGLE_DEACTIVATE);
-    place("is_center", TOGGLE_DEACTIVATE);
-    place("in_angst", TOGGLE_DEACTIVATE);
-    place("angpix", TOGGLE_DEACTIVATE);
     place("remove_substring", TOGGLE_DEACTIVATE);
     place("remove_substring2", TOGGLE_DEACTIVATE);
+
+    // Add a little spacer
+    current_y += STEPY/2;
+
+    place("is_center", TOGGLE_DEACTIVATE, group2, false);
+    place("scale_factor", TOGGLE_DEACTIVATE);
+    place("add_factor", TOGGLE_DEACTIVATE);
+
     group1->end();
     guientries["do_coords"].cb_menu_i(); // make default active
 
