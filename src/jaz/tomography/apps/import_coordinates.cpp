@@ -28,7 +28,8 @@
 #include <src/jaz/util/zio.h>
 #include <src/ctf.h>
 
-bool readCoordinateFile(FileName fn_coord, MetaDataTable &MD,  bool is_centered, bool is_angst, RFLOAT angpix = 1.0, std::string tomoname="None")
+bool readCoordinateFile(FileName fn_coord, MetaDataTable &MD,  bool is_centered,
+                        RFLOAT rescale_factor, RFLOAT add_factor, std::string tomoname="None")
 {
     MD.clear();
 
@@ -88,31 +89,17 @@ bool readCoordinateFile(FileName fn_coord, MetaDataTable &MD,  bool is_centered,
                 if (is_centered)
                 {
 
-                    if (!is_angst)
-                    {
-                        num1 *= angpix;
-                        num2 *= angpix;
-                        num3 *= angpix;
-                    }
-
-                    MD.setValue(EMDL_IMAGE_CENT_COORD_X_ANGST, num1);
-                    MD.setValue(EMDL_IMAGE_CENT_COORD_Y_ANGST, num2);
-                    MD.setValue(EMDL_IMAGE_CENT_COORD_Z_ANGST, num3);
+                    MD.setValue(EMDL_IMAGE_CENT_COORD_X_ANGST, num1*rescale_factor + add_factor);
+                    MD.setValue(EMDL_IMAGE_CENT_COORD_Y_ANGST, num2*rescale_factor + add_factor);
+                    MD.setValue(EMDL_IMAGE_CENT_COORD_Z_ANGST, num3*rescale_factor + add_factor);
 
                 }
                 else
                 {
 
-                    if (is_angst)
-                    {
-                        num1 /= angpix;
-                        num2 /= angpix;
-                        num3 /= angpix;
-                    }
-
-                    MD.setValue(EMDL_IMAGE_COORD_X, num1);
-                    MD.setValue(EMDL_IMAGE_COORD_Y, num2);
-                    MD.setValue(EMDL_IMAGE_COORD_Z, num3);
+                    MD.setValue(EMDL_IMAGE_COORD_X, num1*rescale_factor + add_factor);
+                    MD.setValue(EMDL_IMAGE_COORD_Y, num2*rescale_factor + add_factor);
+                    MD.setValue(EMDL_IMAGE_COORD_Z, num3*rescale_factor + add_factor);
 
                 }
 
@@ -148,8 +135,8 @@ int main(int argc, char *argv[])
 		IOParser parser;
 
 		FileName inStarFn, tomoFn, outDir;
-		bool is_centered, is_angst;
-        RFLOAT angpix;
+		bool is_centered;
+        RFLOAT scale_factor, add_factor;
         std::string remove_substring, remove_substring2;
 
 		try
@@ -160,12 +147,11 @@ int main(int argc, char *argv[])
 
 			inStarFn = parser.getOption("--i", "Linux wildcard for set of coordinate files (in STAR or 3/6-column ASCII), or a STAR file with a list of coordinate files and their tomogram name");
 			outDir = parser.getOption("--o", "Name of the output directory");
-			is_centered = parser.checkOption("--centered", "Are the coordinates relative to the center of the tomogram?");
-            is_angst = parser.checkOption("--in_angstrom", "Are the coordinates in Angstroms?");
-            angpix = textToFloat(parser.getOption("--angpix", "Pixel size for conversion from/to coordinates in Angstroms", "1.0"));
             remove_substring = parser.getOption("--remove_substring", "Remove this substring from the coordinate filenames to get the tomogram names", "");
             remove_substring2 = parser.getOption("--remove_substring2", "Remove also this substring from the coordinate filenames to get the tomogram names", "");
-
+            is_centered = parser.checkOption("--centered", "Are the coordinates relative to the center of the tomogram?");
+            scale_factor = textToFloat(parser.getOption("--scale_factor", "Multiply coordinates with this factor", "1.0"));
+            add_factor =  textToFloat(parser.getOption("--add_factor", "Add this value to final coordinates", "0.0"));
 			Log::readParams(parser);
 
 			if (parser.checkForErrors())
@@ -233,7 +219,7 @@ int main(int argc, char *argv[])
             MDin.getValue(EMDL_TOMO_NAME, tomoname);
             MDin.getValue(EMDL_TOMO_IMPORT_PARTICLE_FILE, partfile);
 
-            bool hasAngles = readCoordinateFile(partfile, MDpart, is_centered, is_angst, angpix, tomoname);
+            bool hasAngles = readCoordinateFile(partfile, MDpart, is_centered, scale_factor, add_factor, tomoname);
             if (hasAngles) some_have_angles = true;
             else all_have_angles = false;
 
