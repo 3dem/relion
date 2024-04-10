@@ -56,7 +56,8 @@ def combine_particle_annotations(
             'rlnCoordinateZ': 'rlnCenteredCoordinateZAngst'
         }, inplace=True)
 
-        df.insert(loc=0, column='rlnTomoName', value=tilt_series_id)
+        if 'rlnTomoName' not in df.columns:
+            df.insert(loc=0, column='rlnTomoName', value=tilt_series_id)
 
         dfs.append(df)
     df = pd.concat(dfs)
