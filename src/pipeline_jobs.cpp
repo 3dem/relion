@@ -7358,6 +7358,21 @@ The command 'relion_refine --sym D2 --print_symmetry_ops' prints a list of all s
 RELION uses XMIPP's libraries for symmetry operations. \
 Therefore, look at the XMIPP Wiki for more details:  http://xmipp.cnb.csic.es/twiki/bin/view/Xmipp/WebHome?topic=Symmetry");
 
+
+
+    joboptions["do_helix"] = JobOption("Apply helical symmetry?", false, "If set to Yes, then apply helical symmetry in Fourier space. Note that you may also want to apply helical symmetry in real-space, but that needs to be done from the command line, using the relion_helix_toolbox...");
+    //joboptions["helical_tube_outer_diameter"] = JobOption("Outer helical diameter (A):", 200, 50, 300, 10, "Outer diameter (in Angstroms) of the reconstructed helix. Real-space averaging will be performed within this diameter");
+    joboptions["helical_nr_asu"] = JobOption("Number of unique asymmetrical units:", 1, 1, 100, 1, "Number of unique helical asymmetrical units in each segment box. If the inter-box distance (set in segment picking step) \
+is 100 Angstroms and the estimated helical rise is ~20 Angstroms, then set this value to 100 / 20 = 5 (nearest integer). This integer should not be less than 1. The correct value is essential in measuring the \
+signal to noise ratio in helical reconstruction.");
+    joboptions["helical_twist"] =  JobOption("Helical twist (deg):", -1., -50, 50, 1, "Set helical twist (in degrees) to positive value if it is a right-handed helix. \
+Helical rise is a positive value in Angstroms.");
+    joboptions["helical_rise"] = JobOption("Helical rise (A):", 4.75, 0., 50, 0.5, "Set helical rise (in Amgstroms). This value is always positive");
+    //joboptions["helical_z_percentage"] = JobOption("Central Z length (%):", 20., 5., 80., 1., "Reconstructed helix suffers from inaccuracies of orientation searches. \
+The central part of the box contains more reliable information compared to the top and bottom parts along Z axis, where Fourier artefacts are also present if the \
+number of helical asymmetrical units is larger than 1. Therefore, information from the central part of the box is used for searching and imposing \
+helical symmetry in real space. Set this value (%) to the central part length along Z axis divided by the box size. Values around 30% are commonly used.");
+
 }
 
 bool RelionJob::getCommandsTomoReconPartJob(std::string &outputname, std::vector<std::string> &commands,
@@ -7399,6 +7414,13 @@ bool RelionJob::getCommandsTomoReconPartJob(std::string &outputname, std::vector
     float SNR = joboptions["snr"].getNumber(error_message);
     if (error_message != "") return false;
     if (SNR > 0.) command += " --SNR " + joboptions["snr"].getString();
+
+    if (joboptions["do_helix"].getBoolean())
+    {
+        command += " --nr_helical_asu " + joboptions["helical_nr_asu"].getString();
+        command += " --helical_twist " + joboptions["helical_twist"].getString();
+        command += " --helical_rise " + joboptions["helical_rise"].getString();
+    }
 
     // Running stuff
     command += " --j " + joboptions["nr_threads"].getString();
