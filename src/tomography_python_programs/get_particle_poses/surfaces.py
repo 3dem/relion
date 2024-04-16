@@ -12,26 +12,21 @@ from .._utils.cgal import Polyhedron
 
 COMMAND_NAME = 'surfaces'
 
-def vector2matrix(z_vectors: np.ndarray):
-    """Turn normal vector into rotation matrix
-    Stolen from the PoseSampler class in MorphoSampler.
-    """
-    z_vectors /= np.linalg.norm(z_vectors, axis=-1, keepdims=True)
-    y_vectors = np.cross(z_vectors, [1, 1, 1])
-    y_vectors /= np.linalg.norm(y_vectors, axis=-1, keepdims=True)
-    x_vectors = np.cross(y_vectors, z_vectors)
-    x_vectors /= np.linalg.norm(x_vectors, axis=-1, keepdims=True)
-    orientations = np.empty(shape=(len(z_vectors), 3, 3), dtype=np.float32)
-    orientations[:, :, 0] = x_vectors
-    orientations[:, :, 1] = y_vectors
-    orientations[:, :, 2] = z_vectors
-
-    # randomise in plane rotation
-    angles = np.random.uniform(0, 360, size=(len(z_vectors)))
-    Rz = R.from_euler('z', angles=angles, degrees=True).as_matrix()
-    return orientations @ Rz
-
-
+def vec2euler(vec: np.ndarray, random_rot: bool=True) -> np.ndarray:
+    """Vector is [Z, Y, X] of shape (3,) or (N, 3). The vectors have to be normalized.
+    Returns array of shape (N, 3) with [rot, tilt, psi] in radians."""
+    vec = vec.reshape((-1, 3))
+    out = np.empty_like(vec, dtype=float)
+    # psi: rotation around global Z axis
+    np.arctan2(vec[:, 1], -vec[:, 2], out=out[:, 2])
+    # tilt: rotation around new Y axis
+    np.arccos(vec[:, 0], out=out[:, 1])
+    # rot: rotation around new Z axis (random)
+    if random_rot:
+        out[:, 0] = np.random.rand(len(out)) * 2 * np.pi - np.pi
+    else:
+        out[:, 0] = 0
+    return out
 
 @cli.command(name=COMMAND_NAME, no_args_is_help=True)
 @relion_pipeline_job
@@ -69,10 +64,10 @@ def derive_poses_on_surfaces(
         vertices = polyhedron.vertices_array()
         normals = polyhedron.compute_vertex_normals()
         assert len(vertices) == len(normals)
-        rotated_orientations = vector2matrix(normals[:, (2, 1, 0)]) @ rotated_basis
-        eulers = R.from_matrix(rotated_orientations).inv().as_euler(
-            seq='ZYZ', degrees=True,
-        )
+        eulers = vec2euler(normals)
+        eulers = R.from_matrix(
+            np.linalg.inv(rotated_basis) @ R.from_euler('ZYZ', eulers).as_matrix()
+        ).as_euler(seq='ZYZ', degrees=True)
         assert len(vertices) == len(eulers)
         data = {
             'rlnTomoName': [tilt_series_id] * len(vertices),
