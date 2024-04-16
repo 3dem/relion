@@ -203,6 +203,7 @@ void getFourierTransformsAndCtfs(long int part_id,
             bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
             if (!do_local_angular_searches)
             {
+                // TODO: I am not at all sure this is the right thing to do..... shouldn't it still be X for 3D data too??
                 if (accMLO->shiftsIs3D)
                     ZZ(my_old_offset_helix_coords) = 0.;
                 else
@@ -1214,7 +1215,16 @@ void getAllSquaredDifferencesCoarse(
 			if (accMLO->shiftsIs3D)
 				zshift = oversampled_translations_z[0];
 
-			if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
+            if (op.is_tomo)
+            {
+                // op.old_offset was not yet applied for subtomos!
+                // For helices: op.old_offset is in HELICAL COORDS, not CART_COORDS!
+                xshift += XX(op.old_offset);
+                yshift += YY(op.old_offset);
+                zshift += ZZ(op.old_offset);
+            }
+
+            if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
 			{
 				RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
 				RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
@@ -1225,10 +1235,6 @@ void getAllSquaredDifferencesCoarse(
 
             if (op.is_tomo)
             {
-                // op.old_offset was not yet applied for subtomos!
-                xshift += XX(op.old_offset);
-                yshift += YY(op.old_offset);
-                zshift += ZZ(op.old_offset);
                 baseMLO->mydata.getTranslationInTiltSeries(op.part_id, img_id,
                                                            xshift, yshift, zshift,
                                                            xshift, yshift, zshift);
@@ -1519,7 +1525,16 @@ void getAllSquaredDifferencesFine(
 				if (accMLO->shiftsIs3D)
 					zshift = oversampled_translations_z[iover_trans];
 
-				if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
+                if (op.is_tomo)
+                {
+                    // op.old_offset was not yet applied for subtomos!
+                    // For helices: op.old_offset is in HELICAL COORDS, not CART_COORDS!
+                    xshift += XX(op.old_offset);
+                    yshift += YY(op.old_offset);
+                    zshift += ZZ(op.old_offset);
+                }
+
+                if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
 				{
                     RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
 					RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
@@ -1530,10 +1545,6 @@ void getAllSquaredDifferencesFine(
 
                 if (op.is_tomo)
                 {
-                    // op.old_offset was not yet applied for subtomos!
-                    xshift += XX(op.old_offset);
-                    yshift += YY(op.old_offset);
-                    zshift += ZZ(op.old_offset);
                     baseMLO->mydata.getTranslationInTiltSeries(op.part_id, img_id,
                                                                xshift, yshift, zshift,
                                                                xshift, yshift, zshift);
@@ -2973,6 +2984,15 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					if (accMLO->shiftsIs3D)
 						zshift = oversampled_translations_z[iover_trans];
 
+                    if (op.is_tomo)
+                    {
+                        // op.old_offset was not yet applied for subtomos!
+                        // For helices: op.old_offset is in HELICAL COORDS, not CART_COORDS!
+                        xshift += XX(op.old_offset);
+                        yshift += YY(op.old_offset);
+                        zshift += ZZ(op.old_offset);
+                    }
+
 					if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
 					{
 						RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
@@ -2984,10 +3004,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
                     if (op.is_tomo)
                     {
-                        // op.old_offset was not yet applied for subtomos!
-                        xshift += XX(op.old_offset);
-                        yshift += YY(op.old_offset);
-                        zshift += ZZ(op.old_offset);
                         baseMLO->mydata.getTranslationInTiltSeries(op.part_id, img_id,
                                                                    xshift, yshift, zshift,
                                                                    xshift, yshift, zshift);
