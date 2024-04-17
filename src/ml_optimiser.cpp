@@ -6030,7 +6030,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
                 std::cerr << "  old_offset_helix(p1, p2, z) = (" << XX(my_old_offset_helix_coords) << ", " << YY(my_old_offset_helix_coords) << "," << ZZ(my_old_offset_helix_coords) << ")" << std::endl;
             }
 #endif
-        // We do NOT want to accumulate the offsets in the direction along the helix (which is X in the 2D helical coordinate system, and Z in 3D!)
+        // We do NOT want to accumulate the offsets in the direction along the helix (which is X in the 2D and 3D helical coordinate system)
         // However, when doing helical local searches, we accumulate offsets
         if ( (!do_skip_align) && (!do_skip_rotate) )
         {
@@ -6041,10 +6041,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
             bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
             if (!do_local_angular_searches)
             {
-                if (mymodel.data_dim == 2)
-                    XX(my_old_offset_helix_coords) = 0.;
-                else if (mymodel.data_dim == 3 || mydata.is_tomo)
-                    ZZ(my_old_offset_helix_coords) = 0.;
+                XX(my_old_offset_helix_coords) = 0.;
             }
         }
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH

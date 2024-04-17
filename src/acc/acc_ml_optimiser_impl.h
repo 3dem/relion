@@ -182,7 +182,7 @@ void getFourierTransformsAndCtfs(long int part_id,
     CTOC(accMLO->timer,"nonZeroProb");
 
     // Helical reconstruction: calculate old_offset in the system of coordinates of the helix, i.e. parallel & perpendicular, depending on psi-angle!
-    // For helices do NOT apply old_offset along the direction of the helix!!
+    // For helices do NOT apply old_offset along the direction of the helix (i.e. X-axis) !!
     Matrix1D<RFLOAT> my_old_offset_helix_coords;
     RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
     RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
@@ -203,11 +203,7 @@ void getFourierTransformsAndCtfs(long int part_id,
             bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
             if (!do_local_angular_searches)
             {
-                // TODO: I am not at all sure this is the right thing to do..... shouldn't it still be X for 3D data too??
-                if (accMLO->shiftsIs3D)
-                    ZZ(my_old_offset_helix_coords) = 0.;
-                else
-                    XX(my_old_offset_helix_coords) = 0.;
+                XX(my_old_offset_helix_coords) = 0.;
             }
         }
         // TODO: Now re-calculate the my_old_offset in the real (or image) system of coordinate (rotate -psi angle)

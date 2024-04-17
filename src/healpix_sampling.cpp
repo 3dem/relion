@@ -1741,7 +1741,7 @@ void HealpixSampling::getTranslationsInPixel(long int itrans, int oversampling_o
 		RFLOAT over_xoff = 0., over_yoff = 0., over_zoff = 0.;
 		for (int itrans_overx = 0; itrans_overx < nr_oversamples; itrans_overx++)
 		{
-			if ( (do_helical_refine) && (!is_3d_trans) ) // Helical reconstruction with 2D segments
+			if ( do_helical_refine ) // Helical reconstruction with 2D segments
 				over_xoff = translations_x[itrans] - 0.5 * h_step + (0.5 + itrans_overx) * h_step / nr_oversamples;
 			else
 				over_xoff = translations_x[itrans] - 0.5 * offset_step + (0.5 + itrans_overx) * offset_step / nr_oversamples;
@@ -1752,10 +1752,7 @@ void HealpixSampling::getTranslationsInPixel(long int itrans, int oversampling_o
 				{
 					for (int itrans_overz = 0; itrans_overz < nr_oversamples; itrans_overz++)
 					{
-						if (do_helical_refine) // Helical reconstruction in 3D subtomogram averaging
-							over_zoff = translations_z[itrans] - 0.5 * h_step + (0.5 + itrans_overz) * h_step / nr_oversamples;
-						else
-							over_zoff = translations_z[itrans] - 0.5 * offset_step + (0.5 + itrans_overz) * offset_step / nr_oversamples;
+                        over_zoff = translations_z[itrans] - 0.5 * offset_step + (0.5 + itrans_overz) * offset_step / nr_oversamples;
 
 						my_translations_x.push_back(over_xoff / my_pixel_size);
 						my_translations_y.push_back(over_yoff / my_pixel_size);
@@ -1789,17 +1786,14 @@ void HealpixSampling::getTranslationsInPixel(long int itrans, int oversampling_o
 		for (int iover = 0; iover < my_translations_x.size(); iover++)
 		{
 			// If doing helical refinement, DONT put perturbation onto translations along helical axis???
-			if ( (do_helical_refine) && (!is_3d_trans) ) // Helical reconstruction with 2D segments
+			if ( do_helical_refine ) // Helical reconstruction with 2D segments
 				my_translations_x[iover] += myperturb_helical;
 			else
 				my_translations_x[iover] += myperturb;
 			my_translations_y[iover] += myperturb;
 			if (is_3d_trans)
 			{
-				if (do_helical_refine)
-					my_translations_z[iover] += myperturb_helical; // Helical reconstruction in 3D subtomogram averaging
-				else
-					my_translations_z[iover] += myperturb;
+                my_translations_z[iover] += myperturb;
 			}
 		}
 	}
