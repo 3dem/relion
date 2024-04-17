@@ -564,22 +564,26 @@ void ReconstructParticleProgram::symmetrise(
 		std::vector<BufferedImage<double> >& ctfImgFS,
 		double binnedOutPixelSize)
 {
-	if (symmName != "C1" && symmName != "c1")
+	if ((symmName != "C1" && symmName != "c1") || nr_helical_asu > 1)
 	{
 		std::vector<gravis::d4Matrix> symmetryMatrices;
 
-		if (nr_helical_asu == 1)
-		{
-			Log::print("Applying point-group symmetries");
+        if (symmName != "C1" && symmName != "c1")
+        {
+            Log::print("Applying point-group symmetries");
 
-			symmetryMatrices = Symmetry::getPointGroupMatrices(symmName);
-		}
-		else
+            symmetryMatrices = Symmetry::getPointGroupMatrices(symmName);
+        }
+        if (nr_helical_asu > 1)
 		{
 			Log::print("Applying helical symmetries");
 
-			symmetryMatrices = Symmetry::getHelicalSymmetryMatrices(
+			std::vector<gravis::d4Matrix> helicalSymmetryMatrices;
+            helicalSymmetryMatrices = Symmetry::getHelicalSymmetryMatrices(
 						nr_helical_asu, helical_twist, helical_rise/binnedOutPixelSize);
+            symmetryMatrices.insert(symmetryMatrices.end(),
+                        helicalSymmetryMatrices.begin(),
+                        helicalSymmetryMatrices.end());
 		}
 
 		for (int half = 0; half < 2; half++)

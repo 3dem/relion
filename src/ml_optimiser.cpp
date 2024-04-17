@@ -6030,7 +6030,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
                 std::cerr << "  old_offset_helix(p1, p2, z) = (" << XX(my_old_offset_helix_coords) << ", " << YY(my_old_offset_helix_coords) << "," << ZZ(my_old_offset_helix_coords) << ")" << std::endl;
             }
 #endif
-        // We do NOT want to accumulate the offsets in the direction along the helix (which is X in the 2D helical coordinate system, and Z in 3D!)
+        // We do NOT want to accumulate the offsets in the direction along the helix (which is X in the 2D and 3D helical coordinate system)
         // However, when doing helical local searches, we accumulate offsets
         if ( (!do_skip_align) && (!do_skip_rotate) )
         {
@@ -6041,10 +6041,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
             bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
             if (!do_local_angular_searches)
             {
-                if (mymodel.data_dim == 2)
-                    XX(my_old_offset_helix_coords) = 0.;
-                else if (mymodel.data_dim == 3 || mydata.is_tomo)
-                    ZZ(my_old_offset_helix_coords) = 0.;
+                XX(my_old_offset_helix_coords) = 0.;
             }
         }
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
@@ -6950,6 +6947,16 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
                     if (mymodel.data_dim == 3 || mydata.is_tomo)
                         zshift = oversampled_translations_z[iover_trans];
 
+                    // For subtomo: convert 3D shifts in the tomogram to 2D shifts in the tilt series images
+                    if (mydata.is_tomo)
+                    {
+                        // exp_old_offset has not been applied (as it is selfRounded() for 2D images...), so do this now
+                        // For helices: op.old_offset is in HELICAL COORDS, not CART_COORDS!
+                        xshift += XX(exp_old_offset);
+                        yshift += YY(exp_old_offset);
+                        zshift += ZZ(exp_old_offset);
+                    }
+
                     if ( (do_helical_refine) && (!ignore_helical_symmetry) )
                     {
                         RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT);
@@ -6967,10 +6974,6 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
                     // For subtomo: convert 3D shifts in the tomogram to 2D shifts in the tilt series images
                     if (mydata.is_tomo)
                     {
-                        // exp_old_offset has not been applied (as it is selfRounded() for 2D images...), so do this now
-                        xshift += XX(exp_old_offset);
-                        yshift += YY(exp_old_offset);
-                        zshift += ZZ(exp_old_offset);
                         mydata.getTranslationInTiltSeries(part_id, img_id, xshift, yshift, zshift, xshift, yshift, zshift);
                     }
 
@@ -7333,6 +7336,16 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                                                 if (mymodel.data_dim == 3 || mydata.is_tomo)
                                                     zshift = (exp_current_oversampling == 0) ? (oversampled_translations_z[0]) : (oversampled_translations_z[iover_trans]);
 
+                                                // For subtomo: convert 3D shifts in the tomogram to 2D shifts in the tilt series images
+                                                if (mydata.is_tomo)
+                                                {
+                                                    // exp_old_offset was not yet applied for subtomos!
+                                                    // For helices: op.old_offset is in HELICAL COORDS, not CART_COORDS!
+                                                    xshift += XX(exp_old_offset);
+                                                    yshift += YY(exp_old_offset);
+                                                    zshift += ZZ(exp_old_offset);
+                                                }
+
                                                 if ((do_helical_refine) && (!ignore_helical_symmetry))
                                                 {
                                                     RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT);
@@ -7349,10 +7362,6 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                                                 // For subtomo: convert 3D shifts in the tomogram to 2D shifts in the tilt series images
                                                 if (mydata.is_tomo)
                                                 {
-                                                    // exp_old_offset was not yet applied for subtomos!
-                                                    xshift += XX(exp_old_offset);
-                                                    yshift += YY(exp_old_offset);
-                                                    zshift += ZZ(exp_old_offset);
                                                     mydata.getTranslationInTiltSeries(part_id, img_id,
                                                                                       xshift, yshift, zshift,
                                                                                       xshift, yshift, zshift);
@@ -8532,6 +8541,16 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
                                                 if (mymodel.data_dim == 3 || mydata.is_tomo)
                                                     zshift = oversampled_translations_z[iover_trans];
 
+                                                // For subtomo: convert 3D shifts in the tomogram to 2D shifts in the tilt series images
+                                                if (mydata.is_tomo)
+                                                {
+                                                    // exp_old_offset was not yet applied for subtomos!
+                                                    // For helices: op.old_offset is in HELICAL COORDS, not CART_COORDS!
+                                                    xshift += XX(exp_old_offset);
+                                                    yshift += YY(exp_old_offset);
+                                                    zshift += ZZ(exp_old_offset);
+                                                }
+
                                                 // Feb01,2017 - Shaoda, on-the-fly shifts in helical reconstuctions (2D and 3D)
                                                 if ( (do_helical_refine) && (!ignore_helical_symmetry) )
                                                 {
@@ -8550,10 +8569,6 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
                                                 // For subtomo: convert 3D shifts in the tomogram to 2D shifts in the tilt series images
                                                 if (mydata.is_tomo)
                                                 {
-                                                    // exp_old_offset was not yet applied for subtomos!
-                                                    xshift += XX(exp_old_offset);
-                                                    yshift += YY(exp_old_offset);
-                                                    zshift += ZZ(exp_old_offset);
                                                     mydata.getTranslationInTiltSeries(part_id, img_id,
                                                                                       xshift, yshift, zshift,
                                                                                       xshift, yshift, zshift);

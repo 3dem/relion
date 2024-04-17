@@ -59,7 +59,7 @@ BufferedImage<T> Symmetry::symmetrise_FS_real(
 			accum += Interpolation::linearXYZ_FftwHalf_real(img, p.x, p.y, p.z);
 		}
 		
-		out(x,y,z) = accum;														   
+		out(x,y,z) = accum/(sc+1);
 	}
 	
 	return out;
@@ -101,7 +101,7 @@ BufferedImage<tComplex<T>> Symmetry::symmetrise_FS_complex(
 			accum += val;
 		}
 
-		out(x,y,z) = accum;
+		out(x,y,z) = accum/(sc+1);
 	}
 
 	return out;
@@ -146,7 +146,7 @@ BufferedImage<DualContrastVoxel<T>> Symmetry::symmetrise_dualContrast(
 			accum += val;
 		}
 
-		out(x,y,z) = accum;
+		out(x,y,z) = accum/(sc+1);
 	}
 
 	return out;
