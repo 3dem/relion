@@ -6418,7 +6418,7 @@ void RelionJob::initialiseTomoImportJob()
 	joboptions["Cs"] = JobOption("Spherical aberration (mm):", 2.7, 0.01, 4, 0.1 , "Spherical aberration of the microscope used to collect these images (in mm). Typical values are 2.7 (FEI Titan & Talos, most JEOL CRYO-ARM), 2.0 (FEI Polara), 1.4 (some JEOL CRYO-ARM) and 0.01 (microscopes with a Cs corrector).");
 	joboptions["Q0"] = JobOption("Amplitude contrast:", 0.1, 0.05, 1, 0.01, "Fraction of amplitude contrast (default=0.1). Often values around 10% work better than theoretically more accurate lower values. ");
 	joboptions["dose_rate"] = JobOption("Dose rate per tilt-image:", 3, 0, 20, 1, "Electron dose (in e/A^2) per image in the tilt series. If the option below is set to true, then you can provide the dose rate per movie frame here.");
-	joboptions["dose_is_per_movie_frame"] = JobOption("Is dose rate per movie frame?", false, "If set to true, the dose tate above is taken per movie frame, otherwise the dose rate is assumed to be per tilt image.");
+	joboptions["dose_is_per_movie_frame"] = JobOption("Is dose rate per movie frame?", false, "If set to true, the dose rate above is taken per movie frame, otherwise the dose rate is assumed to be per tilt image.");
 
 	joboptions["movie_files"] = JobOption("Tilt image files:", (std::string)"frames/*.mrc","File pattern matching all tilt image files. These can be multi-frame micrographs or single 2D images.");
 	joboptions["mdoc_files"] = JobOption("mdoc files:", (std::string)"mdoc/*.mdoc","File pattern pointing to the mdoc files.");
