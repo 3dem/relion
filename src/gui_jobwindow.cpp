@@ -2534,7 +2534,7 @@ void JobWindow::placeTomoInput(bool has_tomograms, bool has_particles,
 
 void JobWindow::initialiseTomoImportWindow()
 {
-	setupTabs(2);
+	setupTabs(3);
 
     tab1->begin();
 	tab1->label("General");
@@ -2569,6 +2569,33 @@ void JobWindow::initialiseTomoImportWindow()
     place("flip_tiltseries_hand", TOGGLE_DEACTIVATE);
 
 	tab2->end();
+
+    tab3->begin();
+    tab3->label("Coordinates");
+    resetHeight();
+
+    group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group1->end();
+
+    place("do_coords", TOGGLE_DEACTIVATE, group1, false);
+
+    group1->begin();
+    place("in_coords", TOGGLE_DEACTIVATE);
+    place("remove_substring", TOGGLE_DEACTIVATE);
+    place("remove_substring2", TOGGLE_DEACTIVATE);
+
+    // Add a little spacer
+    current_y += STEPY/2;
+
+    place("is_center", TOGGLE_DEACTIVATE, group2, false);
+    place("scale_factor", TOGGLE_DEACTIVATE);
+    place("add_factor", TOGGLE_DEACTIVATE);
+
+    group1->end();
+    guientries["do_coords"].cb_menu_i(); // make default active
+
+    tab3->end();
+
 }
 
 void JobWindow::initialiseTomoAlignTiltseriesWindow()
@@ -2942,7 +2969,7 @@ void JobWindow::initialiseTomoAlignWindow()
 
 void JobWindow::initialiseTomoReconParWindow()
 {
-	setupTabs(2);
+	setupTabs(3);
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -2969,6 +2996,29 @@ void JobWindow::initialiseTomoReconParWindow()
 	place("sym_name", TOGGLE_DEACTIVATE);
 
 	tab2->end();
+
+    tab3->begin();
+	tab3->label("Helix");
+	resetHeight();
+
+    group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group1->end();
+    place("do_helix", TOGGLE_DEACTIVATE, group1);
+
+    current_y += STEPY /2 ;
+
+    group1->begin();
+
+    place("helical_nr_asu");
+    place("helical_twist");
+    place("helical_rise");
+
+    group1->end();
+    guientries["do_helix"].cb_menu_i();
+
+    tab3->end();
+
+
 }
 
 void JobWindow::initialiseTomoExcludeTiltImagesWindow()

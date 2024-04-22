@@ -271,6 +271,7 @@ static bool do_allow_change_minimum_dedicated;
 
 // Tomography-specific jobs
 #define LABEL_IMPORT_TOMOGRAMS         "TomogramGroupMetadata.star.relion.tomo.import"
+#define LABEL_IMPORT_TOMO_COORDS       "ParticleGroupMetadata.star.relion.tomo.import"
 #define LABEL_MOCORR_TOMOGRAMS         "TomogramGroupMetadata.star.relion.tomo.motioncorr"
 #define LABEL_CTFFIND_TOMOGRAMS        "TomogramGroupMetadata.star.relion.tomo.ctffind"
 #define LABEL_TILTALIGN_TOMOGRAMS      "TomogramGroupMetadata.star.relion.tomo.aligntiltseries"
