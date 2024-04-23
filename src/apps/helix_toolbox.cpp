@@ -293,7 +293,7 @@ public:
 		int params_section = parser.addSection("Parameters (alphabetically ordered)");
 		is_3d_tomo = parser.checkOption("--3d_tomo", "Simulate 3D subtomograms using a STAR file?");
 		ang = textToFloat(parser.getOption("--ang", "Cut out a small part of the helix within this angle (in degrees)", "91."));
-		pixel_size_A = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "1."));
+		pixel_size_A = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "-1."));
 		do_bimodal_searches = parser.checkOption("--bimodal", "Do bimodal searches of tilt and psi angles in 3D helical reconstruction?");
 		binning_factor = textToInteger(parser.getOption("--bin", "Binning factor used in manual segment picking", "1"));
 		boxdim = textToInteger(parser.getOption("--boxdim", "Box size (in pixels)", "-1"));
@@ -687,6 +687,11 @@ public:
 
 			Image<RFLOAT> img;
 			img.read(fn_in);
+            if (pixel_size_A < 0.01)
+            {
+                pixel_size_A = img.samplingRateX();
+                std::cerr << "WARNING: You did not specify --angpix. The pixel size in the image header, " << pixel_size_A << " A/px, is used." << std::endl;
+            }
 
 			box_size = ((XSIZE(img())) < (YSIZE(img()))) ? (XSIZE(img())) : (YSIZE(img()));
 			box_size = (box_size < (ZSIZE(img()))) ? (box_size) : (ZSIZE(img()));
@@ -725,7 +730,13 @@ public:
 			Image<RFLOAT> img;
 			img.read(fn_in);
 
-			box_size = ((XSIZE(img())) < (YSIZE(img()))) ? (XSIZE(img())) : (YSIZE(img()));
+            if (pixel_size_A < 0.01)
+            {
+                pixel_size_A = img.samplingRateX();
+                std::cerr << "WARNING: You did not specify --angpix. The pixel size in the image header, " << pixel_size_A << " A/px, is used." << std::endl;
+            }
+
+            box_size = ((XSIZE(img())) < (YSIZE(img()))) ? (XSIZE(img())) : (YSIZE(img()));
 			box_size = (box_size < (ZSIZE(img()))) ? (box_size) : (ZSIZE(img()));
 			sphere_diameter_A = pixel_size_A * sphere_percentage * RFLOAT(box_size);
 
@@ -913,6 +924,11 @@ public:
 			img.read(fn_in);
 			img().getDimensions(Xdim, Ydim, Zdim, Ndim);
 			img().setXmippOrigin();
+            if (pixel_size_A < 0.01)
+            {
+                pixel_size_A = img.samplingRateX();
+                std::cerr << "WARNING: You did not specify --angpix. The pixel size in the image header, " << pixel_size_A << " A/px, is used." << std::endl;
+            }
 
 			if ( (Xdim != Ydim) || (Ydim != Zdim) )
 				REPORT_ERROR("Error in the input 3D map: DimX != DimY or DimY != DimZ");
