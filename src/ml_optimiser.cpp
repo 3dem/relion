@@ -9063,11 +9063,14 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
         if (mydata.obsModel.getCtfPremultiplied(optics_group))
         {
             RFLOAT myscale = XMIPP_MAX(0.001, mymodel.scale_correction[igroup]);
-            FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mresol_fine[optics_group])
+            for (int img_id =0; img_id < exp_nr_images; img_id++)
             {
-                int ires = DIRECT_MULTIDIM_ELEM(Mresol_fine[optics_group], n);
-                if (ires > -1)
-                    DIRECT_MULTIDIM_ELEM(thr_wsum_ctf2, ires) += myscale * DIRECT_MULTIDIM_ELEM(exp_local_Fctf[0], n);
+                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mresol_fine[optics_group])
+                {
+                    int ires = DIRECT_MULTIDIM_ELEM(Mresol_fine[optics_group], n);
+                    if (ires > -1)
+                        DIRECT_MULTIDIM_ELEM(thr_wsum_ctf2, ires) += myscale * DIRECT_MULTIDIM_ELEM(exp_local_Fctf[img_id], n);
+                }
             }
         }
 
