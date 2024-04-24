@@ -3588,13 +3588,18 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
             int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id);
 
 
-            if (baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group)) {
+            if (baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group))
+            {
                 RFLOAT myscale = XMIPP_MAX(0.001, baseMLO->mymodel.scale_correction[igroup]);
-                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->Mresol_fine[optics_group]) {
-                    int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine[optics_group], n);
-                    if (ires > -1)
-                        DIRECT_MULTIDIM_ELEM(thr_wsum_ctf2, ires) +=
-                                myscale * DIRECT_MULTIDIM_ELEM(op.local_Fctf[0], n);
+                for (int img_id = 0; img_id < sp.nr_images; img_id++)
+                {
+                    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->Mresol_fine[optics_group])
+                    {
+                        int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine[optics_group], n);
+                        if (ires > -1)
+                            DIRECT_MULTIDIM_ELEM(thr_wsum_ctf2, ires) +=
+                                    myscale * DIRECT_MULTIDIM_ELEM(op.local_Fctf[img_id], n);
+                    }
                 }
             }
 
