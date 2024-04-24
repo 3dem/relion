@@ -3012,6 +3012,8 @@ void JobWindow::initialiseTomoReconParWindow()
     place("helical_nr_asu");
     place("helical_twist");
     place("helical_rise");
+    place("helical_tube_outer_diameter");
+    place("helical_z_percentage");
 
     group1->end();
     guientries["do_helix"].cb_menu_i();
