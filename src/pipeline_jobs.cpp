@@ -6630,6 +6630,12 @@ void RelionJob::initialiseTomoReconstructTomogramsJob()
 	joboptions["xdim"] = JobOption("Unbinned tomogram width (Xdim): ", 4000, 1, 6000, 100, "The tomogram X-dimension in unbinned pixels.");
 	joboptions["ydim"] = JobOption("Unbinned tomogram height (Ydim): ", 4000, 1, 6000, 100, "The tomogram Y-dimension in unbinned pixels.");
 	joboptions["zdim"] = JobOption("Unbinned tomogram thickness (Zdim): ", 2000, 1, 6000, 100, "The tomogram Z-dimension in unbinned pixels.");
+
+    joboptions["do_proj"] = JobOption("Also write 2D sums of central Z-slices?:", true, "When set to Yes, this option will result in the calculation of 2D sums of Z-slices from the reconstructed tomograms. These may be useful to quickly screen for bad tomograms using the relion_display program.");
+    joboptions["centre_proj"] = JobOption("Central Z-slice (in binned pix): ", 0., -50, 50, 10, "This defines the central Z-slice of all Z-slices that will be summed to generate the 2D projection (in pixels in the tomogram). Zero means the middle (centre) of the tomogram.");
+    joboptions["thickness_proj"] = JobOption("Number of Z-slices (in binned pix): ", 10., 1, 30, 1, "This defines how many Z-slices will be summed to generate the 2D projection (in pixels in the tomogram). Half of the slices will be above and half will be below the central slice defined above.");
+
+
 }
 
 bool RelionJob::getCommandsTomoReconstructTomogramsJob(std::string &outputname, std::vector<std::string> &commands,
@@ -6670,6 +6676,13 @@ bool RelionJob::getCommandsTomoReconstructTomogramsJob(std::string &outputname, 
 	command += " --d " + joboptions["zdim"].getString();
 
 	command += " --binned_angpix " + joboptions["binned_angpix"].getString();
+
+    if (joboptions["do_proj"].getBoolean())
+	{
+		command += " --do_proj ";
+        command += " --centre_proj " + joboptions["centre_proj"].getString();
+        command += " --thickness_proj " + joboptions["thickness_proj"].getString();
+	}
 
     if (fabs(joboptions["tiltangle_offset"].getNumber(error_message)) > 0.)
     {
