@@ -22,7 +22,8 @@ class TomoBackprojectProgram
 			FileName tomoName, outFn;
 			bool applyPreWeight, applyWeight, applyCtf, doWiener, zeroDC, FourierCrop;
             bool do_multiple, do_only_unfinished;
-	     	bool do_even_odd_tomograms;
+	     	bool do_even_odd_tomograms, do_2dproj;
+            int centre_2dproj, thickness_2dproj;
 			double SNR;
             double tiltAngleOffset;
             double BfactorPerElectronDose;
@@ -39,7 +40,7 @@ class TomoBackprojectProgram
         void reconstructOneTomogram(int tomoIndex, bool doEven, bool doOdd);
         void setMetaDataAllTomograms();
     private:
-        FileName getOutputFileName(int index, bool nameEven, bool nameOdd);
+        FileName getOutputFileName(int index, bool nameEven, bool nameOdd, bool is_2dproj = false);
 };
 
 #endif

@@ -46,7 +46,7 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
     do_only_unfinished = parser.checkOption("--only_do_unfinished", "Only reconstruct those tomograms that haven't finished yet");
     SNR = textToDouble(parser.getOption("--SNR", "SNR assumed by the Wiener filter", "10"));
 
-	applyCtf = !parser.checkOption("--noctf", "Ignore the CTF");
+	applyCtf = parser.checkOption("--ctf", "Perform CTF correction");
     doWiener = !parser.checkOption("--skip_wiener", "Do multiply images with CTF, but don't divide by CTF^2 in Wiener filter");
 
     if (!doWiener) applyCtf = true;
@@ -68,6 +68,9 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
     BfactorPerElectronDose = textToDouble(parser.getOption("--bfactor_per_edose", "B-factor dose-weighting per electron/A^2 dose (default is use Niko's model)", "0"));
     n_threads = textToInteger(parser.getOption("--j", "Number of threads", "1"));
 
+    do_2dproj = parser.checkOption("--do_proj", "Use this to skip calculation of 2D projection of the tomogram along the Z-axis");
+    centre_2dproj = textToInteger(parser.getOption("--centre_proj", "Central Z-slice for 2D projection (in tomogram pixels from the middle)", "0"));
+    thickness_2dproj = textToInteger(parser.getOption("--thickness_proj", "Thickness of the 2D projection (in tomogram pixels)", "10"));
 
 	Log::readParams(parser);
 
@@ -123,6 +126,13 @@ void TomoBackprojectProgram::initialise(bool verbose)
         if (fabs(tiltAngleOffset) > 0.)
         {
             std::cout << " + Applying a tilt angle offset of " << tiltAngleOffset << " degrees" << std::endl;
+        }
+
+        if (do_2dproj)
+        {
+            std::cout << " + Making 2D projections " << std::endl;
+            std::cout << "    - centered at " << centre_2dproj << " tomogram pixels from the centre of the tomogram" << std::endl;
+            std::cout << "    - and a thickness of " << thickness_2dproj << " tomogram pixels" << std::endl;
         }
     }
 
@@ -392,7 +402,6 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex, bool doEven, 
     else 
         out.write(getOutputFileName(tomoIndex, false, false), samplingRate);
 
-
     // Also add the tomogram sizes and name to the tomogramSet
     tomogramSet.globalTable.setValue(EMDL_TOMO_SIZE_X, w, tomoIndex);
     tomogramSet.globalTable.setValue(EMDL_TOMO_SIZE_Y, h, tomoIndex);
@@ -401,11 +410,42 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex, bool doEven, 
     if (doEven)
     	tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF1_FILE_NAME, getOutputFileName(tomoIndex, true, false), tomoIndex);
     else if (doOdd)
-	tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF2_FILE_NAME, getOutputFileName(tomoIndex, false, true), tomoIndex);
+        tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF2_FILE_NAME, getOutputFileName(tomoIndex, false, true), tomoIndex);
     else  
+        tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME, getOutputFileName(tomoIndex, false, false), tomoIndex);
+
+    if (do_2dproj)
     {
-    tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME, getOutputFileName(tomoIndex, false, false), tomoIndex);
-    }  
+        BufferedImage<float> proj(w1, h1);
+        proj.fill(0.f);
+        int minz = out.zdim/2 + centre_2dproj - thickness_2dproj/2;
+        int maxz = out.zdim/2 + centre_2dproj + thickness_2dproj/2;
+        for (int z = 0; z < out.zdim; z++)
+        {
+            if (z >= minz && z <= maxz)
+            {
+                for (int y = 0; y < out.ydim; y++)
+                    for (int x = 0; x < out.xdim; x++)
+                        proj(x, y) += out(x, y, z);
+            }
+        }
+        if (doEven)
+            proj.write(getOutputFileName(tomoIndex, true, false, true), samplingRate);
+        else if (doOdd)
+            proj.write(getOutputFileName(tomoIndex, false, true, true), samplingRate);
+        else
+            proj.write(getOutputFileName(tomoIndex, false, false, true), samplingRate);
+
+        if (doEven)
+            tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_HALF1_FILE_NAME, getOutputFileName(tomoIndex, true, false, true), tomoIndex);
+        else if (doOdd)
+            tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_HALF2_FILE_NAME, getOutputFileName(tomoIndex, false, true, true), tomoIndex);
+        else
+            tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_FILE_NAME, getOutputFileName(tomoIndex, false, false, true), tomoIndex);
+
+    }
+
+
 }
 
 void TomoBackprojectProgram::setMetaDataAllTomograms()
@@ -450,29 +490,43 @@ void TomoBackprojectProgram::setMetaDataAllTomograms()
             tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME,
                                              getOutputFileName(tomoIndex, false, false), tomoIndex);
         }
+
+        if (do_2dproj)
+        {
+            if (do_even_odd_tomograms)
+            {
+                tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_HALF1_FILE_NAME, getOutputFileName(tomoIndex, true, false, true), tomoIndex);
+                tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_HALF2_FILE_NAME, getOutputFileName(tomoIndex, false, true, true), tomoIndex);
+            }
+            else
+            {
+                tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_FILE_NAME, getOutputFileName(tomoIndex, false, false, true), tomoIndex);
+            }
+        }
     }
 
 }
 
-FileName TomoBackprojectProgram::getOutputFileName(int index, bool nameEven, bool nameOdd)
+FileName TomoBackprojectProgram::getOutputFileName(int index, bool nameEven, bool nameOdd, bool is_2dproj)
 {
     // If we're reconstructing many tomograms, or the output filename is a directory: use standardized output filenames
     FileName fn_result = outFn;
 
+    std::string dirname = (is_2dproj) ? "projections/" : "tomograms/";
     if (do_even_odd_tomograms)
     {
 		if (nameEven)
 		{
-			fn_result += "tomograms/rec_" + tomogramSet.getTomogramName(index)+"_half1.mrc";
+			fn_result += dirname + "rec_" + tomogramSet.getTomogramName(index)+"_half1.mrc";
 		}
 		else if (nameOdd)
 		{
-			fn_result += "tomograms/rec_" + tomogramSet.getTomogramName(index)+"_half2.mrc";
+			fn_result += dirname + "rec_" + tomogramSet.getTomogramName(index)+"_half2.mrc";
 		}
     }
 	else
 	{
-	    fn_result += "tomograms/rec_" + tomogramSet.getTomogramName(index)+".mrc";
+	    fn_result += dirname + "rec_" + tomogramSet.getTomogramName(index)+".mrc";
 	}
 
     if (!exists(fn_result.beforeLastOf("/"))) mktree(fn_result.beforeLastOf("/"));

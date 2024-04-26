@@ -2690,7 +2690,20 @@ void JobWindow::initialiseTomoReconstructTomogramsWindow()
     place ("tiltangle_offset");
     place("tomo_name");
 
-	tab2->end();
+    current_y += STEPY /2 ;
+
+    group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group1->end();
+    place("do_proj", TOGGLE_DEACTIVATE, group1, false);
+
+    group1->begin();
+    place("centre_proj", TOGGLE_DEACTIVATE);
+    place("thickness_proj", TOGGLE_DEACTIVATE);
+    group1->end();
+    guientries["do_proj"].cb_menu_i();
+
+
+    tab2->end();
 
 }
 

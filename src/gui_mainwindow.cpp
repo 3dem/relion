@@ -1501,6 +1501,7 @@ void GuiMainWindow::cb_display_io_node_i()
         command += " &";
 
     }
+    /*
     else if (pipeline.nodeList[mynode].type.find(LABEL_RECONSTRUCT_TOMOGRAMS) != std::string::npos ||
              pipeline.nodeList[mynode].type.find(LABEL_DENOISE_TOMOGRAMS) != std::string::npos ||
              pipeline.nodeList[mynode].type.find(LABEL_CTFREFINE_TOMOGRAMS) != std::string::npos ||
@@ -1523,6 +1524,7 @@ void GuiMainWindow::cb_display_io_node_i()
         command += " &";
 
     }
+    */
 	else if (pipeline.nodeList[mynode].type.find(LABEL_LOGFILE_CPIPE) != std::string::npos )
 	{
 		const char * default_pdf_viewer = getenv ("RELION_PDFVIEWER_EXECUTABLE");
