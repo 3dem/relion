@@ -46,7 +46,7 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
     do_only_unfinished = parser.checkOption("--only_do_unfinished", "Only reconstruct those tomograms that haven't finished yet");
     SNR = textToDouble(parser.getOption("--SNR", "SNR assumed by the Wiener filter", "10"));
 
-	applyCtf = !parser.checkOption("--noctf", "Ignore the CTF");
+	applyCtf = parser.checkOption("--ctf", "Perform CTF correction");
     doWiener = !parser.checkOption("--skip_wiener", "Do multiply images with CTF, but don't divide by CTF^2 in Wiener filter");
 
     if (!doWiener) applyCtf = true;
