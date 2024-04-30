@@ -48,10 +48,10 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 	cropSize = textToInteger(parser.getOption("--crop", "Output box size", "-1"));
 	binning = textToDouble(parser.getOption("--bin", "Binning factor", "1"));
     do_stack2d = parser.checkOption("--stack2d", "Write out 2D stacks of cropped images for each particle, instead of pseudo-subtomograms");
-    rescale_coords = textToDouble(parser.getOption("--rescale_coords", "Rescale input particles by this factor", "1."));
 	write_multiplicity = parser.checkOption("--multi", "Write out multiplicity volumes");
 	SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio (negative means use a heuristic)", "-1"));
-    min_frames = textToInteger(parser.getOption("--min_frames", "Minimum number of lowest-dose tilt series frames that needs to be inside the box (default is half the number of frames)", "-1"));
+    min_frames = textToInteger(parser.getOption("--min_frames", "Minimum number of lowest-dose tilt series frames that needs to be inside the box", "1"));
+    maxDose = textToDouble(parser.getOption("--max_dose", "Maximum dose (in e/A^2) of tilt series frames to be included (negative means use all frames)", "-1"));
 
 	do_cone_weight = parser.checkOption("--cone_weight", "Weight down a double cone along Z");
 	const double alpha = 0.5 * textToDouble(parser.getOption("--cone_angle", "Opening angle of the cone in degrees", "10"));
@@ -77,7 +77,7 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 	write_normalised = parser.checkOption("--nrm", "Write multiplicity-normalised subtomograms");
 
     apply_offsets = !parser.checkOption("--dont_apply_offsets", "By default, rlnOriginX/Y/ZAngst are combined with rlnCoordinateX/Y/Z to construct the particles in their refined translations. Use this argument to skip that.");
-    apply_orientations = parser.checkOption("--apply_orientations", "rlnAngle<Rot/Tilt/Psi> are combined with rlnTomoSubtomogram<Rot/Tilt/Psi> to construct the particles in their refined orientations. This will also apply translations; No longer recommended in relion5!");
+    apply_orientations = parser.checkOption("--apply_orientations", "rlnAngle<Rot/Tilt/Psi> are combined with rlnTomoSubtomogram<Rot/Tilt/Psi> to construct the particles in their refined orientations. This will also apply translations!");
     if (apply_orientations) apply_offsets = true;
 
 	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process undone subtomograms");
@@ -126,7 +126,6 @@ void SubtomoProgram::run()
 {
 	TomogramSet tomogramSet(optimisationSet.tomograms, true);
 
-    // TODO: Introduce optics parameters from tomogramSet if they are not present yet in particleSet
 	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories, true, &tomogramSet);
 	std::vector<std::vector<ParticleIndex> > particles = particleSet.splitByTomogram(tomogramSet, true);
 	
@@ -248,30 +247,7 @@ void SubtomoProgram::initialise(
 		}
 	}
 
-    if (std::abs(rescale_coords - 1.0) > 1e-2)
-    {
-        if (verbose) Log::print("Rescaling input coordinates ... ");
-
-        for (int t = 0; t < tc; t++)
-        {
-            const int pc = particles[t].size();
-
-            if (pc == 0) continue;
-
-            for (int p = 0; p < pc; p++)
-            {
-                const ParticleIndex part_id = particles[t][p];
-
-                d3Vector pos = particleSet.getParticleCoord(part_id);
-
-                pos *= rescale_coords;
-
-                particleSet.setParticleCoord(part_id, pos);
-            }
-        }
-    }
-
-	if (verbose) writeParticleSet(particleSet, particles, tomogramSet);
+    if (verbose) writeParticleSet(particleSet, particles, tomogramSet);
 }
 
 std::string SubtomoProgram::getOutputFilename(
@@ -318,12 +294,25 @@ void SubtomoProgram::writeParticleSet(
 			Tomogram tomogram = tomogramSet.loadTomogram(t, false);
 
 			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
-						part_id, tomogram.frameCount, tomogram.optics.pixelSize, !apply_offsets);
+						part_id, tomogram.frameCount, tomogram.centre, tomogram.optics.pixelSize, !apply_offsets);
 
-            int my_min_frames = (min_frames < 0 ) ? tomogram.frameCount / 2 : min_frames;
-			if (tomogram.isVisibleFirstFrames(traj, boxSize / 2.0, my_min_frames))
-			{
-				const ParticleIndex new_id = copy.addParticle(particleSet, part_id);
+            //SHWS 24jan2024 only for debugging: // int my_min_frames = (min_frames < 0 ) ? tomogram.frameCount / 2 : min_frames;
+			//SHWS 24jan2024 only for debugging: // if (tomogram.isVisibleFirstFrames(traj, boxSize / 2.0, my_min_frames))
+			std::vector<bool> isVisible;
+            if (tomogram.getVisibilityMinFramesMaxDose(traj, binning * cropSize / 2.0, maxDose, min_frames, isVisible))
+            {
+
+                // Get all the particle metadata
+                const ParticleIndex new_id = copy.addParticle(particleSet, part_id);
+
+                // Also set isVisible in the output particle STAR file
+                if (do_stack2d)
+                {
+                    std::vector<int> isVisibleInt(isVisible.size(), 0);
+                    for (int f = 0; f < tomogram.frameCount; f++)
+                        if (isVisible[f]) isVisibleInt[f] = 1;
+                    copy.partTable.setValue(EMDL_TOMO_VISIBLE_FRAMES, isVisibleInt);
+                }
 
 				const int opticsGroup = particleSet.getOpticsGroup(part_id);
 				const double tiltSeriesPixelSize = particleSet.getTiltSeriesPixelSize(opticsGroup);
@@ -338,10 +327,9 @@ void SubtomoProgram::writeParticleSet(
 
                 if (apply_offsets)
                 {
-                    const d3Matrix A_subtomogram = particleSet.getSubtomogramMatrix(part_id);
-                    const d3Vector pos = particleSet.getParticleCoord(part_id) - (A_subtomogram * particleSet.getParticleOffset(part_id)) / tiltSeriesPixelSize;
+                    const d3Vector pos = particleSet.getPosition(part_id, tomogram.centre, true);
                     copy.setParticleOffset(new_id, d3Vector(0,0,0));
-                    copy.setParticleCoord(new_id, pos);
+                    copy.setParticleCoordDecenteredPixel(new_id, pos, tomogram.centre, tiltSeriesPixelSize);
                 }
 
 				if (apply_orientations)
@@ -388,7 +376,14 @@ void SubtomoProgram::writeParticleSet(
 		copy.optTable.setValue(EMDL_IMAGE_SIZE, cropSize, og);
 	}
 
-	copy.write(outDir + "particles.star");
+    if (copy.partTable.containsLabel(EMDL_IMAGE_COORD_X)) copy.partTable.deactivateLabel(EMDL_IMAGE_COORD_X);
+    if (copy.partTable.containsLabel(EMDL_IMAGE_COORD_Y)) copy.partTable.deactivateLabel(EMDL_IMAGE_COORD_Y);
+    if (copy.partTable.containsLabel(EMDL_IMAGE_COORD_Z)) copy.partTable.deactivateLabel(EMDL_IMAGE_COORD_Z);
+
+    // remove CTF image name that could be there from old pseudo-subtomo jobs if we're writing 2D stacks
+    if (do_stack2d && copy.partTable.containsLabel(EMDL_CTF_IMAGE))  copy.partTable.deactivateLabel(EMDL_CTF_IMAGE);
+
+    copy.write(outDir + "particles.star");
 
 	if (copy.hasMotion && particles_removed > 0)
 	{
@@ -467,8 +462,7 @@ void SubtomoProgram::processTomograms(
 		// @TODO: define input and output pixel sizes!
 
 		const double binnedPixelSize = tomogram.optics.pixelSize * binning;
-
-		if (verbosity > 0)
+ 		if (verbosity > 0)
 		{
             Log::beginProgress(
 				"Extracting particles",
@@ -504,14 +498,11 @@ void SubtomoProgram::processTomograms(
             }
 
             const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
-                    part_id, fc, tomogram.optics.pixelSize, !apply_offsets);
+                    part_id, fc, tomogram.centre, tomogram.optics.pixelSize, !apply_offsets);
 
-            int my_min_frames = (min_frames < 0 ) ? tomogram.frameCount / 2 : min_frames;
-            if (!tomogram.isVisibleFirstFrames(traj, s2D / 2.0, my_min_frames)) {
+            std::vector<bool> isVisible;
+            if (!tomogram.getVisibilityMinFramesMaxDose(traj, binning * cropSize / 2.0, maxDose, min_frames, isVisible))
                 continue;
-            }
-
-            const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s2D / 2.0);
 
             std::vector<d4Matrix> projCut(fc), projPart(fc);
 
@@ -521,6 +512,8 @@ void SubtomoProgram::processTomograms(
             TomoExtraction::extractAt3D_Fourier(
                     tomogram.stack, s02D, binning, tomogram, traj, isVisible,
                     particleStack, projCut, inner_thread_num, do_circle_precrop);
+
+
 
             if (!do_ctf) weightStack.fill(1.f);
 
@@ -545,24 +538,19 @@ void SubtomoProgram::processTomograms(
                 projPart[f] = projCut[f] * d4Matrix(A);
 
                 if (do_ctf) {
-                    const d3Vector pos = (apply_offsets) ? particleSet.getPosition(part_id)
-                                                         : particleSet.getParticleCoord(part_id);
+                    const d3Vector pos = particleSet.getPosition(part_id, tomogram.centre, apply_offsets);
 
                     CTF ctf = tomogram.getCtf(f, pos);
                     BufferedImage<float> ctfImg(sh2D, s2D);
                     ctf.draw(s2D, s2D, binnedPixelSize, gammaOffset, &ctfImg(0, 0, 0));
 
+                    // Apply doseWeigths until Nyquist frequency! Otherwise, convolution artefacts when do_circle_crop invFFT/FFT below
                     for (int y = 0; y < s2D; y++) {
-                        for (int x = 0; x < xRanges(y, f); x++) {
+                        for (int x = 0; x < sh2D; x++) {
                             const double c = ctfImg(x, y) * doseWeights(x, y, f);
 
                             particleStack(x, y, f) *= sign * c;
                             weightStack(x, y, f) = c * c;
-                        }
-                        // SHWS 23nov22: for writing out 2D stacks: need to set everything outside the xRanges to zero!
-                        for (int x = xRanges(y, f); x < sh2D; x++) {
-                            particleStack(x, y, f) = 0.;
-                            weightStack(x, y, f) = 0.;
                         }
                     }
                 } // end if do_ctf
@@ -577,6 +565,9 @@ void SubtomoProgram::processTomograms(
                 particleStack *= noiseWeights;
                 weightStack *= noiseWeights;
             }
+
+            // Make sure output greyscale of 2D stacks does not depend on binning
+            if (do_stack2d) particleStack/= (float)binning;
 
             const int boundary = (boxSize - cropSize) / 2;
 
@@ -599,7 +590,8 @@ void SubtomoProgram::processTomograms(
             if (do_stack2d) {
 
                 BufferedImage<float> cropParticlesRS = Padding::unpadCenter2D_full(particlesRS, boundary);
-                cropParticlesRS.write(outData, binnedPixelSize, write_float16);
+                BufferedImage<float> cropParticlesRS2 = NewStackHelper::getVisibleSlices(cropParticlesRS, isVisible);
+                cropParticlesRS2.write(outData, binnedPixelSize, write_float16);
 
             } else {
 
@@ -638,9 +630,9 @@ void SubtomoProgram::processTomograms(
                 Centering::shiftInSitu(dataImgFS);
 
                 // correct FT scale after the implicit cropping:
-                if (s3D != s2D) {
-                    dataImgFS *= (float) sqrt(s2D / (double) s3D);
-                }
+                float normfft = (float) s2D / ((float) s3D * sqrt((float)(binning)) );
+                if (fabs(normfft - 1.) > 0.0001)
+                    dataImgFS *= normfft;
 
                 FFT::inverseFourierTransform(dataImgFS, dataImgRS, FFT::Both);
 
@@ -738,8 +730,8 @@ void SubtomoProgram::processTomograms(
                     Reconstruction::taper(dataImgDivRS, taper, do_center, inner_thread_num);
                     dataImgDivRS.write(outDiv, binnedPixelSize, write_float16);
                 }
-            }
-        } // end if do_stack2d
+            } // end if do_stack2d
+        } // end loop particles p
 
 		if (verbosity > 0)
 		{

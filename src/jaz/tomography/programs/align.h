@@ -73,6 +73,7 @@ class AlignProgram : public RefinementProgram
 		void writeTempAlignmentData(
 				const std::vector<gravis::d4Matrix>& proj,
 				const std::vector<gravis::d3Vector>& pos,
+                const Tomogram &tomogram,
 				int t);
 		
 		void writeTempMotionData(
@@ -199,14 +200,13 @@ void AlignProgram::performAlignment(
 		per_tomogram_progress && verbosity > 0,
 		min_frame, max_frame);
 
-	std::vector<double> initial = alignment.originalCoefficients;
+    std::vector<double> initial = alignment.originalCoefficients;
 
 	alignment.devMode = debug;
 
-
 	if (!debug && verbosity > 0 && per_tomogram_progress)
 	{
-		Log::beginProgress("Performing optimisation", num_iters);
+		Log::beginProgress("Performing optimisation ...", num_iters);
 	}
 
 	/*std::cout << "initial info: \n";
@@ -237,7 +237,7 @@ void AlignProgram::performAlignment(
 	std::vector<gravis::d4Matrix> projections = alignment.getProjections(opt, tomogram.frameSequence);
 	std::vector<gravis::d3Vector> positions = alignment.getParticlePositions(opt);
 	
-	writeTempAlignmentData(projections, positions, tomo_index);
+	writeTempAlignmentData(projections, positions, tomogram, tomo_index);
 	
 	if (do_motion)
 	{

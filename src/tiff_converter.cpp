@@ -361,8 +361,7 @@ void TIFFConverter::initialise(int _rank, int _total_ranks)
 		fn_first = fn_in;
 	}
 
-	// Shuffle the input list so that (almost) all MPI processes get new movies
-	if (do_estimate || total_ranks > 1)
+	if (do_estimate)
 		MD.randomiseOrder();
 
 	if (fn_first.getExtension() != "mrc" && fn_first.getExtension() != "mrcs" && !EERRenderer::isEER(fn_first))
@@ -511,9 +510,8 @@ void TIFFConverter::processOneMovie(FileName fn_movie, FileName fn_tiff)
 void TIFFConverter::run()
 {
 	long int my_first, my_last;
-	 divide_equally(MD.numberOfObjects(), total_ranks, rank, my_first, my_last); // MPI parallelization
 
-	for (long i = my_first; i <= my_last; i++)
+	for (long i = rank; i < MD.numberOfObjects(); i += total_ranks)
 	{
 		FileName fn_movie, fn_tiff;
 		MD.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_movie, i);

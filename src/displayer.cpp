@@ -1982,10 +1982,7 @@ int pickerViewerCanvas::handle(int ev)
 			else if ( strcmp(m->label(), "Help") == 0 )
 				printHelp();
 			else if ( strcmp(m->label(), "Quit (CTRL-q)") == 0 )
-                        {
-                            saveCoordinates(false);
-                            exit(0);
-                        }
+                exit(0);
 			redraw();
 			return 1; // (tells caller we handled this event)
 		}
@@ -2885,6 +2882,13 @@ int Displayer::runGui()
 			win.display_labels.push_back(EMDL::label2Str(EMDL_CTF_POWER_SPECTRUM));
 		if (MD.containsLabel(EMDL_MICROGRAPH_MOVIE_NAME))
 			win.display_labels.push_back(EMDL::label2Str(EMDL_MICROGRAPH_MOVIE_NAME));
+        if (MD.containsLabel(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_FILE_NAME))
+            win.display_labels.push_back(EMDL::label2Str(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_FILE_NAME));
+        if (MD.containsLabel(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_HALF1_FILE_NAME))
+            win.display_labels.push_back(EMDL::label2Str(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_HALF1_FILE_NAME));
+        if (MD.containsLabel(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_HALF2_FILE_NAME))
+            win.display_labels.push_back(EMDL::label2Str(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_HALF2_FILE_NAME));
+
 	}
 	else
 	{

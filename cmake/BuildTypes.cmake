@@ -4,7 +4,7 @@
 # So -D__INTEL_COMPILER just manages to avoid compiling float128-targets (see fftw3.h, for instance).
 # Add -G to allow cuda-gdb to break inside kernels.
 if(CUDA)
-    set(EXTRA_NVCC_FLAGS "-D__INTEL_COMPILER --default-stream per-thread --std=c++11")
+    set(EXTRA_NVCC_FLAGS "-D__INTEL_COMPILER --default-stream per-thread --std=c++14")
     set(RELION_NVCC_FLAGS "${CUDARCH} ${WARN_DBL} ${EXTRA_NVCC_FLAGS}" CACHE STRING "" FORCE)
 elseif (HIP)
     if (${HIP_VERSION} VERSION_LESS "5.3" )

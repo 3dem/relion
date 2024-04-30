@@ -148,6 +148,14 @@ void Postprocessing::initialise()
 		std::cout.width(35); std::cout << std::left <<"  + half2-map: "; std::cout << fn_I2 << std::endl;
 	}
 
+    // Check if output directory exists, otherwise create it
+    if (fn_out.contains("/"))
+    {
+        FileName fn_dir = fn_out.beforeLastOf("/");
+        if (!exists(fn_dir)) mktree(fn_dir);
+    }
+
+
 	I1.read(fn_I1);
 	I2.read(fn_I2);
 	I1().setXmippOrigin();
@@ -562,6 +570,8 @@ void Postprocessing::calculateFSCtrue(MultidimArray<RFLOAT> &fsc_true, MultidimA
 	// Sometimes FSc at origin becomes -1!
 	if (DIRECT_A1D_ELEM(fsc_masked, 0) <= 0.)
 		DIRECT_A1D_ELEM(fsc_masked, 0) = 1.;
+	if (DIRECT_A1D_ELEM(fsc_unmasked, 0) <= 0.)
+		DIRECT_A1D_ELEM(fsc_unmasked, 0) = 1.;
 	if (DIRECT_A1D_ELEM(fsc_random_masked, 0) <= 0.)
 		DIRECT_A1D_ELEM(fsc_random_masked, 0) = 1.;
 
@@ -581,6 +591,7 @@ void Postprocessing::calculateFSCtrue(MultidimArray<RFLOAT> &fsc_true, MultidimA
 			DIRECT_A1D_ELEM(fsc_true, i) = (fsct - fscn) / (1. - fscn);
 		}
 	}
+    
 }
 
 void Postprocessing::calculateFSCpart(const MultidimArray<RFLOAT> fsc_unmasked, RFLOAT fraction, MultidimArray<RFLOAT> &fsc_part)
@@ -880,14 +891,11 @@ void Postprocessing::writeOutput()
 	delete plot2Dc;
 
 	FileName fn_log = fn_out.beforeLastOf("/") + "/logfile.pdf";
-	if (!exists(fn_log))
-	{
-		std::vector<FileName> fn_eps;
-		fn_eps.push_back(fn_out + "_fsc.eps");
-		fn_eps.push_back(fn_out + "_fsc_part.eps");
-		fn_eps.push_back(fn_out + "_guinier.eps");
-		joinMultipleEPSIntoSinglePDF(fn_log, fn_eps);
-	}
+	std::vector<FileName> fn_eps;
+	fn_eps.push_back(fn_out + "_fsc.eps");
+	fn_eps.push_back(fn_out + "_fsc_part.eps");
+	fn_eps.push_back(fn_out + "_guinier.eps");
+	joinMultipleEPSIntoSinglePDF(fn_log, fn_eps);
 
 	if (verb > 0)
 	{

@@ -233,7 +233,10 @@ public:
 	// Return true if at least one process is imported correctly
 	bool importPipeline(std::string _name);
 
-	// Write out the pipeline to a STAR file
+	// Convert node type names from v30001 to v50001
+    std::string convertOldNodeTypeLabel(std::string input_label);
+
+    // Write out the pipeline to a STAR file
 	void write(bool do_lock = false, FileName fn_del="", std::vector<bool> deleteNode = std::vector<bool>(), std::vector<bool> deleteProcess = std::vector<bool>());
 
 	// Read in the pipeline from a STAR file

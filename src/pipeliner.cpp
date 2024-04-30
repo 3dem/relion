@@ -232,17 +232,23 @@ bool PipeLine::touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist)
 	if (exists(node.name) || touch_even_if_not_exist)
 	{
 		// Make subdirectory for each type of node
-		// Only at the highest level, so before the first "."
-        //FileName fn_label = get_node_label(node.type);
-        // PIPELINER
 		FileName fn_label = node.type;
-		FileName fn_type = fn_label.beforeFirstOf(".") + "/";
+        std::string fn_type = fn_label.beforeFirstOf(".") + "/";
 
 		FileName mydir = fn_dir + fn_type + fnt.substr(0, fnt.rfind("/") + 1);
 		FileName mynode = fn_dir + fn_type + fnt;
-
-		mktree(mydir);
+        mktree(mydir);
 		touch(mynode);
+
+        // For deeper levels, also touch the deeper file
+        if (node.type_depth > 1)
+        {
+            std::string fn_type2 = fn_label.beforeNthOf('.', node.type_depth) + "/";
+            FileName mydir2 = fn_dir + fn_type2 + fnt.substr(0, fnt.rfind("/") + 1);
+            FileName mynode2 = fn_dir + fn_type2 + fnt;
+            mktree(mydir2);
+            touch(mynode2);
+        }
 		return true;
 	}
 	else
@@ -290,8 +296,6 @@ void PipeLine::deleteTemporaryNodeFile(Node &node)
 	else
 		fnt = node.name;
 
-    //FileName fn_type = get_node_label(node.type) + "/";
-	// PIPELINER
     FileName fn_type = node.type;
     fn_type = fn_type.beforeFirstOf(".") + "/";
 	FileName fn = fn_dir + fn_type + fnt;
@@ -1163,15 +1167,18 @@ void PipeLine::getOutputNodesFromStarFile(int this_job)
 
 		FileName nodename;
 		std::string nodetypelabel;
+        int nodetypedepth = 1;
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDnodes)
 		{
 			MDnodes.getValue(EMDL_PIPELINE_NODE_NAME, nodename);
 			MDnodes.getValue(EMDL_PIPELINE_NODE_TYPE_LABEL, nodetypelabel);
+            if (MDnodes.containsLabel(EMDL_PIPELINE_NODE_TYPE_DEPTH))
+                MDnodes.getValue(EMDL_PIPELINE_NODE_TYPE_DEPTH, nodetypedepth);
 
 			// if this node does not exist yet, then add it to the pipeline
 			if (findNodeByName(nodename) < 0 )
 			{
-				Node node(nodename, nodetypelabel);
+				Node node(nodename, nodetypelabel, nodetypedepth);
 				addNewOutputEdge(this_job, node);
 			}
 		}
@@ -1864,6 +1871,35 @@ bool PipeLine::importPipeline(std::string _name)
 	return imported;
 }
 
+
+std::string PipeLine::convertOldNodeTypeLabel(std::string input_label)
+{
+    FileName output_label = input_label;
+    if (output_label.contains("ParticlesData"))
+        output_label.replaceAllSubstrings("ParticlesData","ParticleGroupMetadata");
+    else if (output_label.contains("MicrographMoviesData"))
+        output_label.replaceAllSubstrings("MicrographMoviesData","MicrographMovieGroupMetadata");
+    else if (output_label.contains("MicrographsData"))
+        output_label.replaceAllSubstrings("MicrographsData","MicrographGroupMetadata");
+    else if (output_label.contains("MicrographsCoords"))
+        output_label.replaceAllSubstrings("MicrographsCoords","MicrographCoordsGroup");
+    else if (output_label.contains("ImagesData"))
+        output_label.replaceAllSubstrings("ImagesData","Image2DGroupMetadata");
+    else if (output_label.contains("OptimisationSet"))
+        output_label.replaceAllSubstrings("OptimisationSet","TomoOptimisationSet");
+    else if (output_label.contains("TomogramData"))
+        output_label.replaceAllSubstrings("TomogramData","TomogramGroupMetadata");
+    else if (output_label.contains("TrajectoryData"))
+        output_label.replaceAllSubstrings("TrajectoryData","TomoTrajectoryData");
+    else if (output_label.contains("ProcessData.star.relion.tomo.relion.tiltseries_set"))
+        output_label.replaceAllSubstrings("ProcessData.star.relion.tomo.relion.tiltseries_set","TomogramGroupMetadata.star.relion.tomo");
+    else if (output_label.contains("ProcessData.star.relion.tomo.relion.tomogram_set"))
+        output_label.replaceAllSubstrings("ProcessData.star.relion.tomo.relion.tomogram_set","TomogramGroupMetadata.star.relion.tomo");
+
+    return output_label;
+}
+
+
 // Read pipeline from STAR file
 void PipeLine::read(bool do_lock, std::string lock_message)
 {
@@ -1895,6 +1931,9 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 			if (iwait == 3)
 			{
 				std::cout << " WARNING: trying to read pipeline.star, but directory " << dir_lock << " exists (which protects against simultaneous writing by multiple instances of the GUI)" << std::endl;
+                std::cout << " WARNING: Perhaps the GUI or one of RELION's programs crashed unexpectedly? " << std::endl;
+                std::cout << " WARNING: You may want to check if your default_pipeline.star in this directory has been corrupted in the process." << std::endl;
+                std::cout << " WARNING: If so, you can copy a backup from the directory of the last job you executed. " << std::endl;
 			}
 			sleep(3);
 			status =  mkdir(dir_lock.c_str(), S_IRWXU);
@@ -1903,10 +1942,10 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 #endif
 
 			iwait++;
-			if (iwait > 40)
+			if (iwait > 20)
 			{
 
-				REPORT_ERROR("ERROR: PipeLine::read has waited for 2 minutes for lock directory to disappear. You may want to manually remove the file: " + fn_lock);
+				REPORT_ERROR("ERROR: PipeLine::read has waited for 1 minute for lock directory to disappear.You may want to manually remove the lock file: " + fn_lock);
 			}
 
 		}
@@ -1930,40 +1969,45 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 
 	MetaDataTable MDgen, MDnode, MDproc, MDedge1, MDedge2;
 
-	// This if allows for older version of the pipeline without the jobcounter
-	// TODO: remove after alpha-testing
-	if (MDgen.readStar(in, "pipeline_general"))
-	{
-		MDgen.getValue(EMDL_PIPELINE_JOB_COUNTER, job_counter);
-		if (job_counter < 0)
-			REPORT_ERROR("PipeLine::read: rlnPipeLineJobCounter must not be negative!");
-	}
+	// There seem to be some file systems, where reading the starfile is not entirely robust. Let's try 3 times
+    bool has_read = false;
+    for (int i= 0; i < 3; i++)
+    {
+        if (MDgen.readStar(in, "pipeline_general"))
+        {
+            MDgen.getValue(EMDL_PIPELINE_JOB_COUNTER, job_counter);
+            if (job_counter < 0)
+                REPORT_ERROR("PipeLine::read: rlnPipeLineJobCounter must not be negative!");
+            has_read = true;
+            break;
+        }
+        //std::cerr <<" read has failed reading pipeline_general table from the default_pipeliner.star file, will sleep 0.5 seconds and try again; attempt "<< i << " out of 3" << std::endl;
+        sleep(0.5);
+    }
+    if (!has_read) REPORT_ERROR("ERROR: cannot read expected pipeline_general table from the default_pipeliner.star file...");
 
 	MDnode.readStar(in, "pipeline_nodes");
+    bool do_convert = (MDnode.getVersion() < 50001);
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDnode)
 	{
 		std::string name, label;
-		// PIPELINER
-		int type;
+		int type, type_depth;
 		if (!MDnode.getValue(EMDL_PIPELINE_NODE_NAME, name) )
 			REPORT_ERROR("PipeLine::read: cannot find name in pipeline_nodes table");
 
-		if (MDnode.containsLabel(EMDL_PIPELINE_NODE_TYPE_LABEL))
-		{
-			MDnode.getValue(EMDL_PIPELINE_NODE_TYPE_LABEL, label);
-		}
-		else if (MDnode.getValue(EMDL_PIPELINE_NODE_TYPE, type))
-		{
-			label = get_node_label(type);
-		}
-		else
-		{
-			REPORT_ERROR("PipeLine::read: cannot find type in pipeline_nodes table");
-		}
+        MDnode.getValue(EMDL_PIPELINE_NODE_TYPE_LABEL, label);
+        // convert from pre-relion50001 version metadata files
+        if (do_convert) label = convertOldNodeTypeLabel(label);
+
+        // new in relion5: use different type-depths for the type_labels for easier compatibility with ccpem pipeliner
+        if (MDnode.containsLabel(EMDL_PIPELINE_NODE_TYPE_DEPTH))
+                MDnode.getValue(EMDL_PIPELINE_NODE_TYPE_DEPTH, type_depth);
+        else
+            type_depth = 1;
 
 		//Node newNode(name, get_node_type(label));
 		// PIPELINER
-		Node newNode(name, label);
+		Node newNode(name, label, type_depth);
 		nodeList.push_back(newNode);
 	}
 
@@ -2086,6 +2130,7 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 	in.close();
 }
 
+
 void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode, std::vector<bool> deleteProcess)
 {
 	if (do_read_only)
@@ -2183,7 +2228,7 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 		}
 
 	}
-#ifdef DEBUG
+#ifdef DEBUG_DEEP
 	MDproc.write(std::cerr);
 #endif
 	MDproc.write(fh);
@@ -2198,20 +2243,20 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 		{
 			MDnode.addObject();
 			MDnode.setValue(EMDL_PIPELINE_NODE_NAME, nodeList[i].name);
-			//MDnode.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, get_node_label(nodeList[i].type));
 			// PIPELINER
 			MDnode.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, nodeList[i].type);
+            MDnode.setValue(EMDL_PIPELINE_NODE_TYPE_DEPTH, nodeList[i].type_depth);
 		}
 		else
 		{
 			MDnode_del.addObject();
 			MDnode_del.setValue(EMDL_PIPELINE_NODE_NAME, nodeList[i].name);
-			//MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, get_node_label(nodeList[i].type));
 			// PIPELINER
 			MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, nodeList[i].type);
+            MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE_DEPTH, nodeList[i].type_depth);
 		}
 	}
-#ifdef DEBUG
+#ifdef DEBUG_DEEP
 	MDnode.write(std::cerr);
 #endif
 	MDnode.write(fh);
@@ -2240,7 +2285,7 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 			}
 		}
 	}
-#ifdef DEBUG
+#ifdef DEBUG_DEEP
 	MDedge1.write(std::cerr);
 #endif
 	MDedge1.write(fh);
@@ -2273,7 +2318,7 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 	if (fn_del != "")
 		MDedge2_del.write(fh_del);
 
-#ifdef DEBUG
+#ifdef DEBUG_DEEP
 	MDedge2.write(std::cerr);
 #endif
 

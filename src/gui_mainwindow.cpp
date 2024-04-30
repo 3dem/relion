@@ -409,7 +409,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 	{
 
 		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Tomo import");
+		browser->add("Import");
 		gui_jobwindows[nr_browse_tabs] = new JobWindow();
 		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_IMPORT);
 		browse_grp[nr_browse_tabs]->end();
@@ -465,7 +465,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
         nr_browse_tabs++;
 
         browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Make pseudo-subtomos");
+		browser->add("Extract subtomos");
 		gui_jobwindows[nr_browse_tabs] = new JobWindow();
 		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_SUBTOMO);
 		browse_grp[nr_browse_tabs]->end();
@@ -563,21 +563,21 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 	if (_do_tomo)
 	{
 		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Tomo reconstruct particle");
+		browser->add("Reconstruct particle");
 		gui_jobwindows[nr_browse_tabs] = new JobWindow();
 		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_RECONSTRUCT);
 		browse_grp[nr_browse_tabs]->end();
 		nr_browse_tabs++;
-
+        
 		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Tomo CTF refinement");
+		browser->add("CTF refinement");
 		gui_jobwindows[nr_browse_tabs] = new JobWindow();
 		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_CTFREFINE);
 		browse_grp[nr_browse_tabs]->end();
 		nr_browse_tabs++;
 
 		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Tomo frame alignment");
+		browser->add("Bayesian polishing");
 		gui_jobwindows[nr_browse_tabs] = new JobWindow();
 		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_ALIGN);
 		browse_grp[nr_browse_tabs]->end();
@@ -623,13 +623,16 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 	browse_grp[nr_browse_tabs]->end();
 	nr_browse_tabs++;
 
-	browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Particle subtraction");
-	gui_jobwindows[nr_browse_tabs] = new JobWindow();
-	gui_jobwindows[nr_browse_tabs]->initialise(PROC_SUBTRACT);
-	browse_grp[nr_browse_tabs]->end();
-	nr_browse_tabs++;
-
+	if (!_do_tomo)
+    {
+        browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+        browser->add("Particle subtraction");
+        gui_jobwindows[nr_browse_tabs] = new JobWindow();
+        gui_jobwindows[nr_browse_tabs]->initialise(PROC_SUBTRACT);
+        browse_grp[nr_browse_tabs]->end();
+        nr_browse_tabs++;
+    }
+    
 	browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Post-processing");
 	gui_jobwindows[nr_browse_tabs] = new JobWindow();
@@ -644,15 +647,13 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 	browse_grp[nr_browse_tabs]->end();
 	nr_browse_tabs++;
 
-    if (!_do_tomo)
-    {
-        browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-        browser->add("ModelAngelo building");
-        gui_jobwindows[nr_browse_tabs] = new JobWindow();
-        gui_jobwindows[nr_browse_tabs]->initialise(PROC_MODELANGELO);
-        browse_grp[nr_browse_tabs]->end();
-        nr_browse_tabs++;
-    }
+    browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+    browser->add("ModelAngelo building");
+    gui_jobwindows[nr_browse_tabs] = new JobWindow();
+    gui_jobwindows[nr_browse_tabs]->initialise(PROC_MODELANGELO);
+    browse_grp[nr_browse_tabs]->end();
+    nr_browse_tabs++;
+
 	browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("External");
 	gui_jobwindows[nr_browse_tabs] = new JobWindow();
@@ -1110,6 +1111,9 @@ void GuiMainWindow::fillStdOutAndErr()
 				REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_outtail + " does not exists" );
 			int err = textbuff_stdout->loadfile(fn_outtail.c_str());
 			in.close();
+            command = "rm -f " + fn_outtail;
+			res = system(command.c_str());
+
 		}
 		// Scroll to the bottom
 		disp_stdout->insert_position(textbuff_stdout->length());
@@ -1135,7 +1139,10 @@ void GuiMainWindow::fillStdOutAndErr()
 				REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_errtail + " does not exists" );
 			int err = textbuff_stderr->loadfile(fn_errtail.c_str());
 			in.close();
-		}
+            command = "rm -f " + fn_errtail;
+            res = system(command.c_str());
+
+        }
 		// Scroll to the bottom
 		disp_stderr->insert_position(textbuff_stderr->length());
 		disp_stderr->show_insert_position();
@@ -1377,8 +1384,7 @@ void GuiMainWindow::cb_display_io_node_i()
 	std::string command;
 
 	// Second line for backward compatibility with earlier alpha versions of relion-4.0....
-	if (pipeline.nodeList[mynode].type.find(LABEL_COORDS_CPIPE) != std::string::npos ||
-		pipeline.nodeList[mynode].type.find(NODE_MIC_COORDS_LABEL) != std::string::npos )
+	if (pipeline.nodeList[mynode].type.find(LABEL_COORDS_CPIPE) != std::string::npos)
 	{
 
 		// TODO: write error message saying this is no longer possible: use Continue to pick more/inspect results!
@@ -1472,10 +1478,14 @@ void GuiMainWindow::cb_display_io_node_i()
 		// Other arguments for extraction
 		command += " " + manualpickjob.joboptions["other_args"].getString() + " &";
 	}
-    else if (pipeline.nodeList[mynode].type.find(LABEL_TOMO_TILTSERIES) != std::string::npos )
+    else if (pipeline.nodeList[mynode].type.find(LABEL_IMPORT_TOMOGRAMS) != std::string::npos ||
+            pipeline.nodeList[mynode].type.find(LABEL_MOCORR_TOMOGRAMS) != std::string::npos ||
+            pipeline.nodeList[mynode].type.find(LABEL_CTFFIND_TOMOGRAMS) != std::string::npos ||
+            pipeline.nodeList[mynode].type.find(LABEL_TILTALIGN_TOMOGRAMS) != std::string::npos ||
+            pipeline.nodeList[mynode].type.find(LABEL_EXCLUDE_TOMOGRAMS) != std::string::npos )
     {
 
-        command = "relion_tomo_view tilt-series --tilt-series-star-file " + pipeline.nodeList[mynode].name;
+        command = "relion_python_tomo_view tilt-series --tilt-series-star-file " + pipeline.nodeList[mynode].name;
 
         // Read cache-size from gui_tomo_exclude_tilt_imagesjob.star if that file exists
 		RelionJob excludetiltseriesjob;
@@ -1491,10 +1501,14 @@ void GuiMainWindow::cb_display_io_node_i()
         command += " &";
 
     }
-    else if (pipeline.nodeList[mynode].type.find(LABEL_TOMO_TOMOGRAMS) != std::string::npos )
+    /*
+    else if (pipeline.nodeList[mynode].type.find(LABEL_RECONSTRUCT_TOMOGRAMS) != std::string::npos ||
+             pipeline.nodeList[mynode].type.find(LABEL_DENOISE_TOMOGRAMS) != std::string::npos ||
+             pipeline.nodeList[mynode].type.find(LABEL_CTFREFINE_TOMOGRAMS) != std::string::npos ||
+             pipeline.nodeList[mynode].type.find(LABEL_FRAMEALIGN_TOMOGRAMS) != std::string::npos )
     {
 
-        command = "relion_tomo_view tomograms --tilt-series-star-file " + pipeline.nodeList[mynode].name;
+        command = "relion_python_tomo_view tomograms --tilt-series-star-file " + pipeline.nodeList[mynode].name;
 
         // Read cache-size from gui_tomo_exclude_tilt_imagesjob.star if that file exists
         RelionJob excludetiltseriesjob;
@@ -1510,8 +1524,8 @@ void GuiMainWindow::cb_display_io_node_i()
         command += " &";
 
     }
-	else if (pipeline.nodeList[mynode].type.find(LABEL_LOGFILE_CPIPE) != std::string::npos ||
-			 pipeline.nodeList[mynode].type.find(NODE_PDF_LOGFILE_LABEL) != std::string::npos )
+    */
+	else if (pipeline.nodeList[mynode].type.find(LABEL_LOGFILE_CPIPE) != std::string::npos )
 	{
 		const char * default_pdf_viewer = getenv ("RELION_PDFVIEWER_EXECUTABLE");
 		char mydefault[]=DEFAULTPDFVIEWER;
@@ -1522,13 +1536,11 @@ void GuiMainWindow::cb_display_io_node_i()
 		std::string myviewer(default_pdf_viewer);
 		command = myviewer + " " + pipeline.nodeList[mynode].name + "&";
 	}
-	else if (pipeline.nodeList[mynode].type.find(LABEL_POLISH_PARAMS) != std::string::npos ||
-			 pipeline.nodeList[mynode].type.find(NODE_POLISH_PARAMS_LABEL) != std::string::npos )
+	else if (pipeline.nodeList[mynode].type.find(LABEL_POLISH_PARAMS) != std::string::npos )
 	{
 		command = "cat " + pipeline.nodeList[mynode].name;
 	}
-	else if (pipeline.nodeList[mynode].type.find(LABEL_POST) == std::string::npos &&
-			 pipeline.nodeList[mynode].type.find(NODE_POST_LABEL) == std::string::npos)
+	else
 	{
 		command = "relion_display --gui --i " + pipeline.nodeList[mynode].name + " &";
 	}

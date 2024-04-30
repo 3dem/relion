@@ -1156,25 +1156,35 @@ class star_handler_parameters
 		if (obsModel.numberOfOpticsGroups() > 1)
 			std::cerr << "WARNING: The input contains multiple optics groups. We assume that the pixel sizes of original micrographs before extraction are all the same. If this is not the case, you have to split the input and remove duplicates separately." << std::endl;
 
-		if (extract_angpix > 0)
-		{
-			std::cout << " + Using the provided pixel size for original micrographs before extraction: " << extract_angpix << std::endl;
-		}
-		else
-		{
-			extract_angpix = obsModel.getPixelSize(0);
-			std::cout << " + Assuming the pixel size of original micrographs before extraction is " << extract_angpix << std::endl;
-		}
+        RFLOAT scale;
+        if (mic_label == EMDL_MICROGRAPH_NAME)
+        {
+            if (extract_angpix > 0)
+            {
+                std::cout << " + Using the provided pixel size for original micrographs before extraction: " << extract_angpix << std::endl;
+            }
+            else
+            {
+                extract_angpix = obsModel.getPixelSize(0);
+                std::cout << " + Assuming the pixel size of original micrographs before extraction is " << extract_angpix << std::endl;
+            }
 
-		RFLOAT scale = particle_angpix / extract_angpix;
-		RFLOAT duplicate_threshold_in_px = duplicate_threshold / extract_angpix;
+            scale = particle_angpix / extract_angpix;
+            RFLOAT duplicate_threshold_in_px = duplicate_threshold / extract_angpix;
 
-		std::cout << " + The minimum inter-particle distance " << duplicate_threshold << " A corresponds to " << duplicate_threshold_in_px << " px in the micrograph coordinate (rlnCoordinateX/Y)." << std::endl;
-		std::cout << " + The particle shifts (rlnOriginXAngst, rlnOriginYAngst) are multiplied by " << scale << " to bring it to the same scale as rlnCoordinateX/Y." << std::endl;
+		    std::cout << " + The minimum inter-particle distance " << duplicate_threshold << " A corresponds to " << duplicate_threshold_in_px << " px in the micrograph coordinate (rlnCoordinateX/Y)." << std::endl;
+		    std::cout << " + The particle shifts (rlnOriginXAngst, rlnOriginYAngst) are multiplied by " << scale << " to bring it to the same scale as rlnCoordinateX/Y." << std::endl;
+
+            duplicate_threshold = duplicate_threshold_in_px;
+        }
+        else if (mic_label == EMDL_TOMO_NAME)
+        {
+            scale = 1.0;
+        }
 		FileName fn_removed = fn_out.withoutExtension() + "_removed.star";
 
 
-		MetaDataTable MDout = removeDuplicatedParticles(MD, mic_label, duplicate_threshold_in_px, scale, fn_removed, true);
+		MetaDataTable MDout = removeDuplicatedParticles(MD, mic_label, duplicate_threshold, scale, fn_removed, true);
 
 		write_check_ignore_optics(MDout, fn_out, "particles");
 		std::cout << " Written: " << fn_out << std::endl;

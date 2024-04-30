@@ -12,6 +12,7 @@
 class ParticleSet;
 class ParticleIndex;
 class TomogramSet;
+class Tomogram;
 class AberrationsCache;
 
 
@@ -34,12 +35,12 @@ class SubtomoProgram
 			double 
 				SNR,
 				binning,
-                rescale_coords,
-				taper, 
+				taper,
 				env_sigma,
 				cone_slope,
 				cone_sig0,
-				freqCutoffFract;
+				freqCutoffFract,
+                maxDose;
 			
 			bool 
 				flip_value, 
@@ -95,8 +96,7 @@ class SubtomoProgram
 				BufferedImage<float>& sum_data,
 				BufferedImage<float>& sum_weights );
 
-
-	private:
+private:
 
 			bool directoriesPerTomogram;
 

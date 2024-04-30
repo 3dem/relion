@@ -5,7 +5,7 @@
 #include <string>
 #include "src/acc/settings.h"
 
-enum class syclMallocType {shared, device, host};
+enum class syclMallocType {device, host};
 enum class syclBackendType {openCL, levelZero, CUDA, HIP, host};
 enum class syclDeviceType {gpu, cpu, fpga, host};
 enum class syclDeviceID {cpuAVX2, cpuAVX512, intelATS, intelARC, intelPVC};
@@ -52,6 +52,8 @@ public:
 	virtual bool isAsyncQueue() const = 0;
 	virtual bool canSupportFP64() const = 0;
 	virtual syclQueueType getSyclQueueType() const = 0;
+
+	virtual void destroyMemoryPool() = 0;
 
 	virtual std::string getName() = 0;
 	virtual int getDeviceID() const = 0;

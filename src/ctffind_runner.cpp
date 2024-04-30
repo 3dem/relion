@@ -40,7 +40,11 @@ void CtffindRunner::read(int argc, char **argv, int rank)
 	// Use a smaller squared part of the micrograph to estimate CTF (e.g. to avoid film labels...)
 	ctf_win =  textToInteger(parser.getOption("--ctfWin", "Size (in pixels) of a centered, squared window to use for CTF-estimation", "-1"));
 
-	int mic_section = parser.addSection("Microscopy parameters");
+    int tomo_section = parser.addSection("Tomography-specific parameters");
+    localsearch_nominal_defocus_range = textToFloat(parser.getOption("--localsearch_nominal_defocus", "If positive, search defoci (+/-) around rlnTomoNominalDefocus (in A)", "10000."));
+    bfactor_dose = textToFloat(parser.getOption("--exp_factor_dose", "If positive, use exponential factor by which to limit maxres per unit dose (maxres*=exp(dose/factor))", "100."));
+
+    int mic_section = parser.addSection("Microscopy parameters");
 	// First parameter line in CTFFIND
 	Cs = textToFloat(parser.getOption("--CS", "Spherical Aberration (mm) ","-1"));
 	Voltage = textToFloat(parser.getOption("--HT", "Voltage (kV)","-1"));
@@ -72,16 +76,6 @@ void CtffindRunner::read(int argc, char **argv, int rank)
 	nr_threads = textToInteger(parser.getOption("--j", "Number of threads (for CTFIND4 only)", "1"));
 	do_fast_search = parser.checkOption("--fast_search", "Disable \"Slower, more exhaustive search\" in CTFFIND4.1 (faster but less accurate)");
 
-	int gctf_section = parser.addSection("Gctf parameters");
-	do_use_gctf = parser.checkOption("--use_gctf", "Use Gctf instead of CTFFIND to estimate the CTF parameters");
-	fn_gctf_exe = parser.getOption("--gctf_exe","Location of Gctf executable (or through RELION_GCTF_EXECUTABLE environment variable)","");
-	angpix = textToFloat(parser.getOption("--angpix", "Magnified pixel size in Angstroms", "1."));
-	do_ignore_ctffind_params = parser.checkOption("--ignore_ctffind_params", "Use Gctf default parameters instead of CTFFIND parameters");
-	do_EPA = parser.checkOption("--EPA", "Use equi-phase averaging to calculate Thon rinds in Gctf");
-	do_validation = parser.checkOption("--do_validation", "Use validation inside Gctf to analyse quality of the fit?");
-	additional_gctf_options = parser.getOption("--extra_gctf_options", "Additional options for Gctf", "");
-	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread, e.g 0:1:2:3","");
-
 	// Initialise verb for non-parallel execution
 	verb = 1;
 
@@ -97,7 +91,8 @@ void CtffindRunner::usage()
 
 void CtffindRunner::initialise(bool is_leader)
 {
-	// Get the CTFFIND executable
+
+    // Get the CTFFIND executable
 	if (fn_ctffind_exe == "")
 	{
 		char *penv;
@@ -105,31 +100,12 @@ void CtffindRunner::initialise(bool is_leader)
 		if (penv != NULL)
 			fn_ctffind_exe = (std::string)penv;
 	}
-	// Get the GCTF executable
-	if (do_use_gctf && fn_gctf_exe == "")
-	{
-		char *penv;
-		penv = getenv("RELION_GCTF_EXECUTABLE");
-		if (penv != NULL)
-			fn_gctf_exe = (std::string)penv;
-	}
 
 	fn_shell = "/bin/sh";
 	char *shell_name;
 	shell_name = getenv("RELION_SHELL");
 	if (shell_name != NULL)
 		fn_shell = (std::string)shell_name;
-
-	if (do_use_gctf && ctf_win>0)
-		REPORT_ERROR("ERROR: Running Gctf together with --ctfWin is not implemented, please use CTFFIND instead.");
-
-	if (!do_phaseshift && (additional_gctf_options.find("--phase_shift_L") != std::string::npos ||
-	                       additional_gctf_options.find("--phase_shift_H") != std::string::npos ||
-	                       additional_gctf_options.find("--phase_shift_S") != std::string::npos))
-		REPORT_ERROR("ERROR: Please don't specify --phase_shift_L, H, S in 'Other Gctf options' (--extra_gctf_options). Use 'Estimate phase shifts' (--do_phaseshift) and 'Phase shift - Min, Max, Step' (--phase_min, --phase_max, --phase_step) instead.");
-
-	if (do_use_gctf && use_given_ps)
-		REPORT_ERROR("ERROR: --use_given_ps is available only with CTFFIND 4.1");
 
 	if (use_given_ps && do_movie_thon_rings)
 		REPORT_ERROR("ERROR: You cannot enable --use_given_ps and --do_movie_thon_rings simultaneously");
@@ -171,6 +147,12 @@ void CtffindRunner::initialise(bool is_leader)
 		if (use_given_ps && MDin.numberOfObjects() > 0 && !MDin.containsLabel(EMDL_CTF_POWER_SPECTRUM))
 			REPORT_ERROR("ERROR: You are using --use_given_ps, but there is no rlnCtfPowerSpectrum label in the input micrograph STAR file.");
 
+        if (is_tomo && (localsearch_nominal_defocus_range > 0.) && !MDin.containsLabel(EMDL_TOMO_NOMINAL_DEFOCUS))
+        {
+            if (verb > 0) std::cout << "WARNING: you specified --localsearch_nominal_defocus, but there is no rlnTomoNomicalDefocus in the STAR file; using min and max defocus instead..."<<std::endl;
+            localsearch_nominal_defocus_range = 0.;
+        }
+
 		fn_micrographs_all.clear();
 		optics_group_micrographs_all.clear();
 		fn_micrographs_ctf_all.clear();
@@ -196,8 +178,13 @@ void CtffindRunner::initialise(bool is_leader)
                 RFLOAT exposure;
                 MDin.getValue(EMDL_MICROGRAPH_PRE_EXPOSURE, exposure);
                 pre_exposure_micrographs.push_back(exposure);
+                if (localsearch_nominal_defocus_range > 0.)
+                {
+                    RFLOAT nominal_defocus;
+                    MDin.getValue(EMDL_TOMO_NOMINAL_DEFOCUS, nominal_defocus);
+                    nominal_defocus_micrographs.push_back(-10000. * nominal_defocus); // in positive Angstroms instead of negative um!
+                }
             }
-
 		}
 	}
 	else
@@ -278,9 +265,9 @@ void CtffindRunner::initialise(bool is_leader)
 		if (continue_old)
 		{
 			FileName fn_microot = fn_mic_ctf_given_all[imic].withoutExtension();
-			RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep, maxres=-1., valscore = -1., phaseshift = 0.;
+			RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep, maxres=-1., valscore = -1., phaseshift = 0., icering = 0.;
 			if (getCtffindResults(fn_microot, defU, defV, defAng, CC,
-			     HT, CS, AmpCnst, XMAG, DStep, maxres, valscore, phaseshift, false)) // false: dont warn if not found Final values
+			     HT, CS, AmpCnst, XMAG, DStep, maxres, valscore, phaseshift, icering, false)) // false: dont warn if not found Final values
 			{
 				process_this = false; // already done
 			}
@@ -322,7 +309,7 @@ void CtffindRunner::initialise(bool is_leader)
 		std::cout  << do_at_most << " micrographs as specified in --do_at_most." << std::endl;
 	}
 
-	// Make symbolic links of the input micrographs in the output directory because ctffind and gctf write output files alongside the input micropgraph
+	// Make symbolic links of the input micrographs in the output directory because ctffind writes output files alongside the input micropgraph
 	if (is_leader)
 	{
 		char temp [180];
@@ -349,37 +336,12 @@ void CtffindRunner::initialise(bool is_leader)
 		}
 	}
 
-	if (do_use_gctf && fn_micrographs.size()>0)
-	{
-		untangleDeviceIDs(gpu_ids, allThreadIDs);
-		if (allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
-		{
-#if defined _CUDA_ENABLED || defined _HIP_ENABLED
-			if (verb>0)
-				std::cout << "gpu-ids were not specified, so threads will automatically be mapped to devices (incrementally)."<< std::endl;
-			HANDLE_ERROR(accGPUGetDeviceCount(&devCount));
-#else
-			if (verb>0)
-				REPORT_ERROR("gpu-ids were not specified, but we could not figure out which GPU to use because RELION was not compiled with CUDA or HIP support.");
-#endif
-		}
-
-		// Find the dimensions of the first micrograph, to later on ensure all micrographs are the same size
-		Image<double> Itmp;
-		Itmp.read(fn_micrographs[0], false); // false means only read header!
-		xdim = XSIZE(Itmp());
-		ydim = YSIZE(Itmp());
-	}
-
 	if (is_ctffind4 && ctf_win > 0 && do_movie_thon_rings)
 		REPORT_ERROR("CtffindRunner::initialise ERROR: You cannot use a --ctfWin operation on movies.");
 
 	if (verb > 0)
 	{
-		if (do_use_gctf)
-			std::cout << " Using Gctf executable in: " << fn_gctf_exe << std::endl;
-		else
-			std::cout << " Using CTFFIND executable in: " << fn_ctffind_exe << std::endl;
+        std::cout << " Using CTFFIND executable in: " << fn_ctffind_exe << std::endl;
 		std::cout << " to estimate CTF parameters for the following micrographs: " << std::endl;
 		if (continue_old)
 			std::cout << " (skipping all micrographs for which a logfile with Final values already exists " << std::endl;
@@ -396,15 +358,10 @@ void CtffindRunner::run()
 		int barstep;
 		if (verb > 0)
 		{
-			if (do_use_gctf)
-				std::cout << " Estimating CTF parameters using Kai Zhang's Gctf ..." << std::endl;
-			else
-			{
-				if (is_ctffind4)
-					std::cout << " Estimating CTF parameters using Alexis Rohou's and Niko Grigorieff's CTFFIND4.1 ..." << std::endl;
-				else
-					std::cout << " Estimating CTF parameters using Niko Grigorieff's CTFFIND ..." << std::endl;
-			}
+            if (is_ctffind4)
+                std::cout << " Estimating CTF parameters using Alexis Rohou's and Niko Grigorieff's CTFFIND4.1 ..." << std::endl;
+            else
+                std::cout << " Estimating CTF parameters using Niko Grigorieff's CTFFIND ..." << std::endl;
 			init_progress_bar(fn_micrographs.size());
 			barstep = XMIPP_MAX(1, fn_micrographs.size() / 60);
 		}
@@ -424,11 +381,7 @@ void CtffindRunner::run()
             EMDLabel mylabel = (is_tomo) ? EMDL_TOMO_TILT_SERIES_PIXEL_SIZE : EMDL_MICROGRAPH_PIXEL_SIZE;
             obsModel.opticsMdt.getValue(mylabel, angpix, optics_group_micrographs[imic]-1);
 
-			if (do_use_gctf)
-			{
-				executeGctf(imic, allmicnames, imic+1==fn_micrographs.size());
-			}
-			else if (is_ctffind4)
+			if (is_ctffind4)
 			{
 				executeCtffind4(imic);
 			}
@@ -462,9 +415,9 @@ void CtffindRunner::joinCtffindResults()
 	{
 		FileName fn_microot = fn_micrographs_ctf_all[imic].withoutExtension();
 		RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep;
-		RFLOAT maxres = -999., valscore = -999., phaseshift = -999.;
+		RFLOAT maxres = -999., valscore = -999., phaseshift = -999., icering = 0.;
 		bool has_this_ctf = getCtffindResults(fn_microot, defU, defV, defAng, CC,
-		                                      HT, CS, AmpCnst, XMAG, DStep, maxres, valscore, phaseshift);
+		                                      HT, CS, AmpCnst, XMAG, DStep, maxres, valscore, phaseshift, icering);
 
 		if (!has_this_ctf)
 		{
@@ -496,6 +449,9 @@ void CtffindRunner::joinCtffindResults()
 				MDctf.setValue(EMDL_CTF_PHASESHIFT, phaseshift);
 			if (fabs(valscore + 999.) > 0.)
 				MDctf.setValue(EMDL_CTF_VALIDATIONSCORE, valscore);
+
+            if (icering > 0.)
+                MDctf.setValue(EMDL_CTF_ICERINGDENSITY, icering);
 
             if (is_tomo)
             {
@@ -537,7 +493,8 @@ void CtffindRunner::joinCtffindResults()
 	plot_labels.push_back(EMDL_CTF_MAXRES);
 	plot_labels.push_back(EMDL_CTF_PHASESHIFT);
 	plot_labels.push_back(EMDL_CTF_FOM);
-	plot_labels.push_back(EMDL_CTF_VALIDATIONSCORE);
+    plot_labels.push_back(EMDL_CTF_VALIDATIONSCORE);
+    plot_labels.push_back(EMDL_CTF_ICERINGDENSITY);
 	FileName fn_eps, fn_eps_root = fn_out+"micrographs_ctf";
 	std::vector<FileName> all_fn_eps;
 	for (int i = 0; i < plot_labels.size(); i++)
@@ -573,91 +530,31 @@ void CtffindRunner::joinCtffindResults()
 		std::cout << " Done! Written out: " << fn_out << "logfile.pdf" << std::endl;
 	}
 
-	if (do_use_gctf)
-	{
-		FileName fn_gctf_junk = "micrographs_all_gctf";
-		if (exists(fn_gctf_junk))
-			remove(fn_gctf_junk.c_str());
-		fn_gctf_junk = "extra_micrographs_all_gctf";
-		if (exists(fn_gctf_junk))
-			remove(fn_gctf_junk.c_str());
-	}
 }
 
-void CtffindRunner::executeGctf(long int imic, std::vector<std::string> &allmicnames, bool is_last, int rank)
+void CtffindRunner::getMySearchParameters(long int imic, RFLOAT &my_def_min, RFLOAT &my_def_max, RFLOAT &my_maxres)
 {
-	// Always add the new micrograph to the TODO list
-	Image<double> Itmp;
-	FileName outputfile = getOutputFileWithNewUniqueDate(fn_micrographs_ctf[imic], fn_out);
-	Itmp.read(outputfile, false); // false means only read header!
-	if (XSIZE(Itmp()) != xdim || YSIZE(Itmp()) != ydim)
-		REPORT_ERROR("CtffindRunner::executeGctf ERROR: Micrographs do not all have the same size! " + fn_micrographs_ctf[imic] + " is different from the first micrograph!");
-	if (ZSIZE(Itmp()) > 1 || NSIZE(Itmp()) > 1)
-		REPORT_ERROR("CtffindRunner::executeGctf ERROR: No movies or volumes allowed for " + fn_micrographs_ctf[imic]);
 
-	allmicnames.push_back(outputfile);
+    my_maxres = resol_max;
+    my_def_min = min_defocus;
+    my_def_max = max_defocus;
 
-	// Execute Gctf every 20 images, and always for the last one
-	if ( ((imic+1)%20) == 0 || is_last)
-	{
-		std::string command = fn_gctf_exe;
-		//command +=  " --ctfstar " + fn_out + "tt_micrographs_ctf.star";
-		command +=  " --apix " + floatToString(angpix);
-		command +=  " --cs " + floatToString(Cs);
-		command +=  " --kV " + floatToString(Voltage);
-		command +=  " --ac " + floatToString(AmplitudeConstrast);
-		command += " --astm " + floatToString(amount_astigmatism);
-		command +=  " --logsuffix _gctf.log";
+    if (!is_tomo) return;
 
-		if (!do_ignore_ctffind_params)
-		{
-			command += " --boxsize " + floatToString(box_size);
-			command += " --resL " + floatToString(resol_min);
-			command += " --resH " + floatToString(resol_max);
-			command += " --defL " + floatToString(min_defocus);
-			command += " --defH " + floatToString(max_defocus);
-			command += " --defS " + floatToString(step_defocus);
-		}
+    if (bfactor_dose > 0.)
+    {
+        // Simple model that increases maxres by an exponential on the dose
+        RFLOAT mydose = pre_exposure_micrographs[imic];
+        my_maxres = resol_max * exp(mydose/bfactor_dose);
+    }
 
-		if (do_phaseshift)
-		{
-			command += " --phase_shift_L " + floatToString(phase_min);
-			command += " --phase_shift_H " + floatToString(phase_max);
-			command += " --phase_shift_S " + floatToString(phase_step);
-		}
+    if (localsearch_nominal_defocus_range > 0.)
+    {
+        // Never search to a defocus of 0A!
+        my_def_min = XMIPP_MAX(min_defocus, nominal_defocus_micrographs[imic] - localsearch_nominal_defocus_range);
+        my_def_max = nominal_defocus_micrographs[imic] + localsearch_nominal_defocus_range;
+    }
 
-		if (do_EPA)
-			command += " --do_EPA ";
-
-		if (do_validation)
-			command += " --do_validation ";
-
-		for (size_t i = 0; i<allmicnames.size(); i++)
-			command += " " + allmicnames[i];
-
-		if (allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
-		{
-			// Automated mapping
-			command += " -gid " + integerToString(rank % devCount);
-		}
-		else
-		{
-			// User-specified mapping
-			command += " -gid " + allThreadIDs[rank][0];
-		}
-
-		// extra Gctf options
-		command += " " + additional_gctf_options;
-
-		// Redirect all gctf output
-		command += " >> " + fn_out + "gctf" + integerToString(rank)+".out  2>> " + fn_out + "gctf" + integerToString(rank)+".err";
-
-		//std::cerr << " command= " << command << std::endl;
-		int res = system(command.c_str());
-
-		// Re-set the allmicnames vector
-		allmicnames.clear();
-	}
 }
 
 void CtffindRunner::executeCtffind3(long int imic)
@@ -668,6 +565,9 @@ void CtffindRunner::executeCtffind3(long int imic)
 	FileName fn_log = fn_root + "_ctffind3.log";
 	FileName fn_ctf = fn_root + ".ctf";
 	FileName fn_mic_win;
+
+    RFLOAT my_min_defocus, my_max_defocus, my_maxres;
+    getMySearchParameters(imic, my_min_defocus, my_max_defocus, my_maxres);
 
 	std::ofstream  fh;
 	fh.open((fn_script).c_str(), std::ios::out);
@@ -711,7 +611,7 @@ void CtffindRunner::executeCtffind3(long int imic)
 	// line 3: CS[mm], HT[kV], AmpCnst, XMAG, DStep[um]
 	fh << Cs << ", " << Voltage << ", " << AmplitudeConstrast << ", 10000, " << angpix<< std::endl;
 	// line 4: Box, ResMin[A], ResMax[A], dFMin[A], dFMax[A], FStep[A], dAst[A]
-	fh << box_size << ", " << resol_min << ", " << resol_max << ", " << min_defocus << ", " << max_defocus << ", " << step_defocus << ", " << amount_astigmatism << std::endl;
+	fh << box_size << ", " << resol_min << ", " << my_maxres << ", " << my_min_defocus << ", " << my_max_defocus << ", " << step_defocus << ", " << amount_astigmatism << std::endl;
 	if (is_ctffind4)
 	{
 		// line 4: Movie Thon rings: $input_is_stack_of_frames,$number_of_frames_to_average
@@ -749,6 +649,9 @@ void CtffindRunner::executeCtffind4(long int imic)
 	FileName fn_log = fn_root + "_ctffind4.log";
 	FileName fn_ctf = fn_root + ".ctf";
 	FileName fn_mic_win;
+
+    RFLOAT my_min_defocus, my_max_defocus, my_maxres;
+    getMySearchParameters(imic, my_min_defocus, my_max_defocus, my_maxres);
 
 	std::ofstream  fh;
 	fh.open((fn_script).c_str(), std::ios::out);
@@ -814,9 +717,9 @@ void CtffindRunner::executeCtffind4(long int imic)
 	fh << AmplitudeConstrast << std::endl;
 	fh << ctf_boxsize << std::endl;
 	fh << resol_min << std::endl;
-	fh << resol_max << std::endl;
-	fh << min_defocus << std::endl;
-	fh << max_defocus << std::endl;
+	fh << my_maxres << std::endl;
+	fh << my_min_defocus << std::endl;
+	fh << my_max_defocus << std::endl;
 	fh << step_defocus << std::endl;
 	// Do you know what astigmatism is present?
 	fh << "no" << std::endl;
@@ -866,16 +769,17 @@ void CtffindRunner::executeCtffind4(long int imic)
 
 bool CtffindRunner::getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
 		RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
-		RFLOAT &maxres, RFLOAT &valscore, RFLOAT &phaseshift, bool do_warn)
+		RFLOAT &maxres, RFLOAT &valscore, RFLOAT &phaseshift, RFLOAT &icering, bool do_warn)
 {
 	if (is_ctffind4)
 	{
 		return getCtffind4Results(fn_microot, defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep,
-		                          maxres, phaseshift, do_warn);
+		                          maxres, phaseshift, icering, do_warn);
 	}
 	else
 	{
-		return getCtffind3Results(fn_microot, defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep,
+		icering = 0.;
+        return getCtffind3Results(fn_microot, defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep,
 		                          maxres, phaseshift, valscore, do_warn);
 	}
 }
@@ -886,8 +790,6 @@ bool CtffindRunner::getCtffind3Results(FileName fn_microot, RFLOAT &defU, RFLOAT
 {
 	FileName fn_root = getOutputFileWithNewUniqueDate(fn_microot, fn_out);
 	FileName fn_log = fn_root + "_ctffind3.log";
-	if (do_use_gctf)
-		fn_log = fn_root + "_gctf.log";
 
 	std::ifstream in(fn_log.data(), std::ios_base::in);
 	if (in.fail())
@@ -932,30 +834,10 @@ bool CtffindRunner::getCtffind3Results(FileName fn_microot, RFLOAT &defU, RFLOAT
 				defU = textToFloat(words[0]);
 				defV = textToFloat(words[1]);
 				defAng = textToFloat(words[2]);
-				if (do_use_gctf && do_phaseshift)
-				{
-					phaseshift = textToFloat(words[3]);
-					CC = textToFloat(words[4]);
-				}
-				else
-					CC = textToFloat(words[3]);
+                CC = textToFloat(words[3]);
 			}
 		}
 
-		if (do_use_gctf)
-		{
-			if (line.find("Resolution limit estimated by EPA:") != std::string::npos)
-			{
-				tokenize(line, words);
-				maxres = textToFloat(words[words.size()-1]);
-			}
-
-			if (line.find("OVERALL_VALIDATION_SCORE:") != std::string::npos)
-			{
-				tokenize(line, words);
-				valscore = textToFloat(words[words.size()-1]);
-			}
-		}
 	}
 
 	if (!Cs_is_found)
@@ -979,7 +861,7 @@ bool CtffindRunner::getCtffind3Results(FileName fn_microot, RFLOAT &defU, RFLOAT
 
 bool CtffindRunner::getCtffind4Results(FileName fn_microot, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
 		RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
-		RFLOAT &maxres, RFLOAT &phaseshift, bool do_warn)
+		RFLOAT &maxres, RFLOAT &phaseshift, RFLOAT &icering, bool do_warn)
 {
 	FileName fn_root = getOutputFileWithNewUniqueDate(fn_microot, fn_out);
 	FileName fn_log = fn_root + "_ctffind4.log";
@@ -1063,6 +945,40 @@ bool CtffindRunner::getCtffind4Results(FileName fn_microot, RFLOAT &defU, RFLOAT
 	}
 
 	in2.close();
+
+    // Also try and get rlnIceRingDensity, as suggested by Rafael Leiro from the CNIO in Madrid
+    FileName fn_avrot = fn_root + "_avrot.txt";
+    std::ifstream av(fn_avrot.data(), std::ios_base::in);
+	icering = 0.;
+    if (!av.fail())
+    {
+        std::string s1, s2;
+        //skip 5 lines
+        for(int i = 0; i < 5; ++i)
+            std::getline(av, s1);
+
+        // Now get lines 6 and 7
+        std::getline(av,s1);
+        tokenize(s1, words);
+        int imin = -999;
+        int imax = -999;
+        for (int i = 0; i < words.size(); i++)
+            if (imin < 0 && textToFloat(words[i]) >= 0.25) {
+                imin = i;
+                break;
+            }
+        for (int i = imin; i < words.size(); i++)
+            if (imax < 0 && imin > 0 && textToFloat(words[i]) > 0.28) {
+                imax = i;
+                break;
+            }
+        std::getline(av,s2);
+        tokenize(s2, words);
+        for (int i = imin; i < imax; i++)
+        {
+            icering += fabs(textToFloat(words[i]));
+        }
+    }
 
 	return Final_is_found;
 }

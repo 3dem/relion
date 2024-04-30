@@ -49,11 +49,8 @@ public:
     // Projection matrix for tilt series stacks
     Matrix2D<RFLOAT> Aproj;
 
-    // Flag to monitor whether this images is all-zero
-    bool is_empty;
-
     // CTF information for defocus adjustment of tilt seriers
-    float defU, defV, defAngle, dose;
+    float defU, defV, defAngle, scale, dose, bfactor, phase_shift;
 
     // Empty Constructor
 	ExpImage() {}
@@ -66,11 +63,13 @@ public:
 	{
 		particle_id = copy.particle_id;
 		Aproj = copy.Aproj;
-        is_empty =copy.is_empty;
         defU = copy.defU;
         defV = copy.defV;
         defAngle = copy.defAngle;
+        scale = copy.scale;
         dose = copy.dose;
+        bfactor = copy.bfactor;
+        phase_shift = copy.phase_shift;
 	}
 
 	// Define assignment operator in terms of the copy constructor
@@ -79,11 +78,13 @@ public:
 
 		particle_id = copy.particle_id;
         Aproj = copy.Aproj;
-        is_empty =copy.is_empty;
         defU = copy.defU;
         defV = copy.defV;
         defAngle = copy.defAngle;
+        scale = copy.scale;
         dose = copy.dose;
+        bfactor = copy.bfactor;
+        phase_shift = copy.phase_shift;
 		return *this;
 	}
 };
@@ -158,6 +159,7 @@ public:
 	{
 		return images.size();
 	}
+
 };
 
 class ExpGroup
@@ -333,7 +335,7 @@ public:
 	void addParticle(std::string img_name, int optics_group, long int group_id, int random_subset = 0, int tomogram_id = 0);
 
  	// Add an image to the given particle
-	void addImageToParticle(long int part_id, d4Matrix *Aproj = NULL, CTF *ctf = NULL, float dose = 0.);
+	void addImageToParticle(long int part_id, d4Matrix *Aproj = NULL, CTF *ctf = NULL, float dose = 0., double BfactorPerElectronDose = 0.);
 
 	// Add a group
 	long int addGroup(std::string mic_name, int optics_group);
@@ -373,7 +375,7 @@ public:
 	// in that case, stop copying, and keep reading particles from where they were...
 	void copyParticlesToScratch(int verb, bool do_copy = true, bool also_do_ctf_image = false, RFLOAT free_scratch_Gb = 10);
 
-	// Read from file
+    // Read from file
 	bool read(
 		FileName fn_in, FileName fn_tomo, FileName fn_motion,
 		bool do_ignore_particle_name = false,

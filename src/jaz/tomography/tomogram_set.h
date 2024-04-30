@@ -8,6 +8,7 @@
 #include <src/jaz/tomography/tomogram.h>
 #include <src/jaz/gravis/t4Matrix.h>
 #include <src/ctf.h>
+#include <src/transformations.h>
 
 class TomogramSet
 {
@@ -24,27 +25,17 @@ class TomogramSet
         void write(FileName filename);
 
         // If max_dose is positive, then only images with cumulativeDose less than or equal to max_dose will be loaded.
-		Tomogram loadTomogram(int index, bool loadImageData, bool loadEvenFrames = false, bool loadOddFrames = false) const;
-			
-		void addTomogramFromIMODStack(
-			std::string tomoName, std::string stackFilename,
-			const std::vector<gravis::d4Matrix>& projections,
-			int w, int h, int d,
-			const std::vector<double>& dose,
-			double fractionalDose,
-			const std::vector<CTF>& ctfs,
-			double handedness, 
-			double pixelSize);
-		
-		int size() const;
+		Tomogram loadTomogram(int index, bool loadImageData, bool loadEvenFrames = false, bool loadOddFrames = false, int w0 = -999, int h0 =-999, int d0 = -999 ) const;
 
-		void setProjections(int tomogramIndex, const std::vector<gravis::d4Matrix>& proj);
-		void setProjection(int tomogramIndex, int frame, const gravis::d4Matrix& P);
+		int size() const;
+        void setProjectionAngles(int tomogramIndex, int frame, RFLOAT xtilt, RFLOAT ytilt, RFLOAT zrot, RFLOAT xshift_angst, RFLOAT yshift_angst);
+
 		void setCtf(int tomogramIndex, int frame, const CTF& ctf);
 		void setDose(int tomogramIndex, int frame, double dose);
 		void setTiltSeriesFile(int tomogramIndex, const std::string& filename);
 		void setFiducialsFile(int tomogramIndex, const std::string& filename);
 		void setDefocusSlope(int tomogramIndex, double slope);
+        void applyTiltAngleOffset(int tomogramIndex, double offset);
 
 		void setDeformation(
 				int tomogramIndex,
@@ -53,6 +44,7 @@ class TomogramSet
 				const std::vector<std::vector<double>>& coeffs);
 
 		void clearDeformation();
+
 
 		int getTomogramIndex(std::string tomogramName) const;
         std::string getTomogramName(int index) const;

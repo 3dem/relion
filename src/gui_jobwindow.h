@@ -56,7 +56,7 @@ public:
 	Fl_Group *tab1, *tab2, *tab3, *tab4, *tab5, *tab6, *tab7, *runtab;
 
 	// Groups
-	Fl_Group *group1, *group2, *group3, *group4, *group5, *group6, *group7, *group8, *queue_group;
+	Fl_Group *group0, *group1, *group2, *group3, *group4, *group5, *group6, *group7, *group8, *queue_group;
 
 public:
 	// Constructor with x, y, w, h and a title
@@ -132,8 +132,7 @@ private:
 	void initialiseExternalWindow();
 
 	// relion-4.0: add subtomogram averaging programs by Jasenko
-	void placeTomoInput(bool has_tomograms, bool has_particles,
-						bool has_trajectories, bool has_manifolds, bool has_halfmaps, bool has_postprocess);
+	void placeTomoInput(bool has_tomograms, bool has_particles,	bool has_trajectories, bool has_manifolds);
 	void initialiseTomoImportWindow();
 	void initialiseTomoExcludeTiltImagesWindow();
     void initialiseTomoReconstructTomogramsWindow();
@@ -143,7 +142,7 @@ private:
     void initialiseTomoSubtomoWindow();
 	void initialiseTomoCtfRefineWindow();
 	void initialiseTomoAlignWindow();
-	void initialiseTomoReconParWindow();
+    void initialiseTomoReconParWindow();
 
 };
 

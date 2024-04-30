@@ -98,7 +98,10 @@ void globalThreadExpectationSomeParticles(void *self, int thread_id)
 MlOptimiser::~MlOptimiser()
 {
 	for (int i = 0; i < syclDeviceList.size(); i++)
+	{
+		syclDeviceList[i]->destroyMemoryPool();
 		delete syclDeviceList[i];
+	}
 
 	syclDeviceList.clear();
 }
@@ -662,23 +665,20 @@ void MlOptimiser::parseInitial(int argc, char **argv)
         if (fn_data == "")
         {
             if (!optimisationSet.getValue(EMDL_TOMO_PARTICLES_FILE_NAME, fn_data))
-                REPORT_ERROR("No particles filename was found in file " + fn_OS);
+                REPORT_ERROR("No particles filename was found from command line or in optimisation_set " + fn_OS);
         }
         if (fn_tomo == "")
         {
             if (!optimisationSet.getValue(EMDL_TOMO_TOMOGRAMS_FILE_NAME, fn_tomo))
-                REPORT_ERROR("No tomograms filename was found in file " + fn_OS);
+                REPORT_ERROR("No tomograms filename was found from command line or  in optimisation_set " + fn_OS);
         }
-        if (fn_motion == "")
+         if (fn_motion == "")
         {
-            if (!optimisationSet.getValue(EMDL_TOMO_TRAJECTORIES_FILE_NAME, fn_motion))
-                std::cout << " No motion trajectories were found in file " + fn_OS + ". Continuing without mask." << std::endl;
+            // Motions are optional!
+            if (optimisationSet.containsLabel(EMDL_TOMO_TRAJECTORIES_FILE_NAME))
+                optimisationSet.getValue(EMDL_TOMO_TRAJECTORIES_FILE_NAME, fn_motion);
         }
-        if (fn_mask == "None")
-        {
-            if (!optimisationSet.getValue(EMDL_TOMO_REFERENCE_MASK_FILE_NAME, fn_mask))
-                std::cout << " WARNING: No reference mask filename was found in file " + fn_OS + ". Continuing without mask." << std::endl;
-        }
+
     }
 
     // Perform cross-product comparison at first iteration
@@ -715,8 +715,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
     // SHWS 25apr2023 for subtomogram averaging
     offset_range_x = textToFloat(parser.getOption("--offset_range_x", "Range for sampling offsets in X-direction (in Angstrom; default=auto)", "-1"));
-    offset_range_y = textToFloat(parser.getOption("--offset_range_y", "Range for sampling offsets in X-direction (in Angstrom; default=auto)", "-1"));
-    offset_range_z = textToFloat(parser.getOption("--offset_range_z", "Range for sampling offsets in X-direction (in Angstrom; default=auto)", "-1"));
+    offset_range_y = textToFloat(parser.getOption("--offset_range_y", "Range for sampling offsets in Y-direction (in Angstrom; default=auto)", "-1"));
+    offset_range_z = textToFloat(parser.getOption("--offset_range_z", "Range for sampling offsets in Z-direction (in Angstrom; default=auto)", "-1"));
 
     // Jun19,2015 - Shaoda, Helical refinement
     sampling.helical_offset_step = textToFloat(parser.getOption("--helical_offset_step", "Sampling rate (before oversampling) for offsets along helical axis (in Angstroms)", "-1"));
@@ -1003,16 +1003,16 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     do_skip_maximization = parser.checkOption("--skip_maximize", "Skip maximization step (only write out data.star file)?");
     failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be handled by fail-safe mode, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
 
-    do_blush = parser.checkOption("--blush", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
+    do_blush = parser.checkOption("--blush", "Perform the reconstruction with the Blush algorithm.");
     skip_spectral_trailing = parser.checkOption("--blush_skip_spectral_trailing", "Skip spectral trailing during Blush reconstruction (WARNING: This may inflate resolution estimates)");
 
-	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction with the Blush algorithm.");
+    do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
     nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
     auto_ignore_angle_changes = parser.checkOption("--auto_ignore_angles", "In auto-refinement, update angular sampling regardless of changes in orientations for convergence. This makes convergence faster.");
     auto_resolution_based_angles= parser.checkOption("--auto_resol_angles", "In auto-refinement, update angular sampling based on resolution-based required sampling. This makes convergence faster.");
     allow_coarser_samplings = parser.checkOption("--allow_coarser_sampling", "In 2D/3D classification, allow coarser angular and translational samplings if accuracies are bad (typically in earlier iterations.");
     do_trust_ref_size = parser.checkOption("--trust_ref_size", "Trust the pixel and box size of the input reference; by default the program will die if these are different from the first optics group of the data");
-    minimum_nr_particles_sigma2_noise = textToInteger(parser.getOption("--nr_parts_sigma2noise", "Number of particles (per optics group) for initial noise spectra estimation.", "1000"));
+    minimum_nr_particles_sigma2_noise = textToInteger(parser.getOption("--nr_parts_sigma2noise", "Number of particles (per optics group) for initial noise spectra estimation (default 1000 for SPA and 100 for STA).", "-1"));
     ///////////////// Special stuff for first iteration (only accessible via CL, not through readSTAR ////////////////////
 
     // When reading from the CL: always start at iteration 1 and subset 1
@@ -1536,16 +1536,16 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
     }
 
     // Creating output tomo optimiser set, if required
-    if (do_join_random_halves && !optimisationSet.isEmpty())
+    if (do_write_data && (mymodel.data_dim == 3 || mydata.is_tomo) )
     {
+        if (optimisationSet.numberOfObjects() == 0)
+        {
+            optimisationSet.addObject();
+            optimisationSet.setIsList(true);
+        }
         optimisationSet.setValue(EMDL_TOMO_PARTICLES_FILE_NAME, fn_root + "_data.star");
         optimisationSet.setValue(EMDL_TOMO_TOMOGRAMS_FILE_NAME, fn_tomo);
         optimisationSet.setValue(EMDL_TOMO_TRAJECTORIES_FILE_NAME, fn_motion);
-        optimisationSet.setValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, fn_root2 + "_half1_class001_unfil.mrc");
-        optimisationSet.setValue(EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME, fn_root2 + "_half2_class001_unfil.mrc");
-        optimisationSet.setValue(EMDL_TOMO_REFERENCE_MASK_FILE_NAME, fn_mask);
-        if (optimisationSet.containsLabel(EMDL_TOMO_REFERENCE_FSC_FILE_NAME))
-            optimisationSet.deactivateLabel(EMDL_TOMO_REFERENCE_FSC_FILE_NAME);
 
         optimisationSet.write(fn_root + "_optimisation_set.star");
     }
@@ -1733,7 +1733,11 @@ void MlOptimiser::initialise()
 			if (semiAutomaticMapping)
 			{
 				if (fullAutomaticMapping)
+#if 1
+					dev_id = 0;	// Do not span multiple devices between threads for automatic mapping
+#else
 					dev_id = devCount*i / nr_threads;
+#endif
 				else
 					dev_id = textToInteger(allThreadIDs[0][i % (allThreadIDs[0]).size()].c_str());
 			}
@@ -2058,6 +2062,7 @@ void MlOptimiser::initialiseGeneral(int rank)
                 fn_ref, is_3d_model, mydata,
                 do_average_unaligned, do_generate_seeds,refs_are_ctf_corrected,
                 ref_angpix, gradient_refine, grad_pseudo_halfsets, do_trust_ref_size, (rank==0));
+
     }
 
     if (mymodel.nr_classes > 1 && do_split_random_halves)
@@ -2138,7 +2143,9 @@ void MlOptimiser::initialiseGeneral(int rank)
         // This creates a rotation matrix for (rot,tilt,psi) = (0,90,0)
         // It will be used to make all Abody orientation matrices relative to (0,90,0) instead of the more logical (0,0,0)
         // This is useful, as psi-priors are ill-defined around tilt=0, as rot becomes the same as -psi!!
-        rotation3DMatrix(-90., 'Y', A_rot90, false);
+        //SHWS 2feb2024: found bug in rotation around Y: reverse direction!
+        //rotation3DMatrix(-90., 'Y', A_rot90, false);
+        rotation3DMatrix(90., 'Y', A_rot90, false);
         A_rot90T = A_rot90.transpose();
     }
 
@@ -2542,6 +2549,11 @@ void MlOptimiser::initialiseGeneral(int rank)
 	else
 		blush_args = blush_args + " --gpu -1 ";
 
+    if (minimum_nr_particles_sigma2_noise < 0)
+    {
+        minimum_nr_particles_sigma2_noise = (mymodel.data_dim == 3 || mydata.is_tomo) ? 10 : 1000;
+    }
+
 #ifdef DEBUG
     std::cerr << "Leaving initialiseGeneral" << std::endl;
 #endif
@@ -2672,7 +2684,7 @@ void MlOptimiser::initialiseReferences()
         // Low-pass filter the initial references
         initialLowPassFilterReferences();
 
-        if (do_init_blobs && fn_ref == "None")
+        if (do_init_blobs && fn_ref == "None" && !(mydata.is_tomo || mymodel.data_dim == 3))
         {
             bool is_helical_segment =
                     (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
@@ -2777,6 +2789,9 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
         long int part_id = mydata.sorted_idx[part_id_sorted];
         long int optics_group = mydata.getOpticsGroup(part_id);
 
+        if (nr_particles_done_per_optics_group[optics_group] >= minimum_nr_particles_sigma2_noise)
+            continue;
+
         // Extract the relevant MetaDataTable row from MDimg
         MDimg = mydata.getMetaDataParticle(part_id);
 
@@ -2816,8 +2831,8 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
             img().setXmippOrigin();
         }
 
-        Image<RFLOAT> wholestack;
-        if (mydata.is_tomo) wholestack=img;
+        MultidimArray<RFLOAT> wholestack;
+        if (mydata.is_tomo) wholestack = img();
 
         for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++)
         {
@@ -2826,14 +2841,8 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
             if (mydata.is_tomo)
             {
                 MultidimArray<RFLOAT> my_img;
-                wholestack().getImage(img_id, my_img);
+                wholestack.getImage(img_id, my_img);
                 img() = my_img;
-                if (img().computeStddev() == 0.) continue;
-            }
-
-            if (nr_particles_done_per_optics_group[optics_group] >= minimum_nr_particles_sigma2_noise)
-            {
-                continue;
             }
 
             RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
@@ -2857,7 +2866,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
             }
 
             // Check that the average in the noise area is approximately zero and the stddev is one
-            if (!dont_raise_norm_error && verb > 0)
+            if (!dont_raise_norm_error && !(mymodel.data_dim == 3 || mydata.is_tomo) && verb > 0)
             {
                 // NEW METHOD
                 RFLOAT sum, sum2, sphere_radius_pix, cyl_radius_pix;
@@ -3002,9 +3011,9 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
                                 mydata.particles[part_id].images[img_id].defU,
                                 mydata.particles[part_id].images[img_id].defV,
                                 mydata.particles[part_id].images[img_id].defAngle,
-                                0.,
-                                1.,
-                                0.,
+                                mydata.particles[part_id].images[img_id].bfactor,
+                                mydata.particles[part_id].images[img_id].scale,
+                                mydata.particles[part_id].images[img_id].phase_shift,
                                 mydata.particles[part_id].images[img_id].dose);
                     }
                     else
@@ -3513,7 +3522,7 @@ void MlOptimiser::expectation()
         (do_auto_refine || !do_grad || iter % 10 == 0 || iter == nr_iter || iter <= 1))
     {
         // Set the exp_metadata (but not the exp_imagedata which is not needed for calculateExpectedAngularErrors)
-        int n_trials_acc = (mymodel.ref_dim==3 && mymodel.data_dim != 3) ? 100 : 10;
+        int n_trials_acc = (mymodel.ref_dim==3 && (mymodel.data_dim != 3 || mydata.is_tomo)) ? 100 : 10;
         n_trials_acc = XMIPP_MIN(n_trials_acc, mydata.numberOfParticles());
         getMetaAndImageDataSubset(0, n_trials_acc-1, false);
         calculateExpectedAngularErrors(0, n_trials_acc-1);
@@ -4860,22 +4869,38 @@ bool MlOptimiser::setAverageCTF2(MultidimArray<RFLOAT> &avgctf2)
     if (mydata.hasCtfPremultiplied() && !fix_tau && !do_split_random_halves)
     {
         do_correct_tau2_by_avgctf2 = true;
-        MultidimArray<RFLOAT> sumw_multi;
+        MultidimArray<RFLOAT> sumw;
         avgctf2.initZeros(mymodel.sigma2_noise[0]);
-        sumw_multi.initZeros(mymodel.sigma2_noise[0]);
+        sumw.initZeros(mymodel.sigma2_noise[0]);
+
+        bool do_subtomo_correction = wsum_model.sumw_stMulti[0].sum() > 0.;
         for (int igroup = 0; igroup < mymodel.nr_optics_groups; igroup++)
         {
-            FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(avgctf2)
+            if (do_subtomo_correction)
             {
-                DIRECT_MULTIDIM_ELEM(avgctf2, n) += DIRECT_MULTIDIM_ELEM(wsum_model.sumw_ctf2[igroup], n);
-                DIRECT_MULTIDIM_ELEM(sumw_multi, n) += DIRECT_MULTIDIM_ELEM(wsum_model.sumw_stMulti[igroup], n);
+                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(avgctf2)
+                {
+                    DIRECT_MULTIDIM_ELEM(avgctf2, n) += DIRECT_MULTIDIM_ELEM(wsum_model.sumw_ctf2[igroup], n);
+                    DIRECT_MULTIDIM_ELEM(sumw, n) += DIRECT_MULTIDIM_ELEM(wsum_model.sumw_stMulti[igroup], n);
+                }
+            }
+            else
+            {
+                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(avgctf2)
+                {
+                    DIRECT_MULTIDIM_ELEM(avgctf2, n) += DIRECT_MULTIDIM_ELEM(wsum_model.sumw_ctf2[igroup], n);
+                    DIRECT_MULTIDIM_ELEM(sumw, n) += wsum_model.sumw_group[igroup] * DIRECT_MULTIDIM_ELEM(Npix_per_shell, n);
+                }
             }
         }
+
+        // Store the updated avgctf2 inside the wsum_model.sumw_ctf2 array of the first group
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(avgctf2)
         {
-            if (DIRECT_MULTIDIM_ELEM(sumw_multi, n) > 0.)
-                DIRECT_MULTIDIM_ELEM(avgctf2, n) /= DIRECT_MULTIDIM_ELEM(sumw_multi, n);
+            if (DIRECT_MULTIDIM_ELEM(sumw, n) > 0.)
+                DIRECT_MULTIDIM_ELEM(avgctf2, n) = DIRECT_MULTIDIM_ELEM(avgctf2, n) / DIRECT_MULTIDIM_ELEM(sumw, n);
         }
+
     }
 
     return do_correct_tau2_by_avgctf2;
@@ -5239,6 +5264,7 @@ void MlOptimiser::maximizationOtherParameters()
             }
         }
     }
+
     RCTOC(timer,RCT_7);
     RCTIC(timer,RCT_8);
     // After the first iteration the references are always CTF-corrected
@@ -6004,7 +6030,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
                 std::cerr << "  old_offset_helix(p1, p2, z) = (" << XX(my_old_offset_helix_coords) << ", " << YY(my_old_offset_helix_coords) << "," << ZZ(my_old_offset_helix_coords) << ")" << std::endl;
             }
 #endif
-        // We do NOT want to accumulate the offsets in the direction along the helix (which is X in the 2D helical coordinate system, and Z in 3D!)
+        // We do NOT want to accumulate the offsets in the direction along the helix (which is X in the 2D and 3D helical coordinate system)
         // However, when doing helical local searches, we accumulate offsets
         if ( (!do_skip_align) && (!do_skip_rotate) )
         {
@@ -6015,10 +6041,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
             bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
             if (!do_local_angular_searches)
             {
-                if (mymodel.data_dim == 2)
-                    XX(my_old_offset_helix_coords) = 0.;
-                else if (mymodel.data_dim == 3 || mydata.is_tomo)
-                    ZZ(my_old_offset_helix_coords) = 0.;
+                XX(my_old_offset_helix_coords) = 0.;
             }
         }
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
@@ -6150,7 +6173,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
     else // !do_parallel_disc_io
     {
 
-        if (mymodel.data_dim == 3 || mydata.is_tomo) REPORT_ERROR("BUG: no STA for !do_parallel_disc_io");
+        if (mymodel.data_dim == 3 || mydata.is_tomo) REPORT_ERROR("BUG: subtomogram averaging should always use parallel disc I/O");
 
         // Unpack the image from the imagedata
         img().resize(image_full_size[optics_group], image_full_size[optics_group]);
@@ -6206,8 +6229,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(
             selfTranslate(rec_img(), my_old_offset, DONT_WRAP);
     }
 
-    Image<RFLOAT> wholestack;
-    if (mydata.is_tomo) wholestack=img;
+    MultidimArray<RFLOAT> wholestack;
+    if (mydata.is_tomo) wholestack=img();
 
     FourierTransformer transformer;
     for (int img_id = 0; img_id < exp_nr_images; img_id++)
@@ -6217,11 +6240,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(
         if (mydata.is_tomo)
         {
             MultidimArray<RFLOAT> my_img;
-            wholestack().getImage(img_id, my_img);
+            wholestack.getImage(img_id, my_img);
             img() = my_img;
-
-            // Keep info whether this image is empty
-            mydata.particles[part_id].images[img_id].is_empty = (img().computeStddev() == 0.);
         }
 
 //#define DEBUG_SOFTMASK
@@ -6425,9 +6445,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(
                             mydata.particles[part_id].images[img_id].defU,
                             mydata.particles[part_id].images[img_id].defV,
                             mydata.particles[part_id].images[img_id].defAngle,
-                            0.,
-                            (mydata.particles[part_id].images[img_id].is_empty) ? 0. : 1.,
-                            0.,
+                            mydata.particles[part_id].images[img_id].bfactor,
+                            mydata.particles[part_id].images[img_id].scale,
+                            mydata.particles[part_id].images[img_id].phase_shift,
                             mydata.particles[part_id].images[img_id].dose);
                 else
                     ctf.setValuesByGroup(
@@ -6927,6 +6947,16 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
                     if (mymodel.data_dim == 3 || mydata.is_tomo)
                         zshift = oversampled_translations_z[iover_trans];
 
+                    // For subtomo: convert 3D shifts in the tomogram to 2D shifts in the tilt series images
+                    if (mydata.is_tomo)
+                    {
+                        // exp_old_offset has not been applied (as it is selfRounded() for 2D images...), so do this now
+                        // For helices: op.old_offset is in HELICAL COORDS, not CART_COORDS!
+                        xshift += XX(exp_old_offset);
+                        yshift += YY(exp_old_offset);
+                        zshift += ZZ(exp_old_offset);
+                    }
+
                     if ( (do_helical_refine) && (!ignore_helical_symmetry) )
                     {
                         RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT);
@@ -6944,10 +6974,6 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
                     // For subtomo: convert 3D shifts in the tomogram to 2D shifts in the tilt series images
                     if (mydata.is_tomo)
                     {
-                        // exp_old_offset has not been applied (as it is selfRounded() for 2D images...), so do this now
-                        xshift += XX(exp_old_offset);
-                        yshift += YY(exp_old_offset);
-                        zshift += ZZ(exp_old_offset);
                         mydata.getTranslationInTiltSeries(part_id, img_id, xshift, yshift, zshift, xshift, yshift, zshift);
                     }
 
@@ -7192,8 +7218,6 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                             for (int img_id = 0; img_id < exp_nr_images; img_id++)
                             {
 
-                                if (mydata.is_tomo && mydata.particles[part_id].images[img_id].is_empty) continue;
-
                                 // Get the Euler matrix
                                 Euler_angles2matrix(oversampled_rot[iover_rot],
                                         oversampled_tilt[iover_rot],
@@ -7312,6 +7336,16 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                                                 if (mymodel.data_dim == 3 || mydata.is_tomo)
                                                     zshift = (exp_current_oversampling == 0) ? (oversampled_translations_z[0]) : (oversampled_translations_z[iover_trans]);
 
+                                                // For subtomo: convert 3D shifts in the tomogram to 2D shifts in the tilt series images
+                                                if (mydata.is_tomo)
+                                                {
+                                                    // exp_old_offset was not yet applied for subtomos!
+                                                    // For helices: op.old_offset is in HELICAL COORDS, not CART_COORDS!
+                                                    xshift += XX(exp_old_offset);
+                                                    yshift += YY(exp_old_offset);
+                                                    zshift += ZZ(exp_old_offset);
+                                                }
+
                                                 if ((do_helical_refine) && (!ignore_helical_symmetry))
                                                 {
                                                     RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT);
@@ -7328,10 +7362,6 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                                                 // For subtomo: convert 3D shifts in the tomogram to 2D shifts in the tilt series images
                                                 if (mydata.is_tomo)
                                                 {
-                                                    // exp_old_offset was not yet applied for subtomos!
-                                                    xshift += XX(exp_old_offset);
-                                                    yshift += YY(exp_old_offset);
-                                                    zshift += ZZ(exp_old_offset);
                                                     mydata.getTranslationInTiltSeries(part_id, img_id,
                                                                                       xshift, yshift, zshift,
                                                                                       xshift, yshift, zshift);
@@ -7470,7 +7500,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                                                 //std::cerr << " oversampled_rot[iover_rot]= " << oversampled_rot[iover_rot] << " oversampled_tilt[iover_rot]= " << oversampled_tilt[iover_rot] << " oversampled_psi[iover_rot]= " << oversampled_psi[iover_rot] << std::endl;
                                                 //std::cerr << " group_id= " << group_id << " myscale= " << myscale <<std::endl;
                                                 std::cerr << " itrans= " << itrans << " itrans * exp_nr_oversampled_trans +  iover_trans= " << itrans * exp_nr_oversampled_trans +  iover_trans << " ihidden= " << ihidden << std::endl;
-                                                std::cerr <<" img_id= "<<img_id<<" name= "<< mydata.particles[part_id].images[img_id].name << std::endl;
+                                                std::cerr <<" img_id= "<<img_id<<" name= "<< mydata.particles[part_id].name << std::endl;
 
                                                 //std::cerr << " myrank= "<< myrank<<std::endl;
                                                 //std::cerr << "Written Fimg_shift.spi and Fref.spi. Press any key to continue... part_id= " << part_id<< std::endl;
@@ -8254,7 +8284,6 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 
     //Sigma2_noise estimation
     MultidimArray<RFLOAT> thr_wsum_sigma2_noise, thr_wsum_ctf2, thr_wsum_stMulti;
-    mydata.getOpticsGroup(part_id);
     thr_wsum_sigma2_noise.initZeros(image_full_size[optics_group]/2 + 1);
     thr_wsum_ctf2.initZeros(image_full_size[optics_group]/2 + 1);
     if (do_subtomo_correction)
@@ -8338,7 +8367,6 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
                     // The order of the looping here has changed for 3.1: different img_id have different optics_group and therefore different applyAnisoMag....
                     for (int img_id = 0; img_id < exp_nr_images; img_id++)
                     {
-                        if (mydata.is_tomo && mydata.particles[part_id].images[img_id].is_empty) continue;
 
                         // Loop over all oversampled orientations (only a single one in the first pass)
                         for (long int iover_rot = 0; iover_rot < exp_nr_oversampled_rot; iover_rot++)
@@ -8513,6 +8541,16 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
                                                 if (mymodel.data_dim == 3 || mydata.is_tomo)
                                                     zshift = oversampled_translations_z[iover_trans];
 
+                                                // For subtomo: convert 3D shifts in the tomogram to 2D shifts in the tilt series images
+                                                if (mydata.is_tomo)
+                                                {
+                                                    // exp_old_offset was not yet applied for subtomos!
+                                                    // For helices: op.old_offset is in HELICAL COORDS, not CART_COORDS!
+                                                    xshift += XX(exp_old_offset);
+                                                    yshift += YY(exp_old_offset);
+                                                    zshift += ZZ(exp_old_offset);
+                                                }
+
                                                 // Feb01,2017 - Shaoda, on-the-fly shifts in helical reconstuctions (2D and 3D)
                                                 if ( (do_helical_refine) && (!ignore_helical_symmetry) )
                                                 {
@@ -8531,10 +8569,6 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
                                                 // For subtomo: convert 3D shifts in the tomogram to 2D shifts in the tilt series images
                                                 if (mydata.is_tomo)
                                                 {
-                                                    // exp_old_offset was not yet applied for subtomos!
-                                                    xshift += XX(exp_old_offset);
-                                                    yshift += YY(exp_old_offset);
-                                                    zshift += ZZ(exp_old_offset);
                                                     mydata.getTranslationInTiltSeries(part_id, img_id,
                                                                                       xshift, yshift, zshift,
                                                                                       xshift, yshift, zshift);
@@ -8927,8 +8961,6 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
     // loop over all images inside this particle
     for (int img_id = 0; img_id < exp_nr_images; img_id++)
     {
-        if (mydata.is_tomo && mydata.particles[part_id].images[img_id].is_empty) continue;
-
         // If the current images were smaller than the original size, fill the rest of wsum_model.sigma2_noise with the power_class spectrum of the images
         for (int ires = image_current_size[optics_group]/2 + 1; ires < image_full_size[optics_group]/2 + 1; ires++)
         {
@@ -9031,11 +9063,14 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
         if (mydata.obsModel.getCtfPremultiplied(optics_group))
         {
             RFLOAT myscale = XMIPP_MAX(0.001, mymodel.scale_correction[igroup]);
-            FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mresol_fine[optics_group])
+            for (int img_id =0; img_id < exp_nr_images; img_id++)
             {
-                int ires = DIRECT_MULTIDIM_ELEM(Mresol_fine[optics_group], n);
-                if (ires > -1)
-                    DIRECT_MULTIDIM_ELEM(thr_wsum_ctf2, ires) += myscale * DIRECT_MULTIDIM_ELEM(exp_local_Fctf[0], n);
+                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mresol_fine[optics_group])
+                {
+                    int ires = DIRECT_MULTIDIM_ELEM(Mresol_fine[optics_group], n);
+                    if (ires > -1)
+                        DIRECT_MULTIDIM_ELEM(thr_wsum_ctf2, ires) += myscale * DIRECT_MULTIDIM_ELEM(exp_local_Fctf[img_id], n);
+                }
             }
         }
 
@@ -9241,8 +9276,6 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
     // P(X | X_1) / P(X | X_2) = exp ( |F_1 - F_2|^2 / (-2 sigma2) )
     // exp(-4.60517) = 0.01
     RFLOAT pvalue = 4.60517;
-    //if (mymodel.data_dim == 3)
-    //	pvalue *= 2.;
 
     std::cout << " Estimating accuracies in the orientational assignment ... " << std::endl;
     int nr_particles = (my_last_part_id - my_first_part_id + 1);
@@ -9358,9 +9391,9 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
                                     mydata.particles[part_id].images[img_id].defU,
                                     mydata.particles[part_id].images[img_id].defV,
                                     mydata.particles[part_id].images[img_id].defAngle,
-                                    0.,
-                                    (mydata.particles[part_id].images[img_id].is_empty) ? 0.: 1.,
-                                    0.,
+                                    mydata.particles[part_id].images[img_id].bfactor,
+                                    mydata.particles[part_id].images[img_id].scale,
+                                    mydata.particles[part_id].images[img_id].phase_shift,
                                     mydata.particles[part_id].images[img_id].dose);
                         else
                             ctf.setValuesByGroup(

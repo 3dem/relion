@@ -150,11 +150,28 @@ bool FileName::contains(const std::string& str) const
 // Get substring before first instance of str
 FileName FileName::beforeFirstOf(const std::string& str) const
 {
+
 	int point = find(str);
 	if (point > -1)
 		return substr(0, point);
 	else
 		return *this;
+}
+
+// Get substring before first instance of str
+FileName FileName::beforeNthOf(const char& chr, const int N) const
+{
+    int count = 0;
+    for (int i = 0; i < (*this).length(); i++)
+    {
+        if ((*this)[i] == chr)
+        {
+            count++;
+            if (count == N) return substr(0, i);
+        }
+    }
+
+    return *this;
 }
 
 // Get substring before last instance of str

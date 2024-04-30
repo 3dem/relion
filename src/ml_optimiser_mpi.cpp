@@ -655,10 +655,15 @@ will still yield good performance and possibly a more stable execution. \n" << s
 				{
 					if (fullAutomaticMapping)
 					{
-						if(nodeSize > 1)
+#if 1
+						// Do not span multiple devices between threads for automatic mapping
+						dev_id = devCount * ((node->rank-1)%nodeSize) / nodeSize;
+#else
+						if (nodeSize > 1)
 							dev_id = (devCount*( ((node->rank-1)%nodeSize)*nr_threads + i )) / (nodeSize*nr_threads);
 						else
 							dev_id = devCount*i / nr_threads;
+#endif
 					}
 					else
 						dev_id = textToInteger(allThreadIDs[node->rank-1][i % (allThreadIDs[node->rank-1]).size()].c_str());
@@ -740,25 +745,28 @@ will still yield good performance and possibly a more stable execution. \n" << s
 
 	initialiseWorkLoad();
 
-	// Only the first follower calculates the sigma2_noise spectra and sets initial guesses for Iref
-	if (node->rank == 1)
-	{
-		MlOptimiser::initialiseSigma2Noise();
-		MlOptimiser::initialiseReferences();
-    }
+	// Only the first follower calculates the sigma2_noise spectra (and if fn_ref == None, later sets initial guesses for Iref)
+	if (node->rank == 1) MlOptimiser::initialiseSigma2Noise();
 
-	//Now the first follower broadcasts resulting Iref and sigma2_noise to everyone else
+        MlOptimiser::initialiseReferences();
+
+	// Now the first follower broadcasts resulting sigma2_noise to everyone else
 	for (int i = 0; i < mymodel.sigma2_noise.size(); i++)
 	{
 		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.sigma2_noise[i]),
 							   MULTIDIM_SIZE(mymodel.sigma2_noise[i]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
 	}
-	for (int i = 0; i < mymodel.Iref.size(); i++)
-	{
-		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Iref[i]),
-							   MULTIDIM_SIZE(mymodel.Iref[i]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
-	}
 
+	// Also broadcast Iref if that was set in initialiseSigma2Noise
+        if (fn_ref == "None")
+        {
+            for (int i = 0; i < mymodel.Iref.size(); i++)
+            {
+		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Iref[i]),
+                                       MULTIDIM_SIZE(mymodel.Iref[i]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
+            }
+        }
+        
 	// Initialise the data_versus_prior ratio to get the initial current_size right
 	if (iter == 0 && !do_initialise_bodies && !node->isLeader())
 		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
@@ -989,7 +997,7 @@ void MlOptimiserMpi::expectation()
 	MultidimArray<long int> first_last_nr_images(6);
 	int first_follower = 1;
 	// Use maximum of 100 particles for 3D and 10 particles for 2D estimations
-	int n_trials_acc = (mymodel.ref_dim==3 && mymodel.data_dim != 3) ? 100 : 10;
+	int n_trials_acc = (mymodel.ref_dim==3 && (mymodel.data_dim != 3|| mydata.is_tomo) ) ? 100 : 10;
 	n_trials_acc = XMIPP_MIN(n_trials_acc, mydata.numberOfParticles());
 	MPI_Status status;
 

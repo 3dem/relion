@@ -39,12 +39,14 @@ def align_single_tilt_series(
         create_alignment_job_directories(job_directory, tilt_series.name)
 
     # Order is important in IMOD, sort by tilt angle
-    df = tilt_series.data.sort_values(by='rlnTomoNominalStageTiltAngle', ascending=True)
+    df = tilt_series.data.sort_values(
+        by='rlnTomoNominalStageTiltAngle', ascending=True)
 
     console.log(f'Running AreTomo on {tilt_series.name}')
     try:
         aretomo_output = align_tilt_series_with_aretomo(
-            tilt_series=np.stack([mrcfile.read(f) for f in df['rlnMicrographName']]),
+            tilt_series=np.stack([mrcfile.read(f)
+                                 for f in df['rlnMicrographName']]),
             tilt_angles=df['rlnTomoNominalStageTiltAngle'],
             pixel_size=pixel_spacing_angstroms,
             nominal_rotation_angle=df['rlnTomoNominalTiltAxisAngle'][0],
@@ -62,10 +64,11 @@ def align_single_tilt_series(
         df[['rlnTomoXTilt', 'rlnTomoYTilt', 'rlnTomoZRot']] = \
             get_xyz_extrinsic_euler_angles(aretomo_output.aln_file)
         df[['rlnTomoXShiftAngst', 'rlnTomoYShiftAngst']] = \
-            get_specimen_shifts(aretomo_output.aln_file) * pixel_spacing_angstroms
+            get_specimen_shifts(aretomo_output.aln_file) * \
+            pixel_spacing_angstroms
         RlnTiltSeries(name=tilt_series.name, data=df).write_star_file(
             metadata_directory / f'{tilt_series.name}.star')
-   
-    except RuntimeError:
-        error_console.log(f'ERROR: alignment for {tilt_series.name} failed')
-   
+
+    except RuntimeError as e:
+        error_console.log(
+            f'ERROR: alignment for {tilt_series.name} failed with error: {str(e)}')

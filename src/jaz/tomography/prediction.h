@@ -47,7 +47,7 @@ class Prediction
 				ParticleIndex particle_id,
 				const ParticleSet& dataSet,
 				gravis::d4Matrix proj,
-				int s, const CTF& ctf, double pixelSize,
+				int s, const CTF& ctf, const gravis::d3Vector &tomo_centre, double pixelSize,
 				const AberrationsCache& aberrationsCache,
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
 				HalfSet halfSet = OwnHalf,
@@ -60,7 +60,7 @@ class Prediction
 				ParticleIndex particle_id,
 				const ParticleSet& dataSet,
 				gravis::d4Matrix proj,
-				int s, 
+				int s, const gravis::d3Vector &tomo_centre,
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
 				HalfSet halfSet = OwnHalf,
 				const int* xRanges = 0);

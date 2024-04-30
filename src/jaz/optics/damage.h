@@ -16,22 +16,22 @@ class Damage
 				RawImage<float>& stack,
 				double pixelSize,
 				const std::vector<double> &doses,
-				int num_threads);
+				int num_threads, double BfactorPerElectronDose = 0.);
 
 		static void applyWeight(
 				RawImage<fComplex>& stack,
 				double pixelSize,
 				const std::vector<double> &doses,
-				int num_threads);
+				int num_threads, double BfactorPerElectronDose = 0.);
 		
 		static std::vector<double> criticalDamageVector(double pixelSize, int boxSize);
 		
 		static std::vector<double> weightVector(double dose, double pixelSize, int boxSize);
 		
-		static BufferedImage<float> weightImage(double dose, double pixelSize, int boxSize);
+		static BufferedImage<float> weightImage(double dose, double pixelSize, int boxSize, double BfactorPerElectronDose = 0.);
 		
 		static BufferedImage<float> weightStack_GG(const std::vector<double>& doses,
-										 double pixelSize, int boxSize);
+										 double pixelSize, int boxSize, double BfactorPerElectronDose = 0.);
 		
 		static double getWeight(double dose, double k);
 		

@@ -50,7 +50,7 @@ void sycl_kernel_diff2_coarse(
 	const XFLOAT tz {trans_z[tid % trans_num]};
 
 	//Step through data
-    const int max_block_pass_pixel {(image_size/block_sz + 1) * block_sz};
+	const int max_block_pass_pixel {(image_size/block_sz + 1) * block_sz};
 	for (int init_pixel = 0; init_pixel < max_block_pass_pixel; init_pixel += block_sz/prefetch_fraction)
 	{
 		__group_barrier(nit);
@@ -146,8 +146,13 @@ void sycl_kernel_diff2_coarse(
 				{
 //					translatePixel(x, y, z, tx, ty, tz, s_real[pix+init_pixel%block_sz], s_imag[pix+init_pixel%block_sz], real, imag);
 					XFLOAT val {x*tx + y*ty + z*tz};
+#ifdef ACC_DOUBLE_PRECISION
+					XFLOAT s {sycl::sin(val)};
+					XFLOAT c {sycl::cos(val)};
+#else
 					XFLOAT s {sycl::native::sin(val)};
 					XFLOAT c {sycl::native::cos(val)};
+#endif
 					real = c * s_real[pix + init_pixel%block_sz] - s * s_imag[pix + init_pixel%block_sz];
 					imag = c * s_imag[pix + init_pixel%block_sz] + s * s_real[pix + init_pixel%block_sz];
 				}
@@ -155,8 +160,13 @@ void sycl_kernel_diff2_coarse(
 				{
 //					translatePixel(x, y,    tx, ty,     s_real[pix+init_pixel%block_sz], s_imag[pix+init_pixel%block_sz], real, imag);
 					XFLOAT val {x*tx + y*ty};
+#ifdef ACC_DOUBLE_PRECISION
+					XFLOAT s {sycl::sin(val)};
+					XFLOAT c {sycl::cos(val)};
+#else
 					XFLOAT s {sycl::native::sin(val)};
 					XFLOAT c {sycl::native::cos(val)};
+#endif
 					real = c*s_real[pix + init_pixel%block_sz] - s*s_imag[pix + init_pixel%block_sz];
 					imag = c*s_imag[pix + init_pixel%block_sz] + s*s_real[pix + init_pixel%block_sz];
 				}
@@ -196,14 +206,14 @@ void sycl_kernel_diff2_fine(
 	const int maxR = projector.maxR;
 
 	if (bid < todo_blocks ) // we only need to make
-    {
-		int trans_num  = static_cast<int>(d_job_num[bid]); //how many transes we have for this rot
+	{
+		int trans_num = static_cast<int>(d_job_num[bid]); //how many transes we have for this rot
 		for (int itrans = 0; itrans < trans_num; itrans++)
 			s[itrans*block_sz + tid] = 0.0f;
 
 		// index of comparison
 		int ix = static_cast<int>(d_rot_idx[d_job_idx[bid]]);
-        int pass_num {image_size/block_sz + 1};
+		int pass_num {image_size/block_sz + 1};
 
 		for (int pass = 0; pass < pass_num; pass++) // finish an entire ref image each block
 		{
@@ -396,7 +406,11 @@ void sycl_kernel_diff2_CC_coarse(
 	}
 
 	if (tid == 0)
+#ifdef ACC_DOUBLE_PRECISION
+		g_diff2[iorient*trans_num + itrans] += -s_weight[0] / sycl::sqrt(s_norm[0]);
+#else
 		g_diff2[iorient*trans_num + itrans] += -s_weight[0] / sycl::native::sqrt(s_norm[0]);
+#endif
 }
 
 template<bool REF3D, bool DATA3D, int block_sz>
@@ -516,8 +530,12 @@ void sycl_kernel_diff2_CC_fine(
 			__group_barrier(nit);
 		}
 
-        if (tid < trans_num)
-            g_diff2s[d_job_idx[bid] + tid] += -s[tid * block_sz] / sycl::native::sqrt(s_cc[tid * block_sz]);
+		if (tid < trans_num)
+#ifdef ACC_DOUBLE_PRECISION
+			g_diff2s[d_job_idx[bid] + tid] += -s[tid * block_sz] / sycl::sqrt(s_cc[tid * block_sz]);
+#else
+			g_diff2s[d_job_idx[bid] + tid] += -s[tid * block_sz] / sycl::native::sqrt(s_cc[tid * block_sz]);
+#endif
     }
 }
 

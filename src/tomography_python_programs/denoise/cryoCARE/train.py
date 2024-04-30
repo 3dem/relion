@@ -32,6 +32,7 @@ def cryoCARE_train(
         tomogram_star_file: Path = typer.Option(...),
         output_directory: Path = typer.Option(...),
         training_tomograms: Optional[str] = typer.Option(None),
+        cryocare_path: Optional[Path] = typer.Option(""),
         number_training_subvolumes: int = typer.Option(1200),
         subvolume_sidelength: int = typer.Option(72),
         gpu: Optional[List[int]] = typer.Option(None)
@@ -55,6 +56,9 @@ def cryoCARE_train(
     training_tomograms: Optional[str]
         tomograms which are to be used for denoise neural network training.
         User should enter tomogram names as rlnTomoName, separated by colons, e.g. TS_1:TS_2
+    cryocare_path: Optional[Path]
+        directory where the cryoCARE executables can be found. This can be
+        left empty if the cryoCARE executables are already in the PATH
     number_training_subvolumes: int
         Number of sub-volumes to be extracted per training tomogram
         Corresponds to num_slices in cryoCARE_extract_train_data.py.
@@ -71,6 +75,23 @@ def cryoCARE_train(
         e = 'Could not find tomogram star file'
         console.log(f'ERROR: {e}')
         raise RuntimeError(e)
+
+    cryocare_path = str(cryocare_path)
+    if cryocare_path != "":
+        train_executable = os.path.join(cryocare_path, "cryoCARE_train.py")
+        if not os.path.isfile(train_executable):
+            e = 'Could not find cryoCARE_train.py executable in the input path: ' + cryocare_path
+            console.log(f'ERROR: {e}')
+            raise RuntimeError(e)
+        extract_train_data_executable = os.path.join(cryocare_path, "cryoCARE_extract_train_data.py")
+        if not os.path.isfile(extract_train_data_executable):
+            e = 'Could not find cryoCARE_extract_train_data.py executable in the input path: ' + cryocare_path
+            console.log(f'ERROR: {e}')
+            raise RuntimeError(e)
+    else:
+        train_executable = "cryoCARE_train.py"
+        extract_train_data_executable = "cryoCARE_extract_train_data.py"
+
 
     global_star = starfile.read(tomogram_star_file, always_dict=True)['global']
 
@@ -110,7 +131,7 @@ def cryoCARE_train(
         json_prefix=TRAIN_DATA_CONFIG_PREFIX,
     )
 
-    cmd = f"cryoCARE_extract_train_data.py --conf {training_dir}/{TRAIN_DATA_CONFIG_PREFIX}.json"
+    cmd = f"{extract_train_data_executable} --conf {training_dir}/{TRAIN_DATA_CONFIG_PREFIX}.json"
     subprocess.run(cmd, shell=True, stderr=subprocess.STDOUT)
 
     train_config_json = generate_train_config_json(
@@ -126,7 +147,7 @@ def cryoCARE_train(
         json_prefix=TRAIN_CONFIG_PREFIX,
     )
 
-    cmd = f"cryoCARE_train.py --conf {training_dir}/{TRAIN_CONFIG_PREFIX}.json"
+    cmd = f"{train_executable} --conf {training_dir}/{TRAIN_CONFIG_PREFIX}.json"
     subprocess.run(cmd, shell=True)
 
     save_tilt_series_stars(

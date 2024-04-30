@@ -328,10 +328,10 @@ void AlignProgram::processTomograms(
 
 				for (int p = 0; p < pc; p++)
 				{
-					positions[p] = particleSet.getPosition(particles[t][p]);
+					positions[p] = particleSet.getPosition(particles[t][p], tomogram.centre, true);
 				}
 
-				writeTempAlignmentData(projections, positions, t);
+				writeTempAlignmentData(projections, positions, tomogram, t);
 
 				ShiftAlignment::visualiseShifts(
 					shifts, tomogram.frameSequence, tomogram.name,
@@ -360,7 +360,7 @@ std::string AlignProgram::getTempFilenameRoot(const std::string& tomogram_name)
 
 void AlignProgram::writeTempAlignmentData(
 		const std::vector<d4Matrix>& proj, 
-		const std::vector<d3Vector>& pos, int t)
+		const std::vector<d3Vector>& pos, const Tomogram &tomogram, int t)
 {	
 	const int pc = particles[t].size();
 	const int fc = tomogramSet.getFrameCount(t);
@@ -375,14 +375,22 @@ void AlignProgram::writeTempAlignmentData(
 		temp_positions.addObject();
 
         // SHWS 25nov22: relion-4.1 has origins at 0,0,0, no longer at 1,1,1 like relion-4.0 and some old imod.
+        // SHWS 17jan24: put '-1' back in because relion5 doesn't go as high resolution as tutorial data set as relion4....
+        // SHWS 2feb24: remove '-1' again!
+
         //temp_positions.setValue(EMDL_IMAGE_COORD_X, pos[p].x - 1, p);
         //temp_positions.setValue(EMDL_IMAGE_COORD_Y, pos[p].y - 1, p);
         //temp_positions.setValue(EMDL_IMAGE_COORD_Z, pos[p].z - 1, p);
 
-		temp_positions.setValue(EMDL_IMAGE_COORD_X, pos[p].x, p);
-		temp_positions.setValue(EMDL_IMAGE_COORD_Y, pos[p].y, p);
-		temp_positions.setValue(EMDL_IMAGE_COORD_Z, pos[p].z, p);
-	}
+        // Better write already in centered coordinates in Angstroms, now that we still have tomogram
+        d3Vector posA = pos[p] - tomogram.centre;
+        posA *= tomogram.optics.pixelSize;
+
+        temp_positions.setValue(EMDL_IMAGE_CENT_COORD_X_ANGST, posA.x , p);
+        temp_positions.setValue(EMDL_IMAGE_CENT_COORD_Y_ANGST, posA.y , p);
+        temp_positions.setValue(EMDL_IMAGE_CENT_COORD_Z_ANGST, posA.z , p);
+
+    }
 
 	temp_positions.write(temp_filename_root + "_positions.star");
 	
@@ -390,14 +398,16 @@ void AlignProgram::writeTempAlignmentData(
 
 	for (int f = 0; f < fc; f++)
 	{
-		const d4Matrix& P = proj[f];
+        RFLOAT xtilt, ytilt, zrot, xshift_angst, yshift_angst;
+        tomogram.getProjectionAnglesFromMatrix(f, proj[f], xtilt, ytilt, zrot, xshift_angst, yshift_angst);
 
-		temp_projections.addObject();
+        temp_projections.addObject();
+        temp_projections.setValue(EMDL_TOMO_XTILT, xtilt, f);
+        temp_projections.setValue(EMDL_TOMO_YTILT, ytilt, f);
+        temp_projections.setValue(EMDL_TOMO_ZROT,  zrot, f);
+        temp_projections.setValue(EMDL_TOMO_XSHIFT_ANGST, xshift_angst, f);
+        temp_projections.setValue(EMDL_TOMO_YSHIFT_ANGST, yshift_angst, f);
 
-		temp_projections.setValue(EMDL_TOMO_PROJECTION_X, std::vector<double>{P(0,0), P(0,1), P(0,2), P(0,3)}, f);
-		temp_projections.setValue(EMDL_TOMO_PROJECTION_Y, std::vector<double>{P(1,0), P(1,1), P(1,2), P(1,3)}, f);
-		temp_projections.setValue(EMDL_TOMO_PROJECTION_Z, std::vector<double>{P(2,0), P(2,1), P(2,2), P(2,3)}, f);
-		temp_projections.setValue(EMDL_TOMO_PROJECTION_W, std::vector<double>{P(3,0), P(3,1), P(3,2), P(3,3)}, f);
 	}
 
 	temp_projections.write(temp_filename_root + "_projections.star");
@@ -452,13 +462,13 @@ void AlignProgram::readTempData(int t)
 	{
 		d3Vector imgCoord;
 
-		imgCoord.x = temp_positions.getDouble(EMDL_IMAGE_COORD_X, p);
-		imgCoord.y = temp_positions.getDouble(EMDL_IMAGE_COORD_Y, p);
-		imgCoord.z = temp_positions.getDouble(EMDL_IMAGE_COORD_Z, p);
+		imgCoord.x = temp_positions.getDouble(EMDL_IMAGE_CENT_COORD_X_ANGST, p);
+		imgCoord.y = temp_positions.getDouble(EMDL_IMAGE_CENT_COORD_Y_ANGST, p);
+		imgCoord.z = temp_positions.getDouble(EMDL_IMAGE_CENT_COORD_Z_ANGST, p);
 
-		particleSet.partTable.setValue(EMDL_IMAGE_COORD_X, imgCoord.x, particles[t][p].value);
-		particleSet.partTable.setValue(EMDL_IMAGE_COORD_Y, imgCoord.y, particles[t][p].value);
-		particleSet.partTable.setValue(EMDL_IMAGE_COORD_Z, imgCoord.z, particles[t][p].value);
+		particleSet.partTable.setValue(EMDL_IMAGE_CENT_COORD_X_ANGST, imgCoord.x, particles[t][p].value);
+		particleSet.partTable.setValue(EMDL_IMAGE_CENT_COORD_Y_ANGST, imgCoord.y, particles[t][p].value);
+		particleSet.partTable.setValue(EMDL_IMAGE_CENT_COORD_Z_ANGST, imgCoord.z, particles[t][p].value);
 
 		particleSet.partTable.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, 0.0, particles[t][p].value);
 		particleSet.partTable.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, 0.0, particles[t][p].value);
@@ -518,18 +528,15 @@ void AlignProgram::readTempData(int t)
 
 	for (int f = 0; f < fc; f++)
 	{
-		const std::vector<double> X = temp_projections.getDoubleVector(EMDL_TOMO_PROJECTION_X, f);
-		const std::vector<double> Y = temp_projections.getDoubleVector(EMDL_TOMO_PROJECTION_Y, f);
-		const std::vector<double> Z = temp_projections.getDoubleVector(EMDL_TOMO_PROJECTION_Z, f);
-		const std::vector<double> W = temp_projections.getDoubleVector(EMDL_TOMO_PROJECTION_W, f);
 
-		const d4Matrix P(
-				X[0], X[1], X[2], X[3],
-				Y[0], Y[1], Y[2], Y[3],
-				Z[0], Z[1], Z[2], Z[3],
-				W[0], W[1], W[2], W[3] );
+        RFLOAT xtilt, ytilt, zrot, xshift_angst, yshift_angst;
+        temp_projections.getValueSafely(EMDL_TOMO_XTILT, xtilt, f);
+        temp_projections.getValueSafely(EMDL_TOMO_YTILT, ytilt, f);
+        temp_projections.getValueSafely(EMDL_TOMO_ZROT,  zrot, f);
+        temp_projections.getValueSafely(EMDL_TOMO_XSHIFT_ANGST, xshift_angst, f);
+        temp_projections.getValueSafely(EMDL_TOMO_YSHIFT_ANGST, yshift_angst, f);
 
-		tomogramSet.setProjection(t, f, P);
+        tomogramSet.setProjectionAngles(t, f, xtilt, ytilt, zrot, xshift_angst, yshift_angst);
 	}
 }
 

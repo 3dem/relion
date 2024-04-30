@@ -39,23 +39,31 @@ def get_poses_along_filament_backbones(
     for file in annotation_files:
         filament_df = starfile.read(file)
         tilt_series_id = '_'.join(file.name.split('_')[:-1])
-        pixel_size = float(global_df.loc[tilt_series_id, 'rlnTomoTiltSeriesPixelSize'])
-        scale_factor = float(global_df.loc[tilt_series_id, 'rlnTomoTomogramBinning'])
+        pixel_size = float(
+            global_df.loc[tilt_series_id, 'rlnTomoTiltSeriesPixelSize']
+        )
+        scale_factor = pixel_size * \
+            float(global_df.loc[tilt_series_id, 'rlnTomoTomogramBinning'])
+        tomo_size = global_df.loc[tilt_series_id][
+            ['rlnTomoSizeX', 'rlnTomoSizeY', 'rlnTomoSizeZ']
+        ].to_numpy().astype(float)
+        tomo_center = (tomo_size / 2 - 1) * pixel_size
         for filament_id, df in filament_df.groupby('rlnTomoManifoldIndex'):
             xyz = df[['rlnCoordinateX', 'rlnCoordinateY', 'rlnCoordinateZ']]
-            xyz = xyz.to_numpy() * scale_factor
+            xyz = xyz.to_numpy() * scale_factor - tomo_center
 
             # derive equidistant poses along length of filament
             path = Path(control_points=xyz)
             pose_sampler = path_samplers.HelicalPoseSampler(
-                spacing=spacing_angstroms / pixel_size, twist=0
+                spacing=spacing_angstroms, twist=0
             )
             poses = pose_sampler.sample(path)
 
             # rot/psi are coupled when tilt==0,
             # pre-rotate particles such that they have tilt=90 relative to a reference
             # filament aligned along the z-axis
-            rotated_basis = R.from_euler('y', angles=90, degrees=True).as_matrix()
+            rotated_basis = R.from_euler(
+                'y', angles=90, degrees=True).as_matrix()
             rotated_orientations = poses.orientations @ rotated_basis
             rotated_eulers = R.from_matrix(rotated_orientations).inv().as_euler(
                 seq='ZYZ', degrees=True,
@@ -70,15 +78,16 @@ def get_poses_along_filament_backbones(
 
             # how far along the helix is each particle? in angstroms
             total_length = total_length / pixel_size
-            distance_along_helix = np.linspace(0, 1, num=len(poses)) * total_length
+            distance_along_helix = np.linspace(
+                0, 1, num=len(poses)) * total_length
 
             data = {
                 'rlnTomoName': [tilt_series_id] * len(poses),
                 'rlnHelicalTubeID': [int(filament_id) + 1] * len(poses),
                 'rlnHelicalTrackLengthAngst': distance_along_helix,
-                'rlnCoordinateX': poses.positions[:, 0],
-                'rlnCoordinateY': poses.positions[:, 1],
-                'rlnCoordinateZ': poses.positions[:, 2],
+                'rlnCenteredCoordinateXAngst': poses.positions[:, 0],
+                'rlnCenteredCoordinateYAngst': poses.positions[:, 1],
+                'rlnCenteredCoordinateZAngst': poses.positions[:, 2],
                 'rlnTomoSubtomogramRot': rotated_eulers[:, 0],
                 'rlnTomoSubtomogramTilt': rotated_eulers[:, 1],
                 'rlnTomoSubtomogramPsi': rotated_eulers[:, 2],
@@ -102,3 +111,8 @@ def get_poses_along_filament_backbones(
     # write output
     output_file = output_directory / 'particles.star'
     starfile.write({'particles': df}, output_file, overwrite=True)
+
+    df2 = pd.DataFrame({'rlnTomoParticlesFile': [output_file],
+                        'rlnTomoTomogramsFile': [tilt_series_star_file]})
+    opt_file = output_directory / 'optimisation_set.star'
+    starfile.write({'optimisation_set': df2}, opt_file, overwrite=True)

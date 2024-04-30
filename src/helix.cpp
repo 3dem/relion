@@ -1845,7 +1845,11 @@ void convertHelicalTubeCoordsToMetaDataTable(
     if ( (!MD_in.containsLabel(EMDL_IMAGE_COORD_X)) || (!MD_in.containsLabel(EMDL_IMAGE_COORD_Y)) )
     	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): Input STAR file does not contain X and Y coordinates! Error(s) in " + fn_in);
     if (MD_in.numberOfObjects() % 2)
-    	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): Input coordinates should be in pairs! Error(s) in" + fn_in);
+	{
+		std::cerr << " WARNING: ignoring micrograph with uneven number of coordinates: " << fn_in << std::endl;
+		total_segments = total_tubes = 0;
+		return;
+	}
 
     // Sjors added MDin_has_id and MDin_has_pitch to allow manual calculation of different cross-over distances to be carried onto the extracted segments...
     bool MDin_has_id = MD_in.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);

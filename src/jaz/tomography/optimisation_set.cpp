@@ -177,26 +177,6 @@ void OptimisationSet::write(std::string filename)
 	}
 
 
-	if (refMap1 != "")
-	{
-		table.setValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, refMap1);
-	}
-
-	if (refMap2 != "")
-	{
-		table.setValue(EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME, refMap2);
-	}
-
-	if (refMask != "")
-	{
-		table.setValue(EMDL_TOMO_REFERENCE_MASK_FILE_NAME, refMask);
-	}
-
-	if (refFSC != "")
-	{
-		table.setValue(EMDL_TOMO_REFERENCE_FSC_FILE_NAME, refFSC);
-	}
-
 	table.write(filename);
 }
 

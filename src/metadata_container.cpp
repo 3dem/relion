@@ -20,18 +20,19 @@
 #include "src/metadata_container.h"
 
 MetaDataContainer::MetaDataContainer()
-    :   doubles(0), ints(0), bools(0), strings(0), doubleVectors(0), unknowns(0)
+    :   doubles(0), ints(0), bools(0), strings(0), intVectors(0), doubleVectors(0), unknowns(0)
 {}
 
 
 MetaDataContainer::MetaDataContainer(
         MetaDataTable *table, long doubleCount, long intCount,
-        long boolCount, long stringCount, long doubleVectorCount, long unknownCount)
+        long boolCount, long stringCount, long intVectorCount, long doubleVectorCount, long unknownCount)
 : table(table),
   doubles(doubleCount, 0),
   ints(intCount, 0),
   bools(boolCount, false),
   strings(stringCount, ""),
+  intVectors(intVectorCount),
   doubleVectors(doubleVectorCount),
   unknowns(unknownCount)
 {}
@@ -43,6 +44,7 @@ MetaDataContainer::MetaDataContainer(
   ints(mdc->ints),
   bools(mdc->bools),
   strings(mdc->strings),
+  intVectors(mdc->intVectors),
   doubleVectors(mdc->doubleVectors),
   unknowns(mdc->unknowns)
 {}
@@ -70,6 +72,11 @@ void MetaDataContainer::getValue(long offset, long& dest) const
 void MetaDataContainer::getValue(long offset, bool& dest) const
 {
     dest = bools[offset];
+}
+
+void MetaDataContainer::getValue(long offset, std::vector<int>& dest) const
+{
+    dest = intVectors[offset];
 }
 
 void MetaDataContainer::getValue(long offset, std::vector<double>& dest) const
@@ -116,6 +123,11 @@ void MetaDataContainer::setValue(long offset, const bool& src)
 void MetaDataContainer::setValue(long offset, const std::string& src)
 {
 	strings[offset] = (src.length() == 0) ? "\"\"" : src;
+}
+
+void MetaDataContainer::setValue(long offset, const std::vector<int>& src)
+{
+    intVectors[offset] = src;
 }
 
 void MetaDataContainer::setValue(long offset, const std::vector<double>& src)

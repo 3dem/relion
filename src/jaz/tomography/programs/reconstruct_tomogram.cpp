@@ -46,7 +46,7 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
     do_only_unfinished = parser.checkOption("--only_do_unfinished", "Only reconstruct those tomograms that haven't finished yet");
     SNR = textToDouble(parser.getOption("--SNR", "SNR assumed by the Wiener filter", "10"));
 
-	applyCtf = !parser.checkOption("--noctf", "Ignore the CTF");
+	applyCtf = parser.checkOption("--ctf", "Perform CTF correction");
     doWiener = !parser.checkOption("--skip_wiener", "Do multiply images with CTF, but don't divide by CTF^2 in Wiener filter");
 
     if (!doWiener) applyCtf = true;
@@ -57,20 +57,20 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
 	taperFalloff = textToDouble(parser.getOption("--tf", "Tapering falloff", "0.0"));
 
     // SHWS & Aburt 19Jul2022: use zero-origins from relion-4.1 onwards....
-	//x0 = textToDouble(parser.getOption("--x0", "X origin", "1.0"));
-	//y0 = textToDouble(parser.getOption("--y0", "Y origin", "1.0"));
-	//z0 = textToDouble(parser.getOption("--z0", "Z origin", "1.0"));
-
     x0 = textToDouble(parser.getOption("--x0", "X origin", "0.0"));
     y0 = textToDouble(parser.getOption("--y0", "Y origin", "0.0"));
     z0 = textToDouble(parser.getOption("--z0", "Z origin", "0.0"));
 
-
 	spacing = textToDouble(parser.getOption("--bin", "Binning", "1.0"));
     angpix_spacing = textToDouble(parser.getOption("--binned_angpix", "OR: desired pixel size after binning", "-1"));
 
-	n_threads = textToInteger(parser.getOption("--j", "Number of threads", "1"));
+    tiltAngleOffset = textToDouble(parser.getOption("--tiltangle_offset", "Offset applied to all tilt angles (in deg)", "0"));
+    BfactorPerElectronDose = textToDouble(parser.getOption("--bfactor_per_edose", "B-factor dose-weighting per electron/A^2 dose (default is use Niko's model)", "0"));
+    n_threads = textToInteger(parser.getOption("--j", "Number of threads", "1"));
 
+    do_2dproj = parser.checkOption("--do_proj", "Use this to skip calculation of 2D projection of the tomogram along the Z-axis");
+    centre_2dproj = textToInteger(parser.getOption("--centre_proj", "Central Z-slice for 2D projection (in tomogram pixels from the middle)", "0"));
+    thickness_2dproj = textToInteger(parser.getOption("--thickness_proj", "Thickness of the 2D projection (in tomogram pixels)", "10"));
 
 	Log::readParams(parser);
 
@@ -122,6 +122,17 @@ void TomoBackprojectProgram::initialise(bool verbose)
         for (int idx = 0; idx < tomoIndexTodo.size(); idx++)
         {
             std::cout << "  - " << tomogramSet.getTomogramName(tomoIndexTodo[idx]) << std::endl;
+        }
+        if (fabs(tiltAngleOffset) > 0.)
+        {
+            std::cout << " + Applying a tilt angle offset of " << tiltAngleOffset << " degrees" << std::endl;
+        }
+
+        if (do_2dproj)
+        {
+            std::cout << " + Making 2D projections " << std::endl;
+            std::cout << "    - centered at " << centre_2dproj << " tomogram pixels from the centre of the tomogram" << std::endl;
+            std::cout << "    - and a thickness of " << thickness_2dproj << " tomogram pixels" << std::endl;
         }
     }
 
@@ -177,91 +188,33 @@ void TomoBackprojectProgram::writeOutput(bool do_all_metadata)
         std::cout << " Written out: " << outFn << "tomograms.star" << std::endl;
 
     }
+    else if (fabs(tiltAngleOffset) > 0.)
+    {
+        // Also write out the modified metadata file
+        int idx=tomoIndexTodo[0];
+        FileName fn_star;
+        tomogramSet.globalTable.getValue(EMDL_TOMO_TILT_SERIES_STARFILE, fn_star, idx);
+        FileName fn_newstar = getOutputFileWithNewUniqueDate(fn_star, outFn);
+        tomogramSet.tomogramTables[idx].write(fn_newstar);
+
+    }
 
 }
 
-
-void TomoBackprojectProgram::getProjectMatrices(Tomogram &tomogram, MetaDataTable &tomogramTable)
+void TomoBackprojectProgram::initialiseCtfScaleFactors(int tomoIndex, Tomogram &tomogram)
 {
-/* From Alister Burt
- *
- * tilt_image_center = tilt_image_dimensions / 2
- * specimen_center = tomogram_dimensions / 2
- *
- * # Transformations, defined in order of application
- * s0 = S(-specimen_center)  # put specimen center-of-rotation at the origin
- * r0 = Rx(euler_angles['rlnTomoXTilt'])  # rotate specimen around X-axis
- * r1 = Ry(euler_angles['rlnTomoYTilt'])  # rotate specimen around Y-axis
- * r2 = Rz(euler_angles['rlnTomoZRot'])  # rotate specimen around Z-axis
- * s1 = S(specimen_shifts)  # shift projected specimen in xy (camera) plane
- * s2 = S(tilt_image_center)  # move specimen back into tilt-image coordinate system
- *
- * # compose matrices
- * transformations = s2 @ s1 @ r2 @ r1 @ r0 @ s0
- *
- */
+    // Skip initialisation of scale factor if it is already present in the tilt series star file
+    if (tomogramSet.tomogramTables[tomoIndex].containsLabel(EMDL_CTF_SCALEFACTOR))
+        return;
 
-    if (!(tomogramTable.containsLabel(EMDL_TOMO_XTILT) &&
-          tomogramTable.containsLabel(EMDL_TOMO_YTILT) &&
-          tomogramTable.containsLabel(EMDL_TOMO_ZROT) &&
-          tomogramTable.containsLabel(EMDL_TOMO_XSHIFT_ANGST) &&
-          tomogramTable.containsLabel(EMDL_TOMO_YSHIFT_ANGST)))
-
-        REPORT_ERROR("ERROR: at least one of the input tilt series star file(s) does not contain projections matrices, NOR rlnTomoXTilt, rlnTomoYtilt, rlnTomoZRot, rlnTomoXShiftAngst or rlnTomoYShiftAng.");
-
-
-    double pixelSizeAct = tomogram.optics.pixelSize;
     const int fc = tomogram.frameCount;
     for (int f = 0; f < fc; f++)
     {
-        d4Matrix s0, s1, s2, r0, r1, r2, out;
-
-        // Get specimen center
-        t3Vector<double> specimen_center((double)int(w/2), (double)int(h/2), (double)int(d/2) );
-        s0 = s0. translation(-specimen_center);
-
-        // Get specimen shifts (in pixels)
-        double xshift, yshift;
-        tomogramTable.getValueSafely(EMDL_TOMO_XSHIFT_ANGST, xshift, f);
-        tomogramTable.getValueSafely(EMDL_TOMO_YSHIFT_ANGST, yshift, f);
-        t3Vector<double> specimen_shifts(xshift/pixelSizeAct, yshift/pixelSizeAct, 0.);
-        s1 = s1.translation(specimen_shifts);
-
-        // Get tilt image center
-        std::vector<long int> tilt_image_center_int = tomogram.stack.getSizeVector();
-        t3Vector<double> tilt_image_center((double)int(tilt_image_center_int[0]/2), (double)int(tilt_image_center_int[1]/2), 0.);
-        s2 = s2.translation(tilt_image_center);
-
-        // Get rotation matrices
-        t3Vector<double> xaxis(1., 0., 0.), yaxis(0., 1., 0.), zaxis(0., 0., 1.);
-        double xtilt, ytilt, zrot;
-        tomogramTable.getValueSafely(EMDL_TOMO_XTILT, xtilt, f);
-        tomogramTable.getValueSafely(EMDL_TOMO_YTILT, ytilt, f);
-        tomogramTable.getValueSafely(EMDL_TOMO_ZROT, zrot, f);
-
-        r0 = r0.rotation(xaxis, xtilt);
-        r1 = r1.rotation(yaxis, ytilt);
-        r2 = r2.rotation(zaxis, zrot);
-
-        tomogram.projectionMatrices[f] = s2 * s1 * r2 * r1 * r0 * s0;
-
-        // Set the four rows of the projectionMatrix back into the metaDataTable
-        std::vector<EMDLabel> rows({
-            EMDL_TOMO_PROJECTION_X,
-            EMDL_TOMO_PROJECTION_Y,
-            EMDL_TOMO_PROJECTION_Z,
-            EMDL_TOMO_PROJECTION_W });
-
-        for (int i = 0; i < 4; i++)
-        {
-            std::vector<double> vals(4);
-            for (int j = 0; j < 4; j++)
-            {
-                vals[j] = tomogram.projectionMatrices[f](i,j);
-            }
-            tomogramTable.setValue(rows[i], vals, f);
-        }
-
+        RFLOAT ytilt;
+        tomogramSet.tomogramTables[tomoIndex].getValueSafely(EMDL_TOMO_YTILT, ytilt, f);
+        RFLOAT scale = cos(DEG2RAD(ytilt));
+        tomogramSet.tomogramTables[tomoIndex].setValue(EMDL_CTF_SCALEFACTOR, scale, f);
+        tomogram.centralCTFs[f].scale = scale;
     }
 }
 
@@ -271,17 +224,20 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex, bool doEven, 
 
     if (doEven)
     {
-    	tomogram = tomogramSet.loadTomogram(tomoIndex, true, true, false);
+    	tomogram = tomogramSet.loadTomogram(tomoIndex, true, true, false, w, h, d);
     }
     else if (doOdd)
     {
-    	tomogram = tomogramSet.loadTomogram(tomoIndex, true, false, true);
+    	tomogram = tomogramSet.loadTomogram(tomoIndex, true, false, true, w, h, d);
     }
     else
     {
-        tomogram = tomogramSet.loadTomogram(tomoIndex, true);
+        tomogram = tomogramSet.loadTomogram(tomoIndex, true, false, false, w, h, d);
     }
-    
+
+    // Initialise CTF scale factors to cosine(tilt) if they're not present yet
+    initialiseCtfScaleFactors(tomoIndex, tomogram);
+
 	if (zeroDC) Normalization::zeroDC_stack(tomogram.stack);
 	
 	const int fc = tomogram.frameCount;
@@ -296,7 +252,12 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex, bool doEven, 
         spacing = angpix_spacing / pixelSizeAct;
     }
 
-    if (!tomogram.hasMatrices) getProjectMatrices(tomogram, tomogramSet.tomogramTables[tomoIndex]);
+    if (fabs(tiltAngleOffset) > 0.)
+    {
+        tomogramSet.applyTiltAngleOffset(tomoIndex, tiltAngleOffset);
+    }
+
+    if (!tomogram.hasMatrices) REPORT_ERROR("ERROR; tomograms do not have tilt series alignment parameters to calculate projectionMatrices!");
 
     const int w1 = w / spacing + 0.5;
 	const int h1 = h / spacing + 0.5;
@@ -350,7 +311,7 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex, bool doEven, 
 	out.fill(0.f);
 	
 	BufferedImage<float> psfStack;
-	
+
 	if (applyCtf)
 	{
 		// modulate stackAct with CTF (mind the spacing)
@@ -380,7 +341,9 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex, bool doEven, 
 				const double xA = x / box_size_x;
 				const double yA = (y < h_stackAct/2? y : y - h_stackAct) / box_size_y;
 				
-				const float c = ctf.getCTF(xA, yA);
+                const float c = ctf.getCTF(xA, yA, false, false,
+                                           true, false, 0.0, false);
+
 				
 				ctf2ImageFS(x,y) = fComplex(c*c,0);
 				frameFS(x,y) *= c;
@@ -439,7 +402,6 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex, bool doEven, 
     else 
         out.write(getOutputFileName(tomoIndex, false, false), samplingRate);
 
-
     // Also add the tomogram sizes and name to the tomogramSet
     tomogramSet.globalTable.setValue(EMDL_TOMO_SIZE_X, w, tomoIndex);
     tomogramSet.globalTable.setValue(EMDL_TOMO_SIZE_Y, h, tomoIndex);
@@ -448,11 +410,42 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex, bool doEven, 
     if (doEven)
     	tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF1_FILE_NAME, getOutputFileName(tomoIndex, true, false), tomoIndex);
     else if (doOdd)
-	tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF2_FILE_NAME, getOutputFileName(tomoIndex, false, true), tomoIndex);
+        tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF2_FILE_NAME, getOutputFileName(tomoIndex, false, true), tomoIndex);
     else  
+        tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME, getOutputFileName(tomoIndex, false, false), tomoIndex);
+
+    if (do_2dproj)
     {
-    tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME, getOutputFileName(tomoIndex, false, false), tomoIndex);
-    }  
+        BufferedImage<float> proj(w1, h1);
+        proj.fill(0.f);
+        int minz = out.zdim/2 + centre_2dproj - thickness_2dproj/2;
+        int maxz = out.zdim/2 + centre_2dproj + thickness_2dproj/2;
+        for (int z = 0; z < out.zdim; z++)
+        {
+            if (z >= minz && z <= maxz)
+            {
+                for (int y = 0; y < out.ydim; y++)
+                    for (int x = 0; x < out.xdim; x++)
+                        proj(x, y) += out(x, y, z);
+            }
+        }
+        if (doEven)
+            proj.write(getOutputFileName(tomoIndex, true, false, true), samplingRate);
+        else if (doOdd)
+            proj.write(getOutputFileName(tomoIndex, false, true, true), samplingRate);
+        else
+            proj.write(getOutputFileName(tomoIndex, false, false, true), samplingRate);
+
+        if (doEven)
+            tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_HALF1_FILE_NAME, getOutputFileName(tomoIndex, true, false, true), tomoIndex);
+        else if (doOdd)
+            tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_HALF2_FILE_NAME, getOutputFileName(tomoIndex, false, true, true), tomoIndex);
+        else
+            tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_FILE_NAME, getOutputFileName(tomoIndex, false, false, true), tomoIndex);
+
+    }
+
+
 }
 
 void TomoBackprojectProgram::setMetaDataAllTomograms()
@@ -464,7 +457,12 @@ void TomoBackprojectProgram::setMetaDataAllTomograms()
         // SHWS 19apr2023: need to do this again for all tomograms: after completion of MPI job, leader does not know about the tomograms of the followers.
         Tomogram tomogram;
         tomogram = tomogramSet.loadTomogram(tomoIndex, false);
-        if (!tomogram.hasMatrices) getProjectMatrices(tomogram, tomogramSet.tomogramTables[tomoIndex]);
+        if (!tomogram.hasMatrices) REPORT_ERROR("ERROR: tomograms do not have tilt series alignment parameters to calculate projectionMatrices");
+
+        if (fabs(tiltAngleOffset) > 0.)
+        {
+            tomogramSet.applyTiltAngleOffset(tomoIndex, tiltAngleOffset);
+        }
 
         double pixelSizeAct = tomogramSet.getTiltSeriesPixelSize(tomoIndex);
         if (angpix_spacing > 0.) spacing = angpix_spacing / pixelSizeAct;
@@ -475,6 +473,10 @@ void TomoBackprojectProgram::setMetaDataAllTomograms()
         tomogramSet.globalTable.setValue(EMDL_TOMO_SIZE_X, w, tomoIndex);
         tomogramSet.globalTable.setValue(EMDL_TOMO_SIZE_Y, h, tomoIndex);
         tomogramSet.globalTable.setValue(EMDL_TOMO_SIZE_Z, d, tomoIndex);
+
+        // And the Bfactor per e/A^2 dose, if provided
+        if (BfactorPerElectronDose > 0.)
+            tomogramSet.globalTable.setValue(EMDL_CTF_BFACTOR_PERELECTRONDOSE, BfactorPerElectronDose, tomoIndex);
 
         if (do_even_odd_tomograms)
         {
@@ -488,29 +490,43 @@ void TomoBackprojectProgram::setMetaDataAllTomograms()
             tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME,
                                              getOutputFileName(tomoIndex, false, false), tomoIndex);
         }
+
+        if (do_2dproj)
+        {
+            if (do_even_odd_tomograms)
+            {
+                tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_HALF1_FILE_NAME, getOutputFileName(tomoIndex, true, false, true), tomoIndex);
+                tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_HALF2_FILE_NAME, getOutputFileName(tomoIndex, false, true, true), tomoIndex);
+            }
+            else
+            {
+                tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_FILE_NAME, getOutputFileName(tomoIndex, false, false, true), tomoIndex);
+            }
+        }
     }
 
 }
 
-FileName TomoBackprojectProgram::getOutputFileName(int index, bool nameEven, bool nameOdd)
+FileName TomoBackprojectProgram::getOutputFileName(int index, bool nameEven, bool nameOdd, bool is_2dproj)
 {
     // If we're reconstructing many tomograms, or the output filename is a directory: use standardized output filenames
     FileName fn_result = outFn;
 
+    std::string dirname = (is_2dproj) ? "projections/" : "tomograms/";
     if (do_even_odd_tomograms)
     {
 		if (nameEven)
 		{
-			fn_result += "tomograms/rec_" + tomogramSet.getTomogramName(index)+"_half1.mrc";
+			fn_result += dirname + "rec_" + tomogramSet.getTomogramName(index)+"_half1.mrc";
 		}
 		else if (nameOdd)
 		{
-			fn_result += "tomograms/rec_" + tomogramSet.getTomogramName(index)+"_half2.mrc";
+			fn_result += dirname + "rec_" + tomogramSet.getTomogramName(index)+"_half2.mrc";
 		}
     }
 	else
 	{
-	    fn_result += "tomograms/rec_" + tomogramSet.getTomogramName(index)+".mrc";
+	    fn_result += dirname + "rec_" + tomogramSet.getTomogramName(index)+".mrc";
 	}
 
     if (!exists(fn_result.beforeLastOf("/"))) mktree(fn_result.beforeLastOf("/"));

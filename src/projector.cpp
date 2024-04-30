@@ -189,6 +189,7 @@ void Projector::computeFourierTransformMap(
 				  (size_t)sizeof(Complex)*Faux_sz +                                // dFaux
 				  (size_t)sizeof(RFLOAT)*MULTIDIM_SIZE(Mpad) +                     // dMpad
 				  ws_sz + 4096;                                                    // workspace for cuFFT + extra space for alingment
+        mem_req = mem_req * 1.5;           
 	}
 
 	CudaCustomAllocator *allocator = NULL;

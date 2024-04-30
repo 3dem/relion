@@ -183,7 +183,7 @@ void Experiment::addParticle(std::string img_name, int optics_group, long int gr
     return;
 }
 
-void Experiment::addImageToParticle(long int part_id, d4Matrix *Aproj, CTF *ctf, float dose)
+void Experiment::addImageToParticle(long int part_id, d4Matrix *Aproj, CTF *ctf, float dose, double BfactorPerElectronDose)
 {
 
     Matrix2D<RFLOAT> A(3,3);
@@ -201,19 +201,31 @@ void Experiment::addImageToParticle(long int part_id, d4Matrix *Aproj, CTF *ctf,
 	ExpImage img;
     if (ctf == NULL)
     {
-        img.defU = img.defV = img.defAngle = 0.;
+        img.defU = img.defV = img.defAngle = img.phase_shift = 0.;
+        img.scale = 1.;
     }
     else
     {
         img.defU = ctf->DeltafU;
         img.defV = ctf->DeltafV;
         img.defAngle = ctf->azimuthal_angle;
+        img.scale = ctf->scale;
+        img.phase_shift = ctf->phase_shift;
     }
 
 	img.particle_id = part_id;
 	img.Aproj = A;
-    img.is_empty = false;
-    img.dose = dose;
+
+    if (BfactorPerElectronDose > 0.)
+    {
+        img.dose = -999.;
+        img.bfactor = BfactorPerElectronDose * dose;
+    }
+    else
+    {
+        img.dose = dose;
+        img.bfactor = 0.;
+    }
 
 	// Push back this particle in the particles vector
 	particles[part_id].images.push_back(img);
@@ -793,6 +805,7 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 	}
 }
 
+
 // Read from file
 bool Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
                       bool do_ignore_particle_name, bool do_ignore_group_name, bool do_preread_images,
@@ -982,18 +995,24 @@ bool Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
                 // Pre-orientation of this particle in the tomogram
                 ParticleIndex id(part_id);
                 d3Matrix A = particleSet.getSubtomogramMatrix(id);
-                const d3Vector pos = particleSet.getPosition(id);
+                const d3Vector pos = particleSet.getPosition(id, tomogram.centre, true);
 
-                // Add all images for this particle
-                const int fc = tomogram.frameCount;
-                for (int f = 0; f < fc; f++)
+
+                // Add only the visible images for this particle
+                std::vector<int> isVisible = particleSet.getVisibleFrames(id);
+                for (int f = 0; f < tomogram.frameCount; f++)
                 {
-                    d4Matrix P = tomogram.projectionMatrices[f] * d4Matrix(A);
 
-                    CTF ctf = tomogram.getCtf(f, pos);
+                    if (isVisible[f] > 0)
+                    {
+                        float dose = tomogram.getCumulativeDose(f);
 
-                    float dose = tomogram.getCumulativeDose(f);
-                    addImageToParticle(part_id, &P, &ctf, dose);
+                        d4Matrix P = tomogram.projectionMatrices[f] * d4Matrix(A);
+
+                        CTF ctf = tomogram.getCtf(f, pos);
+
+                        addImageToParticle(part_id, &P, &ctf, dose, tomogram.BfactorPerElectronDose);
+                    }
                 }
             }
             else

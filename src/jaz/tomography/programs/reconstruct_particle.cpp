@@ -338,9 +338,9 @@ void ReconstructParticleProgram::processTomograms(
 
 			const ParticleIndex part_id = particles[t][p];
 
-			const d3Vector pos = particleSet.getPosition(part_id);
+			const d3Vector pos = particleSet.getPosition(part_id, tomogram.centre);
 			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
-						part_id, fc, tomogram.optics.pixelSize);
+						part_id, fc, tomogram.centre, tomogram.optics.pixelSize);
 			std::vector<d4Matrix> projCut(fc), projPart(fc);
 
 			const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
@@ -352,7 +352,7 @@ void ReconstructParticleProgram::processTomograms(
 					particleStack[th], projCut, inner_threads, circle_crop);
 
 
-			const d4Matrix particleToTomo = particleSet.getMatrix4x4(part_id, s,s,s);
+			const d4Matrix particleToTomo = particleSet.getMatrix4x4(part_id, tomogram.centre, s,s,s);
 
             const int halfSet = (particleSet.hasHalfSets()) ? particleSet.getHalfSet(part_id) : 0;
 
@@ -564,22 +564,26 @@ void ReconstructParticleProgram::symmetrise(
 		std::vector<BufferedImage<double> >& ctfImgFS,
 		double binnedOutPixelSize)
 {
-	if (symmName != "C1" && symmName != "c1")
+	if ((symmName != "C1" && symmName != "c1") || nr_helical_asu > 1)
 	{
 		std::vector<gravis::d4Matrix> symmetryMatrices;
 
-		if (nr_helical_asu == 1)
-		{
-			Log::print("Applying point-group symmetries");
+        if (symmName != "C1" && symmName != "c1")
+        {
+            Log::print("Applying point-group symmetries");
 
-			symmetryMatrices = Symmetry::getPointGroupMatrices(symmName);
-		}
-		else
+            symmetryMatrices = Symmetry::getPointGroupMatrices(symmName);
+        }
+        if (nr_helical_asu > 1)
 		{
 			Log::print("Applying helical symmetries");
 
-			symmetryMatrices = Symmetry::getHelicalSymmetryMatrices(
+			std::vector<gravis::d4Matrix> helicalSymmetryMatrices;
+            helicalSymmetryMatrices = Symmetry::getHelicalSymmetryMatrices(
 						nr_helical_asu, helical_twist, helical_rise/binnedOutPixelSize);
+            symmetryMatrices.insert(symmetryMatrices.end(),
+                        helicalSymmetryMatrices.begin(),
+                        helicalSymmetryMatrices.end());
 		}
 
 		for (int half = 0; half < 2; half++)

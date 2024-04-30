@@ -118,9 +118,9 @@ MpiNode::MpiNode(int &argc, char ** argv)
 	char* pEnvP2P   = std::getenv("MAX_MPI_P2P_BLOCK"); // For pt-2-pt blocking size
 	char* pEnvColl  = std::getenv("MAX_MPI_COLL_BLOCK");// For collective blocking size
 
-	const std::ptrdiff_t lBlock = (pEnvBlock == NULL) ? 0 : std::strtol(pEnvBlock, &pEnvBlock, 10);
-	const std::ptrdiff_t lP2P   = (pEnvP2P == NULL)   ? 0 : std::strtol(pEnvP2P, &pEnvP2P, 10);
-	const std::ptrdiff_t lColl  = (pEnvColl == NULL)  ? 0 : std::strtol(pEnvColl, &pEnvColl, 10);
+	const std::ptrdiff_t lBlock = (pEnvBlock == NULL) ? 0 : std::strtoul(pEnvBlock, nullptr, 10);
+	const std::ptrdiff_t lP2P   = (pEnvP2P == NULL)   ? 0 : std::strtoul(pEnvP2P, nullptr, 10);
+	const std::ptrdiff_t lColl  = (pEnvColl == NULL)  ? 0 : std::strtoul(pEnvColl, nullptr, 10);
 
 	if (lBlock > 0) // "MAX_MPI_BLOCK" has precedence if it is set
 	{
@@ -500,13 +500,13 @@ void printMpiNodesMachineNames(MpiNode &node, int nthreads)
 	if (node.isLeader())
 	{
 		std::cout << " === RELION MPI setup ===" << std::endl;
-		std::cout << " + Number of MPI processes             = " << node.size << std::endl;
+		std::cout << " + Number of MPI processes                 = " << node.size << std::endl;
 		if (nthreads > 1)
 		{
-			std::cout << " + Number of threads per MPI process   = " << nthreads << std::endl;
-		std::cout << " + Total number of threads therefore   = " << nthreads * node.size << std::endl;
+        std::cout << " + Number of threads per MPI process       = " << nthreads << std::endl;
+		std::cout << " + Total number of threads therefore       = " << nthreads * node.size << std::endl;
 		}
-		std::cout << " + Leader  (0) runs on host            = " << node.getHostName() << std::endl;
+		std::cout << " + Leader      (0) runs on host            = " << node.getHostName() << std::endl;
 		std::cout.flush();
 	}
 	node.barrierWait();
@@ -518,7 +518,7 @@ void printMpiNodesMachineNames(MpiNode &node, int nthreads)
 			std::cout << " + Follower ";
 			std::cout.width(5);
 			std::cout << follower;
-			std::cout << " runs on host            = " << node.getHostName() << std::endl;
+			std::cout << "  runs on host            = " << node.getHostName() << std::endl;
 			std::cout.flush();
 		}
 		node.barrierWait();
@@ -526,7 +526,7 @@ void printMpiNodesMachineNames(MpiNode &node, int nthreads)
 
 	if (node.isLeader())
 	{
-		std::cout << " =================" << std::endl;
+		std::cout << " ==========================" << std::endl;
 	}
 	std::cout.flush();
 

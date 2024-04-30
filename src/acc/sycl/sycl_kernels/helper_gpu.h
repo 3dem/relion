@@ -37,9 +37,9 @@ __group_barrier(I __item)
 {
 #if 0
 // group_barrier is too slow!
-    sycl::group_barrier(__item.get_group(), sycl::memory_scope::work_group);
+	sycl::group_barrier(__item.get_group(), sycl::memory_scope::work_group);
 #else
-    __item.barrier(sycl::access::fence_space::local_space);
+	__item.barrier(sycl::access::fence_space::local_space);
 #endif
 }
 
@@ -116,19 +116,19 @@ static T getMaxOnDevice(T *data, const size_t count, virtualSYCL *devAcc)
 
 	Q->memcpy(&val, data+dist, sizeof(T)).wait_and_throw();
  #else
-    val = std::numeric_limits<T>::lowest();
-    {
+	val = std::numeric_limits<T>::lowest();
+	{
 		using namespace sycl;
-        auto buf = buffer{&val, range{1}};
-        Q->submit([&](handler &cgh)
-        {
-            auto reductionMax = reduction(buf, cgh, maximum<T>{});
-            cgh.parallel_for(range<1>{count}, reductionMax, [=](id<1> idx, auto& vmax)
-            {
-                vmax.combine(data[idx]);
-            });
-        }).wait_and_throw();
-    }
+		auto buf = buffer{&val, range{1}};
+		Q->submit([&](handler &cgh)
+		{
+			auto reductionMax = reduction(buf, cgh, maximum<T>{});
+			cgh.parallel_for(range<1>{count}, reductionMax, [=](id<1> idx, auto& vmax)
+			{
+				vmax.combine(data[idx]);
+			});
+		}).wait_and_throw();
+	}
  #endif
 	return val;
 }
@@ -153,10 +153,10 @@ static std::pair<size_t, T> getArgMinOnDevice(T *data, const size_t count, virtu
 	std::pair<T,size_t> res { identity };
 	{
 		using namespace sycl;
-        auto buf = buffer{&res, range{1}};
+		auto buf = buffer{&res, range{1}};
 		Q->submit([&](handler &cgh)
 		{
-            auto reductionMin = reduction(buf, cgh, identity, minloc<T,size_t>{});
+			auto reductionMin = reduction(buf, cgh, identity, minloc<T,size_t>{});
 			cgh.parallel_for(range<1>{count}, reductionMin, [=](id<1> idx, auto& vmin)
 			{
 				std::pair<T,size_t> temp { data[idx], idx };
@@ -191,10 +191,10 @@ static std::pair<size_t, T> getArgMaxOnDevice(T *data, const size_t count, virtu
 	std::pair<T,size_t> res { identity };
 	{
 		using namespace sycl;
-        auto buf = buffer{&res, range{1}};
+		auto buf = buffer{&res, range{1}};
 		Q->submit([&](handler &cgh)
 		{
-            auto reductionMax = reduction(buf, cgh, identity, maxloc<T,size_t>{});
+			auto reductionMax = reduction(buf, cgh, identity, maxloc<T,size_t>{});
 			cgh.parallel_for(range<1>{count}, reductionMax, [=](id<1> idx, auto& vmax)
 			{
 				std::pair<T,size_t> temp { data[idx], idx };
@@ -295,10 +295,10 @@ static void sycl_kernel_exponentiate_weights_fine(
 		const XFLOAT min_diff2,
 		const unsigned long oversamples_orient,
 		const unsigned long oversamples_trans,
-        unsigned long *d_rot_id,
-        unsigned long *d_trans_idx,
-        unsigned long *d_job_idx,
-        unsigned long *d_job_num,
+		unsigned long *d_rot_id,
+		unsigned long *d_trans_idx,
+		unsigned long *d_job_idx,
+		unsigned long *d_job_num,
 		const long job_num,
 		virtualSYCL *devAcc)
 {
@@ -345,7 +345,11 @@ static void sycl_kernel_exponentiate(
 	assert(count <= std::numeric_limits<int>::max());
 	sycl::queue *Q = dynamic_cast<devSYCL*>(devAcc)->getQueue();
  #ifdef USE_MORE_ONEDPL
+  #ifdef ACC_DOUBLE_PRECISION
+	dpl::transform(dynamic_cast<devSYCL*>(devAcc)->getDevicePolicy(), g_array, g_array+count, g_array, [=](T v) { v+=add; v = (v<KERNEL_EXP_VALUE) ? static_cast<T>(0) : sycl::exp(v); return v;});
+  #else
 	dpl::transform(dynamic_cast<devSYCL*>(devAcc)->getDevicePolicy(), g_array, g_array+count, g_array, [=](T v) { v+=add; v = (v<KERNEL_EXP_VALUE) ? static_cast<T>(0) : sycl::native::exp(v); return v;});
+  #endif
  #else
 	Q->submit([&](sycl::handler &cgh)
 	{
@@ -359,7 +363,11 @@ static void sycl_kernel_exponentiate(
 				if (a < KERNEL_EXP_VALUE)
 					g_array[idx] = static_cast<T>(0);
 				else
+  #ifdef ACC_DOUBLE_PRECISION
+					g_array[idx] = sycl::exp(a);
+  #else
 					g_array[idx] = sycl::native::exp(a);
+  #endif
 			}
 		});
 	}).wait_and_throw();
@@ -553,13 +561,13 @@ void sycl_gpu_translate2D(T *g_image_in,
 					int      dy,
 					virtualSYCL	*devAcc)
 {
-    assert(image_size <= std::numeric_limits<int>::max());
-    auto dev = dynamic_cast<devSYCL*>(devAcc);
+	assert(image_size <= std::numeric_limits<int>::max());
+	auto dev = dynamic_cast<devSYCL*>(devAcc);
 
-    dev->syclSubmit([&](sycl::handler &cgh)
-    {
-        cgh.parallel_for(sycl::range<1>(image_size), [=](sycl::id<1> pixel)
-        {
+	dev->syclSubmit([&](sycl::handler &cgh)
+	{
+		cgh.parallel_for(sycl::range<1>(image_size), [=](sycl::id<1> pixel)
+		{
 			int x = pixel % xdim;
 			int y = (pixel-x) / xdim;
 
@@ -573,8 +581,8 @@ void sycl_gpu_translate2D(T *g_image_in,
 					g_image_out[new_pixel] = g_image_in[pixel];
 			}
 
-        });
-    }).wait_and_throw();
+		});
+	}).wait_and_throw();
 }
 
 template <typename T>
@@ -589,13 +597,13 @@ void sycl_gpu_translate3D(T *g_image_in,
 					int      dz,
 					virtualSYCL	*devAcc)
 {
-    assert(image_size <= std::numeric_limits<int>::max());
+	assert(image_size <= std::numeric_limits<int>::max());
 	auto dev = dynamic_cast<devSYCL*>(devAcc);
 
-    dev->syclSubmit([&](sycl::handler &cgh)
-    {
-        cgh.parallel_for(sycl::range<1>(image_size), [=](sycl::id<1> voxel)
-        {
+	dev->syclSubmit([&](sycl::handler &cgh)
+	{
+		cgh.parallel_for(sycl::range<1>(image_size), [=](sycl::id<1> voxel)
+		{
 			int xydim = xdim*ydim;
 
 			int z =  voxel / xydim;
@@ -614,8 +622,8 @@ void sycl_gpu_translate3D(T *g_image_in,
 				if(new_voxel>=0 && new_voxel<image_size) // if displacement is negative, new_pixel could be less than 0
 					g_image_out[new_voxel] = g_image_in[voxel];
 			}
-        });
-    }).wait_and_throw();
+		});
+	}).wait_and_throw();
 }
 
 //----------------------------------------------------------------------------
@@ -852,7 +860,11 @@ inline void powerClass(int          gridSize,
 
 inline std::pair<XFLOAT, XFLOAT> sycl_sincos(XFLOAT val)
 {
+#ifdef ACC_DOUBLE_PRECISION
+	return std::make_pair(sycl::sin(val), sycl::cos(val));
+#else
 	return std::make_pair(sycl::native::sin(val), sycl::native::cos(val));
+#endif
 }
 
 inline void translatePixel(
@@ -866,8 +878,13 @@ inline void translatePixel(
 		XFLOAT &tImag)
 {
 	XFLOAT v = x * tx + y * ty;
+#ifdef ACC_DOUBLE_PRECISION
+	XFLOAT s = sycl::sin(v);
+	XFLOAT c = sycl::cos(v);
+#else
 	XFLOAT s = sycl::native::sin(v);
 	XFLOAT c = sycl::native::cos(v);
+#endif
 
 	tReal = c * real - s * imag;
 	tImag = c * imag + s * real;
@@ -886,8 +903,13 @@ inline void translatePixel(
 		XFLOAT &tImag)
 {
 	XFLOAT v = x * tx + y * ty + z * tz;
+#ifdef ACC_DOUBLE_PRECISION
+	XFLOAT s = sycl::sin(v);
+	XFLOAT c = sycl::cos(v);
+#else
 	XFLOAT s = sycl::native::sin(v);
 	XFLOAT c = sycl::native::cos(v);
+#endif
 
 	tReal = c * real - s * imag;
 	tImag = c * imag + s * real;
@@ -916,18 +938,28 @@ inline void  computeSincosLookupTable2D(unsigned long  trans_num,
 		for(int x=0; x<xSize; x++) {
 			unsigned long index = i * xSize + x;
 			XFLOAT v = x * tx;
+#ifdef ACC_DOUBLE_PRECISION
+			sin_x[index] = sycl::sin(v);
+			cos_x[index] = sycl::cos(v);
+#else
 			sin_x[index] = sycl::native::sin(v);
 			cos_x[index] = sycl::native::cos(v);
+#endif
 		}
 		
 		for(int y=0; y<ySize; y++) {
-            unsigned long index = i * ySize + y;
+			unsigned long index = i * ySize + y;
 			XFLOAT v = y * ty;
+#ifdef ACC_DOUBLE_PRECISION
+			sin_y[index] = sycl::sin(v);
+			cos_y[index] = sycl::cos(v);
+#else
 			sin_y[index] = sycl::native::sin(v);
 			cos_y[index] = sycl::native::cos(v);
-		}        
+#endif
+		}
 	}
-}	                                    
+}
 				
 inline void  computeSincosLookupTable3D(unsigned long  trans_num,
                                         XFLOAT  *trans_x,
@@ -951,23 +983,38 @@ inline void  computeSincosLookupTable3D(unsigned long  trans_num,
 		for(int x=0; x<xSize; x++) {
 			unsigned long index = i * xSize + x;
 			XFLOAT v = x * tx;
+#ifdef ACC_DOUBLE_PRECISION
+			sin_x[index] = sycl::sin(v);
+			cos_x[index] = sycl::cos(v);
+#else
 			sin_x[index] = sycl::native::sin(v);
 			cos_x[index] = sycl::native::cos(v);
+#endif
 		}
 		
 		for(int y=0; y<ySize; y++) {
-            unsigned long index = i * ySize + y;
+			unsigned long index = i * ySize + y;
 			XFLOAT v = y * ty;
+#ifdef ACC_DOUBLE_PRECISION
+			sin_y[index] = sycl::sin(v);
+			cos_y[index] = sycl::cos(v);
+#else
 			sin_y[index] = sycl::native::sin(v);
 			cos_y[index] = sycl::native::cos(v);
-		}           
+#endif
+		}
 		
 		for(int z=0; z<zSize; z++) {
 			unsigned long index = i * zSize + z;
 			XFLOAT v = z * tz;
+#ifdef ACC_DOUBLE_PRECISION
+			sin_z[index] = sycl::sin(v);
+			cos_z[index] = sycl::cos(v);
+#else
 			sin_z[index] = sycl::native::sin(v);
 			cos_z[index] = sycl::native::cos(v);
-		}        		
+#endif
+		}
 	}
 }
 

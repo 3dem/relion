@@ -182,7 +182,7 @@ void getFourierTransformsAndCtfs(long int part_id,
     CTOC(accMLO->timer,"nonZeroProb");
 
     // Helical reconstruction: calculate old_offset in the system of coordinates of the helix, i.e. parallel & perpendicular, depending on psi-angle!
-    // For helices do NOT apply old_offset along the direction of the helix!!
+    // For helices do NOT apply old_offset along the direction of the helix (i.e. X-axis) !!
     Matrix1D<RFLOAT> my_old_offset_helix_coords;
     RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
     RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
@@ -203,10 +203,7 @@ void getFourierTransformsAndCtfs(long int part_id,
             bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
             if (!do_local_angular_searches)
             {
-                if (accMLO->shiftsIs3D)
-                    ZZ(my_old_offset_helix_coords) = 0.;
-                else
-                    XX(my_old_offset_helix_coords) = 0.;
+                XX(my_old_offset_helix_coords) = 0.;
             }
         }
         // TODO: Now re-calculate the my_old_offset in the real (or image) system of coordinate (rotate -psi angle)
@@ -327,8 +324,8 @@ void getFourierTransformsAndCtfs(long int part_id,
     }
     CTOC(accMLO->timer,"readData");
 
-    Image<RFLOAT> wholestack;
-    if (op.is_tomo) wholestack=img;
+    MultidimArray<RFLOAT> wholestack;
+    if (op.is_tomo) wholestack=img();
 
     for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
@@ -341,11 +338,8 @@ void getFourierTransformsAndCtfs(long int part_id,
         if (op.is_tomo)
         {
             MultidimArray<RFLOAT> my_img;
-            wholestack().getImage(img_id, my_img);
+            wholestack.getImage(img_id, my_img);
             img() = my_img;
-
-            // Keep track whether this image is empty
-            baseMLO->mydata.particles[part_id].images[img_id].is_empty = (img().computeStddev() == 0.);
         }
 
 		// ------------------------------------------------------------------------------------------
@@ -820,14 +814,14 @@ void getFourierTransformsAndCtfs(long int part_id,
 				CTF ctf;
 
                 if (op.is_tomo)
-    				ctf.setValuesByGroup(
+                    ctf.setValuesByGroup(
                         &(baseMLO->mydata).obsModel, optics_group,
                         baseMLO->mydata.particles[part_id].images[img_id].defU,
                         baseMLO->mydata.particles[part_id].images[img_id].defV,
                         baseMLO->mydata.particles[part_id].images[img_id].defAngle,
-                        0.,
-                        (baseMLO->mydata.particles[part_id].images[img_id].is_empty) ? 0. : 1.,
-                        0.,
+                        baseMLO->mydata.particles[part_id].images[img_id].bfactor,
+                        baseMLO->mydata.particles[part_id].images[img_id].scale,
+                        baseMLO->mydata.particles[part_id].images[img_id].phase_shift,
                         baseMLO->mydata.particles[part_id].images[img_id].dose);
                 else
                     ctf.setValuesByGroup(
@@ -1193,7 +1187,7 @@ void getAllSquaredDifferencesCoarse(
 	trans_xyz.allAlloc();
 	corr_img.allAlloc();
 
-	for (int img_id = 0; img_id < sp.nr_images; img_id++)
+    for (unsigned long img_id = 0; img_id < sp.nr_images; img_id++)
 	{
 
 		/*====================================
@@ -1217,7 +1211,16 @@ void getAllSquaredDifferencesCoarse(
 			if (accMLO->shiftsIs3D)
 				zshift = oversampled_translations_z[0];
 
-			if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
+            if (op.is_tomo)
+            {
+                // op.old_offset was not yet applied for subtomos!
+                // For helices: op.old_offset is in HELICAL COORDS, not CART_COORDS!
+                xshift += XX(op.old_offset);
+                yshift += YY(op.old_offset);
+                zshift += ZZ(op.old_offset);
+            }
+
+            if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
 			{
 				RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
 				RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
@@ -1228,10 +1231,6 @@ void getAllSquaredDifferencesCoarse(
 
             if (op.is_tomo)
             {
-                // op.old_offset was not yet applied for subtomos!
-                xshift += XX(op.old_offset);
-                yshift += YY(op.old_offset);
-                zshift += ZZ(op.old_offset);
                 baseMLO->mydata.getTranslationInTiltSeries(op.part_id, img_id,
                                                            xshift, yshift, zshift,
                                                            xshift, yshift, zshift);
@@ -1488,7 +1487,7 @@ void getAllSquaredDifferencesFine(
 	trans_xyz.allAlloc();
 	corr_img.allAlloc();
 
-    for (int img_id = 0; img_id < sp.nr_images; img_id++)
+    for (unsigned long img_id = 0; img_id < sp.nr_images; img_id++)
 	{
 
 		// Reset size without de-allocating: we will append everything significant within
@@ -1522,7 +1521,16 @@ void getAllSquaredDifferencesFine(
 				if (accMLO->shiftsIs3D)
 					zshift = oversampled_translations_z[iover_trans];
 
-				if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
+                if (op.is_tomo)
+                {
+                    // op.old_offset was not yet applied for subtomos!
+                    // For helices: op.old_offset is in HELICAL COORDS, not CART_COORDS!
+                    xshift += XX(op.old_offset);
+                    yshift += YY(op.old_offset);
+                    zshift += ZZ(op.old_offset);
+                }
+
+                if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
 				{
                     RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
 					RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
@@ -1533,10 +1541,6 @@ void getAllSquaredDifferencesFine(
 
                 if (op.is_tomo)
                 {
-                    // op.old_offset was not yet applied for subtomos!
-                    xshift += XX(op.old_offset);
-                    yshift += YY(op.old_offset);
-                    zshift += ZZ(op.old_offset);
                     baseMLO->mydata.getTranslationInTiltSeries(op.part_id, img_id,
                                                                xshift, yshift, zshift,
                                                                xshift, yshift, zshift);
@@ -1903,7 +1907,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 #ifdef TIMING
 	if (op.part_id == baseMLO->exp_my_first_part_id)
 	{
-	{
 		if (exp_ipass == 0) baseMLO->timer.tic(baseMLO->TIMING_ESP_WEIGHT1);
 		else baseMLO->timer.tic(baseMLO->TIMING_ESP_WEIGHT2);
 	}
@@ -2017,8 +2020,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
             PassWeights.weights.setAccPtr(&(~Mweight)[0]);
             PassWeights.weights.setHostPtr(&Mweight[0]);
             PassWeights.weights.setSize(nr_coarse_weights);
+            PassWeights.weights.doFreeHost=false;
         }
-        PassWeights.weights.doFreeHost=false;
 
         std::pair<size_t, XFLOAT> min_pair=AccUtilities::getArgMinOnDevice<XFLOAT>(PassWeights.weights);
         PassWeights.weights.cpToHost();
@@ -2953,7 +2956,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 #endif
 		trans_xyz.allAlloc();
 
-		for (int img_id = 0; img_id < sp.nr_images; img_id++)
+        for (unsigned long img_id = 0; img_id < sp.nr_images; img_id++)
 		{
 
 			/*======================================================
@@ -2977,6 +2980,15 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					if (accMLO->shiftsIs3D)
 						zshift = oversampled_translations_z[iover_trans];
 
+                    if (op.is_tomo)
+                    {
+                        // op.old_offset was not yet applied for subtomos!
+                        // For helices: op.old_offset is in HELICAL COORDS, not CART_COORDS!
+                        xshift += XX(op.old_offset);
+                        yshift += YY(op.old_offset);
+                        zshift += ZZ(op.old_offset);
+                    }
+
 					if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
 					{
 						RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
@@ -2988,10 +3000,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
                     if (op.is_tomo)
                     {
-                        // op.old_offset was not yet applied for subtomos!
-                        xshift += XX(op.old_offset);
-                        yshift += YY(op.old_offset);
-                        zshift += ZZ(op.old_offset);
                         baseMLO->mydata.getTranslationInTiltSeries(op.part_id, img_id,
                                                                    xshift, yshift, zshift,
                                                                    xshift, yshift, zshift);
@@ -3384,7 +3392,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				int iproj_offset = 0;
 				if (baseMLO->grad_pseudo_halfsets)
 					// Backproject every other particle into separate volumes
-					iproj_offset = (op.part_id % 2) * baseMLO->mymodel.nr_classes
+					iproj_offset = (op.part_id % 2) * baseMLO->mymodel.nr_classes;
 
 				CTIC(accMLO->timer,"backproject");
 				runBackProjectKernel(
@@ -3496,7 +3504,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		RFLOAT thr_sum_dLL = 0., thr_sum_Pmax = 0.;
 
         // If the current images were smaller than the original size, fill the rest of wsum_model.sigma2_noise with the power_class spectrum of the images
-        for (int img_id = 0; img_id < sp.nr_images; img_id++)
+        for (unsigned long img_id = 0; img_id < sp.nr_images; img_id++)
         {
 
             for (unsigned long ires = baseMLO->image_current_size[optics_group] / 2 + 1;
@@ -3580,13 +3588,18 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
             int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id);
 
 
-            if (baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group)) {
+            if (baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group))
+            {
                 RFLOAT myscale = XMIPP_MAX(0.001, baseMLO->mymodel.scale_correction[igroup]);
-                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->Mresol_fine[optics_group]) {
-                    int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine[optics_group], n);
-                    if (ires > -1)
-                        DIRECT_MULTIDIM_ELEM(thr_wsum_ctf2, ires) +=
-                                myscale * DIRECT_MULTIDIM_ELEM(op.local_Fctf[0], n);
+                for (int img_id = 0; img_id < sp.nr_images; img_id++)
+                {
+                    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->Mresol_fine[optics_group])
+                    {
+                        int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine[optics_group], n);
+                        if (ires > -1)
+                            DIRECT_MULTIDIM_ELEM(thr_wsum_ctf2, ires) +=
+                                    myscale * DIRECT_MULTIDIM_ELEM(op.local_Fctf[img_id], n);
+                    }
                 }
             }
 

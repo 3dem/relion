@@ -30,6 +30,7 @@ def cryoCARE_predict(
         tomogram_star_file: Path = typer.Option(...),
         output_directory: Path = typer.Option(...),
         model_file: Path = typer.Option(...),
+        cryocare_path: Optional[Path] = typer.Option(""),
         n_tiles: Optional[Tuple[int, int, int]] = typer.Option((1, 1, 1)),
         tomogram_name: Optional[str] = typer.Option(None),
         gpu: Optional[List[int]] = typer.Option(None)
@@ -54,6 +55,9 @@ def cryoCARE_predict(
     model_file: Path
         user should provide the path to the model.tar.gz produced by a
         previous cryoCARE denoise job.
+    cryocare_path: Optional[Path]
+        directory where the cryoCARE executables can be found. This can be
+        left empty if the cryoCARE executables are already in the PATH
     n_tiles: Tuple[int, int, int]
         Initial number of tiles per dimension during prediction step.
         Should get increased if the tiles do not fit on the GPU.
@@ -72,6 +76,16 @@ def cryoCARE_predict(
         e = 'Could not find tomogram star file'
         console.log(f'ERROR: {e}')
         raise RuntimeError(e)
+
+    cryocare_path = str(cryocare_path)
+    if cryocare_path != "":
+        predict_executable = os.path.join(cryocare_path,  "cryoCARE_predict.py")
+        if not os.path.isfile(predict_executable):
+            e = 'Could not find cryoCARE_predict.py executable in the input path: ' + cryocare_path
+            console.log(f'ERROR: {e}')
+            raise RuntimeError(e)
+    else:
+        predict_executable = "cryoCARE_predict.py"
 
     global_star = starfile.read(tomogram_star_file, always_dict=True)['global']
 
@@ -106,7 +120,7 @@ def cryoCARE_predict(
     )
 
     console.log('Generating denoised tomograms')
-    cmd = f"cryoCARE_predict.py --conf {training_dir}/{PREDICT_CONFIG_PREFIX}.json"
+    cmd = f"{predict_executable} --conf {training_dir}/{PREDICT_CONFIG_PREFIX}.json"
     subprocess.run(cmd, shell=True, stderr=subprocess.STDOUT)
     rename_predicted_tomograms(
         even_tomos=even_tomos,

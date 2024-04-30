@@ -97,7 +97,7 @@ class PickFilamentsWidget(QWidget):
         ts_id = self.tomogram_browser_widget.selected_tilt_series.name
         filament_data = {
             'rlnTomoName': [ts_id] * len(zyx),
-            'rlnTomoManifoldIndex': paths.spline_ids,
+            'rlnTomoManifoldIndex': paths.path_ids,
             'rlnCoordinateX': zyx[:, -1],
             'rlnCoordinateY': zyx[:, -2],
             'rlnCoordinateZ': zyx[:, -3],

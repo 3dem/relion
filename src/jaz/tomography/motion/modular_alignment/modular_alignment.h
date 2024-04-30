@@ -249,7 +249,7 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 	
 	for (int p = 0; p < pc; p++)
 	{
-		initialPos[p] = particleSet.getPosition(partIndices[p]);
+		initialPos[p] = particleSet.getPosition(partIndices[p], tomogram.centre);
 	}
 	
 	const gravis::d3Vector tomoCentre = tomogram.centre;
@@ -272,7 +272,7 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 	for (int p = 0; p < pc; p++)
 	{
 		const std::vector<gravis::d3Vector> traj = particleSet.getTrajectoryInPixels(
-			partIndices[p], fc, tomogram.optics.pixelSize);
+			partIndices[p], fc, tomogram.centre, tomogram.optics.pixelSize);
 
 		for (int ft = 0; ft < fc; ft++)
 		{

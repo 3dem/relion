@@ -53,6 +53,10 @@ devSYCL::devSYCL(const bool isInOrder, const bool isAsync)
 
 	_devD = _devQ->get_device();
 	_devC = _devQ->get_context();
+	_syclHostPool = nullptr;
+	_syclDevicePool = nullptr;
+	_host_block_size = 0;
+	_device_block_size = 0;
 #ifdef USE_ONEDPL
 	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
 #endif
@@ -114,6 +118,10 @@ devSYCL::devSYCL(sycl::device &d, int id, const bool isInOrder, const bool isAsy
 
 	_devD = d;
 	_devC = _devQ->get_context();
+	_syclHostPool = nullptr;
+	_syclDevicePool = nullptr;
+	_host_block_size = 0;
+	_device_block_size = 0;
 #ifdef USE_ONEDPL
 	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
 #endif
@@ -175,6 +183,10 @@ devSYCL::devSYCL(sycl::device &d, const syclQueueType qType, int id, const bool 
 
 	_devD = d;
 	_devC = _devQ->get_context();
+	_syclHostPool = nullptr;
+	_syclDevicePool = nullptr;
+	_host_block_size = 0;
+	_device_block_size = 0;
 	_queueType = qType;
 #ifdef USE_ONEDPL
 	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
@@ -231,6 +243,10 @@ devSYCL::devSYCL(sycl::context &c, sycl::device &d, int id, const bool isInOrder
 	}
 	_devD = d;
 	_devC = c;
+	_syclHostPool = nullptr;
+	_syclDevicePool = nullptr;
+	_host_block_size = 0;
+	_device_block_size = 0;
 #ifdef USE_ONEDPL
 	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
 #endif
@@ -291,6 +307,10 @@ devSYCL::devSYCL(sycl::context &c, sycl::device &d, const syclQueueType qType, i
 	}
 	_devD = d;
 	_devC = c;
+	_syclHostPool = nullptr;
+	_syclDevicePool = nullptr;
+	_host_block_size = 0;
+	_device_block_size = 0;
 	_queueType = qType;
 #ifdef USE_ONEDPL
 	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
@@ -351,6 +371,84 @@ devSYCL::devSYCL(sycl::device &d, const int qIndex, int id, const bool isInOrder
 
 	_devD = d;
 	_devC = _devQ->get_context();
+	_syclHostPool = nullptr;
+	_syclDevicePool = nullptr;
+	_host_block_size = 0;
+	_device_block_size = 0;
+#ifdef USE_ONEDPL
+	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
+#endif
+	_isFP64Supported = d.has(sycl::aspect::fp64);
+	_isAsyncQueue = isAsync;
+	_computeIndex = qIndex;
+
+	const auto isizes = d.get_info<sycl::info::device::max_work_item_sizes<3>>();
+	maxItem[0] = isizes[0];
+	maxItem[1] = isizes[1];
+	maxItem[2] = isizes[2];
+	maxGroup = d.get_info<sycl::info::device::max_work_group_size>();
+#ifdef SYCL_EXT_ONEAPI_MAX_WORK_GROUP_QUERY
+	auto groups = d.get_info<sycl::ext::oneapi::experimental::info::device::max_work_groups<3>>();
+	maxWorkGroup[0] = groups[0];
+	maxWorkGroup[1] = groups[1];
+	maxWorkGroup[2] = groups[2];
+	maxGlobalWorkGroup = d.get_info<sycl::ext::oneapi::experimental::info::device::max_global_work_groups>();
+#else
+	maxWorkGroup[0] = maxWorkGroup[1] = maxWorkGroup[2] = maxGlobalWorkGroup = std::numeric_limits<int>::max;
+#endif
+	globalMem = d.get_info<sycl::info::device::global_mem_size>();
+	localMem = d.get_info<sycl::info::device::local_mem_size>();
+	maxUnit = d.get_info<sycl::info::device::max_compute_units>();
+	deviceID = id;
+	auto pf = d.get_platform();
+	deviceName = d.get_info<sycl::info::device::name>() + " (" + d.get_info<sycl::info::device::driver_version>() + ") / " + pf.get_info<sycl::info::platform::name>();
+	_prev_submission = sycl::event();
+	_event.push_back(sycl::event());
+}
+
+devSYCL::devSYCL(sycl::device &d, const int qIndex, const syclQueueType qType, int id, const bool isAsync)
+{
+	_exHandler = exceptionHandler;
+
+	try
+	{
+		switch (qType)
+		{
+			case syclQueueType::inOrder :
+			{
+				sycl::property_list q_prop {sycl::property::queue::in_order{}, sycl::ext::intel::property::queue::compute_index{qIndex}};
+				_devQ = new sycl::queue(d, _exHandler, q_prop);
+			}
+				break;
+
+			case syclQueueType::enableProfiling :
+			{
+				sycl::property_list q_prop {sycl::property::queue::enable_profiling{}, sycl::ext::intel::property::queue::compute_index{qIndex}};
+				_devQ = new sycl::queue(d, _exHandler, q_prop);
+			}
+				break;
+
+			case syclQueueType::outOfOrder :
+			default :
+			{
+				sycl::property_list q_prop {sycl::ext::intel::property::queue::compute_index{qIndex}};
+				_devQ = new sycl::queue(d, _exHandler, q_prop);
+			}
+				break;
+		}
+	}
+	catch (const sycl::exception &e)
+	{
+		std::cerr << "Provided SYCL device failed\n" << e.what() << std::endl;
+		std::terminate();
+	}
+	_devD = d;
+	_devC = _devQ->get_context();
+	_syclHostPool = nullptr;
+	_syclDevicePool = nullptr;
+	_host_block_size = 0;
+	_device_block_size = 0;
+	_queueType = qType;
 #ifdef USE_ONEDPL
 	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
 #endif
@@ -408,6 +506,10 @@ devSYCL::devSYCL(sycl::context &c, sycl::device &d, const int qIndex, int id, co
 	}
 	_devD = d;
 	_devC = c;
+	_syclHostPool = nullptr;
+	_syclDevicePool = nullptr;
+	_host_block_size = 0;
+	_device_block_size = 0;
 #ifdef USE_ONEDPL
 	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
 #endif
@@ -477,6 +579,10 @@ devSYCL::devSYCL(sycl::context &c, sycl::device &d, const int qIndex, const sycl
 	}
 	_devD = d;
 	_devC = c;
+	_syclHostPool = nullptr;
+	_syclDevicePool = nullptr;
+	_host_block_size = 0;
+	_device_block_size = 0;
 	_queueType = qType;
 #ifdef USE_ONEDPL
 	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
@@ -552,6 +658,10 @@ devSYCL::devSYCL(const syclDeviceType dev, int id, const bool isInOrder, const b
 
 	_devD = _devQ->get_device();
 	_devC = _devQ->get_context();
+	_syclHostPool = nullptr;
+	_syclDevicePool = nullptr;
+	_host_block_size = 0;
+	_device_block_size = 0;
 #ifdef USE_ONEDPL
 	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
 #endif
@@ -626,6 +736,10 @@ devSYCL::devSYCL(const syclBackendType be, const syclDeviceType dev, int id, con
 
 	_devD = _devQ->get_device();
 	_devC = _devQ->get_context();
+	_syclHostPool = nullptr;
+	_syclDevicePool = nullptr;
+	_host_block_size = 0;
+	_device_block_size = 0;
 #ifdef USE_ONEDPL
 	_devicePolicy = oneapi::dpl::execution::make_device_policy(*_devQ);
 #endif
@@ -659,7 +773,8 @@ devSYCL::devSYCL(const syclBackendType be, const syclDeviceType dev, int id, con
 }
 
 devSYCL::devSYCL(const devSYCL &q)
-:	_devQ {q._devQ}, _devD {q._devD}, _devC {q._devC}, deviceName {q.deviceName},
+:	_devQ {q._devQ}, _devD {q._devD}, _devC {q._devC}, deviceName {q.deviceName}, _exHandler {q._exHandler},
+	_syclHostPool {q._syclHostPool}, _syclDevicePool {q._syclDevicePool}, _host_block_size {q._host_block_size}, _device_block_size {q._device_block_size},
 	_isAsyncQueue {q._isAsyncQueue}, _isFP64Supported {q._isFP64Supported}, _computeIndex {q._computeIndex},
 	cardID {q.cardID}, deviceID {q.deviceID}, stackID {q.stackID}, nStack {q.nStack}, sliceID {q.sliceID}, nSlice {q.nSlice},
 	_queueType {q._queueType}, maxItem {q.maxItem}, maxGroup {q.maxGroup}, maxWorkGroup {q.maxWorkGroup}, maxGlobalWorkGroup {q.maxGlobalWorkGroup}, maxUnit {q.maxUnit},
@@ -670,7 +785,8 @@ devSYCL::devSYCL(const devSYCL &q)
 {}
 
 devSYCL::devSYCL(const devSYCL *q)
-:	_devQ {q->_devQ}, _devD {q->_devD}, _devC {q->_devC}, deviceName {q->deviceName},
+:	_devQ {q->_devQ}, _devD {q->_devD}, _devC {q->_devC}, deviceName {q->deviceName}, _exHandler {q->_exHandler},
+	_syclHostPool {q->_syclHostPool}, _syclDevicePool {q->_syclDevicePool}, _host_block_size {q->_host_block_size}, _device_block_size {q->_device_block_size},
 	_isAsyncQueue {q->_isAsyncQueue}, _isFP64Supported {q->_isFP64Supported}, _computeIndex {q->_computeIndex},
 	cardID {q->cardID}, deviceID {q->deviceID}, stackID {q->stackID}, nStack {q->nStack}, sliceID {q->sliceID}, nSlice {q->nSlice},
 	_queueType {q->_queueType}, maxItem {q->maxItem}, maxGroup {q->maxGroup}, maxWorkGroup {q->maxWorkGroup}, maxGlobalWorkGroup {q->maxGlobalWorkGroup}, maxUnit {q->maxUnit},
@@ -686,23 +802,37 @@ devSYCL::~devSYCL()
 	delete _devQ;
 }
 
+void devSYCL::destroyMemoryPool()
+{
+	if (_syclHostPool)
+		delete _syclHostPool;
+	if (_syclDevicePool)
+		delete _syclDevicePool;
+}
+
 void* devSYCL::syclMalloc(const size_t bytes, const syclMallocType type, const char *name)
 {
 	assert(bytes > 0);
-	void* ptr;
-	switch(type)
+	void* ptr = nullptr;
+	if (type == syclMallocType::device)
 	{
-		case syclMallocType::shared :
-			ptr = sycl::malloc_shared(bytes, *_devQ);
-			break;
-		case syclMallocType::device :
+		if (_syclDevicePool != nullptr && bytes <= _device_block_size)
+			ptr = _syclDevicePool->alloc(bytes);
+		if (_syclDevicePool == nullptr || ptr == nullptr)
+		{
+			std::lock_guard<std::mutex> locker(_lock);
 			ptr = sycl::malloc_device(bytes, *_devQ);
-			break;
-		case syclMallocType::host :
+		}
+	}
+	else if (type == syclMallocType::host)
+	{
+		if (_syclHostPool != nullptr && bytes <= _host_block_size)
+			ptr = _syclHostPool->alloc(bytes);
+		if (_syclHostPool == nullptr || ptr == nullptr)
+		{
+			std::lock_guard<std::mutex> locker(_lock);
 			ptr = sycl::malloc_host(bytes, *_devQ);
-			break;
-		default :
-			return nullptr;
+		}
 	}
 	assert(ptr != nullptr);
 
@@ -712,7 +842,21 @@ void* devSYCL::syclMalloc(const size_t bytes, const syclMallocType type, const c
 void devSYCL::syclFree(void *ptr)
 {
 	if (ptr)
-		sycl::free(ptr, *_devQ);
+	{
+		bool isFree = false;
+		auto kind = sycl::get_pointer_type(ptr, _devC);
+		if (_syclDevicePool && kind == alloc_kind::device)
+			isFree = _syclDevicePool->free(ptr);
+		else if (_syclHostPool && kind == alloc_kind::host)
+			isFree = _syclHostPool->free(ptr);
+		if (isFree == false && (kind == alloc_kind::device || kind == alloc_kind::host))
+		{
+			std::lock_guard<std::mutex> locker(_lock);
+			sycl::free(ptr, *_devQ);
+		}
+		else if (isFree == false)	// This should not happen
+			free(ptr);
+	}
 }
 
 void devSYCL::syclMemcpy(void *dest, const void *src, const size_t bytes)
@@ -736,7 +880,7 @@ void devSYCL::syclMemcpyAfterWaitAll(void *dest, const void *src, const size_t b
 
 void devSYCL::syclMemset(void *ptr, const int value, const size_t bytes)
 {
-	assert(ptr  != nullptr);
+	assert(ptr != nullptr);
 	assert(bytes > 0);
 
 	pushEvent(_devQ->memset(ptr, value, bytes));
@@ -744,7 +888,7 @@ void devSYCL::syclMemset(void *ptr, const int value, const size_t bytes)
 
 void devSYCL::syclMemsetAfterWaitAll(void *ptr, const int value, const size_t bytes)
 {
-	assert(ptr  != nullptr);
+	assert(ptr != nullptr);
 	assert(bytes > 0);
 
 	waitAll();
@@ -753,7 +897,7 @@ void devSYCL::syclMemsetAfterWaitAll(void *ptr, const int value, const size_t by
 
 void devSYCL::syclPrefetch(void *ptr, const size_t bytes)
 {
-	assert(ptr  != nullptr);
+	assert(ptr != nullptr);
 	assert(bytes > 0);
 
 	pushEvent(_devQ->prefetch(ptr, bytes));
@@ -761,7 +905,7 @@ void devSYCL::syclPrefetch(void *ptr, const size_t bytes)
 
 void devSYCL::syclPrefetchAfterWaitAll(void *ptr, const size_t bytes)
 {
-	assert(ptr  != nullptr);
+	assert(ptr != nullptr);
 	assert(bytes > 0);
 
 	waitAll();
@@ -869,19 +1013,19 @@ void devSYCL::reCalculateRange(sycl::range<3> &wg, const sycl::range<3> &wi)
 	{
 		auto wg12 = wg[1]*wg[2];
 		wg[2] = wi[2] * maxWorkGroup[2];
-        wg[1] = wg12 % wg[2] == 0 ? wg12 / wg[2] : wg12 / wg[2] + 1;
+		wg[1] = wg12 % wg[2] == 0 ? wg12 / wg[2] : wg12 / wg[2] + 1;
 	}
 	if (wg[1] > wi[1]*maxWorkGroup[1])
 	{
 		auto wg01 = wg[0]*wg[1];
 		wg[1] = wi[1] * maxWorkGroup[1];
-		wg[0] = wg01 % wg[1] == 0 ?  wg01 / wg[1] : wg01 / wg[1] + 1;
+		wg[0] = wg01 % wg[1] == 0 ? wg01 / wg[1] : wg01 / wg[1] + 1;
 	}
 #if 0
 	if (wg[0] > wi[0]*maxWorkGroup[0])
 	{
 		std::cerr << "The number of work-groups are too big. Please increase work-item.\n";
-    }
+	}
 #endif
 }
 
