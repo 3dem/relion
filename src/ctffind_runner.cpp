@@ -546,6 +546,8 @@ void CtffindRunner::getMySearchParameters(long int imic, RFLOAT &my_def_min, RFL
         // Simple model that increases maxres by an exponential on the dose
         RFLOAT mydose = pre_exposure_micrographs[imic];
         my_maxres = resol_max * exp(mydose/bfactor_dose);
+        //SHWS 3may2024: don't let maxres become smaller than minres!
+        my_maxres = XMIPP_MIN(my_maxres, resol_min * 0.9);
     }
 
     if (localsearch_nominal_defocus_range > 0.)
