@@ -93,7 +93,7 @@ def cryoCARE_train(
         extract_train_data_executable = "cryoCARE_extract_train_data.py"
 
 
-    global_star = starfile.read(tomogram_star_file, always_dict=True)['global']
+    global_star = starfile.read(tomogram_star_file, always_dict=True, parse_as_string=['rlnTomoName'])['global']
 
     if not 'rlnTomoReconstructedTomogramHalf1' in global_star.columns:
         e = 'Could not find rlnTomoReconstructedTomogramHalf1 in tomogram star file.'

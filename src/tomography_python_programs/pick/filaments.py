@@ -108,7 +108,7 @@ class PickFilamentsWidget(QWidget):
     def load_particles(self) -> N3dPaths:
         if not self.current_particle_star_file.exists():
             raise FileNotFoundError
-        df = starfile.read(self.current_particle_star_file)
+        df = starfile.read(self.current_particle_star_file, parse_as_string=['rlnTomoName'])
         paths = []
         for _, _df in df.groupby('rlnTomoManifoldIndex'):
             zyx = _df[['rlnCoordinateZ', 'rlnCoordinateY', 'rlnCoordinateX']].to_numpy()

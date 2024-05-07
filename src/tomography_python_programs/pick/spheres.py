@@ -106,7 +106,7 @@ class PickSpheresWidget(QWidget):
     def load_particles(self) -> N3dSpheres:
         if not self.current_particle_star_file.exists():
             raise FileNotFoundError
-        df = starfile.read(self.current_particle_star_file)
+        df = starfile.read(self.current_particle_star_file, parse_as_string=['rlnTomoName'])
         zyx = df[['rlnCoordinateZ', 'rlnCoordinateY', 'rlnCoordinateX']].to_numpy()
         radii = df['rlnSphereRadius'].to_numpy()
         return N3dSpheres(centers=zyx, radii=radii)
