@@ -288,7 +288,8 @@ void MotioncorrRunner::initialise()
 	else
 	{
 		fn_in.globFiles(fn_micrographs);
-		optics_group_micrographs.resize(fn_in.size(), 1);
+		optics_group_micrographs.resize(fn_micrographs.size(), 1);
+		pre_exposure_micrographs.resize(fn_micrographs.size(), 0.0);
 		obsModel.opticsMdt.clear();
 		obsModel.opticsMdt.addObject();
 	}
