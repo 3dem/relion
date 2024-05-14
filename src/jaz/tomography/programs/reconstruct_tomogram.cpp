@@ -220,6 +220,11 @@ void TomoBackprojectProgram::initialiseCtfScaleFactors(int tomoIndex, Tomogram &
 
 void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex, bool doEven, bool doOdd)
 {
+    if (fabs(tiltAngleOffset) > 0.)
+    {
+        tomogramSet.applyTiltAngleOffset(tomoIndex, tiltAngleOffset);
+    }
+
     Tomogram tomogram;
 
     if (doEven)
@@ -250,11 +255,6 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex, bool doEven, 
     if (angpix_spacing > 0.)
     {
         spacing = angpix_spacing / pixelSizeAct;
-    }
-
-    if (fabs(tiltAngleOffset) > 0.)
-    {
-        tomogramSet.applyTiltAngleOffset(tomoIndex, tiltAngleOffset);
     }
 
     if (!tomogram.hasMatrices) REPORT_ERROR("ERROR; tomograms do not have tilt series alignment parameters to calculate projectionMatrices!");
@@ -458,11 +458,6 @@ void TomoBackprojectProgram::setMetaDataAllTomograms()
         Tomogram tomogram;
         tomogram = tomogramSet.loadTomogram(tomoIndex, false);
         if (!tomogram.hasMatrices) REPORT_ERROR("ERROR: tomograms do not have tilt series alignment parameters to calculate projectionMatrices");
-
-        if (fabs(tiltAngleOffset) > 0.)
-        {
-            tomogramSet.applyTiltAngleOffset(tomoIndex, tiltAngleOffset);
-        }
 
         double pixelSizeAct = tomogramSet.getTiltSeriesPixelSize(tomoIndex);
         if (angpix_spacing > 0.) spacing = angpix_spacing / pixelSizeAct;
