@@ -18,6 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/gui_jobwindow.h"
+#include "src/gui_entries.h"
 JobWindow::JobWindow(int _x, int _y, int _w, int _h, const char* title ) : Fl_Box(_x,_y,_w,_h,title)
 {
 	clear();
@@ -2688,7 +2689,7 @@ void JobWindow::initialiseTomoReconstructTomogramsWindow()
     current_y += STEPY /2 ;
 
     place ("tiltangle_offset");
-    place("tomo_name");
+    place("tomo_name", TOGGLE_REACTIVATE);
 
     current_y += STEPY /2 ;
 
