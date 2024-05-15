@@ -303,7 +303,7 @@ void CtffindRunner::initialise(bool is_leader)
 		}
 	}
 
-	if (is_leader)
+	if (is_leader && do_at_most >= 0)
 	{
 		std::cout << fn_mic_given_all.size() << " micrographs were given but we process only ";
 		std::cout  << do_at_most << " micrographs as specified in --do_at_most." << std::endl;
