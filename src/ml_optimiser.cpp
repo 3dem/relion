@@ -2024,9 +2024,32 @@ void MlOptimiser::initialiseGeneral(int rank)
     if (!exists(fn_dir))
         REPORT_ERROR("ERROR: output directory does not exist!");
 
-    // Just die if trying to use accelerators and skipping alignments
-    if ((do_skip_align || do_skip_rotate) && (do_gpu || do_sycl || do_cpu))
-        REPORT_ERROR("ERROR: you cannot use accelerators when skipping alignments.");
+    char *env_blush_args = getenv("RELION_BLUSH_ARGS");
+    if (env_blush_args != nullptr)
+        blush_args += std::string(env_blush_args);
+
+    if (skip_spectral_trailing)
+        blush_args += " --skip-spectral-trailing ";
+
+    if (do_gpu)
+    {
+        blush_args += " --gpu ";
+        for (auto &d : gpuDevices)
+            blush_args += gpu_ids + ",";
+        blush_args += " ";
+    }
+    else
+        blush_args = blush_args + " --gpu -1 ";
+
+    if (do_skip_align || do_skip_rotate)
+    {
+        do_gpu = false;
+        do_sycl = false;
+        do_cpu = false;
+
+        std::cerr << "WARNING: you cannot use accelerators (like the GPU) when skipping alignments." << std::endl
+                  << "Will continue without accelerators and maintain setting for external tasks (like Blush regularization)." << std::endl;
+    }
 
     if (do_always_cc)
         do_calculate_initial_sigma_noise = false;
@@ -2531,23 +2554,6 @@ void MlOptimiser::initialiseGeneral(int rank)
         subset_size = -1;
         mu = 0.;
     }
-
-	char *env_blush_args = getenv("RELION_BLUSH_ARGS");
-	if (env_blush_args != nullptr)
-		blush_args += std::string(env_blush_args);
-
-    if (skip_spectral_trailing)
-        blush_args += " --skip-spectral-trailing ";
-
-	if (do_gpu)
-	{
-		blush_args += " --gpu ";
-		for (auto &d: gpuDevices)
-			blush_args += gpu_ids + ",";
-		blush_args += " ";
-	}
-	else
-		blush_args = blush_args + " --gpu -1 ";
 
     if (minimum_nr_particles_sigma2_noise < 0)
     {
