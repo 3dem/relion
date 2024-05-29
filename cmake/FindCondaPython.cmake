@@ -97,7 +97,7 @@ if (NOT PYTHON_EXE_PATH STREQUAL "")
             RESULT_VARIABLE PYTHON_RESULT
     )
     if(EXISTS "${TORCH_HOME_PATH_OUTPUT}")
-      set(TORCH_HOME_PATH ${TORCH_HOME_PATH_OUTPUT})
+      set(TORCH_HOME_PATH ${TORCH_HOME_PATH_OUTPUT} CACHE PATH "Path to Torch home directory for storage of trained models." FORCE)
     else ()
       message(
               WARNING
