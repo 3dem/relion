@@ -1799,6 +1799,11 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
         // tomo-specific options
         command += " --localsearch_nominal_defocus " + joboptions["localsearch_nominal_defocus"].getString();
         command += " --exp_factor_dose " +  joboptions["exp_factor_dose"].getString();
+
+        // Tomo-specific output file for display button
+        Node node4(outputname + "power_spectra_fits.star", LABEL_CTFFIND_POWER_SPECTRA);
+        outputNodes.push_back(node4);
+
     }
 	else
 	{
@@ -6631,6 +6636,9 @@ void RelionJob::initialiseTomoReconstructTomogramsJob()
 	joboptions["ydim"] = JobOption("Unbinned tomogram height (Ydim): ", 4000, 1, 6000, 100, "The tomogram Y-dimension in unbinned pixels.");
 	joboptions["zdim"] = JobOption("Unbinned tomogram thickness (Zdim): ", 2000, 1, 6000, 100, "The tomogram Z-dimension in unbinned pixels.");
 
+    joboptions["do_fourier"] = JobOption("Fourier-inversion with odd/even frames?", true, "When set to Yes, a Wiener-filtered reconstruction will be calculated by Fourier inversion. The SNRs of all frames will be measured from the odd/even frames, which should have thus been calculated");
+    joboptions["ctf_intact_first_peak"] =JobOption("Ignore CTFs until first peak?", true, "When set to Yes, the lowest spatial frequencies will not be boosted through CTF-correction, which will lead to a reconstruction with less low-resolution contrast, but better high-resolution details>");
+
     joboptions["do_proj"] = JobOption("Also write 2D sums of central Z-slices?:", true, "When set to Yes, this option will result in the calculation of 2D sums of Z-slices from the reconstructed tomograms. These may be useful to quickly screen for bad tomograms using the relion_display program.");
     joboptions["centre_proj"] = JobOption("Central Z-slice (in binned pix): ", 0., -50, 50, 10, "This defines the central Z-slice of all Z-slices that will be summed to generate the 2D projection (in pixels in the tomogram). Zero means the middle (centre) of the tomogram.");
     joboptions["thickness_proj"] = JobOption("Number of Z-slices (in binned pix): ", 10., 1, 30, 1, "This defines how many Z-slices will be summed to generate the 2D projection (in pixels in the tomogram). Half of the slices will be above and half will be below the central slice defined above.");
@@ -6668,7 +6676,13 @@ bool RelionJob::getCommandsTomoReconstructTomogramsJob(std::string &outputname, 
 
 	if (joboptions["generate_split_tomograms"].getBoolean())
 	{
-		command += " --generate_split_tomograms ";
+		if (joboptions["do_fourier"].getBoolean())
+        {
+            error_message = "ERROR: you cannot generate tomograms for denoising with the Fourier-inversion from odd/even frames method! Disable at least one of them.";
+            return false;
+        }
+
+        command += " --generate_split_tomograms ";
 	}
 
 	command += " --w " + joboptions["xdim"].getString();
@@ -6677,7 +6691,16 @@ bool RelionJob::getCommandsTomoReconstructTomogramsJob(std::string &outputname, 
 
 	command += " --binned_angpix " + joboptions["binned_angpix"].getString();
 
-    if (joboptions["do_proj"].getBoolean())
+    if (joboptions["do_fourier"].getBoolean())
+    {
+        command += " --fourier ";
+        if (joboptions["ctf_intact_first_peak"].getBoolean())
+        {
+            command += " --ctf_intact_first_peak ";
+        }
+    }
+
+        if (joboptions["do_proj"].getBoolean())
 	{
 		command += " --do_proj ";
         command += " --centre_proj " + joboptions["centre_proj"].getString();

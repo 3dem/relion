@@ -210,6 +210,7 @@ static bool do_allow_change_minimum_dedicated;
 #define LABEL_MOCORR_LOG               "LogFile.pdf.relion.motioncorr"
 #define LABEL_CTFFIND_MICS             "MicrographGroupMetadata.star.relion.ctf"
 #define LABEL_CTFFIND_LOG              "LogFile.pdf.relion.ctffind"
+#define LABEL_CTFFIND_POWER_SPECTRA    "Image2DGroupMetadata.star.relion.ctffind.power_spectra"
 #define LABEL_MANPICK_MICS             "MicrographGroupMetadata.star.relion"
 #define LABEL_MANPICK_COORDS           "MicrographCoordsGroup.star.relion.manualpick"
 #define LABEL_MANPICK_COORDS_HELIX     "MicrographCoordsGroup.star.relion.manualpick.helixstartend"

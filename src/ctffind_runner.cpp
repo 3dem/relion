@@ -468,6 +468,22 @@ void CtffindRunner::joinCtffindResults()
     {
         tomogramSet.convertBackFromSingleMetaDataTable(MDctf);
         tomogramSet.write(fn_out+"tilt_series_ctf.star");
+
+        // Also save all Thon-ring diagnosis images in one star file
+        if (verb > 0) std::cout << " Saving a file called " << fn_out << "power_spectra_fits.star for visualisation of Thon ring fits..." << std::endl;
+        MetaDataTable MDpower;
+        for (long int t = 0; t < tomogramSet.tomogramTables.size(); t++)
+        {
+            FOR_ALL_OBJECTS_IN_METADATA_TABLE(tomogramSet.tomogramTables[t])
+            {
+                FileName fn_power;
+                tomogramSet.tomogramTables[t].getValue(EMDL_CTF_IMAGE, fn_power);
+                MDpower.addObject();
+                MDpower.setValue(EMDL_CTF_IMAGE, fn_power);
+            }
+        }
+        MDpower.write(fn_out+"power_spectra_fits.star");
+
     }
     else
     {

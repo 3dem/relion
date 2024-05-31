@@ -2672,24 +2672,9 @@ void JobWindow::initialiseTomoReconstructTomogramsWindow()
     
     place("in_tiltseries", TOGGLE_DEACTIVATE);
 
-	tab2->begin();
-	tab2->label("Reconstruct");
-	resetHeight();
-
-
-    place("xdim", TOGGLE_DEACTIVATE);
-    place("ydim", TOGGLE_DEACTIVATE);
-    place("zdim", TOGGLE_DEACTIVATE);
-    place("binned_angpix", TOGGLE_DEACTIVATE);
-    
     current_y += STEPY /2 ;
 
     place("generate_split_tomograms", TOGGLE_DEACTIVATE);
-
-    current_y += STEPY /2 ;
-
-    place ("tiltangle_offset");
-    place("tomo_name", TOGGLE_REACTIVATE);
 
     current_y += STEPY /2 ;
 
@@ -2703,6 +2688,35 @@ void JobWindow::initialiseTomoReconstructTomogramsWindow()
     group1->end();
     guientries["do_proj"].cb_menu_i();
 
+    tab1-> end();
+
+
+    tab2->begin();
+	tab2->label("Reconstruct");
+	resetHeight();
+
+
+    place("xdim", TOGGLE_DEACTIVATE);
+    place("ydim", TOGGLE_DEACTIVATE);
+    place("zdim", TOGGLE_DEACTIVATE);
+    place("binned_angpix", TOGGLE_DEACTIVATE);
+    
+
+    current_y += STEPY /2 ;
+
+    place ("tiltangle_offset");
+    place("tomo_name", TOGGLE_REACTIVATE);
+
+    current_y += STEPY /2 ;
+
+    group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group2->end();
+    place("do_fourier", TOGGLE_DEACTIVATE, group2, false);
+
+    group2->begin();
+    place("ctf_intact_first_peak", TOGGLE_DEACTIVATE);
+    group2->end();
+    guientries["do_fourier"].cb_menu_i();
 
     tab2->end();
 
