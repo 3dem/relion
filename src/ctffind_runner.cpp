@@ -476,12 +476,11 @@ void CtffindRunner::joinCtffindResults()
         {
             FOR_ALL_OBJECTS_IN_METADATA_TABLE(tomogramSet.tomogramTables[t])
             {
-                FileName fn_power;
-                tomogramSet.tomogramTables[t].getValue(EMDL_CTF_IMAGE, fn_power);
-                MDpower.addObject();
-                MDpower.setValue(EMDL_CTF_IMAGE, fn_power);
+                MDpower.addObject(tomogramSet.tomogramTables[t].getObject(current_object));
             }
         }
+        MDpower.deactivateLabel(EMDL_MICROGRAPH_NAME);
+        MDpower.deactivateLabel(EMDL_MICROGRAPH_MOVIE_NAME);
         MDpower.write(fn_out+"power_spectra_fits.star");
 
     }
