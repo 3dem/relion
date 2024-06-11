@@ -21,16 +21,7 @@
 
 void MotioncorrOwnDevolved::read(int argc, char **argv)
 {
-	// Define a new MpiNode
-	node = new MpiNode(argc, argv);
-
 	MotioncorrRunner::read(argc, argv);
-
-	// Don't put any output to screen for mpi followers
-	verb = (node->isLeader()) ? 1 : 0;
-
-	// Print out MPI info
-	printMpiNodesMachineNames(*node);
 }
 
 void MotioncorrOwnDevolved::addClArgs()
@@ -43,16 +34,12 @@ void MotioncorrOwnDevolved::addClArgs()
 
 void MotioncorrOwnDevolved::run()
 {
-	prepareGainReference(node->isLeader());
-	MPI_Barrier(MPI_COMM_WORLD); // wait for the leader to write the gain reference
+	prepareGainReference(1);
 
 	Micrograph mic(movie_path, fn_gain_reference, bin_factor, eer_upsampling, eer_grouping);
 	bool result;
 	result = executeOwnMotionCorrection(mic);
 	if (result) saveModel(mic);
-
-	MPI_Barrier(MPI_COMM_WORLD);
-
 }
 
 FileName MotioncorrOwnDevolved::getOutputFileNames(FileName fn_mic)

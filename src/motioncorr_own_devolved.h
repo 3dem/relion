@@ -21,15 +21,11 @@
 #ifndef MOTIONCORR_OWN_DEVOLVED_H_
 #define MOTIONCORR_OWN_DEVOLVED_H_
 
-#include "src/mpi.h"
 #include "src/motioncorr_runner.h"
 #include "src/parallel.h"
 
 class MotioncorrOwnDevolved: public MotioncorrRunner
 {
-private:
-	MpiNode *node;
-
 public:
 	/** Destructor, calls MPI_Finalize */
     ~MotioncorrOwnDevolved()
