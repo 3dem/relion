@@ -29,9 +29,6 @@ class MotioncorrOwnDevolved: public MotioncorrRunner
 public:
 	/** Destructor, calls MPI_Finalize */
     ~MotioncorrOwnDevolved()
-    {
-        delete node;
-    }
 
     /** Read
      * This could take care of mpi-parallelisation-dependent variables
