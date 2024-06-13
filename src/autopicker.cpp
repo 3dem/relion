@@ -390,6 +390,8 @@ void AutoPicker::initialise(int rank)
 		if (verb > 0)
 		{
 			std::cout << " + Will use topaz for picking particle coordinates" << std::endl;
+            if (autopick_helical_segments)
+                std::cout << " + Will use modified topaz algorithm for helical segment picking" << std::endl;
 		}
 	}
 	else if (fn_ref == "")
@@ -726,26 +728,10 @@ void AutoPicker::initialise(int rank)
 			}
 			else if (do_topaz_extract)
 			{
-				if (autopick_helical_segments)
-				{
-					topaz_radius = ROUND((helical_tube_diameter) / (2. * angpix * topaz_downscale)); // 100% of particle radius for picking!
-					if (verb > 0)
-						std::cout << " + Setting topaz radius to " << topaz_radius << " downscaled pixels (based on helical_tube_diameter/2)" << std::endl;
-				}
-				else
-				{
-					topaz_radius = ROUND((particle_diameter) / (2. * angpix * topaz_downscale)); // 100% of particle radius for picking!
-					if (verb > 0)
-						std::cout << " + Setting topaz radius to " << topaz_radius << " downscaled pixels (based on particle_diameter/2)" << std::endl;
-				}
+                topaz_radius = ROUND((particle_diameter) / (2. * angpix * topaz_downscale)); // 100% of particle radius for picking!
+                if (verb > 0)
+                    std::cout << " + Setting topaz radius to " << topaz_radius << " downscaled pixels (based on particle_diameter/2)" << std::endl;
 			}
-		}
-
-		// If topaz helical picker: sert default threshold to 1
-		if (autopick_helical_segments && do_topaz_extract && topaz_threshold < -5.)
-		{
-			topaz_threshold = -1.;
-			std::cout << " + Setting default topaz threshold for helical picking to " << topaz_threshold << std::endl;
 		}
 
 	}
