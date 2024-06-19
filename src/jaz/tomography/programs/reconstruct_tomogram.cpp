@@ -370,7 +370,6 @@ void TomoBackprojectProgram::reconstructOneTomogramFourier(int tomoIndex)
 
     float padding_factor = 1;
     bool skip_gridding = true;
-    std::cerr << " new_box= " << new_box << " old_box= " << square_box << std::endl;
     BackProjector BP = BackProjector(new_box, 3,
                                      "C1", TRILINEAR, padding_factor,
                                      10, 0, 1.9, 15, 2, skip_gridding);
