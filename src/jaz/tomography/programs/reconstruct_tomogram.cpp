@@ -370,7 +370,7 @@ void TomoBackprojectProgram::reconstructOneTomogramFourier(int tomoIndex)
 
     float padding_factor = 1;
     bool skip_gridding = true;
-    //std::cerr << " new_box= " << new_box << " old_box= " << square_box << std::endl;
+    std::cerr << " new_box= " << new_box << " old_box= " << square_box << std::endl;
     BackProjector BP = BackProjector(new_box, 3,
                                      "C1", TRILINEAR, padding_factor,
                                      10, 0, 1.9, 15, 2, skip_gridding);
@@ -391,24 +391,41 @@ void TomoBackprojectProgram::reconstructOneTomogramFourier(int tomoIndex)
         // Get frame from Jasenko's stack
         MultidimArray<RFLOAT> frame1(tomogram1.stack.ydim, tomogram1.stack.xdim);
         MultidimArray<RFLOAT> frame2(tomogram1.stack.ydim, tomogram1.stack.xdim);
-        frame1.setXmippOrigin();
-        frame2.setXmippOrigin();
-        RFLOAT avg = 0., c = 0.;
         for (long int y=0; y<tomogram1.stack.ydim; y++)
             for (long int x=0; x<tomogram1.stack.xdim; x++)
             {
                 DIRECT_A2D_ELEM(frame1, y, x) = tomogram1.stack(x, y, f);
                 DIRECT_A2D_ELEM(frame2, y, x) = tomogram2.stack(x, y, f);
-                avg +=  tomogram1.stack(x, y, f);
-                c += 1.;
             }
-        avg /= c;
 
-        // Make square (plus padding)
+        // Make square (plus factor 1.4 padding)
+        frame1.setXmippOrigin();
+        frame2.setXmippOrigin();
         frame1.window(FIRST_XMIPP_INDEX(square_box), FIRST_XMIPP_INDEX(square_box),
-                   LAST_XMIPP_INDEX(square_box), LAST_XMIPP_INDEX(square_box), avg);
+                   LAST_XMIPP_INDEX(square_box), LAST_XMIPP_INDEX(square_box));
         frame2.window(FIRST_XMIPP_INDEX(square_box), FIRST_XMIPP_INDEX(square_box),
-                      LAST_XMIPP_INDEX(square_box), LAST_XMIPP_INDEX(square_box), avg);
+                      LAST_XMIPP_INDEX(square_box), LAST_XMIPP_INDEX(square_box));
+
+        // Mirror the image back out into the padding area to prevent low-resolution artifacts
+        int first_x = FIRST_XMIPP_INDEX(tomogram1.stack.xdim);
+        int last_x = LAST_XMIPP_INDEX(tomogram1.stack.xdim);
+        int first_y = FIRST_XMIPP_INDEX(tomogram1.stack.ydim);
+        int last_y = LAST_XMIPP_INDEX(tomogram1.stack.ydim);
+        FOR_ALL_ELEMENTS_IN_ARRAY2D(frame1)
+        {
+            int jp = j, ip = i;
+            bool do_change = false;
+            if (j < first_x)      {jp = 2 * first_x  - j; do_change = true;}
+            else if (j > last_x)  {jp = 2 * last_x - j; do_change = true;}
+            if (i < first_y)      {ip = 2 * first_y  - i; do_change = true;}
+            else if (i > last_y)  {ip = 2 * last_y - i; do_change = true;}
+            if (do_change)
+            {
+                A2D_ELEM(frame1, i, j) = A2D_ELEM(frame1, ip, jp);
+                A2D_ELEM(frame2, i, j) = A2D_ELEM(frame2, ip, jp);
+            }
+
+        }
 
         // Downscale
         if (new_box != square_box)
