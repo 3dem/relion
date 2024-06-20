@@ -94,6 +94,8 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 	outDir = parser.getOption("--o", "Output filename pattern");
 
 	run_from_GUI = is_under_pipeline_control();
+
+    do_hybrid = parser.checkOption("--hybrid", "Use hybrid between true subtomograms and 2D stacks");
 }
 
 void SubtomoProgram::readParameters(int argc, char *argv[])
@@ -395,6 +397,92 @@ void SubtomoProgram::writeParticleSet(
 	optimisationSet.write(outDir + "optimisation_set.star");
 }
 
+std::vector<MultidimArray<Complex> > SubtomoProgram::extract2DFourierTransformsFromSubtomograms(
+        ParticleIndex part_id, int tomo_idx, MultidimArray<RFLOAT> &recTomo,
+        const Tomogram& tomogram, const ParticleSet &particleSet,
+        const std::vector<bool> &isVisible,
+        RFLOAT tomogram_binning, int hybrid_subtomo_size)
+{
+
+    Projector projector(hybrid_subtomo_size);
+    MultidimArray<RFLOAT> subtom, power_spectrum;
+
+    d3Vector diff, pos = particleSet.getPosition(part_id, d3Vector(0., 0., 0.), apply_offsets);
+    // convert from tilt series pixel to tomogram pixel
+    pos /= tomogram_binning;
+
+    // Keep track of residual shift of volume, as we need to take care of that with phase-shifts in the 3D Fourier transform later!!
+    int posx = int(pos.x);
+    int posy = int(pos.y);
+    int posz = int(pos.z);
+    diff.x = pos.x - posx;
+    diff.y = pos.y - posy;
+    diff.x = pos.z - posz;
+
+    subtom.initZeros(hybrid_subtomo_size, hybrid_subtomo_size, hybrid_subtomo_size);
+    subtom.setXmippOrigin();
+
+    // Extract subtomogram: for most subtomos can do extraction without boundary checks
+    if (posx > FIRST_XMIPP_INDEX(XSIZE(recTomo)) + hybrid_subtomo_size &&
+        posx < LAST_XMIPP_INDEX(XSIZE(recTomo)) - hybrid_subtomo_size  &&
+        posy > FIRST_XMIPP_INDEX(YSIZE(recTomo)) + hybrid_subtomo_size &&
+        posy < LAST_XMIPP_INDEX(YSIZE(recTomo)) - hybrid_subtomo_size  &&
+        posz > FIRST_XMIPP_INDEX(ZSIZE(recTomo)) + hybrid_subtomo_size &&
+        posz < LAST_XMIPP_INDEX(ZSIZE(recTomo)) - hybrid_subtomo_size)
+    {
+        FOR_ALL_ELEMENTS_IN_ARRAY3D(subtom)
+        {
+            A3D_ELEM(subtom, k, i, j) = A3D_ELEM(recTomo, k+posz, i+posy, j+posx);
+        }
+    }
+    else
+    {
+        // do boundary checks for the rest
+        FOR_ALL_ELEMENTS_IN_ARRAY3D(subtom)
+        {
+            int kp = k+posz;
+            int ip = i+posy;
+            int jp = j=posx;
+            if (jp >= FIRST_XMIPP_INDEX(XSIZE(recTomo)) &&
+                jp <= LAST_XMIPP_INDEX(XSIZE(recTomo))  &&
+                ip >= FIRST_XMIPP_INDEX(YSIZE(recTomo)) &&
+                ip <= LAST_XMIPP_INDEX(YSIZE(recTomo))  &&
+                kp >= FIRST_XMIPP_INDEX(ZSIZE(recTomo)) &&
+                kp <= LAST_XMIPP_INDEX(ZSIZE(recTomo)))
+                    A3D_ELEM(subtom, k, i, j) = A3D_ELEM(recTomo, kp, ip, jp);
+        }
+    }
+
+    projector.computeFourierTransformMap(subtom, power_spectrum);
+
+    std::vector<MultidimArray<Complex> > result;
+
+    for (int f = 0; f < tomogram.frameCount; f++)
+    {
+        MultidimArray<Complex> oneFT, emptyFT, shiftFT;
+        if (!isVisible[f])
+            result.push_back(emptyFT);
+
+        // TODO: take scaling into account in this matrix, because of non-integer tomogram_binning
+        Matrix2D<RFLOAT> A(3,3);
+        for (int row= 0; row < 3; row++)
+            for (int col = 0; col < 3; col++)
+                MAT_ELEM(A, row, col) = tomogram.projectionMatrices[f](row, col);
+
+        oneFT.initZeros(hybrid_subtomo_size, hybrid_subtomo_size/2 + 1);
+        projector.get2DFourierTransform(oneFT, A);
+
+        // TODO check sign of the shift for non-zero difference between pos and int(pos)!
+        shiftImageInFourierTransform(oneFT, shiftFT, hybrid_subtomo_size, -diff.x, -diff.y, -diff.z);
+        result.push_back(shiftFT);
+
+    }
+
+    return result;
+
+}
+
+
 void SubtomoProgram::processTomograms(
 		const std::vector<int>& tomoIndices,
 		const TomogramSet& tomogramSet,
@@ -441,6 +529,22 @@ void SubtomoProgram::processTomograms(
 
 		Tomogram tomogram = tomogramSet.loadTomogram(t, true);
 		tomogram.validateParticleOptics(particles[t], particleSet);
+
+        // If using the hybrid approach, then also need to read in the reconstructed tomogram volume
+        Image<RFLOAT> recTomo;
+        RFLOAT tomogram_angpix, tomogram_binning;
+        int hybrid_subtomo_size;
+        if (do_hybrid)
+        {
+            FileName fn_tomo;
+            tomogramSet.globalTable.getValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME, fn_tomo, t);
+            tomogramSet.globalTable.getValue(EMDL_TOMO_TOMOGRAM_BINNING, tomogram_binning, t);
+            recTomo.read(fn_tomo);
+            recTomo().setXmippOrigin();
+            tomogram_angpix =  tomogram.optics.pixelSize * tomogram_binning;
+            hybrid_subtomo_size = ROUND(s2D / tomogram_binning);
+            std::cerr << " read " << fn_tomo << " and set tomogram pixel size to " << tomogram_angpix << " hybrid_subtomo_size= " << hybrid_subtomo_size <<std::endl;
+        }
 
 		const int fc = tomogram.frameCount;
 
@@ -513,7 +617,11 @@ void SubtomoProgram::processTomograms(
                     tomogram.stack, s02D, binning, tomogram, traj, isVisible,
                     particleStack, projCut, inner_thread_num, do_circle_precrop);
 
-
+            std::vector<MultidimArray<Complex> > subtomo_projs;
+            if (do_hybrid)
+            {
+                subtomo_projs = extract2DFourierTransformsFromSubtomograms(part_id, t, recTomo(), tomogramSet, tomogram, particleSet, isVisible, tomogram_binning, hybrid_subtomo_size);
+            }
 
             if (!do_ctf) weightStack.fill(1.f);
 

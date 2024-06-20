@@ -67,7 +67,8 @@ class SubtomoProgram
                 apply_orientations,
 				write_float16,
 				run_from_GUI,
-				run_from_MPI;
+				run_from_MPI,
+                do_hybrid;
 
 		void readBasicParameters(IOParser& parser);
 		virtual void readParameters(int argc, char *argv[]);
@@ -81,6 +82,11 @@ class SubtomoProgram
 				const std::vector<std::vector<ParticleIndex>>& particles,
 				const TomogramSet& tomogramSet,
                 bool verbose = true);
+
+        std::vector<MultidimArray<Complex> > extract2DFourierTransformsFromSubtomograms(
+                ParticleIndex part_id, int tomo_idx, MultidimArray<RFLOAT> &recTomo,
+                const Tomogram& tomogram, const ParticleSet &particleSet,
+                const std::vector<bool> &isVisible, RFLOAT tomogram_binning, int hybrid_subtomo_size);
 
 		void processTomograms(
 				const std::vector<int>& tomoIndices,
