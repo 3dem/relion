@@ -1991,10 +1991,13 @@ void RelionJob::initialiseAutopickJob()
 	joboptions["do_topaz_train_parts"] = JobOption("OR train on a set of particles? ", false, "If set to Yes, the input Coordinates above will be ignored. Instead, one uses a _data.star file from a previous 2D or 3D refinement or selection to use those particle positions for training.");
 	joboptions["topaz_train_parts"] = JobOption("Particles STAR file for training: ", LABEL_PARTS_CPIPE, 1, "", "Input STAR file (*.{star})", "Filename of the STAR file with the particle coordinates to be used for training, e.g. from a previous 2D or 3D classification or selection.");
 	joboptions["do_topaz_pick"] = JobOption("Perform topaz picking?", false, "Set this option to Yes if you want to use a topaz model for autopicking.");
-	joboptions["topaz_particle_diameter"] = JobOption("Particle diameter (A) ", -1, 0, 2000, 20, "Diameter of the particle (to be used to infer topaz downscale factor and particle radius)");
+    joboptions["topaz_particle_diameter"] = JobOption("Particle diameter (A) ", -1, 0, 2000, 20, "Diameter of the particle (to be used to infer topaz downscale factor and particle radius)");
 	joboptions["topaz_nr_particles"] = JobOption("Nr of particles per micrograph: ", -1, 0, 2000, 20, "Expected average number of particles per micrograph");
 	joboptions["topaz_model"] = JobOption("Trained topaz model: ", "", "SAV Files (*.sav)", ".", "Trained topaz model for topaz-based picking. Use on job for training and a next job for picking. Leave this empty to use the default (general) model.");
 	joboptions["fn_topaz_exe"]= JobOption("Topaz executable:", std::string("relion_python_topaz"), "Executable for running topaz. The default relion_python_topaz gets installed automatically through conda in a typical relion install. Only change this if this executable gives you problems.");
+    joboptions["do_topaz_filaments"] = JobOption("Pick filaments?", false, "If set to Yes, this option will activate the -f option in our modified version of topaz that can pick filaments, as described in Lovestam & Scheres, Faraday Discussions 2022");
+    joboptions["topaz_filament_threshold"] = JobOption("Threshold:", std::string("-5"),  "This sets the filament picking threshold and the length of the Hough transform, as described in Lovestam & Scheres, Faraday Discussions 2022. Useful values in our work on recombinant tau for the threshold range from −4 to −7. We typically do not change the default length of the Hough transform, which is set to be equal to the particle diameter when a negative value is given here. You can provide the additional option -fp to display images of intermediate steps of the algorithm to tune difficult cases.");
+    joboptions["topaz_hough_length"] = JobOption("Hough length (A):", std::string("-1"), "This sets the filament picking threshold and the length of the Hough transform, as described in Lovestam & Scheres, Faraday Discussions 2022. Useful values in our work on recombinant tau for the threshold range from −4 to −7. We typically do not change the default length of the Hough transform, which is set to be equal to the particle diameter when a negative value is given here. You can provide the additional option -fp to display images of intermediate steps of the algorithm to tune difficult cases.");
 	joboptions["topaz_other_args"]= JobOption("Additional topaz arguments:", std::string(""), "These additional arguments will be passed onto all topaz programs.");
 
 	joboptions["do_refs"] = JobOption("Use reference-based template-matching?", false, "If set to Yes, 2D or 3D references, as defined on the References tab will be used for autopicking.");
@@ -2031,7 +2034,7 @@ The samplings are approximate numbers and vary slightly over the sphere.\n\n For
 	joboptions["use_gpu"] = JobOption("Use GPU acceleration?", false, "If set to Yes, the job will try to use GPU acceleration. The Laplacian-of-Gaussian picker does not support GPU.");
 	joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':'. For example: 0:1:0:1:0:1");
 
-	joboptions["do_pick_helical_segments"] = JobOption("Pick 2D helical segments?", false, "Set to Yes if you want to pick 2D helical segments.");
+	joboptions["do_pick_helical_segments"] = JobOption("Pick 2D helical segments?", false, "Set to Yes if you want to pick 2D helical segments. Note this will run the old algorithms for reference-based helical segment picking, as described by He & Scheres, J Struct Biol, 2017. Often, we now run filament picking from the Topaz tab instead....");
 	joboptions["do_amyloid"] = JobOption("Pick amyloid segments?", false, "Set to Yes if you want to use the algorithm that was developed specifically for picking amyloids.");
 
 	joboptions["helical_tube_outer_diameter"] = JobOption("Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
@@ -2243,6 +2246,17 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 				command += " --topaz_extract";
 				if (joboptions["topaz_model"].getString() != "")
 					command += " --topaz_model " + joboptions["topaz_model"].getString();
+
+				if (joboptions["do_topaz_filaments"].getBoolean())
+                {
+					command += " --helix ";
+                    command += " --topaz_threshold " + joboptions["topaz_filament_threshold"].getString();
+                    if (joboptions["topaz_hough_length"].getNumber(error_message) > 0.)
+                    {
+                        command += " --helical_tube_length_min " + joboptions["topaz_hough_length"].getString();
+                    }
+                }
+
 			}
 
 			if ((joboptions["topaz_other_args"].getString()).length() > 0)

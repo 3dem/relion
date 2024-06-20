@@ -789,10 +789,35 @@ void JobWindow::initialiseAutopickWindow()
 	tab3->label("Topaz");
 	resetHeight();
 
+    place("fn_topaz_exe", TOGGLE_DEACTIVATE);
 	place("topaz_particle_diameter", TOGGLE_DEACTIVATE);
 
-	// Add a little spacer
-	current_y += STEPY/2;
+    // Add a little spacer
+    current_y += STEPY/4;
+
+    group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group5->end();
+    place("do_topaz_train", TOGGLE_DEACTIVATE, group5);
+    group5->begin();
+
+    place("topaz_nr_particles", TOGGLE_DEACTIVATE);
+    place("topaz_train_picks", TOGGLE_DEACTIVATE);
+
+    group6 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group6->end();
+
+    place("do_topaz_train_parts", TOGGLE_DEACTIVATE, group6);
+
+    group6->begin();
+    place("topaz_train_parts", TOGGLE_DEACTIVATE);
+    group6->end();
+    guientries["do_topaz_train_parts"].cb_menu_i();
+
+    group5->end();
+    guientries["do_topaz_train"].cb_menu_i();
+
+    // Add a little spacer
+    current_y += STEPY/4;
 
 	group7 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group7->end();
@@ -802,38 +827,24 @@ void JobWindow::initialiseAutopickWindow()
 
 	group7->begin();
 	place("topaz_model", TOGGLE_DEACTIVATE);
-	group7->end();
-	guientries["do_topaz_pick"].cb_menu_i();
 
-	// Add a little spacer
-	current_y += STEPY/2;
+    group8 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group8->end();
 
-	group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group5->end();
-	place("do_topaz_train", TOGGLE_DEACTIVATE, group5);
-	group5->begin();
+    place("do_topaz_filaments", TOGGLE_DEACTIVATE, group8);
 
-	place("topaz_nr_particles", TOGGLE_DEACTIVATE);
-	place("topaz_train_picks", TOGGLE_DEACTIVATE);
+    group8->begin();
+    place2("topaz_filament_threshold", "topaz_hough_length", "Threshold, Hough length (A)", TOGGLE_DEACTIVATE);
+    group8->end();
+    guientries["do_topaz_filaments"].cb_menu_i();
 
-	group6 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group6->end();
+    group7->end();
+    guientries["do_topaz_pick"].cb_menu_i();
 
-	place("do_topaz_train_parts", TOGGLE_DEACTIVATE, group6);
+    // Add a little spacer
+    current_y += STEPY/4;
 
-	group6->begin();
-	place("topaz_train_parts", TOGGLE_DEACTIVATE);
-	group6->end();
-	guientries["do_topaz_train_parts"].cb_menu_i();
-
-	group5->end();
-	guientries["do_topaz_train"].cb_menu_i();
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	place("fn_topaz_exe", TOGGLE_DEACTIVATE);
-	place("topaz_other_args", TOGGLE_DEACTIVATE);
+    place("topaz_other_args", TOGGLE_DEACTIVATE);
 
 	tab3->end();
 	tab4->begin();

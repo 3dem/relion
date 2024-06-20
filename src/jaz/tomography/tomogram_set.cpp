@@ -85,8 +85,15 @@ bool TomogramSet::read(FileName filename, bool verbose)
             std::string fn_star = globalTable.getString(EMDL_TOMO_TILT_SERIES_STARFILE, t);
             tomogramTables[t].read(fn_star, name);
 
-            if (!tomogramTables[t].containsLabel(EMDL_MICROGRAPH_PRE_EXPOSURE))
-                 REPORT_ERROR("ERROR: tomogramTable does not contain compulsory rlnMicrographPreExposure label");
+            if ((tomogramTables[t]).numberOfObjects() == 0)
+            {
+                REPORT_ERROR("ERROR: could not read data from " + fn_star + ". Does the table have the correct name: data_" + name + "?");
+            }
+
+            if (!(tomogramTables[t]).containsLabel(EMDL_MICROGRAPH_PRE_EXPOSURE))
+            {
+                REPORT_ERROR("ERROR: tomogramTable " + fn_star + " does not contain compulsory rlnMicrographPreExposure label");
+            }
         }
     }
     return true;

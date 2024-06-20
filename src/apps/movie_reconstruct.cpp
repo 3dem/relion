@@ -293,9 +293,9 @@ void MovieReconstructor::backproject(int rank, int size)
 		std::vector<std::vector<gravis::d2Vector>> trajectories = MotionHelper::readTracksInPix(fn_traj, movie_angpix);
 
 		// TODO: loop over relevant frames with per-frame shifts with per-frame shifts with per-frame shifts with per-frame shifts
+        EERRenderer renderer;
 		if (isEER)
 		{
-			EERRenderer renderer;
 			renderer.read(fn_movie, eer_upsampling);
 			const int frame_start = (frame_no - 1) * eer_grouping + 1;
 			const int frame_end = frame_start + eer_grouping - 1;
