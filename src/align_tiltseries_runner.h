@@ -52,8 +52,11 @@ public:
     // Information about tomography experiment
     TomogramSet tomogramSet;
 
-    // CTFFIND and Gctf executables and shell
+    // Imod-wrapper executables
     FileName fn_imodwrapper_exe;
+
+    // AreTomo executable
+    FileName fn_aretomo_exe;
 
     // Use IMOD:fiducials
     bool do_imod_fiducials;
@@ -96,6 +99,12 @@ public:
     // Process at most this number of unprocessed tomograms
     long do_at_most;
 
+    // Do CTF estimation in aretomo?
+    bool do_aretomo_ctf;
+
+    // Do phase shift estimation in AreTomo?
+    bool do_aretomo_phaseshift;
+
 public:
     // Read command line arguments
     void read(int argc, char **argv, int rank = 0);
@@ -110,16 +119,26 @@ public:
     void run();
 
     // Check STAR file for tomogram exists and has the correct labels
-    bool checkImodWrapperResults(long idx_tomo);
-
-    // Execute CTFFIND for a single tomogram
-    void executeImodWrapper(long idx_tomo, int rank = 0);
+    bool checkResults(long idx_tomo);
 
     // Find the etomo directives file (.edf)
     bool checkEtomoDirectiveFile(long idx_tomo, FileName &filename);
 
+    // Execute IMOD for a single tomogram
+    void executeImodWrapper(long idx_tomo, int rank = 0);
+
     // Harvest all IMOD results into the single tomograms set starfile, and write it out
     void joinImodWrapperResults();
+
+    // Execute AreTomo for a single tomogram
+    void executeAreTomo(long idx_tomo, int rank = 0);
+
+    // Read AreTomo results files and insert data into relion's MetaDataTable
+    bool readAreTomoResults(long idx_tomo, std::string &error_message);
+
+    // Harvest all AreTomo results into the single tomograms set starfile, and write it out
+    void joinResults();
+
 
 };
 

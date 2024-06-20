@@ -60,7 +60,14 @@ void AlignTiltseriesRunnerMpi::run()
         if (pipeline_control_check_abort_job())
             MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
 
-        executeImodWrapper(idx_tomograms[itomo], node->rank);
+        if (do_aretomo)
+        {
+            executeAreTomo(idx_tomograms[itomo], node->rank);
+        }
+        else if (do_imod_fiducials || do_imod_patchtrack)
+        {
+            executeImodWrapper(idx_tomograms[itomo], node->rank);
+        }
 
         if (verb > 0 && itomo % barstep == 0) progress_bar(itomo);
 
@@ -71,6 +78,9 @@ void AlignTiltseriesRunnerMpi::run()
     MPI_Barrier(MPI_COMM_WORLD);
 
     // Only the leader writes the joined result file
-    if (node->isLeader()) joinImodWrapperResults();
+    if (node->isLeader())
+    {
+        joinResults();
+    }
 
 }

@@ -32,7 +32,7 @@ class TomogramSet
 
 		void setCtf(int tomogramIndex, int frame, const CTF& ctf);
 		void setDose(int tomogramIndex, int frame, double dose);
-		void setTiltSeriesFile(int tomogramIndex, const std::string& filename);
+        void setTiltSeriesFile(int tomogramIndex, const std::string& filename);
 		void setFiducialsFile(int tomogramIndex, const std::string& filename);
 		void setDefocusSlope(int tomogramIndex, double slope);
         void applyTiltAngleOffset(int tomogramIndex, double offset);
@@ -54,8 +54,11 @@ class TomogramSet
 		double getOriginalPixelSize(int index) const;
 		double getTiltSeriesPixelSize(int index) const;
 		std::string getOpticsGroupName(int index) const;
+        std::vector<int> getFrameDoseOrder(int tomogramIndex) const;
+        std::vector<int> getFrameTiltOrder(int tomogramIndex) const;
 
-        // SHWS 6Apr2022: Make one big metadatatable with all movies/micrographs (to be used for motioncorr and ctffind runners)
+
+    // SHWS 6Apr2022: Make one big metadatatable with all movies/micrographs (to be used for motioncorr and ctffind runners)
         void generateSingleMetaDataTable(MetaDataTable &MDout, ObservationModel &obsModel);
 
         // SHWS 6Apr2022: Convert back from one big metadatatable into separate STAR files for each tilt serie

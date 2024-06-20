@@ -667,6 +667,33 @@ std::string TomogramSet::getOpticsGroupName(int index) const
 	}
 }
 
+std::vector<int> TomogramSet::getFrameDoseOrder(int index) const
+{
+    std::vector<double> doses;
+    for (int f = 0; f < tomogramTables[index].numberOfObjects(); f++)
+    {
+        double dose;
+        tomogramTables[index].getValue(EMDL_MICROGRAPH_PRE_EXPOSURE, dose, f);
+        doses.push_back(dose);
+    }
+    return IndexSort<double>::sortIndices(doses);
+
+}
+
+std::vector<int> TomogramSet::getFrameTiltOrder(int index) const
+{
+    std::vector<double> angles;
+    for (int f = 0; f < tomogramTables[index].numberOfObjects(); f++)
+    {
+        double angle;
+        tomogramTables[index].getValue(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE, angle, f);
+        angles.push_back(angle);
+    }
+    return IndexSort<double>::sortIndices(angles);
+
+}
+
+
 void TomogramSet::generateSingleMetaDataTable(MetaDataTable &MDout, ObservationModel &obsModel)
 {
     MDout.clear();
