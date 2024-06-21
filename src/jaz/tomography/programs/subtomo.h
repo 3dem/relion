@@ -83,10 +83,12 @@ class SubtomoProgram
 				const TomogramSet& tomogramSet,
                 bool verbose = true);
 
-        std::vector<MultidimArray<Complex> > extract2DFourierTransformsFromSubtomograms(
-                ParticleIndex part_id, int tomo_idx, MultidimArray<RFLOAT> &recTomo,
+        BufferedImage<fComplex> extract2DFourierTransformsFromSubtomograms(
+                ParticleIndex part_id, MultidimArray<RFLOAT> &recTomo, bool ignore_ctf_until_firstpeak,
                 const Tomogram& tomogram, const ParticleSet &particleSet,
-                const std::vector<bool> &isVisible, RFLOAT tomogram_binning, int hybrid_subtomo_size);
+                const BufferedImage<float> &doseWeights, const std::vector<bool> &isVisible, RFLOAT tomogram_angpix);
+
+        void combineSubtomoAndParticleStacks(BufferedImage<fComplex> &particleStack, const BufferedImage<fComplex> &subtomo_projs, double edge_radius);
 
 		void processTomograms(
 				const std::vector<int>& tomoIndices,
