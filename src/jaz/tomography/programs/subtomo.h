@@ -68,7 +68,7 @@ class SubtomoProgram
 				write_float16,
 				run_from_GUI,
 				run_from_MPI,
-                do_hybrid;
+                do_real_subtomo;
 
 		void readBasicParameters(IOParser& parser);
 		virtual void readParameters(int argc, char *argv[]);
@@ -83,12 +83,10 @@ class SubtomoProgram
 				const TomogramSet& tomogramSet,
                 bool verbose = true);
 
-        BufferedImage<fComplex> extract2DFourierTransformsFromSubtomograms(
-                ParticleIndex part_id, MultidimArray<RFLOAT> &recTomo, bool ignore_ctf_until_firstpeak,
+        BufferedImage<float> extractSubtomogramsAndReProject(
+                ParticleIndex part_id, MultidimArray<RFLOAT> &recTomo,
                 const Tomogram& tomogram, const ParticleSet &particleSet,
-                const BufferedImage<float> &doseWeights, const std::vector<bool> &isVisible, RFLOAT tomogram_angpix);
-
-        void combineSubtomoAndParticleStacks(BufferedImage<fComplex> &particleStack, const BufferedImage<fComplex> &subtomo_projs, double edge_radius);
+                const std::vector<bool> &isVisible, RFLOAT tomogram_angpix);
 
 		void processTomograms(
 				const std::vector<int>& tomoIndices,

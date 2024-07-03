@@ -293,6 +293,9 @@ public:
 	// Is any of the optics groups CTF-premultiplied?
 	bool hasCtfPremultiplied();
 
+    // Is any of the optics groups CTF-premultiplied?
+    bool hasCtfCorrected();
+
 	// Get the pixel size for this optics group
 	RFLOAT getOpticsPixelSize(int optics_group);
 

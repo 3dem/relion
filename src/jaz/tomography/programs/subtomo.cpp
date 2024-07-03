@@ -95,7 +95,8 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 
 	run_from_GUI = is_under_pipeline_control();
 
-    do_hybrid = parser.checkOption("--hybrid", "Use hybrid between true subtomograms and 2D stacks");
+    do_real_subtomo = parser.checkOption("--real_subtomo", "Extract true subtomograms and write out projections of those out as 2D stacks");
+
 }
 
 void SubtomoProgram::readParameters(int argc, char *argv[])
@@ -130,22 +131,22 @@ void SubtomoProgram::run()
 
 	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories, true, &tomogramSet);
 	std::vector<std::vector<ParticleIndex> > particles = particleSet.splitByTomogram(tomogramSet, true);
-	
-	if (cropSize < 0) cropSize = boxSize;
+
+    if (cropSize < 0) cropSize = boxSize;
 	
 	const long int s2D = boxSize;
-	
+
 	const long int s3D = cropSize;
 	const long int sh3D = s3D / 2 + 1;
-	
+
 	const long int s02D = (int)(binning * s2D + 0.5);
-	
+
 	const double relative_box_scale = cropSize / (double) boxSize;
 	const double binned_pixel_size = binning * particleSet.getTiltSeriesPixelSize(0);
 
-	initialise(particleSet, particles, tomogramSet);
+    initialise(particleSet, particles, tomogramSet);
 
-	BufferedImage<float> sum_data, sum_weights;
+    BufferedImage<float> sum_data, sum_weights;
 
     if (do_stack2d) do_sum_all = false;
 
@@ -249,6 +250,22 @@ void SubtomoProgram::initialise(
 		}
 	}
 
+    /*
+    if (do_real_subtomo)
+    {
+        // Make sure binning is set to the Nyquist of the tomograms
+        RFLOAT tomogram_binning;
+        for (int t = 0; t < tc; t++)
+        {
+            tomogramSet.globalTable.getValue(EMDL_TOMO_TOMOGRAM_BINNING, tomogram_binning, t);
+            if (t == 0) binning = tomogram_binning;
+            else if (binning != tomogram_binning) REPORT_ERROR("ERROR: not all tomograms have the same binning; can't do real subtomos");
+        }
+        std::cout << " Setting binning level to Nyquist of the tomogram: " << binning << std::endl;
+    }
+     */
+
+
     if (verbose) writeParticleSet(particleSet, particles, tomogramSet);
 }
 
@@ -283,17 +300,34 @@ void SubtomoProgram::writeParticleSet(
 
 	int particles_removed = 0;
 
+    RFLOAT real_subtomo_binning = 0.;
+    int cropSize_tomogram;
 	for (int t = 0; t < tc; t++)
 	{
 		const int pc = particles[t].size();
 
 		if (pc == 0) continue;
 
+        Tomogram tomogram = tomogramSet.loadTomogram(t, false);
+
+        if (do_real_subtomo)
+        {
+            RFLOAT tomogram_binning;
+            tomogramSet.globalTable.getValue(EMDL_TOMO_TOMOGRAM_BINNING, tomogram_binning, t);
+            if (t == 0) real_subtomo_binning = tomogram_binning;
+            else if (real_subtomo_binning != tomogram_binning) REPORT_ERROR("ERROR: not all tomograms have the same binning; can't do real subtomos");
+            cropSize_tomogram = ROUND(cropSize / tomogram_binning);
+            if (cropSize_tomogram%2 != 0)
+            {
+                if ( (cropSize * binning / tomogram_binning) - cropSize_tomogram >= 0. ) cropSize_tomogram++;
+                else cropSize_tomogram--;
+            }
+
+        }
+
 		for (int p = 0; p < pc; p++)
 		{
 			const ParticleIndex part_id = particles[t][p];
-
-			Tomogram tomogram = tomogramSet.loadTomogram(t, false);
 
 			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
 						part_id, tomogram.frameCount, tomogram.centre, tomogram.optics.pixelSize, !apply_offsets);
@@ -366,16 +400,24 @@ void SubtomoProgram::writeParticleSet(
 
 	for (int og = 0; og < copy.numberOfOpticsGroups(); og++)
 	{
-		const double ps_img = copy.optTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, og);
-		const double ps_out = binning * ps_img;
+		RFLOAT mybinning = (do_real_subtomo) ? real_subtomo_binning : binning;
+
+        const double ps_img = copy.optTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, og);
+		const double ps_out = mybinning * ps_img;
 
         bool is_premultiplied = (do_stack2d) ? do_ctf : true;
+        if (do_real_subtomo)
+        {
+            is_premultiplied = false;
+            copy.optTable.setValue(EMDL_OPTIMISER_DATA_ARE_CTF_CORRECTED, true, og);
+        }
 		copy.optTable.setValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, is_premultiplied, og);
-		int datadim = (do_stack2d) ? 2 : 3;
+		int datadim = (do_stack2d || do_real_subtomo) ? 2 : 3;
         copy.optTable.setValue(EMDL_IMAGE_DIMENSIONALITY, datadim, og);
-		copy.optTable.setValue(EMDL_TOMO_SUBTOMOGRAM_BINNING, binning, og);
+		copy.optTable.setValue(EMDL_TOMO_SUBTOMOGRAM_BINNING, mybinning, og);
 		copy.optTable.setValue(EMDL_IMAGE_PIXEL_SIZE, ps_out, og);
-		copy.optTable.setValue(EMDL_IMAGE_SIZE, cropSize, og);
+		int mysize = (do_real_subtomo) ? cropSize_tomogram : cropSize;
+        copy.optTable.setValue(EMDL_IMAGE_SIZE, mysize, og);
 	}
 
     if (copy.partTable.containsLabel(EMDL_IMAGE_COORD_X)) copy.partTable.deactivateLabel(EMDL_IMAGE_COORD_X);
@@ -397,20 +439,19 @@ void SubtomoProgram::writeParticleSet(
 	optimisationSet.write(outDir + "optimisation_set.star");
 }
 
-BufferedImage<fComplex> SubtomoProgram::extract2DFourierTransformsFromSubtomograms(
-        ParticleIndex part_id, MultidimArray<RFLOAT> &recTomo, bool ignore_ctf_until_firstpeak,
+BufferedImage<float> SubtomoProgram::extractSubtomogramsAndReProject(
+        ParticleIndex part_id, MultidimArray<RFLOAT> &recTomo,
         const Tomogram& tomogram, const ParticleSet &particleSet,
-        const BufferedImage<float> &doseWeights, const std::vector<bool> &isVisible,
-        RFLOAT tomogram_angpix)
+        const std::vector<bool> &isVisible, RFLOAT tomogram_angpix)
 {
 
-    RFLOAT tomogram_binning = tomogram_angpix / tomogram.optics.pixelSize;
-
-    // get centered coordinates of the particle (in tilt series pixels)
+    // get centered coordiantes of the particle (in tilt series pixels)
     // note that this function usually returns de-centered coordinates when providing tomogram.centre and that's why to pass 0,0,0: these will still be centered
     d3Vector pos = particleSet.getPosition(part_id, d3Vector(0., 0., 0.), apply_offsets);
     // convert from tilt series pixel to tomogram pixel
-    pos /= tomogram_binning;
+    pos *= tomogram.optics.pixelSize / tomogram_angpix;
+
+    const float sign = flip_value ? -1.f : 1.f;
 
     // Keep track of residual shift of volume, as we need to take care of that with phase-shifts in the 2D Fourier transforms later!!
     d4Vector diff;
@@ -421,54 +462,36 @@ BufferedImage<fComplex> SubtomoProgram::extract2DFourierTransformsFromSubtomogra
     diff.y = pos.y - posy;
     diff.z = pos.z - posz;
 
-    // Center the subtomo in a box that is as wide as the boxSize in Angstroms, but only fill the center cropSize. Leave the rest at zero
-    // First calculate how many pixels boxSize is in the tomogram, and make sure it is an even number
-    int boxSize_tomogram = ROUND(boxSize * binning / tomogram_binning);
-    if (boxSize_tomogram%2 != 0)
-    {
-        if ( (boxSize * binning / tomogram_binning) - boxSize_tomogram >= 0. ) boxSize_tomogram++;
-        else boxSize_tomogram--;
-    }
-    int cropSize_tomogram = ROUND(cropSize * binning / tomogram_binning);
+    // Center the subtomo in a box that is as wide as the cropSize in Angstroms, but only fill the center sphere. Leave the rest at zero
+    int cropSize_tomogram = ROUND(cropSize * binning * tomogram.optics.pixelSize / tomogram_angpix);
     if (cropSize_tomogram%2 != 0)
     {
-        if ( (cropSize * binning / tomogram_binning) - cropSize_tomogram >= 0. ) cropSize_tomogram++;
+        if ( (cropSize * binning * tomogram.optics.pixelSize / tomogram_angpix) - cropSize_tomogram >= 0. ) cropSize_tomogram++;
         else cropSize_tomogram--;
     }
-    std::cerr <<" boxSize_tomogram= " << boxSize_tomogram << " boxSize * binning/ tomogram_binning= " << boxSize * binning/ tomogram_binning << std::endl;
-    std::cerr <<" cropSize_tomogram= " << cropSize_tomogram << " cropSize * binning/ tomogram_binning= " << cropSize * binning/ tomogram_binning << std::endl;
+    //std::cerr << " tomogram_angpix= " << tomogram_angpix << std::endl;
+    //std::cerr << " cropSize_tomogram= " << cropSize_tomogram << " cropSize  * tomogram.optics.pixelSize / tomogram_angpix = " << cropSize * tomogram.optics.pixelSize / tomogram_angpix << std::endl;
 
+    // Extract the subtomo in a sqrt(2) times bigger box to take care of projections in the corners
+
+    int biggerCropSize_tomogram = CEIL(1.8*cropSize_tomogram);
+    if (biggerCropSize_tomogram%2 != 0) biggerCropSize_tomogram++;
     MultidimArray<RFLOAT> subtom;
-    subtom.initZeros(boxSize_tomogram, boxSize_tomogram, boxSize_tomogram);
+    subtom.initZeros(biggerCropSize_tomogram, biggerCropSize_tomogram, biggerCropSize_tomogram);
     subtom.setXmippOrigin();
-
-    /*
-    // For debugging: tmp set all values in tomogram to one, except its centre
-    recTomo.initConstant(1);
-    A3D_ELEM(recTomo, int(pos.z), int(pos.y), int(pos.x)) = 100.;
-    A3D_ELEM(recTomo, int(pos.z), int(pos.y), int(pos.x-1)) = 100.;
-    A3D_ELEM(recTomo, int(pos.z), int(pos.y), int(pos.x+1)) = 100.;
-    A3D_ELEM(recTomo, int(pos.z), int(pos.y-1), int(pos.x-1)) = 100.;
-    A3D_ELEM(recTomo, int(pos.z), int(pos.y+1), int(pos.x+1)) = 100.;
-    A3D_ELEM(recTomo, int(pos.z), int(pos.y+1), int(pos.x-1)) = 100.;
-    A3D_ELEM(recTomo, int(pos.z), int(pos.y-1), int(pos.x+1)) = 100.;
-    A3D_ELEM(recTomo, int(pos.z), int(pos.y-1), int(pos.x)) = 100.;
-    A3D_ELEM(recTomo, int(pos.z), int(pos.y+1), int(pos.x)) = 100.;
-    A3D_ELEM(recTomo, int(pos.z+1), int(pos.y), int(pos.x)) = 100.;
-    A3D_ELEM(recTomo, int(pos.z-1), int(pos.y), int(pos.x)) = 100.;
-    */
 
     // Only extract central sphere with diameter cropSize_tomogram!
     long int r2_max = ROUND(cropSize_tomogram * cropSize_tomogram / 4.);
-    for (long int k= FIRST_XMIPP_INDEX(cropSize_tomogram); k<= LAST_XMIPP_INDEX(cropSize_tomogram); k++)
-        for (long int i= FIRST_XMIPP_INDEX(cropSize_tomogram); i<= LAST_XMIPP_INDEX(cropSize_tomogram); i++)
-            for (long int j= FIRST_XMIPP_INDEX(cropSize_tomogram); j<= LAST_XMIPP_INDEX(cropSize_tomogram); j++)
+    long int bigger_r2_max = ROUND(biggerCropSize_tomogram * biggerCropSize_tomogram / 4.);
+    for (long int k= FIRST_XMIPP_INDEX(biggerCropSize_tomogram); k<= LAST_XMIPP_INDEX(biggerCropSize_tomogram); k++)
+        for (long int i= FIRST_XMIPP_INDEX(biggerCropSize_tomogram); i<= LAST_XMIPP_INDEX(biggerCropSize_tomogram); i++)
+            for (long int j= FIRST_XMIPP_INDEX(biggerCropSize_tomogram); j<= LAST_XMIPP_INDEX(biggerCropSize_tomogram); j++)
             {
                 int kp = k+posz;
                 int ip = i+posy;
                 int jp = j+posx;
                 long int r2 = k*k + i*i + j*j;
-                if (r2 < r2_max &&
+                if (r2 <= r2_max &&
                     jp >= FIRST_XMIPP_INDEX(XSIZE(recTomo)) &&
                     jp <= LAST_XMIPP_INDEX(XSIZE(recTomo))  &&
                     ip >= FIRST_XMIPP_INDEX(YSIZE(recTomo)) &&
@@ -476,24 +499,41 @@ BufferedImage<fComplex> SubtomoProgram::extract2DFourierTransformsFromSubtomogra
                     kp >= FIRST_XMIPP_INDEX(ZSIZE(recTomo)) &&
                     kp <= LAST_XMIPP_INDEX(ZSIZE(recTomo)))
                 {
-                    A3D_ELEM(subtom, k, i, j) = A3D_ELEM(recTomo, kp, ip, jp);
+                    A3D_ELEM(subtom, k, i, j) = sign * A3D_ELEM(recTomo, kp, ip, jp);
                 }
+                else if (r2 < bigger_r2_max)
+                {
+                    // for points outside r2_max, place value of the nearest point on the outside sphere
+                    RFLOAT frac = sqrt((RFLOAT)r2_max/(RFLOAT)r2);
+                    int kkp = FLOOR(frac*k)+posz;
+                    int iip = FLOOR(frac*i)+posy;
+                    int jjp = FLOOR(frac*j)+posx;
+                    A3D_ELEM(subtom, k, i, j) = sign * A3D_ELEM(recTomo, kkp, iip, jjp);
+                }
+                else
+                    A3D_ELEM(subtom, k, i, j) = 0.;
             }
-
 
     Image<RFLOAT> Img;
     Img() = subtom;
     Img.write("subtom.mrc");
 
     MultidimArray<RFLOAT> dummy;
-    Projector projector(boxSize_tomogram);
+    Projector projector(biggerCropSize_tomogram);
     projector.computeFourierTransformMap(subtom, dummy);
 
-    BufferedImage<fComplex> resultImg(boxSize/2 + 1, boxSize, tomogram.frameCount);
-    const d3Vector cenpos = particleSet.getPosition(part_id, tomogram.centre, apply_offsets);
+    BufferedImage<fComplex>  dataImgFS(biggerCropSize_tomogram/2 + 1, biggerCropSize_tomogram, tomogram.frameCount);
+
     for (int f = 0; f < tomogram.frameCount; f++)
     {
-        if (!isVisible[f]) continue;
+        if (!isVisible[f])
+        {
+            // Somehow it is necessary to initialise images to zero here, otherwise I get NaNs in the final images...
+            for (int y = 0; y < dataImgFS.ydim; y++)
+                for (int x = 0; x < dataImgFS.xdim; x++)
+                    dataImgFS(x, y, f) = 0.;
+            continue;
+        }
 
         Matrix2D<RFLOAT> A(3,3);
         for (int row= 0; row < 3; row++)
@@ -501,88 +541,40 @@ BufferedImage<fComplex> SubtomoProgram::extract2DFourierTransformsFromSubtomogra
                 MAT_ELEM(A, row, col) = tomogram.projectionMatrices[f](row, col);
 
         // Get the 2D slice out of the 3D Fourier transform
-        MultidimArray<Complex> oneFT(boxSize_tomogram, boxSize_tomogram/2 + 1), shiftFT;
+        MultidimArray<Complex> oneFT(biggerCropSize_tomogram, biggerCropSize_tomogram/2 + 1), shiftFT;
+        oneFT.initZeros();
+        shiftFT=oneFT;
         projector.get2DFourierTransform(oneFT, A);
 
         // Project 3D diff into 2D of the projection and correct for non-integer shifts due to coarse sampling of tomogram
         RFLOAT diffx = MAT_ELEM(A, 0, 0) * diff.x + MAT_ELEM(A, 0, 1) * diff.y + MAT_ELEM(A, 0, 2) * diff.z;
         RFLOAT diffy = MAT_ELEM(A, 1, 0) * diff.x + MAT_ELEM(A, 1, 1) * diff.y + MAT_ELEM(A, 1, 2) * diff.z;
-        //std::cerr <<" diffx= " << diffx << " diffy= "<< diffy << " boxswize_tomo= " << boxSize_tomogram <<" A00= "<< MAT_ELEM(A, 0, 0) << " A10= "<< MAT_ELEM(A, 1, 0) << std::endl;
-        shiftImageInFourierTransform(oneFT, shiftFT, boxSize_tomogram, -diffx, -diffy);
+        //std::cerr <<" diffx= " << diffx << " diffy= "<< diffy <<" A00= "<< MAT_ELEM(A, 0, 0) << " A10= "<< MAT_ELEM(A, 1, 0) << std::endl;
+        shiftImageInFourierTransform(oneFT, shiftFT, biggerCropSize_tomogram, -diffx, -diffy);
 
-
-        // Go back to much finer sampling of the tilt series pixels, by padding the Fourier transform with zeros
-        windowFourierTransform(shiftFT, oneFT, boxSize);
-
-        // Multiply with the CTF, as we would do with 2D stack images
-        const float sign = flip_value ? -1.f : 1.f;
-        CTF ctf = tomogram.getCtf(f, cenpos);
-        MultidimArray<RFLOAT> Fctf(boxSize, boxSize/2 + 1);
-        ctf.getFftwImage(Fctf, boxSize, boxSize, tomogram.optics.pixelSize * binning);
-        FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(Fctf)
-        {
-            double c = DIRECT_A2D_ELEM(Fctf, i, j);
-            if (!ignore_ctf_until_firstpeak) c *= c;
-            resultImg(j, i, f) = DIRECT_A2D_ELEM(oneFT, i, j) * sign * c * doseWeights(j, i, f);
-        }
-
-        // For debugging
-        Image<RFLOAT> I;
-        I().resize(boxSize, boxSize);
-        FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(Fctf)
-        {
-            double c = DIRECT_A2D_ELEM(Fctf, i, j);
-            if (!ignore_ctf_until_firstpeak) c *= c;
-            DIRECT_A2D_ELEM(oneFT, i, j) *= sign * c * doseWeights(j, i, f);
-        }
-        FourierTransformer transformer;
-        transformer.inverseFourierTransform(oneFT, I());
-        CenterFFT(I(), true);
-        I.write("test_ctfFT.mrc");
-
+        // Set individual FT back in stack of all frames
+        for (int y = 0; y < dataImgFS.ydim; y++)
+            for (int x = 0; x < dataImgFS.xdim; x++)
+                dataImgFS(x, y, f) = DIRECT_A2D_ELEM(shiftFT, y, x);
 
     }
+
+    BufferedImage<float> dataImgRS = NewStackHelper::inverseFourierTransformStack(dataImgFS, true, 1, FFT::FwdOnly);
+
+    // Cropping back to cropSize_tomogram
+    BufferedImage<float> resultImg(cropSize_tomogram, cropSize_tomogram, tomogram.frameCount);
+    const int boundary = (biggerCropSize_tomogram - cropSize_tomogram) / 2;
+    for (int f = 0; f < tomogram.frameCount; f++)
+        for (int y = 0; y < resultImg.ydim; y++)
+            for (int x = 0; x < resultImg.xdim; x++)
+            {
+                if (x+boundary >= dataImgRS.xdim || y+boundary >= dataImgRS.ydim) std::cerr << " x= " << x << " y= " << y << " boundary= " << boundary << std::endl;
+                resultImg(x,y,f) = dataImgRS(x+boundary, y+boundary, f);
+            }
 
     return resultImg;
 
 }
-void SubtomoProgram::combineSubtomoAndParticleStacks(BufferedImage<fComplex> &particleStack,
-                                                     const BufferedImage<fComplex> &subtomo_projs, double edge_radius)
-{
-
-    // TMP: for debugging
-    particleStack = subtomo_projs;
-    std::cerr << "TMP: only using subtomo_projs!!!" << std::endl;
-    return;
-
-    const int fc = particleStack.zdim;
-    const int wp = particleStack.ydim;
-	const int wph = particleStack.xdim;
-    if (fc != subtomo_projs.zdim || wp != subtomo_projs.ydim || wph != subtomo_projs.xdim)
-    {
-        std::cerr << " particleStack= " << particleStack.xdim << " " << particleStack.ydim << " "<<particleStack.zdim << std::endl;
-        std::cerr << " subtomo_projs= " << subtomo_projs.xdim << " " << subtomo_projs.ydim << " "<<subtomo_projs.zdim << std::endl;
-        REPORT_ERROR("ERROR: incompatible sizes for particleStack and subtomo_projs in combineSubtomoAndParticleStacks");
-    }
-
-    const double edge_radius2 = edge_radius * edge_radius;
-    for (int f = 0; f < fc; f++)
-        for (int y = 0; y < wp; y++)
-            for (int x = 0; x < wph; x++)
-            {
-                const double xx = x ;
-                const double yy = ((y + wp/2) % wp) - wp/2;
-                const double ff = xx * xx + yy * yy;
-                if ( ff < edge_radius2)
-                {
-                    //if (y == 0 && f == 0) std::cerr << " x= " << x << " xx= " << xx << " xx= " << " ff= " << ff << " rad2= "<< edge_radius2
-                    //                                << " new= "<< abs(subtomo_projs(x,y,f)) << " old= " << abs(particleStack(x,y,f)) << std::endl;
-                    particleStack(x,y,f) = subtomo_projs(x,y,f);
-                }
-            }
-
-}
-
 
 void SubtomoProgram::processTomograms(
 		const std::vector<int>& tomoIndices,
@@ -631,10 +623,10 @@ void SubtomoProgram::processTomograms(
 		Tomogram tomogram = tomogramSet.loadTomogram(t, true);
 		tomogram.validateParticleOptics(particles[t], particleSet);
 
-        // If using the hybrid approach, then also need to read in the reconstructed tomogram volume
+        // If using the real_subtomo approach, then need to read in the reconstructed tomogram volume
         Image<RFLOAT> recTomo;
         RFLOAT tomogram_angpix, tomogram_binning;
-        if (do_hybrid)
+        if (do_real_subtomo)
         {
             FileName fn_tomo;
             tomogramSet.globalTable.getValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME, fn_tomo, t);
@@ -642,19 +634,18 @@ void SubtomoProgram::processTomograms(
             recTomo.read(fn_tomo);
             recTomo().setXmippOrigin();
             tomogram_angpix =  tomogram.optics.pixelSize * tomogram_binning;
-            std::cerr << " read " << fn_tomo << " and set tomogram pixel size to " << tomogram_angpix <<std::endl;
         }
 
 		const int fc = tomogram.frameCount;
 
 		particleSet.checkTrajectoryLengths(particles[t], fc, "subtomo");
 
-		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(boxSize, binning);
+		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s2D, binning);
 		BufferedImage<float> noiseWeights;
 
 		if (do_whiten)
 		{
-			noiseWeights = tomogram.computeNoiseWeight(boxSize, binning);
+			noiseWeights = tomogram.computeNoiseWeight(s2D, binning);
 		}
 
 		BufferedImage<int> xRanges = tomogram.findDoseXRanges(doseWeights, freqCutoffFract);
@@ -712,250 +703,240 @@ void SubtomoProgram::processTomograms(
             BufferedImage<fComplex> particleStack = BufferedImage<fComplex>(sh2D, s2D, fc);
             BufferedImage<float> weightStack(sh2D, s2D, fc);
 
-            TomoExtraction::extractAt3D_Fourier(
-                    tomogram.stack, s02D, binning, tomogram, traj, isVisible,
-                    particleStack, projCut, inner_thread_num, do_circle_precrop, FFT::FwdOnly);
-
-            BufferedImage<fComplex> subtomo_projs;
-            if (do_hybrid)
+            if (do_real_subtomo)
             {
-                bool ignore_ctf_until_firstpeak = true;
-                subtomo_projs = extract2DFourierTransformsFromSubtomograms(part_id, recTomo(), ignore_ctf_until_firstpeak,
-                                                                           tomogram, particleSet, doseWeights, isVisible, tomogram_angpix);
+
+                // This will extract the true subtomograms and calculate their FTs in the directions of the tilt series
+                BufferedImage<float> subtomo_reprojs = extractSubtomogramsAndReProject(part_id, recTomo(),
+                                                                tomogram, particleSet, isVisible, tomogram_angpix);
+
+                subtomo_reprojs.write(outData, binnedPixelSize, write_float16);
+
             }
-
-            if (!do_ctf) weightStack.fill(1.f);
-
-            const int og = particleSet.getOpticsGroup(part_id);
-
-            const BufferedImage<double> *gammaOffset =
-                    aberrationsCache.hasSymmetrical ? &aberrationsCache.symmetrical[og] : 0;
-
-            const float sign = flip_value ? -1.f : 1.f;
-            for (int f = 0; f < fc; f++)
+            else
             {
-                if (!isVisible[f]) continue;
 
-                d3Matrix A;
+                TomoExtraction::extractAt3D_Fourier(
+                        tomogram.stack, s02D, binning, tomogram, traj, isVisible,
+                        particleStack, projCut, inner_thread_num, do_circle_precrop);
 
-                if (apply_orientations) {
-                    A = particleSet.getMatrix3x3(part_id);
-                } else {
-                    A = particleSet.getSubtomogramMatrix(part_id);
-                }
+                if (!do_ctf) weightStack.fill(1.f);
 
-                projPart[f] = projCut[f] * d4Matrix(A);
+                const int og = particleSet.getOpticsGroup(part_id);
 
-                if (do_ctf)
-                {
-                    const d3Vector pos = particleSet.getPosition(part_id, tomogram.centre, apply_offsets);
+                const BufferedImage<double> *gammaOffset =
+                        aberrationsCache.hasSymmetrical ? &aberrationsCache.symmetrical[og] : 0;
 
-                    CTF ctf = tomogram.getCtf(f, pos);
-                    BufferedImage<float> ctfImg(sh2D, s2D);
-                    ctf.draw(s2D, s2D, binnedPixelSize, gammaOffset, &ctfImg(0, 0, 0));
-
-                    // Apply doseWeigths until Nyquist frequency! Otherwise, convolution artefacts when do_circle_crop invFFT/FFT below
-                    for (int y = 0; y < s2D; y++)
-                    {
-                        for (int x = 0; x < sh2D; x++)
-                        {
-                            const double c = ctfImg(x, y) * doseWeights(x, y, f);
-
-                            particleStack(x, y, f) *= sign * c;
-                            weightStack(x, y, f) = c * c;
-                        }
-                    }
-                } // end if do_ctf
-            } // end for f
-
-            // If we're not doing CTF premultiplication, we may still want to invert the contrast
-            if (!do_ctf) particleStack *= sign;
-
-            aberrationsCache.correctObservations(particleStack, og);
-
-            if (do_whiten) {
-                particleStack *= noiseWeights;
-                weightStack *= noiseWeights;
-            }
-
-            // Make sure output greyscale of 2D stacks does not depend on binning
-            if (do_stack2d)
-            {
-                if (do_hybrid)
-                {
-                    double combine_freq = 20;
-                    int combine_radius = ROUND(boxSize * tomogram.optics.pixelSize * binning / combine_freq);
-                    std::cerr << " combine_freq= " << combine_freq << " combine_radius= " << combine_radius << std::endl;
-                    combineSubtomoAndParticleStacks(particleStack, subtomo_projs, combine_radius);
-                }
-                //TODO: check if this is still necessary with doing FFT::FwdOnly normalization!
-                particleStack/= (float)binning;
-            }
-
-
-            const int boundary = (boxSize - cropSize) / 2;
-
-            BufferedImage<float> particlesRS;
-            if (do_gridding_precorrection || do_circle_crop || do_stack2d) {
-
-                particlesRS = NewStackHelper::inverseFourierTransformStack(particleStack, true, 1, FFT::FwdOnly);
-                particlesRS.write("particlesRS.mrcs");
-
-            }
-
-            if (do_circle_crop) {
-                const double crop_boundary = do_narrow_circle_crop ? boundary : 0.0;
-                TomoExtraction::cropCircle(particlesRS, crop_boundary, 5, num_threads);
-            }
-
-            if (do_gridding_precorrection) {
-                TomoExtraction::griddingPreCorrect(particlesRS, boundary, num_threads);
-            }
-
-            if (do_stack2d) {
-
-                BufferedImage<float> cropParticlesRS = Padding::unpadCenter2D_full(particlesRS, boundary);
-                BufferedImage<float> cropParticlesRS2 = NewStackHelper::getVisibleSlices(cropParticlesRS, isVisible);
-                cropParticlesRS2.write(outData, binnedPixelSize, write_float16);
-
-            } else {
-
-                if (do_gridding_precorrection || do_circle_crop)
-                {
-                    particleStack = NewStackHelper::FourierTransformStack(particlesRS, true, 1, FFT::FwdOnly);
-                }
-
-                // Write 3D subtomograms
-                BufferedImage<fComplex> dataImgFS(sh3D, s3D, s3D);
-                dataImgFS.fill(fComplex(0.0, 0.0));
-
-                BufferedImage<float> ctfImgFS(sh3D, s3D, s3D),
-                        dataImgRS(s3D, s3D, s3D), dataImgDivRS(s3D, s3D, s3D),
-                        multiImageFS(sh3D, s3D, s3D);
-
-                ctfImgFS.fill(0.0);
-                dataImgRS.fill(0.0);
-                dataImgDivRS.fill(0.0);
-
+                const float sign = flip_value ? -1.f : 1.f;
                 for (int f = 0; f < fc; f++)
                 {
-                    if (isVisible[f])
-                    {
-                        FourierBackprojection::backprojectSlice_forward_with_multiplicity(
-                                &xRanges(0, f),
-                                particleStack.getSliceRef(f),
-                                weightStack.getSliceRef(f),
-                                projPart[f] * relative_box_scale,
-                                dataImgFS,
-                                ctfImgFS,
-                                multiImageFS);
-                    }
-                }
+                    if (!isVisible[f]) continue;
 
-                Centering::shiftInSitu(dataImgFS);
+                    d3Matrix A;
 
-                // correct FT scale after the implicit cropping:
-                float normfft = (float) s2D / ((float) s3D * sqrt((float)(binning)) );
-                if (fabs(normfft - 1.) > 0.0001)
-                    dataImgFS *= normfft;
-
-                FFT::inverseFourierTransform(dataImgFS, dataImgRS, FFT::FwdOnly);
-
-                if (do_cone_weight) {
-                    FFT::FourierTransform(dataImgRS, dataImgFS);
-
-                    d3Matrix R = particleSet.getMatrix3x3(part_id);
-
-                    for (int z = 0; z < s3D; z++)
-                        for (int y = 0; y < s3D; y++)
-                            for (int x = 0; x < sh3D; x++) {
-                                const d3Vector p0(
-                                        x,
-                                        y < s3D / 2 ? y : y - s3D,
-                                        z < s3D / 2 ? z : z - s3D);
-
-                                const d3Vector p = R * p0;
-
-                                const double rho = sqrt(p.x * p.x + p.y * p.y);
-                                const double t = rho / (std::abs(p.z) * cone_slope + cone_sig0);
-
-                                const double m = 1.0 - exp(-0.5 * t * t);
-
-                                dataImgFS(x, y, z) *= m;
-                                ctfImgFS(x, y, z) *= m;
-                                multiImageFS(x, y, z) *= m; // apply to both multiplicity and weight?
-                            }
-
-                    FFT::inverseFourierTransform(dataImgFS, dataImgRS);
-                }
-
-                // What if we didn't? The 2D image is already tapered.
-                //Reconstruction::taper(dataImgRS, taper, do_center, inner_thread_num);
-
-                if (do_sum_all) {
-                    omp_set_lock(&writelock);
-
-                    sum_data += dataImgRS;
-                    sum_weights += ctfImgFS;
-
-                    omp_unset_lock(&writelock);
-                }
-
-                if (do_not_write_any) continue;
-
-
-                dataImgRS.write(outData, binnedPixelSize, write_float16);
-
-                if (write_combined) {
-                    BufferedImage<float> ctfAndMultiplicity(sh3D, s3D, 2 * s3D);
-                    ctfAndMultiplicity.getSlabRef(0, s3D).copyFrom(ctfImgFS);
-                    ctfAndMultiplicity.getSlabRef(s3D, s3D).copyFrom(multiImageFS);
-
-                    ctfAndMultiplicity.write(outWeight, 1.0 / binnedPixelSize, write_float16);
-                }
-
-                if (write_ctf) {
-                    Centering::fftwHalfToHumanFull(ctfImgFS).write(outCTF, 1.0 / binnedPixelSize, write_float16);
-                }
-
-                if (write_multiplicity) {
-                    Centering::fftwHalfToHumanFull(multiImageFS).write(outMulti, 1.0 / binnedPixelSize, write_float16);
-                }
-
-                if (write_normalised) {
-                    BufferedImage<float> ctfImgFSnrm = ctfImgFS;
-                    BufferedImage<fComplex> dataImgCorrFS;
-
-                    FFT::FourierTransform(dataImgRS, dataImgCorrFS, FFT::Both);
-
-                    for (long int i = 0; i < ctfImgFSnrm.getSize(); i++) {
-                        const float n = multiImageFS[i];
-                        ctfImgFSnrm[i] = n > 0.f ? ctfImgFS[i] / n : 0.f;
-                        dataImgCorrFS[i] = n > 0.f ? dataImgCorrFS[i] / n : fComplex(0.f, 0.f);
-                    }
-
-                    FFT::inverseFourierTransform(dataImgCorrFS, dataImgDivRS, FFT::Both);
-
-                    dataImgDivRS.write(outNrm, binnedPixelSize, write_float16);
-                    Centering::fftwHalfToHumanFull(ctfImgFSnrm).write(outWeightNrm, 1.0 / binnedPixelSize,
-                                                                      write_float16);
-                }
-
-                if (write_divided) {
-                    if (SNR > 0.0) {
-                        Reconstruction::ctfCorrect3D_Wiener(
-                                dataImgRS, ctfImgFS, dataImgDivRS,
-                                1.0 / SNR, inner_thread_num);
+                    if (apply_orientations) {
+                        A = particleSet.getMatrix3x3(part_id);
                     } else {
-                        Reconstruction::ctfCorrect3D_heuristic(
-                                dataImgRS, ctfImgFS, dataImgDivRS,
-                                0.001, inner_thread_num);
+                        A = particleSet.getSubtomogramMatrix(part_id);
                     }
 
-                    Reconstruction::taper(dataImgDivRS, taper, do_center, inner_thread_num);
-                    dataImgDivRS.write(outDiv, binnedPixelSize, write_float16);
+                    projPart[f] = projCut[f] * d4Matrix(A);
+
+                    if (do_ctf) {
+                        const d3Vector pos = particleSet.getPosition(part_id, tomogram.centre, apply_offsets);
+
+                        CTF ctf = tomogram.getCtf(f, pos);
+                        BufferedImage<float> ctfImg(sh2D, s2D);
+                        ctf.draw(s2D, s2D, binnedPixelSize, gammaOffset, &ctfImg(0, 0, 0));
+
+                        // Apply doseWeigths until Nyquist frequency! Otherwise, convolution artefacts when do_circle_crop invFFT/FFT below
+                        for (int y = 0; y < s2D; y++) {
+                            for (int x = 0; x < sh2D; x++) {
+                                const double c = ctfImg(x, y) * doseWeights(x, y, f);
+
+                                particleStack(x, y, f) *= sign * c;
+                                weightStack(x, y, f) = c * c;
+                            }
+                        }
+                    } // end if do_ctf
+                } // end for f
+
+                // If we're not doing CTF premultiplication, we may still want to invert the contrast
+                if (!do_ctf) particleStack *= sign;
+
+                aberrationsCache.correctObservations(particleStack, og);
+
+                if (do_whiten) {
+                    particleStack *= noiseWeights;
+                    weightStack *= noiseWeights;
                 }
-            } // end if do_stack2d
+
+                // Make sure output greyscale of 2D stacks does not depend on binning
+                if (do_stack2d) particleStack/= (float)binning;
+
+                const int boundary = (boxSize - cropSize) / 2;
+
+                BufferedImage<float> particlesRS;
+                if (do_gridding_precorrection || do_circle_crop || do_stack2d) {
+
+                    particlesRS = NewStackHelper::inverseFourierTransformStack(particleStack);
+
+                }
+
+                if (do_circle_crop) {
+                    const double crop_boundary = do_narrow_circle_crop ? boundary : 0.0;
+                    TomoExtraction::cropCircle(particlesRS, crop_boundary, 5, num_threads);
+                }
+
+                if (do_gridding_precorrection) {
+                    TomoExtraction::griddingPreCorrect(particlesRS, boundary, num_threads);
+                }
+
+                if (do_stack2d) {
+
+                    BufferedImage<float> cropParticlesRS = Padding::unpadCenter2D_full(particlesRS, boundary);
+                    BufferedImage<float> cropParticlesRS2 = NewStackHelper::getVisibleSlices(cropParticlesRS, isVisible);
+                    cropParticlesRS2.write(outData, binnedPixelSize, write_float16);
+
+                } else {
+
+                    if (do_gridding_precorrection || do_circle_crop)
+                    {
+                        particleStack = NewStackHelper::FourierTransformStack(particlesRS);
+                    }
+
+                    // Write 3D subtomograms
+                    BufferedImage<fComplex> dataImgFS(sh3D, s3D, s3D);
+                    dataImgFS.fill(fComplex(0.0, 0.0));
+
+                    BufferedImage<float> ctfImgFS(sh3D, s3D, s3D),
+                            dataImgRS(s3D, s3D, s3D), dataImgDivRS(s3D, s3D, s3D),
+                            multiImageFS(sh3D, s3D, s3D);
+
+                    ctfImgFS.fill(0.0);
+                    dataImgRS.fill(0.0);
+                    dataImgDivRS.fill(0.0);
+
+                    for (int f = 0; f < fc; f++)
+                    {
+                        if (isVisible[f])
+                        {
+                            FourierBackprojection::backprojectSlice_forward_with_multiplicity(
+                                    &xRanges(0, f),
+                                    particleStack.getSliceRef(f),
+                                    weightStack.getSliceRef(f),
+                                    projPart[f] * relative_box_scale,
+                                    dataImgFS,
+                                    ctfImgFS,
+                                    multiImageFS);
+                        }
+                    }
+
+                    Centering::shiftInSitu(dataImgFS);
+
+                    // correct FT scale after the implicit cropping:
+                    float normfft = (float) s2D / ((float) s3D * sqrt((float)(binning)) );
+                    if (fabs(normfft - 1.) > 0.0001)
+                        dataImgFS *= normfft;
+
+                    FFT::inverseFourierTransform(dataImgFS, dataImgRS, FFT::Both);
+
+                    if (do_cone_weight) {
+                        FFT::FourierTransform(dataImgRS, dataImgFS);
+
+                        d3Matrix R = particleSet.getMatrix3x3(part_id);
+
+                        for (int z = 0; z < s3D; z++)
+                            for (int y = 0; y < s3D; y++)
+                                for (int x = 0; x < sh3D; x++) {
+                                    const d3Vector p0(
+                                            x,
+                                            y < s3D / 2 ? y : y - s3D,
+                                            z < s3D / 2 ? z : z - s3D);
+
+                                    const d3Vector p = R * p0;
+
+                                    const double rho = sqrt(p.x * p.x + p.y * p.y);
+                                    const double t = rho / (std::abs(p.z) * cone_slope + cone_sig0);
+
+                                    const double m = 1.0 - exp(-0.5 * t * t);
+
+                                    dataImgFS(x, y, z) *= m;
+                                    ctfImgFS(x, y, z) *= m;
+                                    multiImageFS(x, y, z) *= m; // apply to both multiplicity and weight?
+                                }
+
+                        FFT::inverseFourierTransform(dataImgFS, dataImgRS);
+                    }
+
+                    // What if we didn't? The 2D image is already tapered.
+                    //Reconstruction::taper(dataImgRS, taper, do_center, inner_thread_num);
+
+                    if (do_sum_all) {
+                        omp_set_lock(&writelock);
+
+                        sum_data += dataImgRS;
+                        sum_weights += ctfImgFS;
+
+                        omp_unset_lock(&writelock);
+                    }
+
+                    if (do_not_write_any) continue;
+
+
+                    dataImgRS.write(outData, binnedPixelSize, write_float16);
+
+                    if (write_combined) {
+                        BufferedImage<float> ctfAndMultiplicity(sh3D, s3D, 2 * s3D);
+                        ctfAndMultiplicity.getSlabRef(0, s3D).copyFrom(ctfImgFS);
+                        ctfAndMultiplicity.getSlabRef(s3D, s3D).copyFrom(multiImageFS);
+
+                        ctfAndMultiplicity.write(outWeight, 1.0 / binnedPixelSize, write_float16);
+                    }
+
+                    if (write_ctf) {
+                        Centering::fftwHalfToHumanFull(ctfImgFS).write(outCTF, 1.0 / binnedPixelSize, write_float16);
+                    }
+
+                    if (write_multiplicity) {
+                        Centering::fftwHalfToHumanFull(multiImageFS).write(outMulti, 1.0 / binnedPixelSize, write_float16);
+                    }
+
+                    if (write_normalised) {
+                        BufferedImage<float> ctfImgFSnrm = ctfImgFS;
+                        BufferedImage<fComplex> dataImgCorrFS;
+
+                        FFT::FourierTransform(dataImgRS, dataImgCorrFS, FFT::Both);
+
+                        for (long int i = 0; i < ctfImgFSnrm.getSize(); i++) {
+                            const float n = multiImageFS[i];
+                            ctfImgFSnrm[i] = n > 0.f ? ctfImgFS[i] / n : 0.f;
+                            dataImgCorrFS[i] = n > 0.f ? dataImgCorrFS[i] / n : fComplex(0.f, 0.f);
+                        }
+
+                        FFT::inverseFourierTransform(dataImgCorrFS, dataImgDivRS, FFT::Both);
+
+                        dataImgDivRS.write(outNrm, binnedPixelSize, write_float16);
+                        Centering::fftwHalfToHumanFull(ctfImgFSnrm).write(outWeightNrm, 1.0 / binnedPixelSize,
+                                                                          write_float16);
+                    }
+
+                    if (write_divided) {
+                        if (SNR > 0.0) {
+                            Reconstruction::ctfCorrect3D_Wiener(
+                                    dataImgRS, ctfImgFS, dataImgDivRS,
+                                    1.0 / SNR, inner_thread_num);
+                        } else {
+                            Reconstruction::ctfCorrect3D_heuristic(
+                                    dataImgRS, ctfImgFS, dataImgDivRS,
+                                    0.001, inner_thread_num);
+                        }
+
+                        Reconstruction::taper(dataImgDivRS, taper, do_center, inner_thread_num);
+                        dataImgDivRS.write(outDiv, binnedPixelSize, write_float16);
+                    }
+                } // end if do_stack2d
+            } // end if do_real_subtomo
         } // end loop particles p
 
 		if (verbosity > 0)
