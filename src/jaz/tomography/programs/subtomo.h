@@ -85,7 +85,7 @@ class SubtomoProgram
 				const TomogramSet& tomogramSet,
                 bool verbose = true);
 
-        Image<RFLOAT> extractSubtomogramsAndReProject(
+        BufferedImage<float> extractSubtomogramsAndReProject(
                 ParticleIndex part_id, MultidimArray<RFLOAT> &recTomo,
                 const Tomogram& tomogram, const ParticleSet &particleSet,
                 const std::vector<bool> &isVisible, RFLOAT tomogram_angpix);

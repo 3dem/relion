@@ -250,22 +250,6 @@ void SubtomoProgram::initialise(
 		}
 	}
 
-    /*
-    if (do_real_subtomo)
-    {
-        // Make sure binning is set to the Nyquist of the tomograms
-        RFLOAT tomogram_binning;
-        for (int t = 0; t < tc; t++)
-        {
-            tomogramSet.globalTable.getValue(EMDL_TOMO_TOMOGRAM_BINNING, tomogram_binning, t);
-            if (t == 0) binning = tomogram_binning;
-            else if (binning != tomogram_binning) REPORT_ERROR("ERROR: not all tomograms have the same binning; can't do real subtomos");
-        }
-        std::cout << " Setting binning level to Nyquist of the tomogram: " << binning << std::endl;
-    }
-     */
-
-
     if (verbose) writeParticleSet(particleSet, particles, tomogramSet);
 }
 
@@ -421,10 +405,6 @@ void SubtomoProgram::writeParticleSet(
 
 	for (int og = 0; og < copy.numberOfOpticsGroups(); og++)
 	{
-		RFLOAT mybinning = (do_real_subtomo) ? real_subtomo_binning : binning;
-
-        const double ps_img = copy.optTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, og);
-		const double ps_out = mybinning * ps_img;
 
         bool is_premultiplied = (do_stack2d) ? do_ctf : true;
         if (do_real_subtomo)
@@ -435,7 +415,11 @@ void SubtomoProgram::writeParticleSet(
 		copy.optTable.setValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, is_premultiplied, og);
 		int datadim = (do_stack2d || do_real_subtomo) ? 2 : 3;
         copy.optTable.setValue(EMDL_IMAGE_DIMENSIONALITY, datadim, og);
+
+        RFLOAT mybinning = (do_real_subtomo) ? real_subtomo_binning : binning;
 		copy.optTable.setValue(EMDL_TOMO_SUBTOMOGRAM_BINNING, mybinning, og);
+        const double ps_img = copy.optTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, og);
+        const double ps_out = mybinning * ps_img;
 		copy.optTable.setValue(EMDL_IMAGE_PIXEL_SIZE, ps_out, og);
 		int mysize = (do_real_subtomo) ? cropSize_tomogram : cropSize;
         copy.optTable.setValue(EMDL_IMAGE_SIZE, mysize, og);
@@ -477,28 +461,18 @@ void SubtomoProgram::writeParticleSet(
 	optimisationSet.write(outDir + "optimisation_set.star");
 }
 
-Image<RFLOAT> SubtomoProgram::extractSubtomogramsAndReProject(
+BufferedImage<float> SubtomoProgram::extractSubtomogramsAndReProject(
         ParticleIndex part_id, MultidimArray<RFLOAT> &recTomo,
         const Tomogram& tomogram, const ParticleSet &particleSet,
         const std::vector<bool> &isVisible, RFLOAT tomogram_angpix)
 {
 
-    // get centered coordiantes of the particle (in tilt series pixels)
-    // note that this function usually returns de-centered coordinates when providing tomogram.centre and that's why to pass 0,0,0: these will still be centered
-    d3Vector pos = particleSet.getPosition(part_id, d3Vector(0., 0., 0.), apply_offsets);
+    // get decentered coordinates of the particle (in tilt series pixels)
+    d3Vector pos = particleSet.getPosition(part_id, tomogram.centre, apply_offsets);
     // convert from tilt series pixel to tomogram pixel
     pos *= tomogram.optics.pixelSize / tomogram_angpix;
 
     const float sign = flip_value ? -1.f : 1.f;
-
-    // Keep track of residual shift of volume, as we need to take care of that with phase-shifts in the 2D Fourier transforms later!!
-    d4Vector diff;
-    int posx = int(pos.x);
-    int posy = int(pos.y);
-    int posz = int(pos.z);
-    diff.x = pos.x - posx;
-    diff.y = pos.y - posy;
-    diff.z = pos.z - posz;
 
     // Center the subtomo in a box that is as wide as the cropSize in Angstroms, but only fill the center sphere. Leave the rest at zero
     int cropSize_tomogram = ROUND(cropSize * binning * tomogram.optics.pixelSize / tomogram_angpix);
@@ -516,27 +490,25 @@ Image<RFLOAT> SubtomoProgram::extractSubtomogramsAndReProject(
     RFLOAT edge_width = 2.;
     long int r2_max_smaller = ROUND((cropSize_tomogram - 2*edge_width) * (cropSize_tomogram - 2*edge_width) / 4.);
     long int r2_max = ROUND(cropSize_tomogram * cropSize_tomogram / 4.);
-    RFLOAT sum= 0., nn= 0.;
+    RFLOAT sum= 0., sum2 = 0., nn= 0.;
     for (long int k= FIRST_XMIPP_INDEX(cropSize_tomogram); k<= LAST_XMIPP_INDEX(cropSize_tomogram); k++)
         for (long int i= FIRST_XMIPP_INDEX(cropSize_tomogram); i<= LAST_XMIPP_INDEX(cropSize_tomogram); i++)
             for (long int j= FIRST_XMIPP_INDEX(cropSize_tomogram); j<= LAST_XMIPP_INDEX(cropSize_tomogram); j++)
             {
-                int kp = k+posz;
-                int ip = i+posy;
-                int jp = j+posx;
+                int kp = k + pos.z;
+                int ip = i + pos.y;
+                int jp = j + pos.x;
                 long int r2 = k*k + i*i + j*j;
                 if (r2 <= r2_max &&
-                    jp >= FIRST_XMIPP_INDEX(XSIZE(recTomo)) &&
-                    jp <= LAST_XMIPP_INDEX(XSIZE(recTomo))  &&
-                    ip >= FIRST_XMIPP_INDEX(YSIZE(recTomo)) &&
-                    ip <= LAST_XMIPP_INDEX(YSIZE(recTomo))  &&
-                    kp >= FIRST_XMIPP_INDEX(ZSIZE(recTomo)) &&
-                    kp <= LAST_XMIPP_INDEX(ZSIZE(recTomo)))
+                        jp > 0  && jp < XSIZE(recTomo)  &&
+                        ip > 0  && ip < YSIZE(recTomo)  &&
+                        kp > 0  && kp < ZSIZE(recTomo))
                 {
-                    A3D_ELEM(subtom, k, i, j) = sign * A3D_ELEM(recTomo, kp, ip, jp);
+                    A3D_ELEM(subtom, k, i, j) = sign * DIRECT_A3D_ELEM(recTomo, kp, ip, jp);
                     if (r2 >= r2_max_smaller)
                     {
                         sum += A3D_ELEM(subtom, k, i, j);
+                        sum2 += A3D_ELEM(subtom, k, i, j) * A3D_ELEM(subtom, k, i, j);
                         nn += 1.;
                     }
                 }
@@ -546,25 +518,26 @@ Image<RFLOAT> SubtomoProgram::extractSubtomogramsAndReProject(
 
     // Calculate the background mean in a shell of edge_width around the particle
     RFLOAT bg_mean = sum / nn;
+    RFLOAT stddev = sqrt( (sum2 / nn - bg_mean * bg_mean));
+    if (stddev < 0.00000001)
+        REPORT_ERROR("ERROR: all-zero subtomogram should not happen here!");
 
-    // Apply backgrounhd subtraction and a slightly softer edge
+    // Apply background subtraction and a slightly softer edge
     for (long int k= FIRST_XMIPP_INDEX(cropSize_tomogram); k<= LAST_XMIPP_INDEX(cropSize_tomogram); k++)
         for (long int i= FIRST_XMIPP_INDEX(cropSize_tomogram); i<= LAST_XMIPP_INDEX(cropSize_tomogram); i++)
             for (long int j= FIRST_XMIPP_INDEX(cropSize_tomogram); j<= LAST_XMIPP_INDEX(cropSize_tomogram); j++)
             {
-                int kp = k+posz;
-                int ip = i+posy;
-                int jp = j+posx;
+                int kp = k + pos.z;
+                int ip = i + pos.y;
+                int jp = j + pos.x;
                 long int r2 = k*k + i*i + j*j;
                 if (r2 <= r2_max &&
-                    jp >= FIRST_XMIPP_INDEX(XSIZE(recTomo)) &&
-                    jp <= LAST_XMIPP_INDEX(XSIZE(recTomo))  &&
-                    ip >= FIRST_XMIPP_INDEX(YSIZE(recTomo)) &&
-                    ip <= LAST_XMIPP_INDEX(YSIZE(recTomo))  &&
-                    kp >= FIRST_XMIPP_INDEX(ZSIZE(recTomo)) &&
-                    kp <= LAST_XMIPP_INDEX(ZSIZE(recTomo)))
+                        jp > 0  && jp < XSIZE(recTomo)  &&
+                        ip > 0  && ip < YSIZE(recTomo)  &&
+                        kp > 0  && kp < ZSIZE(recTomo))
                 {
                     A3D_ELEM(subtom, k, i, j) -= bg_mean;
+                    //A3D_ELEM(subtom, k, i, j) /= stddev;
                     // Also apply a slightly softer edge
                     if (r2 >= r2_max_smaller)
                     {
@@ -574,6 +547,10 @@ Image<RFLOAT> SubtomoProgram::extractSubtomogramsAndReProject(
                 }
             }
 
+    //Image<RFLOAT> It;
+    //It()= subtom;
+    //It.write("subtom.spi");
+    //exit(0);
 
     MultidimArray<RFLOAT> dummy;
     Projector projector(cropSize_tomogram);
@@ -585,34 +562,27 @@ Image<RFLOAT> SubtomoProgram::extractSubtomogramsAndReProject(
     transformer.setReal(img);
     transformer.getFourierAlias(F2D);
 
-    Image<RFLOAT> resultImg(cropSize_tomogram, cropSize_tomogram, 1,  tomogram.frameCount);
-    resultImg.setSamplingRateInHeader(tomogram_angpix);
-    resultImg().initZeros();
+    BufferedImage<float> resultImg(cropSize_tomogram, cropSize_tomogram, tomogram.frameCount);
     for (int f = 0; f < tomogram.frameCount; f++)
     {
 
         if (!isVisible[f]) continue;
 
+        d4Matrix Aproj = tomogram.projectionMatrices[f];
         Matrix2D<RFLOAT> A(3,3);
         for (int row= 0; row < 3; row++)
             for (int col = 0; col < 3; col++)
-                MAT_ELEM(A, row, col) = tomogram.projectionMatrices[f](row, col);
+                MAT_ELEM(A, row, col) = Aproj(row, col);
 
         // Get the 2D slice out of the 3D Fourier transform
         F2D.initZeros();
         projector.get2DFourierTransform(F2D, A);
-
-        // Project 3D diff into 2D of the projection and correct for non-integer shifts due to coarse sampling of tomogram
-        RFLOAT diffx = MAT_ELEM(A, 0, 0) * diff.x + MAT_ELEM(A, 0, 1) * diff.y + MAT_ELEM(A, 0, 2) * diff.z;
-        RFLOAT diffy = MAT_ELEM(A, 1, 0) * diff.x + MAT_ELEM(A, 1, 1) * diff.y + MAT_ELEM(A, 1, 2) * diff.z;
-        //std::cerr <<" diffx= " << diffx << " diffy= "<< diffy <<" A00= "<< MAT_ELEM(A, 0, 0) << " A10= "<< MAT_ELEM(A, 1, 0) << std::endl;
-        shiftImageInFourierTransform(F2D, F2D, cropSize_tomogram, cropSize_tomogram/2 - diffx, cropSize_tomogram/2 - diffy);
-
+        shiftImageInFourierTransform(F2D, F2D, cropSize_tomogram, cropSize_tomogram/2, cropSize_tomogram/2);
         transformer.inverseFourierTransform();
 
         FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(img)
         {
-            DIRECT_A3D_ELEM(resultImg(), f, i, j) = DIRECT_A2D_ELEM(img, i, j);
+            resultImg(j, i, f) = DIRECT_A2D_ELEM(img, i, j);
         }
 
     }
@@ -674,10 +644,13 @@ void SubtomoProgram::processTomograms(
         if (do_real_subtomo)
         {
             FileName fn_tomo;
-            tomogramSet.globalTable.getValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME, fn_tomo, t);
+            if (tomogramSet.globalTable.containsLabel(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME))
+                tomogramSet.globalTable.getValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME, fn_tomo, t);
+            else
+                REPORT_ERROR("ERROR: cannot find rlnTomoReconstructedTomogram or rlnTomoDenoisedTomogram in tomogram star file");
+
             tomogramSet.globalTable.getValue(EMDL_TOMO_TOMOGRAM_BINNING, tomogram_binning, t);
             recTomo.read(fn_tomo);
-            recTomo().setXmippOrigin();
             tomogram_angpix =  tomogram.optics.pixelSize * tomogram_binning;
         }
 
@@ -752,10 +725,10 @@ void SubtomoProgram::processTomograms(
             {
 
                 // This will extract the true subtomograms and calculate their FTs in the directions of the tilt series
-                Image<RFLOAT> subtomo_reprojs = extractSubtomogramsAndReProject(part_id, recTomo(),
+                BufferedImage<float> subtomo_reprojs = extractSubtomogramsAndReProject(part_id, recTomo(),
                                                                 tomogram, particleSet, isVisible, tomogram_angpix);
-
-                subtomo_reprojs.write(outData, -1, true, WRITE_OVERWRITE, write_float16 ? Float16 : Float);
+                BufferedImage<float> visible_reproj = NewStackHelper::getVisibleSlices(subtomo_reprojs, isVisible);
+                visible_reproj.write(outData, tomogram_angpix, write_float16);
 
             }
             else
