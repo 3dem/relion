@@ -666,6 +666,24 @@ std::string TomogramSet::getOpticsGroupName(int index) const
 		return globalTable.getString(EMDL_IMAGE_OPTICS_GROUP_NAME, index);
 	}
 }
+int TomogramSet::getImageIndexWithSmallestTiltAngle(int index) const
+{
+    int result = -1;
+    RFLOAT mindiff = 999.;
+
+    for (int idx = 0; idx < tomogramTables[index].numberOfObjects(); idx++)
+    {
+        RFLOAT tilt;
+        tomogramTables[index].getValue(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE, tilt, idx);
+        if (fabs(tilt) < mindiff)
+        {
+            mindiff = fabs(tilt);
+            result = idx;
+        }
+    }
+
+    return result;
+}
 
 void TomogramSet::generateSingleMetaDataTable(MetaDataTable &MDout, ObservationModel &obsModel)
 {
