@@ -32,7 +32,8 @@ def get_poses_along_filament_backbones(
                    "during refinement."
     )
 ):
-    global_df = starfile.read(tilt_series_star_file, parse_as_string=['rlnTomoName'])
+    global_df = starfile.read(tilt_series_star_file,
+                              parse_as_string=['rlnTomoName'])
     global_df = global_df.set_index('rlnTomoName')
     annotation_files = annotations_directory.glob('*_filaments.star')
     dfs = []
@@ -52,6 +53,14 @@ def get_poses_along_filament_backbones(
             xyz = df[['rlnCoordinateX', 'rlnCoordinateY', 'rlnCoordinateZ']]
             xyz = xyz.to_numpy() * scale_factor - tomo_center
 
+            # If two consecutive points on the path are identical, remove one of them
+            # or scipy interpolate.splprep throws error.
+            # This can happen due to user or napari error.
+            indices_to_delete = []
+            for i in range(xyz.shape[0]-1):
+                if np.linalg.norm(xyz[i]-xyz[i+1]) < 1e-6:
+                    indices_to_delete.append(i+1)
+            xyz = np.delete(xyz, indices_to_delete, axis=0)
             # derive equidistant poses along length of filament
             path = Path(control_points=xyz)
             pose_sampler = path_samplers.HelicalPoseSampler(
