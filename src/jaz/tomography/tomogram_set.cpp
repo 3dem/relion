@@ -666,19 +666,28 @@ std::string TomogramSet::getOpticsGroupName(int index) const
 		return globalTable.getString(EMDL_IMAGE_OPTICS_GROUP_NAME, index);
 	}
 }
-int TomogramSet::getImageIndexWithSmallestTiltAngle(int index) const
+int TomogramSet::getImageIndexWithSmallestVisibleTiltAngle(int index, std::vector<bool> isVisible) const
 {
     int result = -1;
     RFLOAT mindiff = 999.;
 
-    for (int idx = 0; idx < tomogramTables[index].numberOfObjects(); idx++)
+    int nr_idx = tomogramTables[index].numberOfObjects();
+    if (nr_idx != isVisible.size()) REPORT_ERROR("BUG: incofrrect number of elements in isVisible vector...");
+
+    int nr_invisible = 0;
+    for (int idx = 0; idx < nr_idx; idx++)
     {
+        if (!isVisible[idx])
+        {
+            nr_invisible++;
+            continue;
+        }
         RFLOAT tilt;
         tomogramTables[index].getValue(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE, tilt, idx);
         if (fabs(tilt) < mindiff)
         {
             mindiff = fabs(tilt);
-            result = idx;
+            result = idx - nr_invisible;
         }
     }
 

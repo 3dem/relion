@@ -309,17 +309,14 @@ void SubtomoProgram::writeParticleSet(
             tomogramSet.globalTable.getValue(EMDL_TOMO_TOMOGRAM_BINNING, tomogram_binning, t);
             if (t == 0) real_subtomo_binning = tomogram_binning;
             else if (real_subtomo_binning != tomogram_binning) REPORT_ERROR("ERROR: not all tomograms have the same binning; can't do real subtomos");
-            cropSize_tomogram = ROUND(cropSize / tomogram_binning);
+            cropSize_tomogram = ROUND(cropSize * binning / tomogram_binning);
             if (cropSize_tomogram%2 != 0)
             {
                 if ( (cropSize * binning / tomogram_binning) - cropSize_tomogram >= 0. ) cropSize_tomogram++;
                 else cropSize_tomogram--;
             }
 
-            // Also make a particle star file for 2D classification
-            mintilt_idx = tomogramSet.getImageIndexWithSmallestTiltAngle(t);
         }
-
 		for (int p = 0; p < pc; p++)
 		{
 			const ParticleIndex part_id = particles[t][p];
@@ -379,7 +376,8 @@ void SubtomoProgram::writeParticleSet(
 
                 if (do_real_subtomo)
                 {
-                    if (!isVisible[mintilt_idx]) continue;
+                    // Also make a particle star file for 2D classification
+                    mintilt_idx = tomogramSet.getImageIndexWithSmallestVisibleTiltAngle(t, isVisible);
 
                     copy2d.partTable.addObject( copy.partTable.getObject(new_id.value) );
 
@@ -443,6 +441,7 @@ void SubtomoProgram::writeParticleSet(
         if (copy2d.partTable.containsLabel(EMDL_IMAGE_COORD_Z)) copy2d.partTable.deactivateLabel(EMDL_IMAGE_COORD_Z);
         if (copy2d.partTable.containsLabel(EMDL_CTF_IMAGE))  copy2d.partTable.deactivateLabel(EMDL_CTF_IMAGE);
 
+        copy2d.optTable.clear();
         copy2d.optTable = copy.optTable;
         // These are now no subtomograms!
         copy2d.genTable.clear();
@@ -727,8 +726,8 @@ void SubtomoProgram::processTomograms(
                 // This will extract the true subtomograms and calculate their FTs in the directions of the tilt series
                 BufferedImage<float> subtomo_reprojs = extractSubtomogramsAndReProject(part_id, recTomo(),
                                                                 tomogram, particleSet, isVisible, tomogram_angpix);
-                BufferedImage<float> visible_reproj = NewStackHelper::getVisibleSlices(subtomo_reprojs, isVisible);
-                visible_reproj.write(outData, tomogram_angpix, write_float16);
+                BufferedImage<float> visible_reprojs = NewStackHelper::getVisibleSlices(subtomo_reprojs, isVisible);
+                visible_reprojs.write(outData, tomogram_angpix, write_float16);
 
             }
             else
