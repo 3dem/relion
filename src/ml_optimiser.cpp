@@ -2088,7 +2088,13 @@ void MlOptimiser::initialiseGeneral(int rank)
 
     }
 
-    if (mydata.hasCtfCorrected()) do_ctf_correction = false;
+    if (do_ctf_correction && mydata.hasCtfCorrected())
+    {
+        do_ctf_correction = false;
+        if (verb > 0)
+            std::cout << " + CTFs have already been corrected, switching off CTF correction ..." << std::endl;
+
+    }
 
     if (mymodel.nr_classes > 1 && do_split_random_halves)
         REPORT_ERROR("ERROR: One cannot use --split_random_halves with more than 1 reference... You could first classify, and then refine each class separately using --random_halves.");
