@@ -409,7 +409,7 @@ def reorder_class_average_star_by_clustered(model_star_file: str, clustered: sns
         write_models_star(reordered_classes_df, all_model_data, filename = f"{output_path}", overwrite = overwrite)
         opt = starfile.read(optimiser_star)
         opt["rlnModelStarFile"] = output_path+"_model.star"
-        data_star = opt["rlnExperimentalDataStarFile"][0]
+        data_star = opt["rlnExperimentalDataStarFile"]
         shutil.copy(data_star, output_path+"_data.star")
         opt["rlnExperimentalDataStarFile"] = output_path+"_data.star"
         starfile.write(opt, output_path+"_optimiser.star")
