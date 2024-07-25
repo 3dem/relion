@@ -30,22 +30,19 @@ class ReconstructSnrOptimisation : public FastDifferentiableOptimization
                 if (has_reached_one && ctf < 0.99 && first_peak < 0) first_peak = n;
             }
 
-            ctf2.resize(size - first_peak);
-            snr.resize(size - first_peak);
+            ctf2.resize(size);
+            snr.resize(size);
             FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(CTF)
             {
                 double ctf = DIRECT_MULTIDIM_ELEM(CTF, n);
-                if (n >= first_peak)
-                {
-                    VEC_ELEM(ctf2, n - first_peak) = ctf * ctf;
-                    VEC_ELEM(snr, n - first_peak) = DIRECT_MULTIDIM_ELEM(SNR, n);
-                }
+                VEC_ELEM(ctf2, n) = ctf * ctf;
+                VEC_ELEM(snr, n) = DIRECT_MULTIDIM_ELEM(SNR, n);
 
             }
 
             // Set D matrix
-            D.initIdentity(size - first_peak);
-            for (int i=1; i < size - first_peak - 1; i++)
+            D.initIdentity(size);
+            for (int i=1; i < size - 1; i++)
             {
                 MAT_ELEM(D, i+1, i) = -1;
             }
