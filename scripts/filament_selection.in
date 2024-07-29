@@ -412,7 +412,7 @@ def reorder_class_average_star_by_clustered(model_star_file: str, clustered: sns
         data_star = opt["rlnExperimentalDataStarFile"]
         shutil.copy(data_star, output_path+"_data.star")
         opt["rlnExperimentalDataStarFile"] = output_path+"_data.star"
-        starfile.write(opt, output_path+"_optimiser.star")
+        starfile.write({'optimiser_general' : opt}, output_path+"_optimiser.star")
         print("Saved optimiser.star with reordered classes as: ",output_path,"_optimiser.star")        
         
     return reordered_classes_df
