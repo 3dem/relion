@@ -608,11 +608,25 @@ void HealpixSampling::writeAllOrientationsToBild(FileName fn_bild, std::string r
     Matrix1D<RFLOAT> v(3);
 	out << ".color " << rgb << std::endl;
 
+    //SHWS 31jul2024: writing of large STAR files on our ceph file system was very slow.
+    //SHWS 31jul2024: writing big data blocks (100,000 lines) in one go is much, much faster
+    std::ostringstream dataBlockStream;
 	for (unsigned long int ipix = 0; ipix < rot_angles.size(); ipix++)
 	{
 		Euler_angles2direction(rot_angles[ipix], tilt_angles[ipix], v);
-		out <<  ".sphere " << XX(v) << " " << YY(v) << " " << ZZ(v)  << " " <<  floatToString(size) << std::endl;
-	}
+        dataBlockStream <<  ".sphere " << XX(v) << " " << YY(v) << " " << ZZ(v)  << " " <<  floatToString(size) << "\n";
+        //out <<  ".sphere " << XX(v) << " " << YY(v) << " " << ZZ(v)  << " " <<  floatToString(size) << std::endl;
+
+        if ((ipix+1)%100000 == 0)
+        {
+            out << dataBlockStream.str();
+            dataBlockStream.str("");
+            dataBlockStream.clear();
+        }
+
+    }
+
+    out << dataBlockStream.str();
 
 	out.close();
 
@@ -641,12 +655,27 @@ void HealpixSampling::writeNonZeroPriorOrientationsToBild(FileName fn_bild, RFLO
 	out <<  ".sphere " << XX(v) << " " << YY(v) << " " << ZZ(v) << " " <<  floatToString(size) << std::endl;
 
 	out << ".color " << rgb << std::endl;
+
+    //SHWS 31jul2024: writing of large STAR files on our ceph file system was very slow.
+    //SHWS 31jul2024: writing big data blocks (100,000 lines) in one go is much, much faster
+    std::ostringstream dataBlockStream;
 	for (unsigned long int ipix = 0; ipix < pointer_dir_nonzeroprior.size(); ipix++)
 	{
 		long int idir = pointer_dir_nonzeroprior[ipix];
 		Euler_angles2direction(rot_angles[idir], tilt_angles[idir], v);
-		out <<  ".sphere " << XX(v) << " " << YY(v) << " " << ZZ(v) << " " << floatToString(size) << std::endl;
-	}
+		//out <<  ".sphere " << XX(v) << " " << YY(v) << " " << ZZ(v) << " " << floatToString(size) << std::endl;
+        dataBlockStream <<  ".sphere " << XX(v) << " " << YY(v) << " " << ZZ(v) << " " << floatToString(size) << "\n";
+
+        if ((ipix+1)%100000 == 0)
+        {
+            out << dataBlockStream.str();
+            dataBlockStream.str("");
+            dataBlockStream.clear();
+        }
+
+    }
+
+    out << dataBlockStream.str();
 
 	out.close();
 
@@ -2010,6 +2039,10 @@ void HealpixSampling::writeBildFileOrientationalDistribution(MultidimArray<RFLOA
     RFLOAT width = width_frac * PI*R*(getAngularSampling()/360.);
     Matrix1D<RFLOAT> v(3);
 
+    //SHWS 31jul2024: writing of large STAR files on our ceph file system was very slow.
+    //SHWS 31jul2024: writing big data blocks (100,000 lines) in one go is much, much faster
+    std::ostringstream dataBlockStream;
+
     for (long int iang = 0; iang < rot_angles.size(); iang++)
     {
      	RFLOAT pdf = DIRECT_A1D_ELEM(pdf_direction, iang);
@@ -2052,20 +2085,41 @@ void HealpixSampling::writeBildFileOrientationalDistribution(MultidimArray<RFLOA
 					ABS((R - Rp) * ZZ(v)) > 0.01)
 			{
 				// The width of the cylinders will be determined by the sampling:
-				fh_bild << ".color " << colscale << " 0 " << 1. - colscale << std::endl;
-				fh_bild << ".cylinder "
-						<< R  * XX(v) + offset + XX(offsetp) << " "
-						<< R  * YY(v) + offset + YY(offsetp) << " "
-						<< R  * ZZ(v) + offset + ZZ(offsetp) << " "
-						<< Rp * XX(v) + offset + XX(offsetp) << " "
-						<< Rp * YY(v) + offset + YY(offsetp) << " "
-						<< Rp * ZZ(v) + offset + ZZ(offsetp) << " "
-						<< width
-						<<"\n";
+				//fh_bild << ".color " << colscale << " 0 " << 1. - colscale << std::endl;
+				//fh_bild << ".cylinder "
+				//		<< R  * XX(v) + offset + XX(offsetp) << " "
+				//		<< R  * YY(v) + offset + YY(offsetp) << " "
+				//		<< R  * ZZ(v) + offset + ZZ(offsetp) << " "
+				//		<< Rp * XX(v) + offset + XX(offsetp) << " "
+				//		<< Rp * YY(v) + offset + YY(offsetp) << " "
+				//		<< Rp * ZZ(v) + offset + ZZ(offsetp) << " "
+				//		<< width
+				//		<<"\n";
+                dataBlockStream << ".color " << colscale << " 0 " << 1. - colscale << "\n";
+                dataBlockStream << ".cylinder "
+                        << R  * XX(v) + offset + XX(offsetp) << " "
+                        << R  * YY(v) + offset + YY(offsetp) << " "
+                        << R  * ZZ(v) + offset + ZZ(offsetp) << " "
+                        << Rp * XX(v) + offset + XX(offsetp) << " "
+                        << Rp * YY(v) + offset + YY(offsetp) << " "
+                        << Rp * ZZ(v) + offset + ZZ(offsetp) << " "
+                        << width
+                        <<"\n";
 			}
+
+            if ((iang+1)%100000 == 0)
+            {
+                fh_bild << dataBlockStream.str();
+                dataBlockStream.str("");
+                dataBlockStream.clear();
+            }
+
      	}
 
     }
+
+
+    fh_bild << dataBlockStream.str();
 
     // Close and write file to disc
     fh_bild.close();

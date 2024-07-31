@@ -69,7 +69,7 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
 	d = textToInteger(parser.getOption("--d", "Thickness"));
 
     fourierInversion = parser.checkOption("--fourier", "Use a Fourier-inversion reconstruction algorithm");
-    lambda = textToDouble(parser.getOption("--lambda", "Regularisation constant for CTF-correction of the SNRs in the Fourier-inversion algorithm", "1"));
+    lambda = textToDouble(parser.getOption("--lambda", "Regularisation constant for CTF-correction of the SNRs in the Fourier-inversion algorithm", "10"));
 	ctf_intact_first_peak = parser.checkOption("--ctf_intact_first_peak", "Leave CTFs intact until first peak");
     applyWeight = !parser.checkOption("--no_weight", "Do not perform weighting in Fourier space using a Wiener filter");
 	applyPreWeight = parser.checkOption("--pre_weight", "Pre-weight the 2D slices prior to backprojection");
@@ -278,22 +278,22 @@ MultidimArray<RFLOAT>  TomoBackprojectProgram::getCtfCorrectedSNR(const Multidim
     }
 
     // Now correct the SNR for the CTF^2 factor, but cannot divide by zeros, so do a regularised optimisation that imposes smoothness on SNRs
-    // Ignore the spatial frequencies until the first peak in the CTF: just divide SNR by CTF^2 for those.
     ReconstructSnrOptimisation problem(myCTF, oriSNR, lambda);
+
+    // Ignore the spatial frequencies until the first peak in the CTF: just divide SNR by CTF^2 for those in the block below this one
+    // Because SNRs can be very high here, they can mess up the optimisation below, just set all values before first peak to the SNR at first_peak
     int first_peak = problem.getFirstPeak();
 
-    std::vector<double> newSNR;
-    if (first_peak < XSIZE(oriSNR) - 1)
+    std::vector<double> initial(XSIZE(oriSNR));
+    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(oriSNR)
     {
-        // Initialise the CTF^2-corrected SNRs with the CTF^2-affected ones
-        std::vector<double> initial(XSIZE(oriSNR) - first_peak);
-        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(oriSNR)
-        {
-            if (n >= first_peak) initial[n-first_peak] = DIRECT_MULTIDIM_ELEM(oriSNR, n);
-        }
-        // The actual regularised optimisation
-        newSNR = LBFGS::optimize(initial, problem, false, 300, 1e-7, 1e-6);
+        if (first_peak < XSIZE(oriSNR) &&  n < first_peak)
+            initial[n] = DIRECT_MULTIDIM_ELEM(oriSNR, first_peak);
+        else
+            initial[n] = DIRECT_MULTIDIM_ELEM(oriSNR, n);
     }
+    std::vector<double> newSNR= LBFGS::optimize(initial, problem, false, 100, 1e-7, 1e-6);
+
 
     FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(corrSNR)
     {
@@ -307,17 +307,19 @@ MultidimArray<RFLOAT>  TomoBackprojectProgram::getCtfCorrectedSNR(const Multidim
         }
         else
         {
-            if (n-first_peak >= newSNR.size()) REPORT_ERROR("TomoBackprojectProgram::getCtfCorrectedSNR  BUG: invalid access of newSNR array...");
-            DIRECT_MULTIDIM_ELEM(corrSNR, n) = newSNR[n - first_peak];
+            DIRECT_MULTIDIM_ELEM(corrSNR, n) = newSNR[n];
         }
     }
 
     if (verb > 0)
     {
-        std::cout << "# shell corrSNR oriSNR corrSNR*CTF^2 oriSNR*CTF^2 CTF^2 FSC" << std::endl;
+        std::cout << " first_peak= " << first_peak << std::endl;
+        std::cout << "# shell corrSNR newSNR oriSNR corrSNR*CTF^2 oriSNR*CTF^2 CTF^2 FSC" << std::endl;
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(corrSNR)
         {
-            std::cout << n << " " << DIRECT_MULTIDIM_ELEM(corrSNR, n)
+            std::cout << n
+                      << " " << DIRECT_MULTIDIM_ELEM(corrSNR, n)
+                      << " " << newSNR[n]
                       << " " << DIRECT_MULTIDIM_ELEM(oriSNR, n)
                       << " " << DIRECT_MULTIDIM_ELEM(corrSNR, n) * DIRECT_MULTIDIM_ELEM(myCTF, n) * DIRECT_MULTIDIM_ELEM(myCTF, n)
                       << " " << DIRECT_MULTIDIM_ELEM(oriSNR, n) * DIRECT_MULTIDIM_ELEM(myCTF, n) * DIRECT_MULTIDIM_ELEM(myCTF, n)
@@ -348,8 +350,8 @@ void TomoBackprojectProgram::reconstructOneTomogramFourier(int tomoIndex)
 
     // Make sure to make all images squared before using FFTs
     int square_box = (tomogram1.stack.xdim == tomogram1.stack.ydim) ? tomogram1.stack.xdim : XMIPP_MAX(tomogram1.stack.xdim, tomogram1.stack.ydim);
-    // Make almost sqrt(2) bigger to account for the empty corners that otherwise appear with the spherical mask....
-    square_box *= 1.4;
+    // Make sqrt(2) bigger to account for the empty corners that otherwise appear with the spherical mask....
+    square_box *= sqrt(2.);
 
     double pixelSizeAct = tomogramSet.getTiltSeriesPixelSize(tomoIndex);
     int new_box = square_box;
