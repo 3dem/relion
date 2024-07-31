@@ -443,9 +443,7 @@ void SubtomoProgram::writeParticleSet(
 
         copy2d.optTable.clear();
         copy2d.optTable = copy.optTable;
-        // These are now no subtomograms!
-        copy2d.genTable.clear();
-
+        copy2d.is_stack2d = false;
         copy2d.write(outDir + "particles_for_class2d.star");
     }
 
