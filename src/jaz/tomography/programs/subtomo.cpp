@@ -286,7 +286,7 @@ void SubtomoProgram::writeParticleSet(
     {
         copy2d = particleSet;
         copy2d.clearParticles();
-        copy2d.is_stack2d = true;
+        copy2d.is_stack2d = false;
     }
 
 	int particles_removed = 0;
@@ -443,7 +443,6 @@ void SubtomoProgram::writeParticleSet(
 
         copy2d.optTable.clear();
         copy2d.optTable = copy.optTable;
-        copy2d.is_stack2d = false;
         copy2d.write(outDir + "particles_for_class2d.star");
     }
 
