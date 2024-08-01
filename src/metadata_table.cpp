@@ -1405,29 +1405,34 @@ void MetaDataTable::write(std::ostream& out) const
 		}
 
 		// Write actual data block
+        //SHWS 31jul2024: writing of large STAR files on our ceph file system was very slow.
+        //SHWS 31jul2024: writing big data blocks (10,000 lines) in one go is much, much faster
+        std::ostringstream dataBlockStream;
 		for (long int idx = 0; idx < objects.size(); idx++)
 		{
 			std::string entryComment = "";
 
-			for (long i = 0; i < activeLabels.size(); i++)
+            for (long i = 0; i < activeLabels.size(); i++)
 			{
 				EMDLabel l = activeLabels[i];
 
 				if (l == EMDL_UNKNOWN_LABEL)
 				{
-					out.width(10);
 					std::string token, val;
 					long offset = unknownLabelPosition2Offset[i];
 					val = objects[idx]->unknowns[offset];
 					escapeStringForSTAR(val);
-					out << val << " ";
+					dataBlockStream << std::setw(10) << val << " ";
+                    //out.width(10);
+                    //out << val << " ";
 				}
 				else if (l != EMDL_COMMENT && l != EMDL_SORTED_IDX)
 				{
-					out.width(10);
 					std::string val;
 					getValueToString(l, val, idx, true); // escape=true
-					out << val << " ";
+					dataBlockStream << std::setw(10) << val << " ";
+                    //out.width(10);
+                    //out << val << " ";
 				}
 				if (l == EMDL_COMMENT)
 				{
@@ -1436,12 +1441,24 @@ void MetaDataTable::write(std::ostream& out) const
 			}
 			if (entryComment != std::string(""))
 			{
-				out << "# " << entryComment;
+				dataBlockStream << "# " << entryComment;
+                //out << "# " << entryComment;
 			}
-			out << "\n";
+            dataBlockStream << "\n";
+			//out << "\n";
+
+            if ((idx+1)%100000 == 0)
+            {
+                out << dataBlockStream.str();
+                dataBlockStream.str("");
+                dataBlockStream.clear();
+            }
+
 		}
 		// Finish table with a white-line
-		out << " \n";
+        dataBlockStream << " \n";
+        //out << " \n";
+        out << dataBlockStream.str();
 
 	}
 	else // isList
