@@ -76,14 +76,17 @@ public:
     // Use AreTomo
     bool do_aretomo;
 
-    // Resolution used in AreTomo alignment
-    RFLOAT aretomo_resolution;
-
-    // Alignment thickness in AreTomo
-    RFLOAT aretomo_thickness;
-
     // Perform tilt angle correction in AreTomo
     bool do_aretomo_tiltcorrect;
+
+    // User-specified value for tilt angle correction
+    RFLOAT aretomo_tilcorrect_angle;
+
+    // Do CTF estimation in aretomo?
+    bool do_aretomo_ctf;
+
+    // Do phase shift estimation in AreTomo?
+    bool do_aretomo_phaseshift;
 
     // Which GPU devices to use?
     int devCount;
@@ -98,12 +101,6 @@ public:
 
     // Process at most this number of unprocessed tomograms
     long do_at_most;
-
-    // Do CTF estimation in aretomo?
-    bool do_aretomo_ctf;
-
-    // Do phase shift estimation in AreTomo?
-    bool do_aretomo_phaseshift;
 
 public:
     // Read command line arguments

@@ -672,7 +672,20 @@ std::vector<int> TomogramSet::getFrameDoseOrder(int index) const
     std::vector<double> doses;
     for (int f = 0; f < tomogramTables[index].numberOfObjects(); f++)
     {
-        double dose;
+        RFLOAT dose;
+        tomogramTables[index].getValue(EMDL_MICROGRAPH_PRE_EXPOSURE, dose, f);
+        doses.push_back(dose);
+    }
+    return IndexSort<double>::sortedPositions(doses);
+
+}
+
+std::vector<int> TomogramSet::getFrameDoseOrderIndex(int index) const
+{
+    std::vector<double> doses;
+    for (int f = 0; f < tomogramTables[index].numberOfObjects(); f++)
+    {
+        RFLOAT dose;
         tomogramTables[index].getValue(EMDL_MICROGRAPH_PRE_EXPOSURE, dose, f);
         doses.push_back(dose);
     }
@@ -689,10 +702,22 @@ std::vector<int> TomogramSet::getFrameTiltOrder(int index) const
         tomogramTables[index].getValue(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE, angle, f);
         angles.push_back(angle);
     }
-    return IndexSort<double>::sortIndices(angles);
+    return IndexSort<double>::sortedPositions(angles);
 
 }
 
+std::vector<int> TomogramSet::getFrameTiltOrderIndex(int index) const
+{
+    std::vector<double> angles;
+    for (int f = 0; f < tomogramTables[index].numberOfObjects(); f++)
+    {
+        double angle;
+        tomogramTables[index].getValue(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE, angle, f);
+        angles.push_back(angle);
+    }
+    return IndexSort<double>::sortIndices(angles);
+
+}
 
 void TomogramSet::generateSingleMetaDataTable(MetaDataTable &MDout, ObservationModel &obsModel)
 {

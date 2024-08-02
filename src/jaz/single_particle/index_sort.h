@@ -44,6 +44,32 @@ class IndexSort
 			return indices;
 		}
 
+    static std::vector<int> sortedPositions(const std::vector<T>& data)
+    {
+        std::vector<std::pair<T, int>> value_index_pairs;
+
+        // Fill the vector with value and index pairs
+        for (int i = 0; i < data.size(); ++i)
+        {
+            value_index_pairs.emplace_back(data[i], i);
+        }
+
+        // Sort the vector of pairs based on the values
+        std::sort(value_index_pairs.begin(), value_index_pairs.end());
+
+        // Vector to store the positions of each element in the sorted vector
+        std::vector<int> positions(data.size());
+
+        // Fill the positions vector with the sorted indices
+        for (int i = 0; i < value_index_pairs.size(); ++i)
+        {
+            positions[value_index_pairs[i].second] = i;
+        }
+
+        return positions;
+
+    }
+
 		struct IndexComparator
 		{
 			IndexComparator(const std::vector<T>& data) : data(data) {}

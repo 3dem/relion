@@ -55,7 +55,9 @@ class TomogramSet
 		double getTiltSeriesPixelSize(int index) const;
 		std::string getOpticsGroupName(int index) const;
         std::vector<int> getFrameDoseOrder(int tomogramIndex) const;
+        std::vector<int> getFrameDoseOrderIndex(int tomogramIndex) const;
         std::vector<int> getFrameTiltOrder(int tomogramIndex) const;
+        std::vector<int> getFrameTiltOrderIndex(int tomogramIndex) const;
 
 
     // SHWS 6Apr2022: Make one big metadatatable with all movies/micrographs (to be used for motioncorr and ctffind runners)

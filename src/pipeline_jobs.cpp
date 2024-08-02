@@ -1494,7 +1494,7 @@ Whichever program you use, 'Motion Refinement' is highly recommended to get the 
 	joboptions["fn_defect"] = JobOption("Defect file:", "", "*", ".", "Location of a UCSF MotionCor2-style defect text file or a defect map that describe the defect pixels on the detector. Each line of a defect text file should contain four numbers specifying x, y, width and height of a defect region. A defect map is an image (MRC or TIFF), where 0 means good and 1 means bad pixels. The coordinate system is the same as the input movie before application of binning, rotation and/or flipping.\nNote that the format of the defect text is DIFFERENT from the defect text produced by SerialEM! One can convert a SerialEM-style defect file into a defect map using IMOD utilities e.g. \"clip defect -D defect.txt -f tif movie.mrc defect_map.tif\". See explanations in the SerialEM manual.\n\nLeave empty if you don't have any defects, or don't want to correct for defects on your detector.");
 	joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string("0"), "Provide a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':'. For example, to place one rank on device 0 and one rank on device 1, provide '0:1'.\n\
 Note that multiple MotionCor2 processes should not share a GPU; otherwise, it can lead to crash or broken outputs (e.g. black images) .");
-	joboptions["other_motioncor2_args"] = JobOption("Other MOTIONCOR2 arguments", std::string(""), "Additional arguments that need to be passed to MOTIONCOR2.");
+    joboptions["other_motioncor2_args"] = JobOption("Other MOTIONCOR2 arguments", std::string(""), "Additional arguments that need to be passed to MOTIONCOR2.");
 
 	// Dose-weight
 	if (!is_tomo) joboptions["do_dose_weighting"] = JobOption("Do dose-weighting?", true ,"If set to Yes, the averaged micrographs will be dose-weighted.");
@@ -6543,11 +6543,22 @@ void RelionJob::initialiseTomoAlignTiltSeriesJob()
 	joboptions["patch_size"] = JobOption("Patch size (in nm): ", 100, 1, 500, 1, "The size of the patches in Angstrom.");
 	joboptions["patch_overlap"] = JobOption("Patch overlap (%): ", 50, 0, 100, 10, "The overlap (0-100%) between the patches.");
 
-	joboptions["do_aretomo"] = JobOption("Use AreTomo?", false, "Set to Yes to perform tilt series alignment using UCSF's AreTomo.");
-	//    joboptions["aretomo_resolution"] = JobOption("Resolution for AreTomo alignment (in A): ", 10, 1, 50, 1, "The maximum resolution (in A) used for AreTomo alignment. The images will be Fourier cropped to have their Nyquist frequency at this value.");
-	joboptions["aretomo_thickness"] = JobOption("Expected sample thickness (in nm): ", 200, 10, 500, 10, "This controls the thickness of intermediate reconstructions used for projection matching in AreTomo. This value is padded internally.");
-	joboptions["aretomo_tiltcorrect"] = JobOption("Correct Tilt Angle Offset?", false, "Specify Yes to correct the tilt angle offset in the tomogram (applies the AreTomo -TiltCor option). This is useful for correcting slanting in tomograms which can arise due to sample mounting or milling angle. This can be useful for in situ data.");
+	joboptions["do_aretomo2"] = JobOption("Use AreTomo2?", false, "Set to Yes to perform tilt series alignment using Shawn Zheng's AreTomo2.");
+
+    char *default_location = getenv ("RELION_ARETOMO_EXECUTABLE");
+    char default_aretomo[] = DEFAULTARETOMOLOCATION;
+    if (default_location == NULL)
+    {
+        default_location = default_aretomo;
+    }
+    joboptions["fn_aretomo_exe"] = JobOption("AreTomo2 executable:", std::string(default_location), "*", ".", "Location of the AreTomo2 executable. You can control the default of this field by setting environment variable RELION_ARETOMO_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+    joboptions["do_aretomo_ctf"] = JobOption("Also do CTF estimation? ", false, "If set to Yes, AreTomo will also perform CTF estimation and any CTF information that was already present in the input STAR files will be overwritten. Note that when using this option, it is no longer necessary to run a CTF estimation job");
+    joboptions["do_aretomo_phaseshift"] = JobOption("Also estimate phase shift? ", false, "If set to Yes, AreTomo will also perform estimation of the phase shift (due to a phase plate) during CTF estimation.");
+    joboptions["do_aretomo_tiltcorrect"] = JobOption("Correct Tilt Angle Offset?", false, "Specify Yes to correct the tilt angle offset in the tomogram (applies the AreTomo -TiltCor option). This is useful for correcting slanting in tomograms which can arise due to sample mounting or milling angle. This can be useful for in situ data.");
+    joboptions["aretomo_tiltcorrect_angle"] = JobOption("Tilt Angle Offset:", 999 , -50, 50, 5, "The tilt angle (in degrees) to be offset. If set to a value larger than 180, AreTomo will search for the optimal value itself, otherwise the value specified here will be used.");
+    joboptions["other_aretomo_args"] = JobOption("Other AreTomo arguments", std::string(""), "Additional arguments that need to be passed to AreTomo.");
 	joboptions["gpu_ids"] = JobOption("Which GPUs to use for AreTomo:", std::string(""), "Provide a list of which GPUs (e.g. 0:1:2:3) to use in AreTomo. MPI-processes are separated by ':'. For example, to place one rank on device 0 and one rank on device 1, provide '0:1'.");
+
 }
 bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::vector<std::string> &commands,
                                        std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
@@ -6559,7 +6570,7 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
 	int i = 0;
 	if (joboptions["do_imod_fiducials"].getBoolean()) i++;
 	if (joboptions["do_imod_patchtrack"].getBoolean()) i++;
-	if (joboptions["do_aretomo"].getBoolean()) i++;
+	if (joboptions["do_aretomo2"].getBoolean()) i++;
 	if (i != 1)
 	{
 		error_message = "ERROR: you should (only) select ONE of the alignment methods: IMOD:fiducials or IMOD:patchtracking or AreTomo.";
@@ -6568,64 +6579,63 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
 
 	if (error_message != "") return false;
 
-	command="`which relion_python_tomo_align_tilt_series` ";
+    if (joboptions["in_tiltseries"].getString() == "")
+    {
+        error_message = "ERROR: you need to provide an input STAR file";
+        return false;
+    }
 
-	// Make sure the methods are the first argument to the program!
+
+    // Make sure the methods are the first argument to the program!
 	if (joboptions["do_imod_fiducials"].getBoolean())
 	{
+        command="`which relion_python_tomo_align_tilt_series` ";
 		command += "IMOD:fiducials ";
-		command += " --nominal-fiducial-diameter-nanometers " + joboptions["fiducial_diameter"].getString() + ' ';
+        command += " --tilt-series-star-file " + joboptions["in_tiltseries"].getString();
+        command += " --output-directory " + outputname;
+        command += " --nominal-fiducial-diameter-nanometers " + joboptions["fiducial_diameter"].getString() + ' ';
 	}
 	else if (joboptions["do_imod_patchtrack"].getBoolean())
 	{
+        command="`which relion_python_tomo_align_tilt_series` ";
 		command += "IMOD:patch-tracking ";
-		command += " --patch-size-nanometers " + joboptions["patch_size"].getString() + ' ';
+        command += " --tilt-series-star-file " + joboptions["in_tiltseries"].getString();
+        command += " --output-directory " + outputname;
+        command += " --patch-size-nanometers " + joboptions["patch_size"].getString() + ' ';
 		command += " --patch-overlap-percentage " + joboptions["patch_overlap"].getString() + ' ';
 	}
-	else if (joboptions["do_aretomo"].getBoolean())
+	else if (joboptions["do_aretomo2"].getBoolean())
 	{
-		command += "AreTomo ";
-		command += " --sample-thickness-nanometers " + joboptions["aretomo_thickness"].getString();
+		command += "`which relion_align_tiltseries` ";
+		command += " --aretomo2 --i " + joboptions["in_tiltseries"].getString();
+        command += " --aretomo_exe " + joboptions["fn_aretomo_exe"].getString();
 
-		if (joboptions["aretomo_tiltcorrect"].getBoolean())
+		if (joboptions["do_aretomo_tiltcorrect"].getBoolean())
 		{
-			command += " --do-tilt-angle-offset-correction ";
+			command += " --aretomo_tiltcorrect ";
+            command += " --aretomo_tilcorrect_angle " + joboptions["aretomo_tiltcorrect_angle"].getString();
 		}
-		if (joboptions["gpu_ids"].getString().length() >= 2)
-		// iterate over gpu ids and append separate --gpu args
-		{
-			std::string s = joboptions["gpu_ids"].getString();
-			std::string delimiter = ":";
-			
-			size_t last = 0;
-			size_t next = 0;
-			while ((next = s.find(delimiter, last)) != std::string::npos)
-			{
-				command += " --gpu " + s.substr(last, next-last) + ' ';
-				last = next + 1;
-			}
-			command += " --gpu " + s.substr(last) + ' ';
-		}
-		else if (joboptions["gpu_ids"].getString().length() > 0)
-		{
-			command += " --gpu " + joboptions["gpu_ids"].getString() + ' ';
-		}
+
+        if (joboptions["do_aretomo_ctf"].getBoolean())
+        {
+            command += " --aretomo_ctf ";
+            if (joboptions["do_aretomo_phaseshift"].getBoolean())
+            {
+                command += " --aretomo_phaseshift ";
+            }
+        }
+
+        command += " --other_wrapper_args \" " + joboptions["other_aretomo_args"].getString() + " \"";
+        command += " --gpu " + joboptions["gpu_ids"].getString() + ' ';
 	}
-	if (joboptions["in_tiltseries"].getString() == "")
-	{
-		error_message = "ERROR: you need to provide an input STAR file";
-		return false;
-	}
-	command += " --tilt-series-star-file " + joboptions["in_tiltseries"].getString();
 
 	Node node(joboptions["in_tiltseries"].getString(), joboptions["in_tiltseries"].node_type);
 	inputNodes.push_back(node);
 
-	command += " --output-directory " + outputname;
 	Node node2(outputname+"aligned_tilt_series.star", LABEL_TILTALIGN_TOMOGRAMS);
 	outputNodes.push_back(node2);
 
-	// Other arguments for extraction
+	// Other arguments from running tab
 	command += " " + joboptions["other_args"].getString();
 	commands.push_back(command);
 
