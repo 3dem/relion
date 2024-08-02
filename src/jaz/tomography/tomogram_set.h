@@ -54,13 +54,15 @@ class TomogramSet
 		double getOriginalPixelSize(int index) const;
 		double getTiltSeriesPixelSize(int index) const;
 		std::string getOpticsGroupName(int index) const;
+
         std::vector<int> getFrameDoseOrder(int tomogramIndex) const;
         std::vector<int> getFrameDoseOrderIndex(int tomogramIndex) const;
         std::vector<int> getFrameTiltOrder(int tomogramIndex) const;
         std::vector<int> getFrameTiltOrderIndex(int tomogramIndex) const;
 
+        int getImageIndexWithSmallestVisibleTiltAngle(int index, std::vector<bool> isVisible) const;
 
-    // SHWS 6Apr2022: Make one big metadatatable with all movies/micrographs (to be used for motioncorr and ctffind runners)
+        // SHWS 6Apr2022: Make one big metadatatable with all movies/micrographs (to be used for motioncorr and ctffind runners)
         void generateSingleMetaDataTable(MetaDataTable &MDout, ObservationModel &obsModel);
 
         // SHWS 6Apr2022: Convert back from one big metadatatable into separate STAR files for each tilt serie

@@ -56,7 +56,7 @@ class ObservationModel
 		// expecting the changes to propagate into the optics star-file
 		std::vector<double> angpix, originalAngpix, lambda, Cs;
 		std::vector<int> boxSizes;
-		std::vector<bool> CtfPremultiplied;
+		std::vector<bool> CtfPremultiplied, CtfCorrected;
 		std::vector<std::vector<double> > evenZernikeCoeffs, oddZernikeCoeffs;
 		std::vector<Matrix2D<RFLOAT> > magMatrices;
 		std::vector<std::string> fnMtfs, groupNames;
@@ -193,8 +193,10 @@ class ObservationModel
 		// returns a zero-indexed value (it exists to ensure this)
 		int getOpticsGroup(const MetaDataTable& particlesMdt, long int particle = -1) const;
 
-		bool getCtfPremultiplied(int og) const;
+        bool getCtfPremultiplied(int og) const;
+        bool getCtfCorrected(int og) const;
 		void setCtfPremultiplied(int og, bool val);
+		void setCtfCorrected(int og, bool val);
 
 		std::string getGroupName(int og);
 

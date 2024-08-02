@@ -348,7 +348,8 @@ enum EMDLabel
 	EMDL_OPTIMISER_CHANGES_OPTIMAL_CLASSES,
 	EMDL_OPTIMISER_COARSE_SIZE,
 	EMDL_OPTIMISER_DATA_ARE_CTF_PHASE_FLIPPED,
-	EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED,
+    EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED,
+    EMDL_OPTIMISER_DATA_ARE_CTF_CORRECTED,
 	EMDL_OPTIMISER_DATA_STARFILE,
 	EMDL_OPTIMISER_DO_AUTO_REFINE,
 	EMDL_OPTIMISER_DO_AUTO_SAMPLING,
@@ -1069,7 +1070,8 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_CHANGES_OPTIMAL_ORIENTS, EMDL_DOUBLE, "rlnChangesOptimalOrientations", "The average change in optimal orientation in the last iteration (in degrees) ");
 		EMDL::addLabel(EMDL_OPTIMISER_CHANGES_OPTIMAL_CLASSES, EMDL_DOUBLE, "rlnChangesOptimalClasses", "The number of particles that changed their optimal clsas assignment in the last iteration");
 		EMDL::addLabel(EMDL_OPTIMISER_DATA_ARE_CTF_PHASE_FLIPPED, EMDL_BOOL, "rlnCtfDataArePhaseFlipped", "Flag to indicate that the input images have been phase-flipped");
-		EMDL::addLabel(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, EMDL_BOOL, "rlnCtfDataAreCtfPremultiplied", "Flag to indicate that the input images have been premultiplied with their CTF");
+        EMDL::addLabel(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, EMDL_BOOL, "rlnCtfDataAreCtfPremultiplied", "Flag to indicate that the input images have been premultiplied with their CTF");
+        EMDL::addLabel(EMDL_OPTIMISER_DATA_ARE_CTF_CORRECTED, EMDL_BOOL, "rlnCtfDataAreCtfCorrected", "Flag to indicate that the input images have been corrected for their CTFs already");
 		EMDL::addLabel(EMDL_OPTIMISER_DATA_STARFILE, EMDL_STRING, "rlnExperimentalDataStarFile", "STAR file with metadata for the experimental images");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_CORRECT_CTF, EMDL_BOOL, "rlnDoCorrectCtf", "Flag to indicate that CTF-correction should be performed");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_CORRECT_MAGNIFICATION, EMDL_BOOL, "rlnDoCorrectMagnification", "Flag to indicate that (per-group) magnification correction should be performed");
