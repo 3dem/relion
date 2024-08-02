@@ -6613,7 +6613,7 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
 		if (joboptions["do_aretomo_tiltcorrect"].getBoolean())
 		{
 			command += " --aretomo_tiltcorrect ";
-            command += " --aretomo_tilcorrect_angle " + joboptions["aretomo_tiltcorrect_angle"].getString();
+            command += " --aretomo_tiltcorrect_angle " + joboptions["aretomo_tiltcorrect_angle"].getString();
 		}
 
         if (joboptions["do_aretomo_ctf"].getBoolean())
