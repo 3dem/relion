@@ -36,7 +36,7 @@ void AlignTiltseriesRunner::read(int argc, char **argv, int rank)
     int pat_section = parser.addSection("IMOD patch-tracking alignment options");
     do_imod_patchtrack = parser.checkOption("--imod_patchtrack", "OR: Use IMOD's patrick-tracking alignment method");
     patch_overlap = textToFloat(parser.getOption("--patch_overlap", "Overlap between the patches (in %)", "10."));
-    patch_size = textToFloat(parser.getOption("--patch_size", "Patch size (in A)", "10."));
+    patch_size = textToFloat(parser.getOption("--patch_size", "Patch size (in nm)", "100."));
 
     int aretomo2_section = parser.addSection("AreTomo2 alignment options");
     do_aretomo = parser.checkOption("--aretomo2", "OR: Use AreTomo2 alignment method");
@@ -227,15 +227,17 @@ void AlignTiltseriesRunner::run()
 bool AlignTiltseriesRunner::checkResults(long idx_tomo)
 {
 
+    std::string tomoname = tomogramSet.getTomogramName(idx_tomo);
+    FileName fn_dir = fn_out + "external/" + tomoname + '/';
+
     if (do_aretomo)
     {
-        // check that .aln file has been written out
-        FileName fn_dir = fn_out + "external/" + tomogramSet.getTomogramName(idx_tomo) + '/';
-        FileName fn_ctf, fn_aln = fn_dir + tomogramSet.getTomogramName(idx_tomo) + ".aln";
+        // check that .aln (and _ctf.txt if do_aretomo_ctf) file(s) has been written out
+        FileName fn_aln = fn_dir + tomoname + ".aln";
+        FileName fn_ctf = fn_dir + tomoname + "_ctf.txt";
 
         if (do_aretomo_ctf)
         {
-            fn_ctf = fn_dir + tomogramSet.getTomogramName(idx_tomo) + "_ctf.txt";
             return (exists(fn_ctf) && exists(fn_aln));
         }
         else
@@ -246,7 +248,11 @@ bool AlignTiltseriesRunner::checkResults(long idx_tomo)
     }
     else
     {
-        // TODO: think about IMOD checking...
+        // check that .xf and .tlt files have been written out
+        FileName fn_xf = fn_dir + tomoname + ".xf";
+        FileName fn_tlt = fn_dir + tomoname + ".tlt";
+
+        return (exists(fn_xf) && exists(fn_tlt));
 
     }
 
@@ -297,25 +303,70 @@ void AlignTiltseriesRunner::executeIMOD(long idx_tomo, int rank)
 {
 
     // Generate external output directory and write input files for AreTomo
-    FileName fn_dir = fn_out + "external/" + tomogramSet.getTomogramName(idx_tomo) + '/';
+    std::string tomoname = tomogramSet.getTomogramName(idx_tomo);
+    FileName fn_dir = fn_out + "external/" + tomoname + '/';
     mktree(fn_dir);
+
+    FileName fn_series = fn_dir + tomoname + ".mrc";
+    FileName fn_tilt = fn_dir + tomoname + ".rawtlt";
+    FileName fn_adoc = fn_dir + "batchDirective.adoc";
+    FileName fn_log = fn_dir + tomoname + ".log";
+    FileName fn_com = fn_dir + tomoname + ".com";
+
+    std::ofstream  fhadoc;
+    fhadoc.open((fn_adoc).c_str(), std::ios::out);
+
+    RFLOAT pixel_size = tomogramSet.getTiltSeriesPixelSize(idx_tomo);
+    RFLOAT rotangle = tomogramSet.tomogramTables[idx_tomo].getDouble(EMDL_TOMO_NOMINAL_TILT_AXIS_ANGLE, 0);
+    if (do_imod_fiducials)
+    {
+        fhadoc << fiducial_directive;
+        fhadoc << "setupset.copyarg.rotation = " << rotangle << std::endl;
+        fhadoc << "setupset.copyarg.pixel = " << pixel_size/10. << std::endl;
+        fhadoc << "setupset.copyarg.gold = " << fiducial_diam << std::endl;
+    }
+    else if (do_imod_patchtrack)
+    {
+        // Find best power-of-2 binning factor that brings pixel size to 10A
+        int mybinning = 1, mybestbinning = 1;
+        RFLOAT mindiff = fabs(pixel_size * mybinning - 10.); // 10A is the target binned pixel size
+        for (int i = 0; i < 8; i++)
+        {
+            mybinning *= 2;
+            //std::cerr << " mybinning= " << mybinning << " diff =" << fabs(pixel_size * mybinning - 10.) <<" mindiff= " << mindiff <<" bestbin= " << mybestbinning << std::endl;
+            if (fabs(pixel_size * mybinning - 10.) < mindiff)
+            {
+                mindiff = fabs(pixel_size * mybinning - 10.);
+                mybestbinning = mybinning;
+            }
+        }
+        int binned_patch_size = ROUND( (10. * patch_size) / (pixel_size * mybestbinning) );
+
+        fhadoc << patchtrack_directive;
+        fhadoc << "setupset.copyarg.rotation = " << rotangle << std::endl;
+        fhadoc << "setupset.copyarg.pixel = " << pixel_size/10. << std::endl;
+        fhadoc << "comparam.prenewst.newstack.BinByFactor = " << mybestbinning << std::endl;
+        fhadoc << "comparam.xcorr_pt.tiltxcorr.SizeOfPatchesXandY = " << binned_patch_size << "," << binned_patch_size << std::endl;
+        fhadoc << "comparam.xcorr_pt.tiltxcorr.OverlapOfPatchesXandY = " << patch_overlap/100. << "," << patch_overlap/100. << std::endl;
+    }
+    else
+    {
+        REPORT_ERROR("ERROR: either do_imod_fiducials or do_imod_patchtrack should be true.");
+    }
+    fhadoc.close();
+
 
     // Make sure metadata table is sorted on rlnTomoNominalStageTiltAngle (it should be, but anyways...)
     tomogramSet.tomogramTables[idx_tomo].sort(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE);
 
     generateMRCStackAndRawTiltFile(idx_tomo, false);
 
-    FileName fn_series = fn_dir + tomogramSet.getTomogramName(idx_tomo) + ".mrc";
-    FileName fn_tilt = fn_dir + tomogramSet.getTomogramName(idx_tomo) + ".rawtlt";
-    FileName fn_ali = fn_dir + tomogramSet.getTomogramName(idx_tomo) + "_aligned.mrc";
-    FileName fn_log = fn_dir + tomogramSet.getTomogramName(idx_tomo) + ".log";
-    FileName fn_com = fn_dir + tomogramSet.getTomogramName(idx_tomo) + ".com";
-
     // Now run the actual IMOD command
-    std::string command = fn_batchtomo_exe + " ";
-
-
-
+    std::string command = fn_batchtomo_exe;
+    command += " -DirectiveFile " + fn_adoc;
+    command += " -CurrentLocation " + fn_dir;
+    command += " -RootName " + tomoname;
+    command += " -EndingStep 6";
 
     if (other_wrapper_args.length() > 0)
         command += " " + other_wrapper_args;
@@ -339,14 +390,15 @@ void AlignTiltseriesRunner::executeAreTomo(long idx_tomo, int rank)
 {
 
     // Generate external output directory and write input files for AreTomo
-    FileName fn_dir = fn_out + "external/" + tomogramSet.getTomogramName(idx_tomo) + '/';
+    std::string tomoname = tomogramSet.getTomogramName(idx_tomo);
+    FileName fn_dir = fn_out + "external/" + tomoname + '/';
     mktree(fn_dir);
 
-    FileName fn_series = fn_dir + tomogramSet.getTomogramName(idx_tomo) + ".mrc";
-    FileName fn_ali = fn_dir + tomogramSet.getTomogramName(idx_tomo) + "_aligned.mrc";
-    FileName fn_tilt = fn_dir + tomogramSet.getTomogramName(idx_tomo) + ".rawtlt";
-    FileName fn_log = fn_dir + tomogramSet.getTomogramName(idx_tomo) + ".log";
-    FileName fn_com = fn_dir + tomogramSet.getTomogramName(idx_tomo) + ".com";
+    FileName fn_series = fn_dir + tomoname + ".mrc";
+    FileName fn_tilt = fn_dir + tomoname + ".rawtlt";
+    FileName fn_ali = fn_dir + tomoname + "_aligned.mrc";
+    FileName fn_log = fn_dir + tomoname + ".log";
+    FileName fn_com = fn_dir + tomoname + ".com";
 
     std::ofstream  fh;
     fh.open((fn_tilt).c_str(), std::ios::out);
@@ -427,15 +479,27 @@ void AlignTiltseriesRunner::executeAreTomo(long idx_tomo, int rank)
 
 bool AlignTiltseriesRunner::readIMODResults(long idx_tomo, std::string &error_message)
 {
+    std::string tomoname = tomogramSet.getTomogramName(idx_tomo);
+    FileName fn_dir = fn_out + "external/" + tomoname + '/';
+    FileName fn_rawtlt = fn_dir + tomoname + ".rawtlt";
+    FileName fn_xf = fn_dir + tomoname + ".xf";
+    FileName fn_tlt = fn_dir + tomoname + ".tlt";
+    FileName fn_edf = fn_dir + tomoname + ".edf";
+
+
+
     std::cerr << " to be implemented..." << std::endl;
     return false;
 }
 
 bool AlignTiltseriesRunner::readAreTomoResults(long idx_tomo, std::string &error_message)
 {
-    FileName fn_dir = fn_out + "external/" + tomogramSet.getTomogramName(idx_tomo) + '/';
-    FileName fn_aln = fn_dir + tomogramSet.getTomogramName(idx_tomo) + ".aln";
-    FileName fn_ctf_img;
+
+    std::string tomoname = tomogramSet.getTomogramName(idx_tomo);
+    FileName fn_dir = fn_out + "external/" + tomoname + '/';
+    FileName fn_aln = fn_dir + tomoname + ".aln";
+    FileName fn_ctf_img = fn_dir + tomoname + "_ctf.mrc";
+    FileName fn_ctf = fn_dir + tomoname + "_ctf.txt";
 
     int fc = tomogramSet.tomogramTables[idx_tomo].numberOfObjects();
     // Get alignment parameters from the .aln file
@@ -497,10 +561,8 @@ bool AlignTiltseriesRunner::readAreTomoResults(long idx_tomo, std::string &error
     {
 
         // Set this for later writing out to power_spectra star file
-        fn_ctf_img = fn_dir + tomogramSet.getTomogramName(idx_tomo) + "_ctf.mrc";
 
         // Get CTF parameters from the _ctf.txt file
-        FileName fn_ctf = fn_dir + tomogramSet.getTomogramName(idx_tomo) + "_ctf.txt";
         std::ifstream in2(fn_ctf.data(), std::ios_base::in);
         if (in2.fail())
         {
