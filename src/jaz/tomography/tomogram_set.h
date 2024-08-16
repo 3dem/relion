@@ -24,6 +24,8 @@ class TomogramSet
         bool read(FileName filename, bool verbose = true);
         void write(FileName filename);
 
+        void removeTomogram(std::string tomogramName);
+
         // If max_dose is positive, then only images with cumulativeDose less than or equal to max_dose will be loaded.
 		Tomogram loadTomogram(int index, bool loadImageData, bool loadEvenFrames = false, bool loadOddFrames = false, int w0 = -999, int h0 =-999, int d0 = -999 ) const;
 

@@ -6608,6 +6608,7 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
 	{
 		command += "`which relion_align_tiltseries` ";
 		command += " --aretomo2 --i " + joboptions["in_tiltseries"].getString();
+        command += " --o " + outputname;
         command += " --aretomo_exe " + joboptions["fn_aretomo_exe"].getString();
 
 		if (joboptions["do_aretomo_tiltcorrect"].getBoolean())
@@ -6627,6 +6628,12 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
 
         command += " --other_wrapper_args \" " + joboptions["other_aretomo_args"].getString() + " \"";
         command += " --gpu " + joboptions["gpu_ids"].getString() + ' ';
+
+        if (is_continue)
+        {
+            command += " --only_do_unfinished ";
+        }
+
 	}
 
 	Node node(joboptions["in_tiltseries"].getString(), joboptions["in_tiltseries"].node_type);

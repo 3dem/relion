@@ -66,7 +66,7 @@ void AlignTiltseriesRunnerMpi::run()
         }
         else if (do_imod_fiducials || do_imod_patchtrack)
         {
-            executeImodWrapper(idx_tomograms[itomo], node->rank);
+            executeIMOD(idx_tomograms[itomo], node->rank);
         }
 
         if (verb > 0 && itomo % barstep == 0) progress_bar(itomo);

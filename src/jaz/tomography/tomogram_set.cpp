@@ -132,6 +132,24 @@ void TomogramSet::write(FileName filename)
 
 }
 
+void TomogramSet::removeTomogram(std::string tomogramName)
+{
+    // Find the index of this tomogram name
+    for (int idx = 0; idx < tomogramTables.size(); idx++)
+    {
+        std::string myname = getTomogramName(idx);
+        if (myname == tomogramName)
+        {
+            tomogramTables.erase(tomogramTables.begin() + idx);
+            globalTable.removeObject(idx);
+            return;
+        }
+    }
+    // not found
+    REPORT_ERROR("ERROR: tried removing tomogram " + tomogramName + " but it did not exist in the tomogramSet");
+
+}
+
 Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenFramesOnly, bool loadOddFramesOnly,
                                    int _w0, int _h0, int _d0) const //Set loadEven/OddFramesOnly to True to loadImageData from rlnTomoMicrographNameEven/Odd rather than rlnMicrographName
 {
