@@ -910,7 +910,8 @@ void RelionJob::initialise(int _job_type)
 	}
 	else if (type == PROC_TOMO_ALIGN_TILTSERIES)
 	{
-		has_mpi = has_thread = false;
+		has_mpi = true;
+        has_thread = false;
 		initialiseTomoAlignTiltSeriesJob();
 	}
 	else if (type == PROC_TOMO_RECONSTRUCT_TOMOGRAM)

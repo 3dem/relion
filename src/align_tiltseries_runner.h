@@ -122,6 +122,11 @@ public:
     // AreTomo executable
     FileName fn_aretomo_exe;
 
+    // Filename for IMOD directives file
+    FileName fn_adoc_template;
+
+    std::string my_adoc_template;
+
     // Use IMOD:fiducials
     bool do_imod_fiducials;
 

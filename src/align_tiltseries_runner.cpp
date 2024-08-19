@@ -28,6 +28,7 @@ void AlignTiltseriesRunner::read(int argc, char **argv, int rank)
 	continue_old = parser.checkOption("--only_do_unfinished", "Only estimate CTFs for those tomograms for which there is not yet a logfile with Final values.");
     do_at_most = textToInteger(parser.getOption("--do_at_most", "Only process up to this number of (unprocessed) tomograms.", "-1"));
     fn_batchtomo_exe = parser.getOption("--batchtomo_exe", "IMOD's batchruntomo executable (default is set through $RELION_BATCHTOMO_EXECUTABLE)", "");
+    fn_adoc_template = parser.getOption("--adoc_template", "Filename of a template for the IMOD directive file (by default, use hard-coded defaults)", "");
 
     int fid_section = parser.addSection("IMOD fiducial-based alignment options");
     do_imod_fiducials = parser.checkOption("--imod_fiducials", "Use IMOD's fiducial-based alignment method");
@@ -93,6 +94,31 @@ void AlignTiltseriesRunner::initialise(bool is_leader)
             fn_aretomo_exe = "AreTomo2";
         }
     }
+
+
+    if (fn_adoc_template != "")
+    {
+        std::ifstream in(fn_adoc_template.data(), std::ios_base::in);
+        if (in.fail()) REPORT_ERROR("ERROR: cannot open directives template file: " + fn_adoc_template);
+
+        in.seekg(0);
+        std::string line;
+        my_adoc_template = "";
+        while (getline(in, line, '\n'))
+        {
+            my_adoc_template += line + "\n";
+        }
+        in.close();
+    }
+    else if (do_imod_fiducials)
+    {
+        my_adoc_template = fiducial_directive;
+    }
+    else if (do_imod_patchtrack)
+    {
+        my_adoc_template = patchtrack_directive;
+    }
+
 
     int i = 0;
     if (do_imod_fiducials) i++;
@@ -286,11 +312,12 @@ void AlignTiltseriesRunner::generateMRCStackAndRawTiltFile(long idx_tomo, bool i
         Imic.read(fn_mic);
         if (f == 0) Iseries().resize(fc, YSIZE(Imic()), XSIZE(Imic()));
         Iseries().setSlice(f, Imic());
+
     }
 
     RFLOAT angpix = tomogramSet.getTiltSeriesPixelSize(idx_tomo);
     tomogramSet.globalTable.getDouble(EMDL_TOMO_IMPORT_FRACT_DOSE, idx_tomo);
-    Iseries.setSamplingRateInHeader(angpix);
+    if (is_aretomo) Iseries.setSamplingRateInHeader(angpix);
     Iseries.write(fn_series);
     fh.close();
 
@@ -320,7 +347,7 @@ void AlignTiltseriesRunner::executeIMOD(long idx_tomo, int rank)
     RFLOAT rotangle = tomogramSet.tomogramTables[idx_tomo].getDouble(EMDL_TOMO_NOMINAL_TILT_AXIS_ANGLE, 0);
     if (do_imod_fiducials)
     {
-        fhadoc << fiducial_directive;
+        fhadoc << my_adoc_template;
         fhadoc << "setupset.copyarg.rotation = " << rotangle << std::endl;
         fhadoc << "setupset.copyarg.pixel = " << pixel_size/10. << std::endl;
         fhadoc << "setupset.copyarg.gold = " << fiducial_diam << std::endl;
@@ -342,7 +369,7 @@ void AlignTiltseriesRunner::executeIMOD(long idx_tomo, int rank)
         }
         int binned_patch_size = ROUND( (10. * patch_size) / (pixel_size * mybestbinning) );
 
-        fhadoc << patchtrack_directive;
+        fhadoc << my_adoc_template;
         fhadoc << "setupset.copyarg.rotation = " << rotangle << std::endl;
         fhadoc << "setupset.copyarg.pixel = " << pixel_size/10. << std::endl;
         fhadoc << "comparam.prenewst.newstack.BinByFactor = " << mybestbinning << std::endl;
@@ -485,11 +512,108 @@ bool AlignTiltseriesRunner::readIMODResults(long idx_tomo, std::string &error_me
     FileName fn_xf = fn_dir + tomoname + ".xf";
     FileName fn_tlt = fn_dir + tomoname + ".tlt";
     FileName fn_edf = fn_dir + tomoname + ".edf";
+    FileName fn_align = fn_dir + "align.log";
 
+    int fc = tomogramSet.tomogramTables[idx_tomo].numberOfObjects();
+    RFLOAT angpix = tomogramSet.getTiltSeriesPixelSize(idx_tomo);
 
+    std::string line;
+    std::vector<std::string> words;
 
-    std::cerr << " to be implemented..." << std::endl;
-    return false;
+    // 1. Get tiltangle_offset from the align.log file
+    RFLOAT tiltangle_offset = 0.;
+    std::ifstream in0(fn_align.data(), std::ios_base::in);
+    if (in0.fail())
+    {
+        error_message = " ERROR: cannot open IMOD's align.log file: " + fn_align;
+        return false;
+    }
+
+    in0.seekg(0);
+    while (getline(in0, line, '\n'))
+    {
+        if (line.find("AngleOffset = ") != std::string::npos)
+        {
+            tokenize(line, words);
+            tiltangle_offset = textToFloat(words[2]);
+        }
+    }
+    in0.close();
+
+    // 2. Get specimen_shifts and zrot from the .xf file
+    std::ifstream in(fn_xf.data(), std::ios_base::in);
+    if (in.fail())
+    {
+        error_message = " ERROR: cannot open IMOD's .xf file: " + fn_xf;
+        return false;
+    }
+
+    in.seekg(0);
+    int f = 0;
+    while (getline(in, line, '\n'))
+    {
+        Matrix2D<RFLOAT> A(2,2);
+        Matrix1D<RFLOAT> s(2), image_shifts(2);
+        tokenize(line, words);
+        if (words.size() != 6) REPORT_ERROR("ERROR: did not find 6 columns in xf file: " + fn_xf);
+        A(0, 0) = textToFloat(words[0]);
+        A(0, 1) = textToFloat(words[1]);
+        A(1, 0) = textToFloat(words[2]);
+        A(1, 1) = textToFloat(words[3]);
+        s(0) =  textToFloat(words[4]);
+        s(1) =  textToFloat(words[5]);
+
+        // get specimen shifts
+        image_shifts = A.inv() * s;
+        tomogramSet.tomogramTables[idx_tomo].setValue(EMDL_TOMO_XSHIFT_ANGST, -image_shifts(0) * angpix, f);
+        tomogramSet.tomogramTables[idx_tomo].setValue(EMDL_TOMO_YSHIFT_ANGST, -image_shifts(1) * angpix, f);
+
+        // get in-plane rotation (zrot)
+        RFLOAT myzrot = RAD2DEG(acos(A(0, 0)));
+        RFLOAT inizrot;
+        tomogramSet.tomogramTables[idx_tomo].getValue(EMDL_TOMO_NOMINAL_TILT_AXIS_ANGLE, inizrot, f);
+        RFLOAT diff = fabs(inizrot - myzrot);
+        RFLOAT flippeddiff = fabs(-inizrot - myzrot);
+        if (flippeddiff < diff) myzrot = -myzrot;
+        tomogramSet.tomogramTables[idx_tomo].setValue(EMDL_TOMO_ZROT, myzrot, f);
+
+        f++;
+    }
+    in.close();
+
+    if (f != fc) REPORT_ERROR("ERROR: found " + integerToString(f) + " entries in xf file " + fn_xf + ", but expected " +
+                                                 integerToString(fc) + " entries...");
+
+    // 3. Get ytilt angles straight from the .tlt file (and apply tiltangle_offset)
+    std::ifstream in2(fn_tlt.data(), std::ios_base::in);
+    if (in2.fail())
+    {
+        error_message = " ERROR: cannot open IMOD's .tlt file: " + fn_tlt;
+        return false;
+    }
+
+    in2.seekg(0);
+    f = 0;
+    while (getline(in2, line, '\n'))
+    {
+        tokenize(line, words);
+        if (words.size() != 1) REPORT_ERROR("ERROR: did not find 1 column in tlt file: " + fn_tlt);
+        tomogramSet.tomogramTables[idx_tomo].setValue(EMDL_TOMO_XTILT, 0., f);
+        // Subtract tilt_angle_offset
+        tomogramSet.tomogramTables[idx_tomo].setValue(EMDL_TOMO_YTILT, textToFloat(words[0]) - tiltangle_offset, f);
+
+        f++;
+    }
+    in2.close();
+
+    if (f != fc) REPORT_ERROR("ERROR: found " + integerToString(f) + " entries in tlt file " + fn_tlt + ", but expected " +
+                              integerToString(fc) + " entries...");
+
+    // Also set the edf filename in the overall tilt_series STAR file
+    tomogramSet.globalTable.setValue(EMDL_TOMO_ETOMO_DIRECTIVE_FILE, fn_edf, idx_tomo);
+
+    return true;
+
 }
 
 bool AlignTiltseriesRunner::readAreTomoResults(long idx_tomo, std::string &error_message)
@@ -502,9 +626,9 @@ bool AlignTiltseriesRunner::readAreTomoResults(long idx_tomo, std::string &error
     FileName fn_ctf = fn_dir + tomoname + "_ctf.txt";
 
     int fc = tomogramSet.tomogramTables[idx_tomo].numberOfObjects();
-    // Get alignment parameters from the .aln file
     RFLOAT angpix = tomogramSet.getTiltSeriesPixelSize(idx_tomo);
 
+    // Get alignment parameters from the .aln file
 
     // In the CTF file, frames are ordered on tilt, sigh!
     std::vector<int> tilt_order_idx = tomogramSet.getFrameTiltOrderIndex(idx_tomo);
