@@ -196,11 +196,14 @@ public:
     // Execute AreTomo for a single tomogram
     void executeAreTomo(long idx_tomo, int rank = 0);
 
-    // Read AreTomo results files and insert data into relion's MetaDataTable
-    bool readAreTomoResults(long idx_tomo, std::string &error_message);
+    // Make per-tiltseries EPS files for the logfile
+    void makePerTiltSeriesEPSFiles(long idx_tomo, bool do_ctf = false);
 
     // Read IMOD results files and insert data into relion's MetaDataTable
     bool readIMODResults(long idx_tomo, std::string &error_message);
+
+    // Read AreTomo results files and insert data into relion's MetaDataTable
+    bool readAreTomoResults(long idx_tomo, std::string &error_message);
 
     // Harvest all AreTomo results into the single tomograms set starfile, and write it out
     void joinResults();

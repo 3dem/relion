@@ -2623,12 +2623,14 @@ void JobWindow::initialiseTomoAlignTiltseriesWindow()
     // Add a little spacer
     current_y += STEPY/2;
 
+    place("fn_batchtomo_exe", TOGGLE_DEACTIVATE);
+    place("fn_aretomo_exe", TOGGLE_DEACTIVATE);
+
     tab1->end();
     tab2->begin();
     tab2->label("IMOD");
     resetHeight();
 
-    place("fn_batchtomo_exe", TOGGLE_DEACTIVATE);
 
     // Add a little spacer
 	current_y += STEPY/2;
@@ -2665,8 +2667,6 @@ void JobWindow::initialiseTomoAlignTiltseriesWindow()
     group3->end();
     place("do_aretomo2", TOGGLE_DEACTIVATE, group3, false);
     group3->begin();
-
-    place("fn_aretomo_exe", TOGGLE_DEACTIVATE);
 
     // Add a little spacer
     current_y += STEPY/2;

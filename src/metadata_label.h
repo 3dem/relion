@@ -621,6 +621,11 @@ enum EMDLabel
     EMDL_TOMO_TILT_SERIES_STARFILE,
 	EMDL_TOMO_TILT_MOVIE_FRAMECOUNT,
     EMDL_TOMO_ETOMO_DIRECTIVE_FILE,
+    EMDL_TOMO_ARETOMO_TILTANGLE_OFFSET,
+    EMDL_TOMO_ARETOMO_TILTAXIS_SCORE,
+    EMDL_TOMO_IMOD_LEAVEOUT_ERROR,
+    EMDL_TOMO_IMOD_ERROR_MEAN,
+    EMDL_TOMO_IMOD_ERROR_STDDEV,
 	EMDL_TOMO_FRAME_COUNT,
 	EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME,
     EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF1_FILE_NAME,
@@ -1340,6 +1345,11 @@ private:
         EMDL::addLabel(EMDL_TOMO_TILT_SERIES_STARFILE, EMDL_STRING, "rlnTomoTiltSeriesStarFile", "Tilt series starfile");
 		EMDL::addLabel(EMDL_TOMO_TILT_MOVIE_FRAMECOUNT, EMDL_INT, "rlnTomoTiltMovieFrameCount", "Number of frames in the tilt series movies");
 		EMDL::addLabel(EMDL_TOMO_ETOMO_DIRECTIVE_FILE, EMDL_STRING, "rlnEtomoDirectiveFile", "Location of the etomo directive file (.edf) from tilt series alignment");
+        EMDL::addLabel(EMDL_TOMO_ARETOMO_TILTANGLE_OFFSET, EMDL_DOUBLE, "rlnAreTomoTiltangleOffset", "Tiltangle offset (in degrees) as refined during tiltseries alignment by AreTomo2");
+        EMDL::addLabel(EMDL_TOMO_ARETOMO_TILTAXIS_SCORE, EMDL_DOUBLE, "rlnAreTomoTiltAxisScore", "Best score for the tilt axis refinement as reported during tiltseries alignment by AreTomo2");
+        EMDL::addLabel(EMDL_TOMO_IMOD_LEAVEOUT_ERROR, EMDL_DOUBLE, "rlnIMODLeaveOutError", "Leave-out error (in nm) as reported by Imod for tiltseries alignment");
+        EMDL::addLabel(EMDL_TOMO_IMOD_ERROR_MEAN, EMDL_DOUBLE, "rlnIMODResidualErrorMean", "Mean of the residual error (in nm) as reported by Imod for tiltseries alignment");
+        EMDL::addLabel(EMDL_TOMO_IMOD_ERROR_STDDEV, EMDL_DOUBLE, "rlnIMODResidualErrorStddev", "Standard deviation of the residual error (in nm) as reported by Imod for tiltseries alignment");
         EMDL::addLabel(EMDL_TOMO_FRAME_COUNT, EMDL_INT, "rlnTomoFrameCount", "Number of tilts in a tilt series");
         EMDL::addLabel(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME, EMDL_STRING, "rlnTomoReconstructedTomogram", "File name of a reconstructed tomogram");
         EMDL::addLabel(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF1_FILE_NAME, EMDL_STRING, "rlnTomoReconstructedTomogramHalf1", "File name of a reconstructed tomogram from even numbered movie frames or tilt image index");

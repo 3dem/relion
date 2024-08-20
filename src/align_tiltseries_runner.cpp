@@ -246,8 +246,6 @@ void AlignTiltseriesRunner::run()
     if (verb > 0)
         progress_bar(idx_tomograms.size());
 
-    joinResults();
-
 }
 
 bool AlignTiltseriesRunner::checkResults(long idx_tomo)
@@ -337,7 +335,7 @@ void AlignTiltseriesRunner::executeIMOD(long idx_tomo, int rank)
     FileName fn_series = fn_dir + tomoname + ".mrc";
     FileName fn_tilt = fn_dir + tomoname + ".rawtlt";
     FileName fn_adoc = fn_dir + "batchDirective.adoc";
-    FileName fn_log = fn_dir + tomoname + ".log";
+    FileName fn_log = fn_dir + "log.txt"; // for compatbility with Alister's wrapper
     FileName fn_com = fn_dir + tomoname + ".com";
 
     std::ofstream  fhadoc;
@@ -410,6 +408,7 @@ void AlignTiltseriesRunner::executeIMOD(long idx_tomo, int rank)
     {
         std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
     }
+
 
 }
 
@@ -504,6 +503,54 @@ void AlignTiltseriesRunner::executeAreTomo(long idx_tomo, int rank)
 
 }
 
+void AlignTiltseriesRunner::makePerTiltSeriesEPSFiles(long idx_tomo, bool do_ctf)
+{
+
+    std::string tomoname = tomogramSet.getTomogramName(idx_tomo);
+    FileName fn_dir = fn_out + "external/" + tomoname + '/';
+    FileName fn_eps_tilt = fn_dir + tomoname + "_tilts.eps";
+    FileName fn_eps_shift = fn_dir + tomoname + "_shifts.eps";
+    FileName fn_eps_defocus = fn_dir + tomoname + "_defocus.eps";
+    FileName fn_eps_ctffom = fn_dir + tomoname + "_ctfscore.eps";
+
+    if (continue_old && exists(fn_eps_tilt) && exists(fn_eps_shift)) return;
+
+    // Nominal and refined tilt values for all images in this tiltseries
+    CPlot2D *plot2Da=new CPlot2D("nominal and refined tilt angles for " + tomoname);
+    tomogramSet.tomogramTables[idx_tomo].addToCPlot2D(plot2Da, EMDL_UNDEFINED, EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE, 0., 0., 1.);
+    tomogramSet.tomogramTables[idx_tomo].addToCPlot2D(plot2Da, EMDL_UNDEFINED, EMDL_TOMO_YTILT, 1., 0., 0.);
+    plot2Da->SetDrawLegend(true);
+    plot2Da->OutputPostScriptPlot(fn_eps_tilt);
+    delete plot2Da;
+
+    // Refined X and Y-shift values for all images in this tiltseries
+    CPlot2D *plot2Db=new CPlot2D("X and Y shifts for " + tomoname);
+    tomogramSet.tomogramTables[idx_tomo].addToCPlot2D(plot2Db, EMDL_UNDEFINED, EMDL_TOMO_XSHIFT_ANGST, 0., 0., 1.);
+    tomogramSet.tomogramTables[idx_tomo].addToCPlot2D(plot2Db, EMDL_UNDEFINED, EMDL_TOMO_YSHIFT_ANGST, 1., 0., 0.);
+    plot2Db->SetDrawLegend(true);
+    plot2Db->OutputPostScriptPlot(fn_eps_shift);
+    delete plot2Db;
+
+    if (do_ctf)
+    {
+        CPlot2D *plot2Dc=new CPlot2D("Defocus U and V for " + tomoname);
+        tomogramSet.tomogramTables[idx_tomo].addToCPlot2D(plot2Dc, EMDL_UNDEFINED, EMDL_CTF_DEFOCUSU, 0., 0., 1.);
+        tomogramSet.tomogramTables[idx_tomo].addToCPlot2D(plot2Dc, EMDL_UNDEFINED, EMDL_CTF_DEFOCUSV, 1., 0., 0.);
+        plot2Dc->SetDrawLegend(true);
+        plot2Dc->OutputPostScriptPlot(fn_eps_defocus);
+        delete plot2Dc;
+
+        CPlot2D *plot2Dd=new CPlot2D("CTF score for " + tomoname);
+        tomogramSet.tomogramTables[idx_tomo].addToCPlot2D(plot2Dd, EMDL_UNDEFINED, EMDL_CTF_FOM, 0., 0., 1.);
+        plot2Dd->OutputPostScriptPlot(fn_eps_ctffom);
+        delete plot2Dd;
+
+    }
+
+
+}
+
+
 bool AlignTiltseriesRunner::readIMODResults(long idx_tomo, std::string &error_message)
 {
     std::string tomoname = tomogramSet.getTomogramName(idx_tomo);
@@ -521,7 +568,7 @@ bool AlignTiltseriesRunner::readIMODResults(long idx_tomo, std::string &error_me
     std::vector<std::string> words;
 
     // 1. Get tiltangle_offset from the align.log file
-    RFLOAT tiltangle_offset = 0.;
+    RFLOAT tiltangle_offset = 0., mean_error = 0., stddev_error = 0., leaveout_error = 0.;
     std::ifstream in0(fn_align.data(), std::ios_base::in);
     if (in0.fail())
     {
@@ -535,8 +582,23 @@ bool AlignTiltseriesRunner::readIMODResults(long idx_tomo, std::string &error_me
         if (line.find("AngleOffset = ") != std::string::npos)
         {
             tokenize(line, words);
+            if (words.size() < 3) REPORT_ERROR("ERROR: fewer than 3 columns on this line from align.log file: " + line);
             tiltangle_offset = textToFloat(words[2]);
         }
+        else if (line.find("Residual error mean and sd:") != std::string::npos)
+        {
+            tokenize(line, words);
+            if (words.size() < 7) REPORT_ERROR("ERROR: fewer than 7 columns on this line from align.log file: " + line);
+            mean_error = textToFloat(words[5]);
+            stddev_error = textToFloat(words[6]);
+        }
+        else if (line.find("Global leave-out error") != std::string::npos)
+        {
+            tokenize(line, words);
+            if (words.size() < 6) REPORT_ERROR("ERROR: fewer than 6 columns on this line from align.log file: " + line);
+            leaveout_error = textToFloat(words[5]);
+        }
+
     }
     in0.close();
 
@@ -611,6 +673,12 @@ bool AlignTiltseriesRunner::readIMODResults(long idx_tomo, std::string &error_me
 
     // Also set the edf filename in the overall tilt_series STAR file
     tomogramSet.globalTable.setValue(EMDL_TOMO_ETOMO_DIRECTIVE_FILE, fn_edf, idx_tomo);
+    tomogramSet.globalTable.setValue(EMDL_TOMO_IMOD_ERROR_MEAN, mean_error, idx_tomo);
+    tomogramSet.globalTable.setValue(EMDL_TOMO_IMOD_ERROR_STDDEV, stddev_error, idx_tomo);
+    tomogramSet.globalTable.setValue(EMDL_TOMO_IMOD_LEAVEOUT_ERROR, leaveout_error, idx_tomo);
+
+    // Also make per-tiltseries EPS files
+    makePerTiltSeriesEPSFiles(idx_tomo);
 
     return true;
 
@@ -624,15 +692,42 @@ bool AlignTiltseriesRunner::readAreTomoResults(long idx_tomo, std::string &error
     FileName fn_aln = fn_dir + tomoname + ".aln";
     FileName fn_ctf_img = fn_dir + tomoname + "_ctf.mrc";
     FileName fn_ctf = fn_dir + tomoname + "_ctf.txt";
+    FileName fn_log = fn_dir + tomoname + ".log";
 
     int fc = tomogramSet.tomogramTables[idx_tomo].numberOfObjects();
     RFLOAT angpix = tomogramSet.getTiltSeriesPixelSize(idx_tomo);
 
-    // Get alignment parameters from the .aln file
+    std::string line;
+    std::vector<std::string> words;
 
-    // In the CTF file, frames are ordered on tilt, sigh!
-    std::vector<int> tilt_order_idx = tomogramSet.getFrameTiltOrderIndex(idx_tomo);
 
+    // 0. Get the best tilt axis score the log file
+    RFLOAT tiltaxis_score = -0.999;
+    std::ifstream in0(fn_log.data(), std::ios_base::in);
+    if (in0.fail())
+    {
+        error_message = " ERROR: cannot open the AreTomo2 log file: " + fn_log;
+        return false;
+    }
+
+    in0.seekg(0);
+    while (getline(in0, line, '\n'))
+    {
+        if (line.find("Best tilt axis:") != std::string::npos)
+        {
+            tokenize(line, words);
+            if (words.size() < 6) REPORT_ERROR("ERROR: fewer than 6 columns on this line from logfile: " + line);
+            if (textToFloat(words[5]) > tiltaxis_score)
+                tiltaxis_score = textToFloat(words[5]);
+        }
+    }
+    in0.close();
+
+    // Set the best score in the global table
+    tomogramSet.globalTable.setValue(EMDL_TOMO_ARETOMO_TILTAXIS_SCORE, tiltaxis_score, idx_tomo);
+
+
+    // 1. Get tiltseries alignment parameters from the .aln file
     std::ifstream in(fn_aln.data(), std::ios_base::in);
     if (in.fail())
     {
@@ -640,8 +735,6 @@ bool AlignTiltseriesRunner::readAreTomoResults(long idx_tomo, std::string &error
         return false;
     }
 
-    std::string line;
-    std::vector<std::string> words;
     std::vector<RFLOAT> rot, tilt, tx, ty;
     std::vector<RFLOAT> defU, defV, defAngle, phaseShift, corr, maxres;
     std::vector<int> indices, dark_frames;
@@ -681,6 +774,7 @@ bool AlignTiltseriesRunner::readAreTomoResults(long idx_tomo, std::string &error
         return false;
     }
 
+    // 1. Get CTF estimation parameters from the _ctf.txt file
     if (do_aretomo_ctf)
     {
 
@@ -724,16 +818,17 @@ bool AlignTiltseriesRunner::readAreTomoResults(long idx_tomo, std::string &error
 
 
     MetaDataTable MDnew;
-
     for (int i = 0; i < rot.size(); i++)
     {
         int f = indices[i];
 
-         MDnew.addObject(tomogramSet.tomogramTables[idx_tomo].getObject(f));
+        MDnew.addObject(tomogramSet.tomogramTables[idx_tomo].getObject(f));
 
         MDnew.setValue(EMDL_TOMO_XTILT, 0.);
         MDnew.setValue(EMDL_TOMO_YTILT, tilt[i]);
         MDnew.setValue(EMDL_TOMO_ZROT, rot[i]);
+        // For AreTomo, also position one of the refined Zrot values in the globalTable, so it can be plotted for the logfile
+        if (i==0) tomogramSet.globalTable.setValue(EMDL_TOMO_ZROT, rot[i], idx_tomo);
         MDnew.setValue(EMDL_TOMO_XSHIFT_ANGST, tx[i]);
         MDnew.setValue(EMDL_TOMO_YSHIFT_ANGST, ty[i]);
 
@@ -757,6 +852,9 @@ bool AlignTiltseriesRunner::readAreTomoResults(long idx_tomo, std::string &error
     MDnew.sort(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE);
     MDnew.setName(tomogramSet.tomogramTables[idx_tomo].getName());
     tomogramSet.tomogramTables[idx_tomo] = MDnew;
+
+    // Also make per-tiltseries EPS files
+    makePerTiltSeriesEPSFiles(idx_tomo, do_aretomo_ctf);
 
     return true;
 
@@ -838,7 +936,82 @@ void AlignTiltseriesRunner::joinResults()
 
     if (verb > 0)
     {
-        std::cout << " Done! Written out: " << fn_out <<  "aligned_tilt_series.star" << std::endl;
+        std::cout << " Written out: " << fn_out <<  "aligned_tilt_series.star" << std::endl;
+    }
+
+
+
+    if (verb > 0)
+    {
+        std::cout << " Now generating logfile.pdf ... " << std::endl;
+    }
+
+    std::vector<EMDLabel> plot_labels;
+    if (do_imod_fiducials || do_imod_patchtrack)
+    {
+        plot_labels.push_back(EMDL_TOMO_IMOD_LEAVEOUT_ERROR);
+        plot_labels.push_back(EMDL_TOMO_IMOD_ERROR_MEAN);
+        plot_labels.push_back(EMDL_TOMO_IMOD_ERROR_STDDEV);
+    }
+    else if (do_aretomo)
+    {
+        plot_labels.push_back(EMDL_TOMO_ZROT);
+        plot_labels.push_back(EMDL_TOMO_ARETOMO_TILTAXIS_SCORE);
+        if (do_aretomo_tiltcorrect && aretomo_tilcorrect_angle > 180.)
+            plot_labels.push_back(EMDL_TOMO_ARETOMO_TILTANGLE_OFFSET);
+    }
+    FileName fn_eps;
+    std::vector<FileName> all_fn_eps;
+    for (int i = 0; i < plot_labels.size(); i++)
+    {
+        EMDLabel label = plot_labels[i];
+        if (tomogramSet.globalTable.containsLabel(label))
+        {
+            // Values for all micrographs
+            CPlot2D *plot2Db=new CPlot2D(EMDL::label2Str(label) + " for all tiltseries");
+            tomogramSet.globalTable.addToCPlot2D(plot2Db, EMDL_UNDEFINED, label, 1.);
+            plot2Db->SetDrawLegend(false);
+            fn_eps = fn_out + "all_" + EMDL::label2Str(label) + ".eps";
+            plot2Db->OutputPostScriptPlot(fn_eps);
+            all_fn_eps.push_back(fn_eps);
+            delete plot2Db;
+            if ( tomogramSet.globalTable.numberOfObjects() > 3)
+            {
+                // Histogram
+                std::vector<RFLOAT> histX, histY;
+                CPlot2D *plot2D=new CPlot2D("");
+                tomogramSet.globalTable.columnHistogram(label,histX,histY,0, plot2D);
+                fn_eps = fn_out + "hist_" + EMDL::label2Str(label) + ".eps";
+                plot2D->OutputPostScriptPlot(fn_eps);
+                all_fn_eps.push_back(fn_eps);
+                delete plot2D;
+            }
+        }
+    }
+
+    // Also add all the EPS plots of the refined tilt series alignments
+    for (long itomo = 0; itomo < tomogramSet.size(); itomo++)
+    {
+        std::string tomoname = tomogramSet.getTomogramName(itomo);
+        FileName fn_dir = fn_out + "external/" + tomoname + '/';
+        FileName fn_eps_tilt = fn_dir + tomoname + "_tilts.eps";
+        FileName fn_eps_shift = fn_dir + tomoname + "_shifts.eps";
+        all_fn_eps.push_back(fn_eps_tilt);
+        all_fn_eps.push_back(fn_eps_shift);
+        if (do_aretomo && do_aretomo_ctf)
+        {
+            FileName fn_eps_defocus = fn_dir + tomoname + "_defocus.eps";
+            FileName fn_eps_ctffom = fn_dir + tomoname + "_ctfscore.eps";
+            all_fn_eps.push_back(fn_eps_defocus);
+            all_fn_eps.push_back(fn_eps_ctffom);
+        }
+    }
+
+    joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf", all_fn_eps);
+
+    if (verb > 0 )
+    {
+        std::cout << " Done! Written out: " << fn_out << "logfile.pdf" << std::endl;
     }
 
 }

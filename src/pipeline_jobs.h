@@ -278,6 +278,7 @@ static bool do_allow_change_minimum_dedicated;
 #define LABEL_MOCORR_TOMOGRAMS         "TomogramGroupMetadata.star.relion.tomo.motioncorr"
 #define LABEL_CTFFIND_TOMOGRAMS        "TomogramGroupMetadata.star.relion.tomo.ctffind"
 #define LABEL_TILTALIGN_TOMOGRAMS      "TomogramGroupMetadata.star.relion.tomo.aligntiltseries"
+#define LABEL_TILTALIGN_LOG            "LogFile.pdf.relion.tomo.aligntiltseries"
 #define LABEL_RECONSTRUCT_TOMOGRAMS    "TomogramGroupMetadata.star.relion.tomo.reconstruct"
 #define LABEL_DENOISE_TOMOGRAMS        "TomogramGroupMetadata.star.relion.tomo.denoise"
 #define LABEL_TOMOPICK_PARTS_PARTS     "ParticleGroupMetadata.star.relion.tomo.manualpick.particles"

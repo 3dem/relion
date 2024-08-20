@@ -6658,7 +6658,10 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
 	Node node2(outputname+"aligned_tilt_series.star", LABEL_TILTALIGN_TOMOGRAMS);
 	outputNodes.push_back(node2);
 
-	// Other arguments from running tab
+    Node node3(outputname + "logfile.pdf", LABEL_TILTALIGN_LOG);
+    outputNodes.push_back(node3);
+
+    // Other arguments from running tab
 	command += " " + joboptions["other_args"].getString();
 	commands.push_back(command);
 
