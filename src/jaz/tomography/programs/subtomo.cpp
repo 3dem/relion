@@ -639,14 +639,27 @@ void SubtomoProgram::processTomograms(
         RFLOAT tomogram_angpix, tomogram_binning;
         if (do_real_subtomo)
         {
-            FileName fn_tomo;
+            FileName fn_tomo, fn_tomo2="";
             if (tomogramSet.globalTable.containsLabel(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME))
+            {
                 tomogramSet.globalTable.getValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME, fn_tomo, t);
+            }
+            else if (tomogramSet.globalTable.containsLabel(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF1_FILE_NAME))
+            {
+                tomogramSet.globalTable.getValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF1_FILE_NAME, fn_tomo, t);
+                tomogramSet.globalTable.getValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF2_FILE_NAME, fn_tomo2, t);
+            }
             else
-                REPORT_ERROR("ERROR: cannot find rlnTomoReconstructedTomogram or rlnTomoDenoisedTomogram in tomogram star file");
+                REPORT_ERROR("ERROR: cannot find rlnTomoReconstructedTomogram or rlnTomoReconstructedTomogramHalf1 in tomogram star file");
 
             tomogramSet.globalTable.getValue(EMDL_TOMO_TOMOGRAM_BINNING, tomogram_binning, t);
             recTomo.read(fn_tomo);
+            if (fn_tomo2 != "")
+            {
+                Image<RFLOAT> recTomo2;
+                recTomo2.read(fn_tomo2);
+                recTomo() += recTomo2();
+            }
             tomogram_angpix =  tomogram.optics.pixelSize * tomogram_binning;
         }
 
