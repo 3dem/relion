@@ -6544,9 +6544,17 @@ void RelionJob::initialiseTomoAlignTiltSeriesJob()
 	joboptions["patch_size"] = JobOption("Patch size (in nm): ", 100, 1, 500, 1, "The size of the patches in nanometer.");
 	joboptions["patch_overlap"] = JobOption("Patch overlap (%): ", 50, 0, 100, 10, "The overlap (0-100%) between the patches.");
 
+    char *default_location = getenv ("RELION_BATCHTOMO_EXECUTABLE");
+    char default_batchtomo[] = DEFAULTBATCHTOMOLOCATION;
+    if (default_location == NULL)
+    {
+        default_location = default_batchtomo;
+    }
+    joboptions["fn_batchtomo_exe"] = JobOption("Batchruntomo executable:", std::string(default_location), "*", ".", "Location of the batchruntomo executable from IMOD. You can control the default of this field by setting environment variable RELION_BATCHTOMO_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+
 	joboptions["do_aretomo2"] = JobOption("Use AreTomo2?", false, "Set to Yes to perform tilt series alignment using Shawn Zheng's AreTomo2.");
 
-    char *default_location = getenv ("RELION_ARETOMO_EXECUTABLE");
+    default_location = getenv ("RELION_ARETOMO_EXECUTABLE");
     char default_aretomo[] = DEFAULTARETOMOLOCATION;
     if (default_location == NULL)
     {
@@ -6586,30 +6594,32 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
         return false;
     }
 
+    if (joboptions["nr_mpi"].getNumber(error_message) > 1)
+        command="`which relion_align_tiltseries_mpi`";
+    else
+        command="`which relion_align_tiltseries`";
+
+
+    command += " --i " + joboptions["in_tiltseries"].getString();
+    command += " --o " + outputname;
 
     // Make sure the methods are the first argument to the program!
 	if (joboptions["do_imod_fiducials"].getBoolean())
 	{
-        command="`which relion_python_tomo_align_tilt_series` ";
-		command += "IMOD:fiducials ";
-        command += " --tilt-series-star-file " + joboptions["in_tiltseries"].getString();
-        command += " --output-directory " + outputname;
-        command += " --nominal-fiducial-diameter-nanometers " + joboptions["fiducial_diameter"].getString() + ' ';
+        command += " --imod_fiducials";
+        command += " --fiducial_diameter " + joboptions["fiducial_diameter"].getString() + ' ';
+        command += " --batchtomo_exe " + joboptions["fn_batchtomo_exe"].getString();
 	}
 	else if (joboptions["do_imod_patchtrack"].getBoolean())
 	{
-        command="`which relion_python_tomo_align_tilt_series` ";
-		command += "IMOD:patch-tracking ";
-        command += " --tilt-series-star-file " + joboptions["in_tiltseries"].getString();
-        command += " --output-directory " + outputname;
-        command += " --patch-size-nanometers " + joboptions["patch_size"].getString() + ' ';
-		command += " --patch-overlap-percentage " + joboptions["patch_overlap"].getString() + ' ';
+        command += " --imod_patchtrack";
+        command += " --patch_size " + joboptions["patch_size"].getString() + ' ';
+		command += " --patch_overlap " + joboptions["patch_overlap"].getString() + ' ';
+        command += " --batchtomo_exe " + joboptions["fn_batchtomo_exe"].getString();
 	}
 	else if (joboptions["do_aretomo2"].getBoolean())
 	{
-		command += "`which relion_align_tiltseries` ";
-		command += " --aretomo2 --i " + joboptions["in_tiltseries"].getString();
-        command += " --o " + outputname;
+		command += " --aretomo2 ";
         command += " --aretomo_exe " + joboptions["fn_aretomo_exe"].getString();
 
 		if (joboptions["do_aretomo_tiltcorrect"].getBoolean())
@@ -6625,6 +6635,11 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
             {
                 command += " --aretomo_phaseshift ";
             }
+
+            // Tomo-specific output file for display button
+            Node node4(outputname + "power_spectra_fits.star", LABEL_CTFFIND_POWER_SPECTRA);
+            outputNodes.push_back(node4);
+
         }
 
         command += " --other_wrapper_args \" " + joboptions["other_aretomo_args"].getString() + " \"";

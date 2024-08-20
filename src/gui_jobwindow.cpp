@@ -2628,6 +2628,11 @@ void JobWindow::initialiseTomoAlignTiltseriesWindow()
     tab2->label("IMOD");
     resetHeight();
 
+    place("fn_batchtomo_exe", TOGGLE_DEACTIVATE);
+
+    // Add a little spacer
+	current_y += STEPY/2;
+
     group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
     group1->end();
     place("do_imod_fiducials", TOGGLE_DEACTIVATE, group1, false);
@@ -2651,7 +2656,6 @@ void JobWindow::initialiseTomoAlignTiltseriesWindow()
     guientries["do_imod_patchtrack"].cb_menu_i(); // make default active
 
     tab2->end();
-
 
     tab3->begin();
     tab3->label("AreTomo2");

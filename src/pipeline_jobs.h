@@ -55,6 +55,7 @@
 #define DEFAULTQSUBLOCATION "/public/EM/RELION/relion/bin/relion_qsub.csh"
 #define DEFAULTCTFFINDLOCATION "/public/EM/ctffind/ctffind.exe"
 #define DEFAULTARETOMOLOCATION "/public/EM/AreTomo/AreTomo2/AreTomo2"
+#define DEFAULTBATCHTOMOLOCATION "/public/EM/imod/IMOD/bin/batchruntomo"
 //#define DEFAULTIMODWRAPPERLOCATION "relion_tomo_align_tilt_series"
 //#define DEFAULTDENOISINGWRAPPERLOCATION "relion_tomo_denoise"
 #define DEFAULTMOTIONCOR2LOCATION "/public/EM/MOTIONCOR2/MotionCor2"
