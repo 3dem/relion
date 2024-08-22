@@ -317,6 +317,10 @@ void MotioncorrRunner::initialise()
 		}
 	}
 
+	// Make sure fn_out ends with a slash
+	if (fn_out[fn_out.length() - 1] != '/')
+		fn_out += "/";
+
 	// First backup the given list of all micrographs
 	std::vector<int> optics_group_given_all = optics_group_micrographs;
 	std::vector<FileName> fn_mic_given_all = fn_micrographs;
@@ -382,10 +386,6 @@ void MotioncorrRunner::initialise()
 			optics_group_ori_micrographs.push_back(optics_group_given_all[imic]);
 		}
 	}
-
-	// Make sure fn_out ends with a slash
-	if (fn_out[fn_out.length()-1] != '/')
-		fn_out += "/";
 
 	// Make all output directories if necessary
 	FileName prevdir="";
