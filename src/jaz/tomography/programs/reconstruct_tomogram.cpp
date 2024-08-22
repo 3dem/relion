@@ -436,7 +436,7 @@ void TomoBackprojectProgram::reconstructOneTomogramFourier(int tomoIndex)
         }
 
         // Get the transformation matrix
-        const Matrix2D<double> A(3,3);
+        const Matrix2D<RFLOAT> A(3,3);
         for (int row= 0; row < 3; row++)
             for (int col = 0; col < 3; col++)
                 MAT_ELEM(A, row, col) = tomogram1.projectionMatrices[f](row, col);
