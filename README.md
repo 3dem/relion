@@ -1,5 +1,5 @@
-RELION 5.0-beta
-===============
+RELION 4.0.2
+============
 
 RELION (for REgularised LIkelihood OptimisatioN) is a stand-alone computer
 program for Maximum A Posteriori refinement of (multiple) 3D reconstructions
