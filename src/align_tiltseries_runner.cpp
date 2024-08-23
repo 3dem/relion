@@ -448,6 +448,12 @@ void AlignTiltseriesRunner::executeAreTomo(long idx_tomo, int rank)
     // Skip reconstruction of the tomogram in AreTomo...
     command += " -volZ 0";
 
+    if (tomogramSet.tomogramTables[idx_tomo].containsLabel(EMDL_TOMO_NOMINAL_TILT_AXIS_ANGLE))
+    {
+        RFLOAT tiltaxis_angle = tomogramSet.tomogramTables[idx_tomo].getDouble(EMDL_TOMO_NOMINAL_TILT_AXIS_ANGLE, 0);
+        command += " -TiltAxis " + floatToString(tiltaxis_angle);
+    }
+
     if (do_aretomo_tiltcorrect)
     {
         command += " -TiltCor 1 ";
