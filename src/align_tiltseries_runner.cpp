@@ -25,6 +25,7 @@ void AlignTiltseriesRunner::read(int argc, char **argv, int rank)
 	int gen_section = parser.addSection("General options");
 	fn_in = parser.getOption("--i", "STAR file with all input tomograms, or a unix wildcard to all tomogram files, e.g. \"mics/*.mrc\"");
 	fn_out = parser.getOption("--o", "Directory, where all output files will be stored", "AlignTiltSeries/");
+    tomogram_thickness = textToFloat(parser.getOption("--tomogram_thickness", "Estimated tomogram thickness (in nm)", "300"));
 	continue_old = parser.checkOption("--only_do_unfinished", "Only estimate CTFs for those tomograms for which there is not yet a logfile with Final values.");
     do_at_most = textToInteger(parser.getOption("--do_at_most", "Only process up to this number of (unprocessed) tomograms.", "-1"));
     fn_batchtomo_exe = parser.getOption("--batchtomo_exe", "IMOD's batchruntomo executable (default is set through $RELION_BATCHTOMO_EXECUTABLE)", "");
@@ -373,6 +374,7 @@ void AlignTiltseriesRunner::executeIMOD(long idx_tomo, int rank)
         fhadoc << "comparam.prenewst.newstack.BinByFactor = " << mybestbinning << std::endl;
         fhadoc << "comparam.xcorr_pt.tiltxcorr.SizeOfPatchesXandY = " << binned_patch_size << "," << binned_patch_size << std::endl;
         fhadoc << "comparam.xcorr_pt.tiltxcorr.OverlapOfPatchesXandY = " << patch_overlap/100. << "," << patch_overlap/100. << std::endl;
+        fhadoc << "comparam.tilt.tilt.THICKNESS = " << tomogram_thickness * 10. << std::endl;
     }
     else
     {
@@ -442,6 +444,7 @@ void AlignTiltseriesRunner::executeAreTomo(long idx_tomo, int rank)
     command += " -AngFile " + fn_tilt;
     command += " -OutMrc " + fn_ali;
     command += " -ImgDose " + floatToString(frac_dose);
+    command += " -AlignZ " + floatToString(tomogram_thickness);
     // Skip reconstruction of the tomogram in AreTomo...
     command += " -volZ 0";
 

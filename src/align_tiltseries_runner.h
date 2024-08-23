@@ -82,7 +82,7 @@ const std::string patchtrack_directive =
         "comparam.xcorr_pt.tiltxcorr.FilterRadius2 = 0.125 \n"
         "comparam.track.beadtrack.SobelFilterCentering = 1 \n"
         "comparam.track.beadtrack.ScalableSigmaForSobel = 0.12 \n"
-        "comparam.tilt.tilt.THICKNESS = 3000 \n"
+//        "comparam.tilt.tilt.THICKNESS = 3000 \n"
 //        "comparam.prenewst.newstack.BinByFactor = 8 \n"
         "comparam.prenewst.newstack.AntialiasFilter = -1 \n"
         "comparam.newst.newstack.TaperAtFill = 1,1 \n"
@@ -156,6 +156,9 @@ public:
 
     // Do phase shift estimation in AreTomo?
     bool do_aretomo_phaseshift;
+
+    // estimated tomogram thickness (for -AlignZ)
+    RFLOAT tomogram_thickness;
 
     // Which GPU devices to use?
     int devCount;

@@ -6534,15 +6534,8 @@ void RelionJob::initialiseTomoAlignTiltSeriesJob()
 {
 	hidden_name = ".gui_tomo_align_tiltseries";
 
-	joboptions["in_tiltseries"] = JobOption("Input tilt series:", LABEL_TOMOGRAMS_CPIPE, 1, "", "STAR files (*.star)",  "Input global tilt series star file.");
-
-	joboptions["do_imod_fiducials"] = JobOption("Use IMOD's fiducial based alignment?", false, "Set to Yes to perform tilt series alignment using fiducials in IMOD.");
-	joboptions["fiducial_diameter"] = JobOption("Fiducial diameter (nm): ", 10, 1, 20, 1, "The diameter of the fiducials (in nm)");
-
-	joboptions["do_imod_patchtrack"] = JobOption("Use IMOD's patch-tracking for alignment?", false, "Set to Yes to perform tilt series alignment using patch-tracking in IMOD.");
-
-	joboptions["patch_size"] = JobOption("Patch size (in nm): ", 100, 1, 500, 1, "The size of the patches in nanometer.");
-	joboptions["patch_overlap"] = JobOption("Patch overlap (%): ", 50, 0, 100, 10, "The overlap (0-100%) between the patches.");
+    joboptions["in_tiltseries"] = JobOption("Input tilt series:", LABEL_TOMOGRAMS_CPIPE, 1, "", "STAR files (*.star)",  "Input global tilt series star file.");
+    joboptions["tomogram_thickness"] = JobOption("Estimated tomogram thickness (nm):", 300, 50, 500, 10, "Estimated tomogram thickness (in nm) to be used for projection matching in AreTomo2 and for patch tracking in IMOD");
 
     char *default_location = getenv ("RELION_BATCHTOMO_EXECUTABLE");
     char default_batchtomo[] = DEFAULTBATCHTOMOLOCATION;
@@ -6552,7 +6545,7 @@ void RelionJob::initialiseTomoAlignTiltSeriesJob()
     }
     joboptions["fn_batchtomo_exe"] = JobOption("Batchruntomo executable:", std::string(default_location), "*", ".", "Location of the batchruntomo executable from IMOD. You can control the default of this field by setting environment variable RELION_BATCHTOMO_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 
-	joboptions["do_aretomo2"] = JobOption("Use AreTomo2?", false, "Set to Yes to perform tilt series alignment using Shawn Zheng's AreTomo2.");
+    joboptions["do_aretomo2"] = JobOption("Use AreTomo2?", false, "Set to Yes to perform tilt series alignment using Shawn Zheng's AreTomo2.");
 
     default_location = getenv ("RELION_ARETOMO_EXECUTABLE");
     char default_aretomo[] = DEFAULTARETOMOLOCATION;
@@ -6561,12 +6554,20 @@ void RelionJob::initialiseTomoAlignTiltSeriesJob()
         default_location = default_aretomo;
     }
     joboptions["fn_aretomo_exe"] = JobOption("AreTomo2 executable:", std::string(default_location), "*", ".", "Location of the AreTomo2 executable. You can control the default of this field by setting environment variable RELION_ARETOMO_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
-    joboptions["do_aretomo_ctf"] = JobOption("Also do CTF estimation? ", false, "If set to Yes, AreTomo will also perform CTF estimation and any CTF information that was already present in the input STAR files will be overwritten. Note that when using this option, it is no longer necessary to run a CTF estimation job");
-    joboptions["do_aretomo_phaseshift"] = JobOption("Also estimate phase shift? ", false, "If set to Yes, AreTomo will also perform estimation of the phase shift (due to a phase plate) during CTF estimation.");
+
+    joboptions["do_imod_fiducials"] = JobOption("Use IMOD's fiducial based alignment?", false, "Set to Yes to perform tilt series alignment using fiducials in IMOD.");
+	joboptions["fiducial_diameter"] = JobOption("Fiducial diameter (nm): ", 10, 1, 20, 1, "The diameter of the fiducials (in nm)");
+
+	joboptions["do_imod_patchtrack"] = JobOption("Use IMOD's patch-tracking for alignment?", false, "Set to Yes to perform tilt series alignment using patch-tracking in IMOD.");
+    joboptions["patch_size"] = JobOption("Patch size (in nm): ", 100, 1, 500, 1, "The size of the patches in nanometer.");
+	joboptions["patch_overlap"] = JobOption("Patch overlap (%): ", 50, 0, 100, 10, "The overlap (0-100%) between the patches.");
+
+    joboptions["do_aretomo_ctf"] = JobOption("Also do CTF estimation? ", false, "If set to Yes, AreTomo2 will also perform CTF estimation and any CTF information that was already present in the input STAR files will be overwritten. Note that when using this option, it is no longer necessary to run a CTF estimation job");
+    joboptions["do_aretomo_phaseshift"] = JobOption("Also estimate phase shift? ", false, "If set to Yes, AreTomo2 will also perform estimation of the phase shift (due to a phase plate) during CTF estimation.");
     joboptions["do_aretomo_tiltcorrect"] = JobOption("Correct Tilt Angle Offset?", false, "Specify Yes to correct the tilt angle offset in the tomogram (applies the AreTomo -TiltCor option). This is useful for correcting slanting in tomograms which can arise due to sample mounting or milling angle. This can be useful for in situ data.");
     joboptions["aretomo_tiltcorrect_angle"] = JobOption("Tilt Angle Offset:", 999 , -50, 50, 5, "The tilt angle (in degrees) to be offset. If set to a value larger than 180, AreTomo will search for the optimal value itself, otherwise the value specified here will be used.");
-    joboptions["other_aretomo_args"] = JobOption("Other AreTomo arguments", std::string(""), "Additional arguments that need to be passed to AreTomo.");
-	joboptions["gpu_ids"] = JobOption("Which GPUs to use for AreTomo:", std::string(""), "Provide a list of which GPUs (e.g. 0:1:2:3) to use in AreTomo. MPI-processes are separated by ':'. For example, to place one rank on device 0 and one rank on device 1, provide '0:1'.");
+    joboptions["other_aretomo_args"] = JobOption("Other AreTomo2 arguments", std::string(""), "Additional arguments that need to be passed to AreTomo2.");
+	joboptions["gpu_ids"] = JobOption("Which GPUs to use for AreTomo:", std::string(""), "Provide a list of which GPUs (e.g. 0:1:2:3) to use in AreTomo2. MPI-processes are separated by ':'. For example, to place one rank on device 0 and one rank on device 1, provide '0:1'.");
 
 }
 bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::vector<std::string> &commands,
@@ -6602,6 +6603,7 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
 
     command += " --i " + joboptions["in_tiltseries"].getString();
     command += " --o " + outputname;
+    command += " --tomogram_thickness " + joboptions["tomogram_thickness"].getString();
 
     // Make sure the methods are the first argument to the program!
 	if (joboptions["do_imod_fiducials"].getBoolean())

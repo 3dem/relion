@@ -2623,6 +2623,11 @@ void JobWindow::initialiseTomoAlignTiltseriesWindow()
     // Add a little spacer
     current_y += STEPY/2;
 
+    place("tomogram_thickness", TOGGLE_DEACTIVATE);
+
+    // Add a little spacer
+    current_y += STEPY/2;
+
     place("fn_batchtomo_exe", TOGGLE_DEACTIVATE);
     place("fn_aretomo_exe", TOGGLE_DEACTIVATE);
 
