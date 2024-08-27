@@ -1,7 +1,6 @@
 name: relion-5.0
 channels:
   - conda-forge
-  - defaults
 dependencies:
   - pip
   - python=3.10
