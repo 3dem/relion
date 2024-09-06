@@ -437,6 +437,9 @@ void AlignTiltseriesRunner::executeAreTomo(long idx_tomo, int rank)
     generateMRCStackAndRawTiltFile(idx_tomo, true);
 
     RFLOAT frac_dose = tomogramSet.globalTable.getDouble(EMDL_TOMO_IMPORT_FRACT_DOSE, idx_tomo);
+    RFLOAT pixel_size = tomogramSet.getTiltSeriesPixelSize(idx_tomo);
+    // Tomogram_thickness is in nm, should become unbinned pixels
+    RFLOAT thickness_pix = tomogram_thickness*10./pixel_size;
 
     // Now run the actual AreTomo command
     std::string command = fn_aretomo_exe + " ";
@@ -444,7 +447,8 @@ void AlignTiltseriesRunner::executeAreTomo(long idx_tomo, int rank)
     command += " -AngFile " + fn_tilt;
     command += " -OutMrc " + fn_ali;
     command += " -ImgDose " + floatToString(frac_dose);
-    command += " -AlignZ " + floatToString(tomogram_thickness);
+    // Tomogram thickness should be in unbinned pixels
+    command += " -AlignZ " + floatToString(thickness_pix);
     // Skip reconstruction of the tomogram in AreTomo...
     command += " -volZ 0";
 
