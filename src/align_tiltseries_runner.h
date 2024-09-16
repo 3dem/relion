@@ -32,6 +32,70 @@
 #include <src/time.h>
 #include <src/jaz/single_particle/obs_model.h>
 #include "src/jaz/tomography/tomogram_set.h"
+const std::string fiducial_directive =
+        "setupset.copyarg.userawtlt = 1 \n"
+        "setupset.copyarg.stackext = mrc \n"
+//        "setupset.copyarg.rotation = 85 \n"
+//        "setupset.copyarg.pixel = 0.0675 \n"
+//        "setupset.copyarg.gold = 10 \n"
+        "setupset.copyarg.dual = 0 \n"
+        "runtime.Positioning.any.wholeTomogram = 1 \n"
+        "runtime.Fiducials.any.trackingMethod = 0 \n"
+        "runtime.Fiducials.any.seedingMethod = 3 \n"
+        "runtime.Excludeviews.any.deleteOldFiles = 0 \n"
+        "runtime.AlignedStack.any.binByFactor = 8 \n"
+        "comparam.prenewst.newstack.BinByFactor = 8 \n"
+        "comparam.prenewst.newstack.AntialiasFilter = -1 \n"
+        "comparam.autofidseed.autofidseed.TargetNumberOfBeads = 50 \n"
+        "comparam.track.beadtrack.SobelFilterCentering = 1 \n"
+        "comparam.track.beadtrack.ScalableSigmaForSobel = 0.12 \n"
+        "comparam.newst.newstack.TaperAtFill = 1,1 \n"
+        "comparam.newst.newstack.AntialiasFilter = -1 \n"
+        "comparam.golderaser.ccderaser.ExpandCircleIterations = 3 \n"
+        "comparam.eraser.ccderaser.PeakCriterion = 8.0 \n"
+        "comparam.eraser.ccderaser.DiffCriterion = 6.0 \n"
+        "comparam.align.tiltalign.TiltOption = 0 \n"
+        "comparam.align.tiltalign.SurfacesToAnalyze = 1 \n"
+        "comparam.align.tiltalign.RotOption = -1 \n"
+        "comparam.align.tiltalign.MagOption = 0 \n"
+        "comparam.align.tiltalign.BeamTiltOption = 2 \n";
+
+const std::string patchtrack_directive =
+        "setupset.copyarg.userawtlt = 1 \n"
+        "setupset.copyarg.stackext = mrc \n"
+//        "setupset.copyarg.rotation = 85 \n"
+//        "setupset.copyarg.pixel = 0.0675 \n"
+        "setupset.copyarg.gold = 10 \n"
+        "setupset.copyarg.dual = 0 \n"
+        "runtime.Positioning.any.wholeTomogram = 1 \n"
+        "runtime.PatchTracking.any.adjustTiltAngles = 0 \n"
+        "runtime.Fiducials.any.trackingMethod = 1 \n"
+        "runtime.Fiducials.any.seedingMethod = 3 \n"
+        "runtime.Excludeviews.any.deleteOldFiles = 0 \n"
+        "runtime.AlignedStack.any.binByFactor = 8 \n"
+//        "comparam.xcorr_pt.tiltxcorr.SizeOfPatchesXandY = 180,180 \n"
+//        "comparam.xcorr_pt.tiltxcorr.OverlapOfPatchesXandY = 0.33 \n"
+        "comparam.xcorr_pt.tiltxcorr.ShiftLimitsXandY = 200,200 \n"
+        "comparam.xcorr_pt.tiltxcorr.LengthAndOverlap = 16,4 \n"
+        "comparam.xcorr_pt.tiltxcorr.IterateCorrelations = 20 \n"
+        "comparam.xcorr_pt.tiltxcorr.FilterSigma2 = 0.03 \n"
+        "comparam.xcorr_pt.tiltxcorr.FilterRadius2 = 0.125 \n"
+        "comparam.track.beadtrack.SobelFilterCentering = 1 \n"
+        "comparam.track.beadtrack.ScalableSigmaForSobel = 0.12 \n"
+//        "comparam.tilt.tilt.THICKNESS = 3000 \n"
+//        "comparam.prenewst.newstack.BinByFactor = 8 \n"
+        "comparam.prenewst.newstack.AntialiasFilter = -1 \n"
+        "comparam.newst.newstack.TaperAtFill = 1,1 \n"
+        "comparam.newst.newstack.AntialiasFilter = -1 \n"
+        "comparam.golderaser.ccderaser.ExpandCircleIterations = 3 \n"
+        "comparam.eraser.ccderaser.PeakCriterion = 8.0 \n"
+        "comparam.eraser.ccderaser.DiffCriterion = 6.0 \n"
+        "comparam.align.tiltalign.TiltOption = 0 \n"
+        "comparam.align.tiltalign.SurfacesToAnalyze = 1 \n"
+        "comparam.align.tiltalign.RotOption = -1 \n"
+        "comparam.align.tiltalign.MagOption = 0 \n"
+        "comparam.align.tiltalign.BeamTiltOption = 2 \n";
+
 
 class AlignTiltseriesRunner
 {
@@ -52,8 +116,16 @@ public:
     // Information about tomography experiment
     TomogramSet tomogramSet;
 
-    // CTFFIND and Gctf executables and shell
-    FileName fn_imodwrapper_exe;
+    // Imod executable
+    FileName fn_batchtomo_exe;
+
+    // AreTomo executable
+    FileName fn_aretomo_exe;
+
+    // Filename for IMOD directives file
+    FileName fn_adoc_template;
+
+    std::string my_adoc_template;
 
     // Use IMOD:fiducials
     bool do_imod_fiducials;
@@ -73,14 +145,20 @@ public:
     // Use AreTomo
     bool do_aretomo;
 
-    // Resolution used in AreTomo alignment
-    RFLOAT aretomo_resolution;
-
-    // Alignment thickness in AreTomo
-    RFLOAT aretomo_thickness;
-
     // Perform tilt angle correction in AreTomo
     bool do_aretomo_tiltcorrect;
+
+    // User-specified value for tilt angle correction
+    RFLOAT aretomo_tilcorrect_angle;
+
+    // Do CTF estimation in aretomo?
+    bool do_aretomo_ctf;
+
+    // Do phase shift estimation in AreTomo?
+    bool do_aretomo_phaseshift;
+
+    // estimated tomogram thickness (for -AlignZ)
+    RFLOAT tomogram_thickness;
 
     // Which GPU devices to use?
     int devCount;
@@ -110,16 +188,29 @@ public:
     void run();
 
     // Check STAR file for tomogram exists and has the correct labels
-    bool checkImodWrapperResults(long idx_tomo);
+    bool checkResults(long idx_tomo);
 
-    // Execute CTFFIND for a single tomogram
-    void executeImodWrapper(long idx_tomo, int rank = 0);
+    // Generate MRC stack and raw tilt file
+    void generateMRCStackAndRawTiltFile(long idx_tomo, bool is_aretomo);
 
-    // Find the etomo directives file (.edf)
-    bool checkEtomoDirectiveFile(long idx_tomo, FileName &filename);
+    // Execute IMOD for a single tomogram
+    void executeIMOD(long idx_tomo, int rank = 0);
 
-    // Harvest all IMOD results into the single tomograms set starfile, and write it out
-    void joinImodWrapperResults();
+    // Execute AreTomo for a single tomogram
+    void executeAreTomo(long idx_tomo, int rank = 0);
+
+    // Make per-tiltseries EPS files for the logfile
+    void makePerTiltSeriesEPSFiles(long idx_tomo, bool do_ctf = false);
+
+    // Read IMOD results files and insert data into relion's MetaDataTable
+    bool readIMODResults(long idx_tomo, std::string &error_message);
+
+    // Read AreTomo results files and insert data into relion's MetaDataTable
+    bool readAreTomoResults(long idx_tomo, std::string &error_message);
+
+    // Harvest all AreTomo results into the single tomograms set starfile, and write it out
+    void joinResults();
+
 
 };
 

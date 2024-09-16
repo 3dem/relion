@@ -132,6 +132,24 @@ void TomogramSet::write(FileName filename)
 
 }
 
+void TomogramSet::removeTomogram(std::string tomogramName)
+{
+    // Find the index of this tomogram name
+    for (int idx = 0; idx < tomogramTables.size(); idx++)
+    {
+        std::string myname = getTomogramName(idx);
+        if (myname == tomogramName)
+        {
+            tomogramTables.erase(tomogramTables.begin() + idx);
+            globalTable.removeObject(idx);
+            return;
+        }
+    }
+    // not found
+    REPORT_ERROR("ERROR: tried removing tomogram " + tomogramName + " but it did not exist in the tomogramSet");
+
+}
+
 Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenFramesOnly, bool loadOddFramesOnly,
                                    int _w0, int _h0, int _d0) const //Set loadEven/OddFramesOnly to True to loadImageData from rlnTomoMicrographNameEven/Odd rather than rlnMicrographName
 {
@@ -665,6 +683,85 @@ std::string TomogramSet::getOpticsGroupName(int index) const
 	{
 		return globalTable.getString(EMDL_IMAGE_OPTICS_GROUP_NAME, index);
 	}
+}
+int TomogramSet::getImageIndexWithSmallestVisibleTiltAngle(int index, std::vector<bool> isVisible) const
+{
+    int result = -1;
+    RFLOAT mindiff = 999.;
+
+    int nr_idx = tomogramTables[index].numberOfObjects();
+    if (nr_idx != isVisible.size()) REPORT_ERROR("BUG: incofrrect number of elements in isVisible vector...");
+
+    int nr_invisible = 0;
+    for (int idx = 0; idx < nr_idx; idx++)
+    {
+        if (!isVisible[idx])
+        {
+            nr_invisible++;
+            continue;
+        }
+        RFLOAT tilt;
+        tomogramTables[index].getValue(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE, tilt, idx);
+        if (fabs(tilt) < mindiff)
+        {
+            mindiff = fabs(tilt);
+            result = idx - nr_invisible;
+        }
+    }
+
+    return result;
+}
+
+std::vector<int> TomogramSet::getFrameDoseOrder(int index) const
+{
+    std::vector<double> doses;
+    for (int f = 0; f < tomogramTables[index].numberOfObjects(); f++)
+    {
+        RFLOAT dose;
+        tomogramTables[index].getValue(EMDL_MICROGRAPH_PRE_EXPOSURE, dose, f);
+        doses.push_back(dose);
+    }
+    return IndexSort<double>::sortedPositions(doses);
+
+}
+
+std::vector<int> TomogramSet::getFrameDoseOrderIndex(int index) const
+{
+    std::vector<double> doses;
+    for (int f = 0; f < tomogramTables[index].numberOfObjects(); f++)
+    {
+        RFLOAT dose;
+        tomogramTables[index].getValue(EMDL_MICROGRAPH_PRE_EXPOSURE, dose, f);
+        doses.push_back(dose);
+    }
+    return IndexSort<double>::sortIndices(doses);
+
+}
+
+std::vector<int> TomogramSet::getFrameTiltOrder(int index) const
+{
+    std::vector<double> angles;
+    for (int f = 0; f < tomogramTables[index].numberOfObjects(); f++)
+    {
+        double angle;
+        tomogramTables[index].getValue(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE, angle, f);
+        angles.push_back(angle);
+    }
+    return IndexSort<double>::sortedPositions(angles);
+
+}
+
+std::vector<int> TomogramSet::getFrameTiltOrderIndex(int index) const
+{
+    std::vector<double> angles;
+    for (int f = 0; f < tomogramTables[index].numberOfObjects(); f++)
+    {
+        double angle;
+        tomogramTables[index].getValue(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE, angle, f);
+        angles.push_back(angle);
+    }
+    return IndexSort<double>::sortIndices(angles);
+
 }
 
 void TomogramSet::generateSingleMetaDataTable(MetaDataTable &MDout, ObservationModel &obsModel)

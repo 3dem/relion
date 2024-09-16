@@ -1107,12 +1107,13 @@ void GuiMainWindow::fillStdOutAndErr()
 			std::string command = "tail -n 20 < " + fn_out + " | awk -F\"\r\" '{if (NF>1) {print $NF} else {print}}' > " + fn_outtail;
 			int res = system(command.c_str());
 			std::ifstream in(fn_outtail.c_str(), std::ios_base::in);
-			if (in.fail())
-				REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_outtail + " does not exists" );
-			int err = textbuff_stdout->loadfile(fn_outtail.c_str());
-			in.close();
-            command = "rm -f " + fn_outtail;
-			res = system(command.c_str());
+			if (!in.fail())
+                        {
+                            int err = textbuff_stdout->loadfile(fn_outtail.c_str());
+                            in.close();
+                            command = "rm -f " + fn_outtail;
+                            res = system(command.c_str());
+                        }
 
 		}
 		// Scroll to the bottom
@@ -1135,12 +1136,13 @@ void GuiMainWindow::fillStdOutAndErr()
 			std::string command = "tail -10 " + fn_err + " > " + fn_errtail;
 			int res = system(command.c_str());
 			std::ifstream in(fn_errtail.c_str(), std::ios_base::in);
-			if (in.fail())
-				REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_errtail + " does not exists" );
-			int err = textbuff_stderr->loadfile(fn_errtail.c_str());
-			in.close();
-            command = "rm -f " + fn_errtail;
-            res = system(command.c_str());
+			if (!in.fail())
+                        {
+                            int err = textbuff_stderr->loadfile(fn_errtail.c_str());
+                            in.close();
+                            command = "rm -f " + fn_errtail;
+                            res = system(command.c_str());
+                        }
 
         }
 		// Scroll to the bottom

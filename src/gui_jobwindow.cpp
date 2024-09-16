@@ -2623,10 +2623,22 @@ void JobWindow::initialiseTomoAlignTiltseriesWindow()
     // Add a little spacer
     current_y += STEPY/2;
 
+    place("tomogram_thickness", TOGGLE_DEACTIVATE);
+
+    // Add a little spacer
+    current_y += STEPY/2;
+
+    place("fn_batchtomo_exe", TOGGLE_DEACTIVATE);
+    place("fn_aretomo_exe", TOGGLE_DEACTIVATE);
+
     tab1->end();
     tab2->begin();
     tab2->label("IMOD");
     resetHeight();
+
+
+    // Add a little spacer
+	current_y += STEPY/2;
 
     group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
     group1->end();
@@ -2651,22 +2663,42 @@ void JobWindow::initialiseTomoAlignTiltseriesWindow()
     guientries["do_imod_patchtrack"].cb_menu_i(); // make default active
 
     tab2->end();
+
     tab3->begin();
-    tab3->label("AreTomo");
+    tab3->label("AreTomo2");
     resetHeight();
 
     group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
     group3->end();
-    place("do_aretomo", TOGGLE_DEACTIVATE, group3, false);
+    place("do_aretomo2", TOGGLE_DEACTIVATE, group3, false);
     group3->begin();
 
-//    place("aretomo_resolution", TOGGLE_DEACTIVATE);
-    place("aretomo_thickness", TOGGLE_DEACTIVATE);
-    place("aretomo_tiltcorrect", TOGGLE_DEACTIVATE);
+    // Add a little spacer
+    current_y += STEPY/2;
+    group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group4->end();
+    place("do_aretomo_tiltcorrect", TOGGLE_DEACTIVATE, group4, false);
+    group4->begin();
+    place("aretomo_tiltcorrect_angle", TOGGLE_DEACTIVATE);
+    group4->end();
+    guientries["do_aretomo_tiltcorrect"].cb_menu_i(); // make default active
 
+    // Add a little spacer
+    current_y += STEPY/2;
+    group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group5->end();
+    place("do_aretomo_ctf", TOGGLE_DEACTIVATE, group5, false);
+    group5->begin();
+    place("do_aretomo_phaseshift", TOGGLE_DEACTIVATE);
+    group5->end();
+    guientries["do_aretomo_ctf"].cb_menu_i(); // make default active
+
+    // Add a little spacer
+    current_y += STEPY/2;
+    place("other_aretomo_args", TOGGLE_DEACTIVATE);
     place("gpu_ids");
-    group2->end();
-    guientries["do_aretomo"].cb_menu_i(); // make default active
+    group3->end();
+    guientries["do_aretomo2"].cb_menu_i(); // make default active
 
     tab3->end();
 
@@ -2851,6 +2883,10 @@ void JobWindow::initialiseTomoSubtomoWindow()
 
     place("do_stack2d", TOGGLE_DEACTIVATE);
     place("do_float16", TOGGLE_DEACTIVATE);
+
+    current_y += STEPY /2 ;
+
+    place("do_real_subtomo", TOGGLE_DEACTIVATE);
 
 	tab2->end();
 }

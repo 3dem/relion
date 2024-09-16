@@ -910,7 +910,8 @@ void RelionJob::initialise(int _job_type)
 	}
 	else if (type == PROC_TOMO_ALIGN_TILTSERIES)
 	{
-		has_mpi = has_thread = false;
+		has_mpi = true;
+        has_thread = false;
 		initialiseTomoAlignTiltSeriesJob();
 	}
 	else if (type == PROC_TOMO_RECONSTRUCT_TOMOGRAM)
@@ -1494,7 +1495,7 @@ Whichever program you use, 'Motion Refinement' is highly recommended to get the 
 	joboptions["fn_defect"] = JobOption("Defect file:", "", "*", ".", "Location of a UCSF MotionCor2-style defect text file or a defect map that describe the defect pixels on the detector. Each line of a defect text file should contain four numbers specifying x, y, width and height of a defect region. A defect map is an image (MRC or TIFF), where 0 means good and 1 means bad pixels. The coordinate system is the same as the input movie before application of binning, rotation and/or flipping.\nNote that the format of the defect text is DIFFERENT from the defect text produced by SerialEM! One can convert a SerialEM-style defect file into a defect map using IMOD utilities e.g. \"clip defect -D defect.txt -f tif movie.mrc defect_map.tif\". See explanations in the SerialEM manual.\n\nLeave empty if you don't have any defects, or don't want to correct for defects on your detector.");
 	joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string("0"), "Provide a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':'. For example, to place one rank on device 0 and one rank on device 1, provide '0:1'.\n\
 Note that multiple MotionCor2 processes should not share a GPU; otherwise, it can lead to crash or broken outputs (e.g. black images) .");
-	joboptions["other_motioncor2_args"] = JobOption("Other MOTIONCOR2 arguments", std::string(""), "Additional arguments that need to be passed to MOTIONCOR2.");
+    joboptions["other_motioncor2_args"] = JobOption("Other MOTIONCOR2 arguments", std::string(""), "Additional arguments that need to be passed to MOTIONCOR2.");
 
 	// Dose-weight
 	if (!is_tomo) joboptions["do_dose_weighting"] = JobOption("Do dose-weighting?", true ,"If set to Yes, the averaged micrographs will be dose-weighted.");
@@ -6533,21 +6534,41 @@ void RelionJob::initialiseTomoAlignTiltSeriesJob()
 {
 	hidden_name = ".gui_tomo_align_tiltseries";
 
-	joboptions["in_tiltseries"] = JobOption("Input tilt series:", LABEL_TOMOGRAMS_CPIPE, 1, "", "STAR files (*.star)",  "Input global tilt series star file.");
+    joboptions["in_tiltseries"] = JobOption("Input tilt series:", LABEL_TOMOGRAMS_CPIPE, 1, "", "STAR files (*.star)",  "Input global tilt series star file.");
+    joboptions["tomogram_thickness"] = JobOption("Estimated tomogram thickness (nm):", 300, 50, 500, 10, "Estimated tomogram thickness (in nm) to be used for projection matching in AreTomo2 and for patch tracking in IMOD");
 
-	joboptions["do_imod_fiducials"] = JobOption("Use IMOD's fiducial based alignment?", false, "Set to Yes to perform tilt series alignment using fiducials in IMOD.");
+    char *default_location = getenv ("RELION_BATCHTOMO_EXECUTABLE");
+    char default_batchtomo[] = DEFAULTBATCHTOMOLOCATION;
+    if (default_location == NULL)
+    {
+        default_location = default_batchtomo;
+    }
+    joboptions["fn_batchtomo_exe"] = JobOption("Batchruntomo executable:", std::string(default_location), "*", ".", "Location of the batchruntomo executable from IMOD. You can control the default of this field by setting environment variable RELION_BATCHTOMO_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+
+    joboptions["do_aretomo2"] = JobOption("Use AreTomo2?", false, "Set to Yes to perform tilt series alignment using Shawn Zheng's AreTomo2.");
+
+    default_location = getenv ("RELION_ARETOMO_EXECUTABLE");
+    char default_aretomo[] = DEFAULTARETOMOLOCATION;
+    if (default_location == NULL)
+    {
+        default_location = default_aretomo;
+    }
+    joboptions["fn_aretomo_exe"] = JobOption("AreTomo2 executable:", std::string(default_location), "*", ".", "Location of the AreTomo2 executable. You can control the default of this field by setting environment variable RELION_ARETOMO_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+
+    joboptions["do_imod_fiducials"] = JobOption("Use IMOD's fiducial based alignment?", false, "Set to Yes to perform tilt series alignment using fiducials in IMOD.");
 	joboptions["fiducial_diameter"] = JobOption("Fiducial diameter (nm): ", 10, 1, 20, 1, "The diameter of the fiducials (in nm)");
 
 	joboptions["do_imod_patchtrack"] = JobOption("Use IMOD's patch-tracking for alignment?", false, "Set to Yes to perform tilt series alignment using patch-tracking in IMOD.");
-
-	joboptions["patch_size"] = JobOption("Patch size (in nm): ", 100, 1, 500, 1, "The size of the patches in Angstrom.");
+    joboptions["patch_size"] = JobOption("Patch size (in nm): ", 100, 1, 500, 1, "The size of the patches in nanometer.");
 	joboptions["patch_overlap"] = JobOption("Patch overlap (%): ", 50, 0, 100, 10, "The overlap (0-100%) between the patches.");
 
-	joboptions["do_aretomo"] = JobOption("Use AreTomo?", false, "Set to Yes to perform tilt series alignment using UCSF's AreTomo.");
-	//    joboptions["aretomo_resolution"] = JobOption("Resolution for AreTomo alignment (in A): ", 10, 1, 50, 1, "The maximum resolution (in A) used for AreTomo alignment. The images will be Fourier cropped to have their Nyquist frequency at this value.");
-	joboptions["aretomo_thickness"] = JobOption("Expected sample thickness (in nm): ", 200, 10, 500, 10, "This controls the thickness of intermediate reconstructions used for projection matching in AreTomo. This value is padded internally.");
-	joboptions["aretomo_tiltcorrect"] = JobOption("Correct Tilt Angle Offset?", false, "Specify Yes to correct the tilt angle offset in the tomogram (applies the AreTomo -TiltCor option). This is useful for correcting slanting in tomograms which can arise due to sample mounting or milling angle. This can be useful for in situ data.");
-	joboptions["gpu_ids"] = JobOption("Which GPUs to use for AreTomo:", std::string(""), "Provide a list of which GPUs (e.g. 0:1:2:3) to use in AreTomo. MPI-processes are separated by ':'. For example, to place one rank on device 0 and one rank on device 1, provide '0:1'.");
+    joboptions["do_aretomo_ctf"] = JobOption("Also do CTF estimation? ", false, "If set to Yes, AreTomo2 will also perform CTF estimation and any CTF information that was already present in the input STAR files will be overwritten. Note that when using this option, it is no longer necessary to run a CTF estimation job");
+    joboptions["do_aretomo_phaseshift"] = JobOption("Also estimate phase shift? ", false, "If set to Yes, AreTomo2 will also perform estimation of the phase shift (due to a phase plate) during CTF estimation.");
+    joboptions["do_aretomo_tiltcorrect"] = JobOption("Correct Tilt Angle Offset?", false, "Specify Yes to correct the tilt angle offset in the tomogram (applies the AreTomo -TiltCor option). This is useful for correcting slanting in tomograms which can arise due to sample mounting or milling angle. This can be useful for in situ data.");
+    joboptions["aretomo_tiltcorrect_angle"] = JobOption("Tilt Angle Offset:", 999 , -50, 50, 5, "The tilt angle (in degrees) to be offset. If set to a value larger than 180, AreTomo will search for the optimal value itself, otherwise the value specified here will be used.");
+    joboptions["other_aretomo_args"] = JobOption("Other AreTomo2 arguments", std::string(""), "Additional arguments that need to be passed to AreTomo2.");
+	joboptions["gpu_ids"] = JobOption("Which GPUs to use for AreTomo:", std::string(""), "Provide a list of which GPUs (e.g. 0:1:2:3) to use in AreTomo2. MPI-processes are separated by ':'. For example, to place one rank on device 0 and one rank on device 1, provide '0:1'.");
+
 }
 bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::vector<std::string> &commands,
                                        std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
@@ -6559,7 +6580,7 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
 	int i = 0;
 	if (joboptions["do_imod_fiducials"].getBoolean()) i++;
 	if (joboptions["do_imod_patchtrack"].getBoolean()) i++;
-	if (joboptions["do_aretomo"].getBoolean()) i++;
+	if (joboptions["do_aretomo2"].getBoolean()) i++;
 	if (i != 1)
 	{
 		error_message = "ERROR: you should (only) select ONE of the alignment methods: IMOD:fiducials or IMOD:patchtracking or AreTomo.";
@@ -6568,64 +6589,81 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
 
 	if (error_message != "") return false;
 
-	command="`which relion_python_tomo_align_tilt_series` ";
+    if (joboptions["in_tiltseries"].getString() == "")
+    {
+        error_message = "ERROR: you need to provide an input STAR file";
+        return false;
+    }
 
-	// Make sure the methods are the first argument to the program!
+    if (joboptions["nr_mpi"].getNumber(error_message) > 1)
+        command="`which relion_align_tiltseries_mpi`";
+    else
+        command="`which relion_align_tiltseries`";
+
+
+    command += " --i " + joboptions["in_tiltseries"].getString();
+    command += " --o " + outputname;
+    command += " --tomogram_thickness " + joboptions["tomogram_thickness"].getString();
+
+    // Make sure the methods are the first argument to the program!
 	if (joboptions["do_imod_fiducials"].getBoolean())
 	{
-		command += "IMOD:fiducials ";
-		command += " --nominal-fiducial-diameter-nanometers " + joboptions["fiducial_diameter"].getString() + ' ';
+        command += " --imod_fiducials";
+        command += " --fiducial_diameter " + joboptions["fiducial_diameter"].getString() + ' ';
+        command += " --batchtomo_exe " + joboptions["fn_batchtomo_exe"].getString();
 	}
 	else if (joboptions["do_imod_patchtrack"].getBoolean())
 	{
-		command += "IMOD:patch-tracking ";
-		command += " --patch-size-nanometers " + joboptions["patch_size"].getString() + ' ';
-		command += " --patch-overlap-percentage " + joboptions["patch_overlap"].getString() + ' ';
+        command += " --imod_patchtrack";
+        command += " --patch_size " + joboptions["patch_size"].getString() + ' ';
+		command += " --patch_overlap " + joboptions["patch_overlap"].getString() + ' ';
+        command += " --batchtomo_exe " + joboptions["fn_batchtomo_exe"].getString();
 	}
-	else if (joboptions["do_aretomo"].getBoolean())
+	else if (joboptions["do_aretomo2"].getBoolean())
 	{
-		command += "AreTomo ";
-		command += " --sample-thickness-nanometers " + joboptions["aretomo_thickness"].getString();
+		command += " --aretomo2 ";
+        command += " --aretomo_exe " + joboptions["fn_aretomo_exe"].getString();
 
-		if (joboptions["aretomo_tiltcorrect"].getBoolean())
+		if (joboptions["do_aretomo_tiltcorrect"].getBoolean())
 		{
-			command += " --do-tilt-angle-offset-correction ";
+			command += " --aretomo_tiltcorrect ";
+            command += " --aretomo_tiltcorrect_angle " + joboptions["aretomo_tiltcorrect_angle"].getString();
 		}
-		if (joboptions["gpu_ids"].getString().length() >= 2)
-		// iterate over gpu ids and append separate --gpu args
-		{
-			std::string s = joboptions["gpu_ids"].getString();
-			std::string delimiter = ":";
-			
-			size_t last = 0;
-			size_t next = 0;
-			while ((next = s.find(delimiter, last)) != std::string::npos)
-			{
-				command += " --gpu " + s.substr(last, next-last) + ' ';
-				last = next + 1;
-			}
-			command += " --gpu " + s.substr(last) + ' ';
-		}
-		else if (joboptions["gpu_ids"].getString().length() > 0)
-		{
-			command += " --gpu " + joboptions["gpu_ids"].getString() + ' ';
-		}
+
+        if (joboptions["do_aretomo_ctf"].getBoolean())
+        {
+            command += " --aretomo_ctf ";
+            if (joboptions["do_aretomo_phaseshift"].getBoolean())
+            {
+                command += " --aretomo_phaseshift ";
+            }
+
+            // Tomo-specific output file for display button
+            Node node4(outputname + "power_spectra_fits.star", LABEL_CTFFIND_POWER_SPECTRA);
+            outputNodes.push_back(node4);
+
+        }
+
+        command += " --other_wrapper_args \" " + joboptions["other_aretomo_args"].getString() + " \"";
+        command += " --gpu " + joboptions["gpu_ids"].getString() + ' ';
+
 	}
-	if (joboptions["in_tiltseries"].getString() == "")
-	{
-		error_message = "ERROR: you need to provide an input STAR file";
-		return false;
-	}
-	command += " --tilt-series-star-file " + joboptions["in_tiltseries"].getString();
+
+    if (is_continue)
+    {
+        command += " --only_do_unfinished ";
+    }
 
 	Node node(joboptions["in_tiltseries"].getString(), joboptions["in_tiltseries"].node_type);
 	inputNodes.push_back(node);
 
-	command += " --output-directory " + outputname;
 	Node node2(outputname+"aligned_tilt_series.star", LABEL_TILTALIGN_TOMOGRAMS);
 	outputNodes.push_back(node2);
 
-	// Other arguments for extraction
+    Node node3(outputname + "logfile.pdf", LABEL_TILTALIGN_LOG);
+    outputNodes.push_back(node3);
+
+    // Other arguments from running tab
 	command += " " + joboptions["other_args"].getString();
 	commands.push_back(command);
 
@@ -7027,6 +7065,8 @@ void RelionJob::initialiseTomoSubtomoJob()
 	joboptions["do_stack2d"] = JobOption("Write output as 2D stacks?", true ,"If set to Yes, this program will write output subtomograms as 2D substacks. This is new as of relion-4.1, and the preferred way of generating subtomograms. If set to No, then relion-4.0 3D pseudo-subtomograms will be written out. Either can be used in subsequent refinements and classifications.");
 	joboptions["do_float16"] = JobOption("Write output in float16?", true ,"If set to Yes, this program will write output images in float16 MRC format. This will save a factor of two in disk space compared to the default of writing in float32. Note that RELION and CCPEM will read float16 images, but other programs may not (yet) do so.");
 
+    joboptions["do_real_subtomo"] = JobOption("Extract and re-project real subtomograms?", false, "If set to Yes, this program will box out real subtomograms from the input tomogram and then re-project these into 2D stacks that resemble the 2D stacks from windowed tilt series images. The size of the images is determined by the crop size; the pixel size is that of the tomogram. This will result in a particles.star file that is suitable for low-resolution subtomogram averaging and a particles_for_class2d.star file that can be used for fast 2D classification in order to select good particles. You can re-launch the GUI without the --tomo argument to get access to the Class2D job type. If set to No, the program will write out normal windowed tilt-series images that are suitable for high-resolution subtomogram averaging.");
+
 }
 
 bool RelionJob::getCommandsTomoSubtomoJob(std::string &outputname, std::vector<std::string> &commands,
@@ -7080,6 +7120,14 @@ bool RelionJob::getCommandsTomoSubtomoJob(std::string &outputname, std::vector<s
 	{
 		command += " --stack2d ";
 	}
+
+    if (joboptions["do_real_subtomo"].getBoolean())
+    {
+        command += " --real_subtomo ";
+        Node node2(outputname+"particles_for_class2d.star", LABEL_CLASS2D_PARTS);
+        outputNodes.push_back(node2);
+
+    }
 
 	if (is_continue)
 	{

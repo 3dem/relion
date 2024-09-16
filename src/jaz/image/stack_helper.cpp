@@ -5,7 +5,8 @@ void NewStackHelper::FourierTransformStack_fast(
 		const RawImage<float>& stack,
 		RawImage<fComplex>& stackOut,
 		bool center,
-		int num_threads)
+		int num_threads,
+        FFT::Normalization normalization)
 {
 	const int w = stack.xdim;
 	const int h = stack.ydim;

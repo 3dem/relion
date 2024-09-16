@@ -24,6 +24,8 @@ class TomogramSet
         bool read(FileName filename, bool verbose = true);
         void write(FileName filename);
 
+        void removeTomogram(std::string tomogramName);
+
         // If max_dose is positive, then only images with cumulativeDose less than or equal to max_dose will be loaded.
 		Tomogram loadTomogram(int index, bool loadImageData, bool loadEvenFrames = false, bool loadOddFrames = false, int w0 = -999, int h0 =-999, int d0 = -999 ) const;
 
@@ -32,7 +34,7 @@ class TomogramSet
 
 		void setCtf(int tomogramIndex, int frame, const CTF& ctf);
 		void setDose(int tomogramIndex, int frame, double dose);
-		void setTiltSeriesFile(int tomogramIndex, const std::string& filename);
+        void setTiltSeriesFile(int tomogramIndex, const std::string& filename);
 		void setFiducialsFile(int tomogramIndex, const std::string& filename);
 		void setDefocusSlope(int tomogramIndex, double slope);
         void applyTiltAngleOffset(int tomogramIndex, double offset);
@@ -54,6 +56,13 @@ class TomogramSet
 		double getOriginalPixelSize(int index) const;
 		double getTiltSeriesPixelSize(int index) const;
 		std::string getOpticsGroupName(int index) const;
+
+        std::vector<int> getFrameDoseOrder(int tomogramIndex) const;
+        std::vector<int> getFrameDoseOrderIndex(int tomogramIndex) const;
+        std::vector<int> getFrameTiltOrder(int tomogramIndex) const;
+        std::vector<int> getFrameTiltOrderIndex(int tomogramIndex) const;
+
+        int getImageIndexWithSmallestVisibleTiltAngle(int index, std::vector<bool> isVisible) const;
 
         // SHWS 6Apr2022: Make one big metadatatable with all movies/micrographs (to be used for motioncorr and ctffind runners)
         void generateSingleMetaDataTable(MetaDataTable &MDout, ObservationModel &obsModel);

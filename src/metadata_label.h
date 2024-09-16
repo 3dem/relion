@@ -348,7 +348,8 @@ enum EMDLabel
 	EMDL_OPTIMISER_CHANGES_OPTIMAL_CLASSES,
 	EMDL_OPTIMISER_COARSE_SIZE,
 	EMDL_OPTIMISER_DATA_ARE_CTF_PHASE_FLIPPED,
-	EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED,
+    EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED,
+    EMDL_OPTIMISER_DATA_ARE_CTF_CORRECTED,
 	EMDL_OPTIMISER_DATA_STARFILE,
 	EMDL_OPTIMISER_DO_AUTO_REFINE,
 	EMDL_OPTIMISER_DO_AUTO_SAMPLING,
@@ -620,6 +621,11 @@ enum EMDLabel
     EMDL_TOMO_TILT_SERIES_STARFILE,
 	EMDL_TOMO_TILT_MOVIE_FRAMECOUNT,
     EMDL_TOMO_ETOMO_DIRECTIVE_FILE,
+    EMDL_TOMO_ARETOMO_TILTANGLE_OFFSET,
+    EMDL_TOMO_ARETOMO_TILTAXIS_SCORE,
+    EMDL_TOMO_IMOD_LEAVEOUT_ERROR,
+    EMDL_TOMO_IMOD_ERROR_MEAN,
+    EMDL_TOMO_IMOD_ERROR_STDDEV,
 	EMDL_TOMO_FRAME_COUNT,
 	EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME,
     EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF1_FILE_NAME,
@@ -1069,7 +1075,8 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_CHANGES_OPTIMAL_ORIENTS, EMDL_DOUBLE, "rlnChangesOptimalOrientations", "The average change in optimal orientation in the last iteration (in degrees) ");
 		EMDL::addLabel(EMDL_OPTIMISER_CHANGES_OPTIMAL_CLASSES, EMDL_DOUBLE, "rlnChangesOptimalClasses", "The number of particles that changed their optimal clsas assignment in the last iteration");
 		EMDL::addLabel(EMDL_OPTIMISER_DATA_ARE_CTF_PHASE_FLIPPED, EMDL_BOOL, "rlnCtfDataArePhaseFlipped", "Flag to indicate that the input images have been phase-flipped");
-		EMDL::addLabel(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, EMDL_BOOL, "rlnCtfDataAreCtfPremultiplied", "Flag to indicate that the input images have been premultiplied with their CTF");
+        EMDL::addLabel(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, EMDL_BOOL, "rlnCtfDataAreCtfPremultiplied", "Flag to indicate that the input images have been premultiplied with their CTF");
+        EMDL::addLabel(EMDL_OPTIMISER_DATA_ARE_CTF_CORRECTED, EMDL_BOOL, "rlnCtfDataAreCtfCorrected", "Flag to indicate that the input images have been corrected for their CTFs already");
 		EMDL::addLabel(EMDL_OPTIMISER_DATA_STARFILE, EMDL_STRING, "rlnExperimentalDataStarFile", "STAR file with metadata for the experimental images");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_CORRECT_CTF, EMDL_BOOL, "rlnDoCorrectCtf", "Flag to indicate that CTF-correction should be performed");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_CORRECT_MAGNIFICATION, EMDL_BOOL, "rlnDoCorrectMagnification", "Flag to indicate that (per-group) magnification correction should be performed");
@@ -1338,6 +1345,11 @@ private:
         EMDL::addLabel(EMDL_TOMO_TILT_SERIES_STARFILE, EMDL_STRING, "rlnTomoTiltSeriesStarFile", "Tilt series starfile");
 		EMDL::addLabel(EMDL_TOMO_TILT_MOVIE_FRAMECOUNT, EMDL_INT, "rlnTomoTiltMovieFrameCount", "Number of frames in the tilt series movies");
 		EMDL::addLabel(EMDL_TOMO_ETOMO_DIRECTIVE_FILE, EMDL_STRING, "rlnEtomoDirectiveFile", "Location of the etomo directive file (.edf) from tilt series alignment");
+        EMDL::addLabel(EMDL_TOMO_ARETOMO_TILTANGLE_OFFSET, EMDL_DOUBLE, "rlnAreTomoTiltangleOffset", "Tiltangle offset (in degrees) as refined during tiltseries alignment by AreTomo2");
+        EMDL::addLabel(EMDL_TOMO_ARETOMO_TILTAXIS_SCORE, EMDL_DOUBLE, "rlnAreTomoTiltAxisScore", "Best score for the tilt axis refinement as reported during tiltseries alignment by AreTomo2");
+        EMDL::addLabel(EMDL_TOMO_IMOD_LEAVEOUT_ERROR, EMDL_DOUBLE, "rlnIMODLeaveOutError", "Leave-out error (in nm) as reported by Imod for tiltseries alignment");
+        EMDL::addLabel(EMDL_TOMO_IMOD_ERROR_MEAN, EMDL_DOUBLE, "rlnIMODResidualErrorMean", "Mean of the residual error (in nm) as reported by Imod for tiltseries alignment");
+        EMDL::addLabel(EMDL_TOMO_IMOD_ERROR_STDDEV, EMDL_DOUBLE, "rlnIMODResidualErrorStddev", "Standard deviation of the residual error (in nm) as reported by Imod for tiltseries alignment");
         EMDL::addLabel(EMDL_TOMO_FRAME_COUNT, EMDL_INT, "rlnTomoFrameCount", "Number of tilts in a tilt series");
         EMDL::addLabel(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME, EMDL_STRING, "rlnTomoReconstructedTomogram", "File name of a reconstructed tomogram");
         EMDL::addLabel(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF1_FILE_NAME, EMDL_STRING, "rlnTomoReconstructedTomogramHalf1", "File name of a reconstructed tomogram from even numbered movie frames or tilt image index");

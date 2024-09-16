@@ -54,6 +54,8 @@
 // Our own defaults at LMB are the hard-coded ones
 #define DEFAULTQSUBLOCATION "/public/EM/RELION/relion/bin/relion_qsub.csh"
 #define DEFAULTCTFFINDLOCATION "/public/EM/ctffind/ctffind.exe"
+#define DEFAULTARETOMOLOCATION "/public/EM/AreTomo/AreTomo2/AreTomo2"
+#define DEFAULTBATCHTOMOLOCATION "/public/EM/imod/IMOD/bin/batchruntomo"
 //#define DEFAULTIMODWRAPPERLOCATION "relion_tomo_align_tilt_series"
 //#define DEFAULTDENOISINGWRAPPERLOCATION "relion_tomo_denoise"
 #define DEFAULTMOTIONCOR2LOCATION "/public/EM/MOTIONCOR2/MotionCor2"
@@ -276,6 +278,7 @@ static bool do_allow_change_minimum_dedicated;
 #define LABEL_MOCORR_TOMOGRAMS         "TomogramGroupMetadata.star.relion.tomo.motioncorr"
 #define LABEL_CTFFIND_TOMOGRAMS        "TomogramGroupMetadata.star.relion.tomo.ctffind"
 #define LABEL_TILTALIGN_TOMOGRAMS      "TomogramGroupMetadata.star.relion.tomo.aligntiltseries"
+#define LABEL_TILTALIGN_LOG            "LogFile.pdf.relion.tomo.aligntiltseries"
 #define LABEL_RECONSTRUCT_TOMOGRAMS    "TomogramGroupMetadata.star.relion.tomo.reconstruct"
 #define LABEL_DENOISE_TOMOGRAMS        "TomogramGroupMetadata.star.relion.tomo.denoise"
 #define LABEL_TOMOPICK_PARTS_PARTS     "ParticleGroupMetadata.star.relion.tomo.manualpick.particles"
