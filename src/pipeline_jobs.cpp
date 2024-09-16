@@ -6647,12 +6647,12 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
         command += " --other_wrapper_args \" " + joboptions["other_aretomo_args"].getString() + " \"";
         command += " --gpu " + joboptions["gpu_ids"].getString() + ' ';
 
-        if (is_continue)
-        {
-            command += " --only_do_unfinished ";
-        }
-
 	}
+
+    if (is_continue)
+    {
+        command += " --only_do_unfinished ";
+    }
 
 	Node node(joboptions["in_tiltseries"].getString(), joboptions["in_tiltseries"].node_type);
 	inputNodes.push_back(node);
