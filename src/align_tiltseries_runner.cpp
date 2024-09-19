@@ -384,7 +384,7 @@ void AlignTiltseriesRunner::executeIMOD(long idx_tomo, int rank)
 
 
     // Make sure metadata table is sorted on rlnTomoNominalStageTiltAngle (it should be, but anyways...)
-    tomogramSet.tomogramTables[idx_tomo].sort(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE);
+    tomogramSet.tomogramTables[idx_tomo].newSort(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE);
 
     generateMRCStackAndRawTiltFile(idx_tomo, false);
 
@@ -573,6 +573,9 @@ bool AlignTiltseriesRunner::readIMODResults(long idx_tomo, std::string &error_me
     FileName fn_tlt = fn_dir + tomoname + ".tlt";
     FileName fn_edf = fn_dir + tomoname + ".edf";
     FileName fn_align = fn_dir + "align.log";
+
+    // In case of MPI, the tomogramTable may not yet have been sorted on the tilt angle. Do it again now
+    tomogramSet.tomogramTables[idx_tomo].newSort(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE);
 
     int fc = tomogramSet.tomogramTables[idx_tomo].numberOfObjects();
     RFLOAT angpix = tomogramSet.getTiltSeriesPixelSize(idx_tomo);
