@@ -170,7 +170,7 @@ void progress_bar(long rlen)
 		while (i--)
 			fprintf(stdout, ".");
 		fprintf(stdout, "~~(,_,\">");
-		if (rlen == totlen)
+		if (rlen >= totlen)
 		{
 			fprintf(stdout, " yum!\n");
 			totlen = 0;
@@ -178,7 +178,7 @@ void progress_bar(long rlen)
         else
         {
             i = (int)(60 * (float)(totlen - rlen) / totlen);
-            const char* cheese;
+            const char* cheese = "";
             if (i >= 3) cheese = "[oo]";
             else if (i==2) cheese = "oo]";
             else if (i==1) cheese = "o]";
