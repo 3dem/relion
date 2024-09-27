@@ -388,7 +388,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
         mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
         mymodel.sigma2_psi = textToFloat(fnt) * textToFloat(fnt);
     }
-    fnt = parser.getOption("--sigma_off", "Stddev. on the translations", "OLD");
+    fnt = parser.getOption("--offset", "Stddev. on the translations", "OLD");
     if (fnt != "OLD")
     {
         mymodel.sigma2_offset = textToFloat(fnt) * textToFloat(fnt);
