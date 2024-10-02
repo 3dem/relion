@@ -317,10 +317,15 @@ void MovieReconstructor::backproject(int rank, int size)
 		if (fn_gain != prev_gain)
 		{
 			if (isEER)
+			{
+				EERRenderer renderer;
 				renderer.loadEERGain(fn_gain, Igain());
+			}
 			else
+			{
 				Igain.read(fn_gain);
 			prev_gain = fn_gain;
+			}
 		}
 
 		// Apply gain correction
