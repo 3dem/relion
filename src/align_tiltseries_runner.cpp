@@ -330,6 +330,9 @@ void AlignTiltseriesRunner::executeIMOD(long idx_tomo, int rank)
 
     // Generate external output directory and write input files for AreTomo
     std::string tomoname = tomogramSet.getTomogramName(idx_tomo);
+    RFLOAT mythickness = tomogram_thickness;
+    if (tomogramSet.globalTable.containsLabel(EMDL_TOMO_TOMOGRAM_THICKNESS))
+        tomogramSet.globalTable.getValueSafely(EMDL_TOMO_TOMOGRAM_THICKNESS, mythickness, idx_tomo);
     FileName fn_dir = fn_out + "external/" + tomoname + '/';
     mktree(fn_dir);
 
@@ -439,7 +442,10 @@ void AlignTiltseriesRunner::executeAreTomo(long idx_tomo, int rank)
     RFLOAT frac_dose = tomogramSet.globalTable.getDouble(EMDL_TOMO_IMPORT_FRACT_DOSE, idx_tomo);
     RFLOAT pixel_size = tomogramSet.getTiltSeriesPixelSize(idx_tomo);
     // Tomogram_thickness is in nm, should become unbinned pixels
-    RFLOAT thickness_pix = tomogram_thickness*10./pixel_size;
+    RFLOAT mythickness = tomogram_thickness;
+    if (tomogramSet.globalTable.containsLabel(EMDL_TOMO_TOMOGRAM_THICKNESS))
+        tomogramSet.globalTable.getValueSafely(EMDL_TOMO_TOMOGRAM_THICKNESS, mythickness, idx_tomo);
+    RFLOAT thickness_pix = mythickness*10./pixel_size;
 
     // Now run the actual AreTomo command
     std::string command = fn_aretomo_exe + " ";

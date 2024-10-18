@@ -657,6 +657,7 @@ enum EMDLabel
     EMDL_TOMO_SUBTOMOGRAM_STACK2D,
 	EMDL_TOMO_SUBTOMOGRAM_BINNING,
     EMDL_TOMO_TOMOGRAM_BINNING,
+    EMDL_TOMO_TOMOGRAM_THICKNESS,
     EMDL_TOMO_PARTICLE_NAME,
 	EMDL_TOMO_PARTICLE_ID,
 	EMDL_TOMO_MANIFOLD_INDEX,
@@ -1385,6 +1386,7 @@ private:
         EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_STACK2D, EMDL_BOOL, "rlnTomoSubTomosAre2DStacks", "This flag is set to true if subtomograms are saved as 2D image stacks");
 		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_BINNING, EMDL_DOUBLE, "rlnTomoSubtomogramBinning", "Binning level of a subtomogram");
         EMDL::addLabel(EMDL_TOMO_TOMOGRAM_BINNING, EMDL_DOUBLE, "rlnTomoTomogramBinning", "Binning level of a  reconstructed tomogram");
+        EMDL::addLabel(EMDL_TOMO_TOMOGRAM_THICKNESS, EMDL_DOUBLE, "rlnTomoTomogramThickness", "Estimated thickness of a tomogram (in nm)");
         EMDL::addLabel(EMDL_TOMO_PARTICLE_NAME, EMDL_STRING, "rlnTomoParticleName", "Name of each individual particle");
 		EMDL::addLabel(EMDL_TOMO_PARTICLE_ID, EMDL_INT, "rlnTomoParticleId", "Unique particle index");
 
