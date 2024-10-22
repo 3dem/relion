@@ -401,7 +401,7 @@ void AlignTiltseriesRunner::executeIMOD(long idx_tomo, int rank)
     if (other_wrapper_args.length() > 0)
         command += " " + other_wrapper_args;
 
-    command += " >& " + fn_log;
+    command += " > " + fn_log + " 2>&1 ";
 
     // Write the command to a .com file
     std::ofstream  fhc;
@@ -507,7 +507,7 @@ void AlignTiltseriesRunner::executeAreTomo(long idx_tomo, int rank)
     if (other_wrapper_args.length() > 0)
         command += " " + other_wrapper_args;
 
-    command += " >& " + fn_log;
+    command += " > " + fn_log + " 2>&1 ";
 
     // Write the command to a .com file
     std::ofstream  fhc;
