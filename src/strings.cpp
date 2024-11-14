@@ -470,15 +470,14 @@ std::string removeSpaces(const std::string& _str)
 // Remove quotes ===========================================================
 void removeQuotes(char **_str)
 {
+	if (!_str || !*_str) { return; }
 	std::string retval = *_str;
-	if (retval.length() == 0)
+	if (retval.empty())
 		return;
-	char c = retval[0];
-	if (c == '\"' || c == '\'')
-		retval = retval.substr(1, retval.length() - 1);
-	c = retval[retval.length()-1];
-	if (c == '\"' || c == '\'')
-		retval = retval.substr(0, retval.length() - 1);
+	if (retval[0] == '\"' || retval[0] == '\'')
+		retval = retval.substr(1);
+	if (!retval.empty() && (retval.back() == '\"' || retval.back() == '\''))
+		retval.pop_back();
 	free(*_str);
 	*_str = strdup(retval.c_str());
 }
