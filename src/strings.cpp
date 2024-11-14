@@ -486,22 +486,6 @@ std::string removeSpaces(const std::string& _str)
 	return retval;
 }
 
-// Remove quotes ===========================================================
-void removeQuotes(char **_str)
-{
-	std::string retval = *_str;
-	if (retval.length() == 0)
-		return;
-	char c = retval[0];
-	if (c == '\"' || c == '\'')
-		retval = retval.substr(1, retval.length() - 1);
-	c = retval[retval.length()-1];
-	if (c == '\"' || c == '\'')
-		retval = retval.substr(0, retval.length() - 1);
-	free(*_str);
-	*_str = strdup(retval.c_str());
-}
-
 // Split a string ==========================================================
 int splitString(const std::string& input,
                 const std::string& delimiter,
