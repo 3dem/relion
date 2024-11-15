@@ -289,23 +289,13 @@ void MovieReconstructor::backproject(int rank, int size)
 				eer_grouping = requested_eer_grouping;
 		}
 
-		FileName fn_gain = mic.getGainFilename();
-		if (fn_gain != prev_gain)
-		{
-			if (isEER)
-				EERRenderer::loadEERGain(fn_gain, Igain(), eer_upsampling);
-			else
-				Igain.read(fn_gain);
-			prev_gain = fn_gain;
-		}
-
 		// Read trajectories. Both particle ID and frame ID are 0-indexed in this array.
 		std::vector<std::vector<gravis::d2Vector>> trajectories = MotionHelper::readTracksInPix(fn_traj, movie_angpix);
 
 		// TODO: loop over relevant frames with per-frame shifts with per-frame shifts with per-frame shifts with per-frame shifts
+        EERRenderer renderer;
 		if (isEER)
 		{
-			EERRenderer renderer;
 			renderer.read(fn_movie, eer_upsampling);
 			const int frame_start = (frame_no - 1) * eer_grouping + 1;
 			const int frame_end = frame_start + eer_grouping - 1;
@@ -321,6 +311,17 @@ void MovieReconstructor::backproject(int rank, int size)
 		}
 		const int w0 = XSIZE(Iframe());
 		const int h0 = YSIZE(Iframe());
+
+		// Read the gain reference
+		FileName fn_gain = mic.getGainFilename();
+		if (fn_gain != prev_gain)
+		{
+			if (isEER)
+				renderer.loadEERGain(fn_gain, Igain());
+			else
+				Igain.read(fn_gain);
+			prev_gain = fn_gain;
+		}
 
 		// Apply gain correction
 		// Probably we can ignore defect correction, because we are not re-aligning.

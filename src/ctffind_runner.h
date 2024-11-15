@@ -31,6 +31,7 @@
 #include <src/image.h>
 #include <src/time.h>
 #include <src/jaz/single_particle/obs_model.h>
+#include "src/jaz/tomography/tomogram_set.h"
 
 class CtffindRunner
 {
@@ -57,11 +58,26 @@ public:
 	// Information about the optics groups
 	ObservationModel obsModel;
 
+    // Tilt movie index for each micrograph in a tilt serie (needed for converting back to tomographyExperiment)
+    std::vector<RFLOAT> pre_exposure_micrographs, nominal_defocus_micrographs;
+
+    // Is this a tomography experiment?
+    bool is_tomo;
+
+    // Information about tomography experiment
+    TomogramSet tomogramSet;
+
+    // Use this search range (in A) around the nominal defocus value
+    RFLOAT localsearch_nominal_defocus_range;
+
+    // Exponential factor to decrease maxres per unit dose
+    RFLOAT bfactor_dose;
+
 	// Dimension of squared area of the micrograph to use for CTF estimation
 	int ctf_win;
 
-	// CTFFIND and Gctf executables and shell
-	FileName fn_ctffind_exe, fn_gctf_exe, fn_shell;
+	// CTFFIND executable and shell
+	FileName fn_ctffind_exe, fn_shell;
 
 	// Is this ctffind4?
 	bool is_ctffind4;
@@ -86,21 +102,6 @@ public:
 
 	// Min, max and step phase-shift
 	RFLOAT phase_min, phase_max, phase_step;
-
-	// use Kai Zhang's Gctf instead of CTFFIND?
-	bool do_use_gctf;
-
-	// When using Gctf, ignore CTFFIND parameters and use Gctf defaults instead?
-	bool do_ignore_ctffind_params;
-
-	// When using Gctf, use equi-phase averaging?
-	bool do_EPA;
-
-	// Additional gctf command line options
-	std::string additional_gctf_options;
-
-	// When using Gctf, do validation test?
-	bool do_validation;
 
 	// Continue an old run: only estimate CTF if logfile WITH Final Values line does not yet exist, otherwise skip the micrograph
 	bool continue_old;
@@ -133,7 +134,6 @@ public:
 	// Magnification
 	RFLOAT Magnification;
 
-	// For Gctf: directly provide angpix!
 	RFLOAT angpix;
 
 	// Flag to only join results into a star file
@@ -169,29 +169,24 @@ public:
 	// Harvest all CTFFIND results into a single STAR file
 	void joinCtffindResults();
 
-	// Execute CTFFIND for a single micrograph
+	void getMySearchParameters(long int imic, RFLOAT &def_min, RFLOAT &def_max, RFLOAT &maxres);
+
+    // Execute CTFFIND for a single micrograph
 	void executeCtffind3(long int imic);
 
 	// Execute CTFFIND4.1+ for a single micrograph
 	void executeCtffind4(long int imic);
 
-	// Check micrograph size and add name to the list of micrographs to run Gctf on
-	//void addToGctfJobList(long int imic, std::vector<std::string> &allmicnames);
-
-	// Execute Gctf for many micrographs
-	//void executeGctf( std::vector<std::string> &allmicnames);
-	void executeGctf(long int imic,  std::vector<std::string> &allmicnames, bool is_last, int rank = 0);
-
 	// Get micrograph metadata
 	bool getCtffindResults(FileName fn_mic, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
 			RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
-			RFLOAT &maxres, RFLOAT &valscore, RFLOAT &phaseshift, bool do_warn = true);
+			RFLOAT &maxres, RFLOAT &valscore, RFLOAT &phaseshift, RFLOAT &icering, bool do_warn = true);
 	bool getCtffind3Results(FileName fn_mic, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
 			RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
 			RFLOAT &maxres, RFLOAT &phaseshift, RFLOAT &valscore, bool do_warn = true);
 	bool getCtffind4Results(FileName fn_mic, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
 			RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
-			RFLOAT &maxres, RFLOAT &phaseshift, bool do_warn = true);
+			RFLOAT &maxres, RFLOAT &phaseshift, RFLOAT &icering, bool do_warn = true);
 };
 
 

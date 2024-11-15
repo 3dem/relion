@@ -30,6 +30,7 @@
 
 #define DEFAULT_EXTERNAL_RECONSTRUCT "relion_external_reconstruct"
 
+#include "src/strings.h"
 #include "src/projector.h"
 #include "src/mask.h"
 #include "src/tabfuncs.h"
@@ -297,11 +298,13 @@ public:
 	                         FileName &fn_out,
 	                         MultidimArray<RFLOAT> &fsc_halves_io,
 	                         MultidimArray<RFLOAT> &tau2_io,
-							 MultidimArray<RFLOAT> &sigma2_ref,
-							 MultidimArray<RFLOAT> &data_vs_prior,
-							 RFLOAT pixel_size=1,
-							 RFLOAT particle_diameter=0,
-							 bool is_whole_instead_of_half = false,
+	                         MultidimArray<RFLOAT> &sigma2_ref,
+	                         MultidimArray<RFLOAT> &data_vs_prior,
+	                         RFLOAT pixel_size=1,
+	                         RFLOAT particle_diameter=0,
+	                         bool is_whole_instead_of_half = false,
+	                         bool do_blush = false,
+	                         std::string gpu_id = "",
 	                         RFLOAT tau2_fudge = 1.,
 	                         int verb = 0);
 

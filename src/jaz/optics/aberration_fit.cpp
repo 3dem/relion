@@ -145,7 +145,7 @@ void AberrationFit :: considerParticle(
 
 
 	const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(
-				part_id, fc, tomogram.optics.pixelSize);
+				part_id, fc, tomogram.centre, tomogram.optics.pixelSize);
 	
 	const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
 
@@ -162,12 +162,13 @@ void AberrationFit :: considerParticle(
 				tomogram.stack, f, s, 1.0, tomogram, traj[f],
 				observation, projCut, 1, true);
 
-		CTF ctf = tomogram.getCtf(f, dataSet.getPosition(part_id));
+		CTF ctf = tomogram.getCtf(f, dataSet.getPosition(part_id, tomogram.centre));
 		const RawImage<float> doseSlice = doseWeights.getConstSliceRef(f);
 
 		BufferedImage<fComplex> prediction = Prediction::predictModulated(
 				part_id, dataSet, projCut, s,
 				ctf,
+                tomogram.centre,
 				tomogram.optics.pixelSize,
 				aberrationsCache,
 				referenceMap.image_FS,

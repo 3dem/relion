@@ -45,7 +45,7 @@
 #ifndef MACROS_H
 #define MACROS_H
 
-#define RELION_SHORT_VERSION "4.0.1"
+#define RELION_SHORT_VERSION "5.0-beta-4"
 extern const char *g_RELION_VERSION;
 
 #include <math.h>
@@ -80,7 +80,9 @@ extern const char *g_RELION_VERSION;
 #define MY_MPI_COMPLEX MPI_C_DOUBLE_COMPLEX
 #endif
 
-#if defined CUDA and DEBUG_CUDA
+#if defined _CUDA_ENABLED and DEBUG_CUDA
+#define CRITICAL(string) raise(SIGSEGV);
+#elif _HIP_ENABLED and DEBUG_HIP
 #define CRITICAL(string) raise(SIGSEGV);
 #else
 #define CRITICAL(string) REPORT_ERROR(string);
@@ -408,7 +410,7 @@ static void SINCOSF(float x, float *s, float *c) { *s = sinf(x); *c = cosf(x); }
 static void PRINT_VERSION_INFO()
 {
 	std::cout << "RELION version: " << g_RELION_VERSION << " "
-#if defined(DEBUG) || defined(DEBUG_CUDA)
+#if defined(DEBUG) || defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 	<< "(debug-build) "
 #endif
 
@@ -420,12 +422,20 @@ static void PRINT_VERSION_INFO()
 	<< "BASE=double"
 #endif
 
-#if defined(CUDA) || defined(ALTCPU)
+#if defined(_CUDA_ENABLED) || defined(_HIP_ENABLED) || defined(_SYCL_ENABLED) || defined(ALTCPU)
 
 	#ifdef _CUDA_ENABLED
 	<< ", CUDA-ACC="
 	#endif
 
+	#ifdef _HIP_ENABLED
+	<< ", HIP-ACC="
+	#endif
+	
+	#ifdef _SYCL_ENABLED
+	<< ", SYCL-ACC="
+	#endif
+	
 	#ifdef ALTCPU
 	<< ", VECTOR-ACC="
 	#endif

@@ -104,6 +104,8 @@ void rotation3DMatrix(RFLOAT ang, char axis, Matrix2D< RFLOAT > &result,
     cosine = cos(ang);
     sine = sin(ang);
 
+    // SHWS 2feb2024: found bug in rotation around Y: should be opposite sign of the sines!
+    // That will revert all rotations, so change in flex_analyser.cpp, healpix_sampling.cpp, ml_optimiser.cpp and particle_subtractor.cpp!!
     switch (axis)
     {
     case 'Z':
@@ -115,8 +117,8 @@ void rotation3DMatrix(RFLOAT ang, char axis, Matrix2D< RFLOAT > &result,
         break;
     case 'Y':
         MAT_ELEM(result,0, 0) = cosine;
-        MAT_ELEM(result,0, 2) = -sine;
-        MAT_ELEM(result,2, 0) = sine;
+        MAT_ELEM(result,0, 2) = sine;
+        MAT_ELEM(result,2, 0) = -sine;
         MAT_ELEM(result,2, 2) = cosine;
         MAT_ELEM(result,1, 1) = 1;
         break;
@@ -200,6 +202,16 @@ void translation3DMatrix(const Matrix1D<RFLOAT> &v, Matrix2D<RFLOAT> &result)
     MAT_ELEM(result,0, 3) = XX(v);
     MAT_ELEM(result,1, 3) = YY(v);
     MAT_ELEM(result,2, 3) = ZZ(v);
+}
+
+void translation3DMatrix(const RFLOAT xshift, const RFLOAT yshift, const RFLOAT zshift, Matrix2D< RFLOAT > &result)
+{
+
+    result.initIdentity(4);
+    MAT_ELEM(result,0, 3) = xshift;
+    MAT_ELEM(result,1, 3) = yshift;
+    MAT_ELEM(result,2, 3) = zshift;
+
 }
 
 /* Scale 3D ---------------------------------------------------------------- */

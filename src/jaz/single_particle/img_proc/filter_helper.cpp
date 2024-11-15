@@ -693,7 +693,7 @@ RFLOAT FilterHelper::averageValue(Image<RFLOAT>& img)
 
 RFLOAT FilterHelper::maxValue(Image<RFLOAT> &img)
 {
-    RFLOAT vMax = -std::numeric_limits<double>::max();
+    RFLOAT vMax = std::numeric_limits<double>::lowest();
 
     FOR_ALL_DIRECT_NZYX_ELEMENTS_IN_MULTIDIMARRAY(img.data)
     {
@@ -1848,7 +1848,7 @@ Image<RFLOAT> FilterHelper::normaliseToUnitInterval(const Image<RFLOAT> &img)
 	const int c = img.data.ndim;
 	
 	RFLOAT minVal = std::numeric_limits<RFLOAT>::max();
-	RFLOAT maxVal = -std::numeric_limits<RFLOAT>::max();
+	RFLOAT maxVal = std::numeric_limits<RFLOAT>::lowest();
 			
 	for (int n = 0; n < c; n++)
 	for (int z = 0; z < d; z++)

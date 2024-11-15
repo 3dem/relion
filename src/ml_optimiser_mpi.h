@@ -27,7 +27,7 @@
 
 class MlOptimiserMpi: public MlOptimiser
 {
-	std::vector<int> cudaDeviceShares;
+	std::vector<int> gpuDeviceShares;
 
 public:
 	MpiNode *node;
@@ -140,6 +140,10 @@ public:
      */
     void iterate();
 
+#ifdef _SYCL_ENABLED
+private:
+	int syclDevicePerRank;
+#endif
 
 };
 

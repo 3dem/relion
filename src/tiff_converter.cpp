@@ -50,10 +50,10 @@ void TIFFConverter::read(int argc, char **argv)
 
 	int eer_section = parser.addSection("EER rendering options");	
 	eer_grouping = textToInteger(parser.getOption("--eer_grouping", "EER grouping", "40"));
-	eer_upsampling = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 = 4K or 2 = 8K)", "1"));
-	// --eer_upsampling 3 is only for debugging. Hidden.
-	if (eer_upsampling != 1 && eer_upsampling != 2 && eer_upsampling != 3)
-		REPORT_ERROR("eer_upsampling must be 1, 2 or 3");
+	eer_upsampling = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 = physical or 2 = 2x super-resolution)", "1"));
+	// --eer_upsampling -1 and 3 are only for debugging. Hidden.
+	if (eer_upsampling != -1 && eer_upsampling != 1 && eer_upsampling != 2 && eer_upsampling != 3)
+		REPORT_ERROR("eer_upsampling must be -1, 1, 2 or 3");
 	eer_short = parser.checkOption("--short", "use unsigned short instead of signed byte for EER rendering");
 
 	int tiff_section = parser.addSection("TIFF writing options");
@@ -361,6 +361,9 @@ void TIFFConverter::initialise(int _rank, int _total_ranks)
 		fn_first = fn_in;
 	}
 
+	if (do_estimate)
+		MD.randomiseOrder();
+
 	if (fn_first.getExtension() != "mrc" && fn_first.getExtension() != "mrcs" && !EERRenderer::isEER(fn_first))
 		REPORT_ERROR(fn_first + ": the input must be MRC, MRCS or EER files");
 
@@ -375,7 +378,9 @@ void TIFFConverter::initialise(int _rank, int _total_ranks)
 		{
 			if (fn_gain != "" && rank == 0)
 			{
-				EERRenderer::loadEERGain(fn_gain, gain(), eer_upsampling);
+				EERRenderer renderer;
+				renderer.read(fn_first, eer_upsampling);
+				renderer.loadEERGain(fn_gain, gain());
 				std::cout << "Read an EER gain file " << fn_gain << " NX = " << XSIZE(gain()) << " NY = " << YSIZE(gain()) << std::endl;
 				std::cout << "Taking inverse and re-scaling (when necessary)." << std::endl;
 				gain.write(fn_out + "gain-reference.mrc");
@@ -392,9 +397,6 @@ void TIFFConverter::initialise(int _rank, int _total_ranks)
 	}
 	else
 	{
-		if (do_estimate)
-			MD.randomiseOrder();	
-
 		// Check type and mode of the input
 		Image<RFLOAT> Ihead;
 		Ihead.read(fn_first, false, -1, false, true); // select_img -1, mmap false, is_2D true
@@ -508,9 +510,8 @@ void TIFFConverter::processOneMovie(FileName fn_movie, FileName fn_tiff)
 void TIFFConverter::run()
 {
 	long int my_first, my_last;
-	 divide_equally(MD.numberOfObjects(), total_ranks, rank, my_first, my_last); // MPI parallelization
 
-	for (long i = my_first; i <= my_last; i++)
+	for (long i = rank; i < MD.numberOfObjects(); i += total_ranks)
 	{
 		FileName fn_movie, fn_tiff;
 		MD.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_movie, i);

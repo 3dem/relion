@@ -409,14 +409,63 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 	{
 
 		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Tomo import");
+		browser->add("Import");
 		gui_jobwindows[nr_browse_tabs] = new JobWindow();
 		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_IMPORT);
 		browse_grp[nr_browse_tabs]->end();
 		nr_browse_tabs++;
 
 		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Make pseudo-subtomos");
+		browser->add("Motion correction");
+		gui_jobwindows[nr_browse_tabs] = new JobWindow();
+		gui_jobwindows[nr_browse_tabs]->initialise(PROC_MOTIONCORR, _do_tomo);
+		browse_grp[nr_browse_tabs]->end();
+		nr_browse_tabs++;
+
+		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+		browser->add("CTF estimation");
+		gui_jobwindows[nr_browse_tabs] = new JobWindow();
+		gui_jobwindows[nr_browse_tabs]->initialise(PROC_CTFFIND, _do_tomo);
+		browse_grp[nr_browse_tabs]->end();
+		nr_browse_tabs++;
+
+		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+		browser->add("Exclude tilt-images");
+		gui_jobwindows[nr_browse_tabs] = new JobWindow();
+		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_EXCLUDE_TILT_IMAGES);
+		browse_grp[nr_browse_tabs]->end();
+		nr_browse_tabs++;
+
+        browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+        browser->add("Align tilt-series");
+        gui_jobwindows[nr_browse_tabs] = new JobWindow();
+        gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_ALIGN_TILTSERIES);
+        browse_grp[nr_browse_tabs]->end();
+        nr_browse_tabs++;
+
+        browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+        browser->add("Reconstruct tomograms");
+        gui_jobwindows[nr_browse_tabs] = new JobWindow();
+        gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_RECONSTRUCT_TOMOGRAM);
+        browse_grp[nr_browse_tabs]->end();
+        nr_browse_tabs++;
+
+        browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+        browser->add("Denoise tomograms");
+        gui_jobwindows[nr_browse_tabs] = new JobWindow();
+        gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_DENOISE_TOMOGRAM);
+        browse_grp[nr_browse_tabs]->end();
+        nr_browse_tabs++;
+
+        browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+        browser->add("Pick tomograms");
+        gui_jobwindows[nr_browse_tabs] = new JobWindow();
+        gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_PICK_TOMOGRAM);
+        browse_grp[nr_browse_tabs]->end();
+        nr_browse_tabs++;
+
+        browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+		browser->add("Extract subtomos");
 		gui_jobwindows[nr_browse_tabs] = new JobWindow();
 		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_SUBTOMO);
 		browse_grp[nr_browse_tabs]->end();
@@ -477,16 +526,16 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 	}
 
 	browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("3D initial model");
+	browser->add("3D initial reference");
 	gui_jobwindows[nr_browse_tabs] = new JobWindow();
-	gui_jobwindows[nr_browse_tabs]->initialise(PROC_INIMODEL);
+	gui_jobwindows[nr_browse_tabs]->initialise(PROC_INIMODEL, _do_tomo);
 	browse_grp[nr_browse_tabs]->end();
 	nr_browse_tabs++;
 
 	browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("3D classification");
 	gui_jobwindows[nr_browse_tabs] = new JobWindow();
-	gui_jobwindows[nr_browse_tabs]->initialise(PROC_3DCLASS);
+	gui_jobwindows[nr_browse_tabs]->initialise(PROC_3DCLASS, _do_tomo);
 	browse_grp[nr_browse_tabs]->end();
 	nr_browse_tabs++;
 
@@ -514,21 +563,21 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 	if (_do_tomo)
 	{
 		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Tomo reconstruct particle");
+		browser->add("Reconstruct particle");
 		gui_jobwindows[nr_browse_tabs] = new JobWindow();
 		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_RECONSTRUCT);
 		browse_grp[nr_browse_tabs]->end();
 		nr_browse_tabs++;
-
+        
 		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Tomo CTF refinement");
+		browser->add("CTF refinement");
 		gui_jobwindows[nr_browse_tabs] = new JobWindow();
 		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_CTFREFINE);
 		browse_grp[nr_browse_tabs]->end();
 		nr_browse_tabs++;
 
 		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Tomo frame alignment");
+		browser->add("Bayesian polishing");
 		gui_jobwindows[nr_browse_tabs] = new JobWindow();
 		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_ALIGN);
 		browse_grp[nr_browse_tabs]->end();
@@ -550,6 +599,14 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 		gui_jobwindows[nr_browse_tabs]->initialise(PROC_MOTIONREFINE);
 		browse_grp[nr_browse_tabs]->end();
 		nr_browse_tabs++;
+
+        browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+        browser->add("DynaMight flexibility");
+        gui_jobwindows[nr_browse_tabs] = new JobWindow();
+        gui_jobwindows[nr_browse_tabs]->initialise(PROC_DYNAMIGHT);
+        browse_grp[nr_browse_tabs]->end();
+        nr_browse_tabs++;
+
 	}
 
 	browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
@@ -566,13 +623,16 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 	browse_grp[nr_browse_tabs]->end();
 	nr_browse_tabs++;
 
-	browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Particle subtraction");
-	gui_jobwindows[nr_browse_tabs] = new JobWindow();
-	gui_jobwindows[nr_browse_tabs]->initialise(PROC_SUBTRACT);
-	browse_grp[nr_browse_tabs]->end();
-	nr_browse_tabs++;
-
+	if (!_do_tomo)
+    {
+        browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+        browser->add("Particle subtraction");
+        gui_jobwindows[nr_browse_tabs] = new JobWindow();
+        gui_jobwindows[nr_browse_tabs]->initialise(PROC_SUBTRACT);
+        browse_grp[nr_browse_tabs]->end();
+        nr_browse_tabs++;
+    }
+    
 	browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Post-processing");
 	gui_jobwindows[nr_browse_tabs] = new JobWindow();
@@ -586,6 +646,13 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 	gui_jobwindows[nr_browse_tabs]->initialise(PROC_RESMAP);
 	browse_grp[nr_browse_tabs]->end();
 	nr_browse_tabs++;
+
+    browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+    browser->add("ModelAngelo building");
+    gui_jobwindows[nr_browse_tabs] = new JobWindow();
+    gui_jobwindows[nr_browse_tabs]->initialise(PROC_MODELANGELO);
+    browse_grp[nr_browse_tabs]->end();
+    nr_browse_tabs++;
 
 	browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("External");
@@ -1040,15 +1107,19 @@ void GuiMainWindow::fillStdOutAndErr()
 			std::string command = "tail -n 20 < " + fn_out + " | awk -F\"\r\" '{if (NF>1) {print $NF} else {print}}' > " + fn_outtail;
 			int res = system(command.c_str());
 			std::ifstream in(fn_outtail.c_str(), std::ios_base::in);
-			if (in.fail())
-				REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_outtail + " does not exists" );
-			int err = textbuff_stdout->loadfile(fn_outtail.c_str());
-			in.close();
+			if (!in.fail())
+                        {
+                            int err = textbuff_stdout->loadfile(fn_outtail.c_str());
+                            in.close();
+                            command = "rm -f " + fn_outtail;
+                            res = system(command.c_str());
+                        }
+
 		}
 		// Scroll to the bottom
-		disp_stdout->insert_position(textbuff_stdout->length()-1);
+		disp_stdout->insert_position(textbuff_stdout->length());
 		disp_stdout->show_insert_position();
-		disp_expand_stdout->insert_position(textbuff_stdout->length()-1);
+		disp_expand_stdout->insert_position(textbuff_stdout->length());
 		disp_expand_stdout->show_insert_position();
 	}
 	else
@@ -1065,15 +1136,19 @@ void GuiMainWindow::fillStdOutAndErr()
 			std::string command = "tail -10 " + fn_err + " > " + fn_errtail;
 			int res = system(command.c_str());
 			std::ifstream in(fn_errtail.c_str(), std::ios_base::in);
-			if (in.fail())
-				REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_errtail + " does not exists" );
-			int err = textbuff_stderr->loadfile(fn_errtail.c_str());
-			in.close();
-		}
+			if (!in.fail())
+                        {
+                            int err = textbuff_stderr->loadfile(fn_errtail.c_str());
+                            in.close();
+                            command = "rm -f " + fn_errtail;
+                            res = system(command.c_str());
+                        }
+
+        }
 		// Scroll to the bottom
-		disp_stderr->insert_position(textbuff_stderr->length()-1);
+		disp_stderr->insert_position(textbuff_stderr->length());
 		disp_stderr->show_insert_position();
-		disp_expand_stderr->insert_position(textbuff_stderr->length()-1);
+		disp_expand_stderr->insert_position(textbuff_stderr->length());
 		disp_expand_stderr->show_insert_position();
 	}
 	else
@@ -1311,8 +1386,7 @@ void GuiMainWindow::cb_display_io_node_i()
 	std::string command;
 
 	// Second line for backward compatibility with earlier alpha versions of relion-4.0....
-	if (pipeline.nodeList[mynode].type.find(LABEL_COORDS_CPIPE) != std::string::npos ||
-		pipeline.nodeList[mynode].type.find(NODE_MIC_COORDS_LABEL) != std::string::npos )
+	if (pipeline.nodeList[mynode].type.find(LABEL_COORDS_CPIPE) != std::string::npos)
 	{
 
 		// TODO: write error message saying this is no longer possible: use Continue to pick more/inspect results!
@@ -1406,8 +1480,54 @@ void GuiMainWindow::cb_display_io_node_i()
 		// Other arguments for extraction
 		command += " " + manualpickjob.joboptions["other_args"].getString() + " &";
 	}
-	else if (pipeline.nodeList[mynode].type.find(LABEL_LOGFILE_CPIPE) != std::string::npos ||
-			 pipeline.nodeList[mynode].type.find(NODE_PDF_LOGFILE_LABEL) != std::string::npos )
+    else if (pipeline.nodeList[mynode].type.find(LABEL_IMPORT_TOMOGRAMS) != std::string::npos ||
+            pipeline.nodeList[mynode].type.find(LABEL_MOCORR_TOMOGRAMS) != std::string::npos ||
+            pipeline.nodeList[mynode].type.find(LABEL_CTFFIND_TOMOGRAMS) != std::string::npos ||
+            pipeline.nodeList[mynode].type.find(LABEL_TILTALIGN_TOMOGRAMS) != std::string::npos ||
+            pipeline.nodeList[mynode].type.find(LABEL_EXCLUDE_TOMOGRAMS) != std::string::npos )
+    {
+
+        command = "relion_python_tomo_view tilt-series --tilt-series-star-file " + pipeline.nodeList[mynode].name;
+
+        // Read cache-size from gui_tomo_exclude_tilt_imagesjob.star if that file exists
+		RelionJob excludetiltseriesjob;
+		FileName fn_job = ".gui_tomo_exclude_tilt_images";
+		bool iscont=false;
+		if (exists(fn_job+"job.star"))
+		{
+			excludetiltseriesjob.read(fn_job.c_str(), iscont, true); // true means do initialise
+            command += " --cache-size " + excludetiltseriesjob.joboptions["cache_size"].getString();
+        }
+
+        // Run in the background
+        command += " &";
+
+    }
+    /*
+    else if (pipeline.nodeList[mynode].type.find(LABEL_RECONSTRUCT_TOMOGRAMS) != std::string::npos ||
+             pipeline.nodeList[mynode].type.find(LABEL_DENOISE_TOMOGRAMS) != std::string::npos ||
+             pipeline.nodeList[mynode].type.find(LABEL_CTFREFINE_TOMOGRAMS) != std::string::npos ||
+             pipeline.nodeList[mynode].type.find(LABEL_FRAMEALIGN_TOMOGRAMS) != std::string::npos )
+    {
+
+        command = "relion_python_tomo_view tomograms --tilt-series-star-file " + pipeline.nodeList[mynode].name;
+
+        // Read cache-size from gui_tomo_exclude_tilt_imagesjob.star if that file exists
+        RelionJob excludetiltseriesjob;
+        FileName fn_job = ".gui_tomo_exclude_tilt_images";
+        bool iscont=false;
+        if (exists(fn_job+"job.star"))
+        {
+            excludetiltseriesjob.read(fn_job.c_str(), iscont, true); // true means do initialise
+            command += " --cache-size " + excludetiltseriesjob.joboptions["cache_size"].getString();
+        }
+
+        // Run in the background
+        command += " &";
+
+    }
+    */
+	else if (pipeline.nodeList[mynode].type.find(LABEL_LOGFILE_CPIPE) != std::string::npos )
 	{
 		const char * default_pdf_viewer = getenv ("RELION_PDFVIEWER_EXECUTABLE");
 		char mydefault[]=DEFAULTPDFVIEWER;
@@ -1418,13 +1538,11 @@ void GuiMainWindow::cb_display_io_node_i()
 		std::string myviewer(default_pdf_viewer);
 		command = myviewer + " " + pipeline.nodeList[mynode].name + "&";
 	}
-	else if (pipeline.nodeList[mynode].type.find(LABEL_POLISH_PARAMS) != std::string::npos ||
-			 pipeline.nodeList[mynode].type.find(NODE_POLISH_PARAMS_LABEL) != std::string::npos )
+	else if (pipeline.nodeList[mynode].type.find(LABEL_POLISH_PARAMS) != std::string::npos )
 	{
 		command = "cat " + pipeline.nodeList[mynode].name;
 	}
-	else if (pipeline.nodeList[mynode].type.find(LABEL_POST) == std::string::npos &&
-			 pipeline.nodeList[mynode].type.find(NODE_POST_LABEL) == std::string::npos)
+	else
 	{
 		command = "relion_display --gui --i " + pipeline.nodeList[mynode].name + " &";
 	}
@@ -2392,19 +2510,8 @@ void GuiMainWindow::cb_about(Fl_Widget* o, void* v)
 void GuiMainWindow::cb_about_i()
 {
 #define HELPTEXT ("RELION " RELION_SHORT_VERSION " \n\n\
-RELION is developed in the groups of:\n\n\
-Sjors H.W. Scheres at the MRC Laboratory of Molecular Biology\n\
- - Sjors H.W. Scheres\n\
- - Shaoda He\n\
- - Takanori Nakane\n\
- - Jasenko Zivanov\n\
- - Liyi Dong\n\
- - Dari Kimanius\n\
-\n\
-and Erik Lindahl at Stockholm University\n\
- - Erik Lindahl\n\
- - Björn O. Forsber\n\
-\n\
+RELION is mainly developed in the group of Sjors Scheres at the MRC Laboratory of Molecular Biology. They are grateful for contributions by other labs and companies. \n\
+\
 Note that RELION is completely free, open-source software. You can redistribute it and/or modify it for your own purposes, but please do make sure \
 the contribution of the developers are acknowledged appropriately. In order to maintain an overview of existing versions, a notification regarding  \
 any redistribution of (modified versions of) the code is appreciated (contact Sjors directly).\n\n\
@@ -2435,6 +2542,12 @@ If RELION is useful in your work, please cite us. Relevant papers are:\n \n \
      Zivanov et al. (2020) IUCrJ (PMID: 32148853)\n\n\
  * Amyloid structure determination:\n\
      Scheres (2020) Acta Cryst. D (PMID: 32038040)\n\n\
+ * Blush regularization:\n\
+     Kimanius et al. (2023) preprint (DOI: 10.1101/2023.10.23.563586)\n\n\
+ * ModelAngelo:\n\
+     Jamali et al. (2023) preprint (DOI: 10.1101/2023.05.16.541002)\n\n\
+ * DynaMight:\n\
+     Schwab et al. (2023) preprint (DOI: 10.1101/2023.10.18.562877)\n\n\
 \
 Please also cite relevant papers when you used external programs or their algorithms re-implemented in RELION: \n \n \
 * MOTIONCOR2 algorithm for beam-induced motion correction:\n\
@@ -2453,12 +2566,9 @@ Please also cite relevant papers when you used external programs or their algori
 * Postscript plots are made using CPlot2D from http://www.amzsaki.com\n\n\
 \
 About the start up screen:\n\n\
-The map shown is the cryo-EM map of mouse heavy-chain apoferritin\n\
-at 1.22 A (EMDB-11638) collected on a new Titan Krios microscope with\n\
-cold FEG, Selectris X energy filter and Falcon4 direct electron detector.\n\
-Densities for hydrogen atoms are visible in the hydrogen difference map\n\
-(orange mesh). See Nakane et al, Nature (2020) (doi:10.1038/s41586-020-2829-0)\n\
-for details. The raw dataset is available at EMPIAR-10424.\
+The map shown is the cryo-EM map of a fungal pheromone receptor STE2 dimer\n\
+without G proteins. Application of Blush algorithm improved the map\n\
+from the left to the middle panel and allowed automatic chain tracing by ModelAngelo (right panel).\n\
 ")
 
 	ShowHelpText *help = new ShowHelpText(HELPTEXT);

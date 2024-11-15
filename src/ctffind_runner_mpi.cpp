@@ -48,10 +48,7 @@ void CtffindRunnerMpi::run()
 		int barstep;
 		if (verb > 0)
 		{
-			if (do_use_gctf)
-				std::cout << " Estimating CTF parameters using Kai Zhang's Gctf ..." << std::endl;
-			else
-				std::cout << " Estimating CTF parameters using Niko Grigorieff's CTFFIND ..." << std::endl;
+            std::cout << " Estimating CTF parameters using Niko Grigorieff's CTFFIND ..." << std::endl;
 			init_progress_bar(my_nr_micrographs);
 			barstep = XMIPP_MAX(1, my_nr_micrographs / 60);
 		}
@@ -68,14 +65,10 @@ void CtffindRunnerMpi::run()
 			obsModel.opticsMdt.getValue(EMDL_CTF_CS, Cs, optics_group_micrographs[imic]-1);
 			obsModel.opticsMdt.getValue(EMDL_CTF_VOLTAGE, Voltage, optics_group_micrographs[imic]-1);
 			obsModel.opticsMdt.getValue(EMDL_CTF_Q0, AmplitudeConstrast, optics_group_micrographs[imic]-1);
-			obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, angpix, optics_group_micrographs[imic]-1);
+            EMDLabel mylabel = (is_tomo) ? EMDL_TOMO_TILT_SERIES_PIXEL_SIZE : EMDL_MICROGRAPH_PIXEL_SIZE;
+			obsModel.opticsMdt.getValue(mylabel, angpix, optics_group_micrographs[imic]-1);
 
-			if (do_use_gctf)
-			{
-				//addToGctfJobList(imic, allmicnames);
-				executeGctf(imic, allmicnames, imic == my_last_micrograph, node->rank);
-			}
-			else if (is_ctffind4)
+			if (is_ctffind4)
 			{
 				executeCtffind4(imic);
 			}
@@ -88,9 +81,6 @@ void CtffindRunnerMpi::run()
 				progress_bar(imic);
 
 		}
-
-		//if (do_use_gctf && allmicnames.size() > 0)
-		//	executeGctf(allmicnames);
 
 		if (verb > 0)
 			progress_bar(my_nr_micrographs);

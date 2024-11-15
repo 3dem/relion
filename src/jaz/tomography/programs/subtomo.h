@@ -7,11 +7,14 @@
 #include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/image/buffered_image.h>
 #include <src/jaz/tomography/optimisation_set.h>
+#include <src/projector.h>
+
 
 
 class ParticleSet;
 class ParticleIndex;
 class TomogramSet;
+class Tomogram;
 class AberrationsCache;
 
 
@@ -27,21 +30,25 @@ class SubtomoProgram
 			
 			int 
 				boxSize, 
-				cropSize, 
-				num_threads;
+				cropSize,
+                min_frames,
+                num_threads;
 			
 			double 
 				SNR,
-				binning, 
-				taper, 
+				binning,
+				taper,
 				env_sigma,
 				cone_slope,
 				cone_sig0,
-				freqCutoffFract;
+				freqCutoffFract,
+                maxDose;
 			
 			bool 
 				flip_value, 
-				diag, 
+				diag,
+                do_ctf,
+                do_stack2d,
 				do_whiten,
 				do_center, 
 				do_rotate, 
@@ -62,7 +69,8 @@ class SubtomoProgram
                 apply_orientations,
 				write_float16,
 				run_from_GUI,
-				run_from_MPI;
+				run_from_MPI,
+                do_real_subtomo;
 
 		void readBasicParameters(IOParser& parser);
 		virtual void readParameters(int argc, char *argv[]);
@@ -72,9 +80,15 @@ class SubtomoProgram
 	protected:
 
 		void initialise(
-				const ParticleSet& particleSet,
+				ParticleSet& particleSet,
 				const std::vector<std::vector<ParticleIndex>>& particles,
-				const TomogramSet& tomogramSet);
+				const TomogramSet& tomogramSet,
+                bool verbose = true);
+
+        BufferedImage<float> extractSubtomogramsAndReProject(
+                ParticleIndex part_id, MultidimArray<RFLOAT> &recTomo,
+                const Tomogram& tomogram, const ParticleSet &particleSet,
+                const std::vector<bool> &isVisible, RFLOAT tomogram_angpix);
 
 		void processTomograms(
 				const std::vector<int>& tomoIndices,
@@ -86,13 +100,11 @@ class SubtomoProgram
 				long int s2D,
 				long int s3D,
 				double relative_box_scale,
-				bool do_ctf,
 				int verbose,
 				BufferedImage<float>& sum_data,
 				BufferedImage<float>& sum_weights );
 
-
-	private:
+private:
 
 			bool directoriesPerTomogram;
 

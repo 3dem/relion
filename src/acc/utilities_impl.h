@@ -9,10 +9,22 @@
 #include "src/acc/cuda/cuda_kernels/wavg.cuh"
 #include "src/acc/cuda/cuda_kernels/diff2.cuh"
 #include "src/acc/cuda/cuda_fft.h"
+using deviceStream_t = cudaStream_t;
+#elif _HIP_ENABLED
+#include "src/acc/hip/hip_kernels/helper.h"
+#include "src/acc/hip/hip_kernels/wavg.h"
+#include "src/acc/hip/hip_kernels/diff2.h"
+#include "src/acc/hip/hip_fft.h"
+using deviceStream_t = hipStream_t;
+#elif _SYCL_ENABLED
+#include "src/acc/sycl/sycl_kernels/helper.h"
+#include "src/acc/sycl/sycl_kernels/wavg.h"
+#include "src/acc/sycl/sycl_kernels/diff2.h"
 #else
 #include "src/acc/cpu/cpu_kernels/helper.h"
 #include "src/acc/cpu/cpu_kernels/wavg.h"
 #include "src/acc/cpu/cpu_kernels/diff2.h"
+using deviceStream_t = cudaStream_t;
 #endif
 
 void dump_array(char *name, bool *ptr, size_t size)
@@ -280,6 +292,65 @@ void makeNoiseImage(XFLOAT sigmaFudgeFactor,
     // transformer can be used to set up the actual particle image
     accMLO->transformer1.reals.cpOnDevice(~RandomImage);
     //cudaMLO->transformer1.reals.streamSync();
+#elif _HIP_ENABLED
+    // Set up states to seed and run randomization on the GPU
+    // AccDataTypes::Image<hiprandState > RandomStates(RND_BLOCK_NUM*RND_BLOCK_SIZE,ptrFactory);
+    AccPtr<hiprandState> RandomStates = RandomImage.make<hiprandState>(RND_BLOCK_NUM*RND_BLOCK_SIZE);
+    RandomStates.deviceAlloc();
+
+    NoiseSpectra.cpToDevice();
+    NoiseSpectra.streamSync();
+    LAUNCH_PRIVATE_ERROR(hipGetLastError(),accMLO->errorStatus);
+
+    // Initialize randomization by particle ID, like on the CPU-side
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_initRND), RND_BLOCK_NUM, RND_BLOCK_SIZE, 0, 0,
+                                     seed,
+                                    ~RandomStates);
+    LAUNCH_PRIVATE_ERROR(hipGetLastError(),accMLO->errorStatus);
+
+    // Create noise image with the correct spectral profile
+    if(is3D)
+    {
+    	hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_RNDnormalDitributionComplexWithPowerModulation3D), dim3(RND_BLOCK_NUM), dim3(RND_BLOCK_SIZE), 0, 0,
+                                    ~accMLO->transformer1.fouriers,
+                                    ~RandomStates,
+									accMLO->transformer1.xFSize,
+									accMLO->transformer1.yFSize,
+                                    ~NoiseSpectra);
+    }
+    else
+    {
+    	hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_RNDnormalDitributionComplexWithPowerModulation2D), dim3(RND_BLOCK_NUM), dim3(RND_BLOCK_SIZE), 0, 0,
+    	                                    ~accMLO->transformer1.fouriers,
+    	                                    ~RandomStates,
+    										accMLO->transformer1.xFSize,
+    	                                    ~NoiseSpectra);
+    }
+    LAUNCH_PRIVATE_ERROR(hipGetLastError(),accMLO->errorStatus);
+
+    // Transform to real-space, to get something which look like
+    // the particle image without actual signal (a particle)
+    accMLO->transformer1.backward();
+
+    // Copy the randomized image to A separate device-array, so that the
+    // transformer can be used to set up the actual particle image
+    accMLO->transformer1.reals.cpOnDevice(~RandomImage);
+    //hipMLO->transformer1.reals.streamSync();
+#elif _SYCL_ENABLED
+	// Create noise image with the correct spectral profile
+	if(is3D)
+		syclKernels::RNDnormalDitributionComplexWithPowerModulation3D(accMLO->transformer1.fouriers(), accMLO->transformer1.xFSize, accMLO->transformer1.yFSize, ~NoiseSpectra);
+	else
+		syclKernels::RNDnormalDitributionComplexWithPowerModulation2D(accMLO->transformer1.fouriers(), accMLO->transformer1.xFSize, ~NoiseSpectra);
+
+	// Transform to real-space, to get something which look like
+	// the particle image without actual signal (a particle)
+	accMLO->transformer1.backward();
+
+	// Copy the randomized image to A separate device-array, so that the
+	// transformer can be used to set up the actual particle image
+	for(size_t i=0; i<RandomImage.getSize(); i++)
+		RandomImage[i]=accMLO->transformer1.reals[i];
 #else
 
     // Create noise image with the correct spectral profile
@@ -324,6 +395,11 @@ static void TranslateAndNormCorrect(MultidimArray<RFLOAT > &img_in,
 #ifdef _CUDA_ENABLED
 		int BSZ = ( (int) ceilf(( float)temp.getSize() /(float)BLOCK_SIZE));
 		CudaKernels::cuda_kernel_multi<XFLOAT><<<BSZ,BLOCK_SIZE,0,temp.getStream()>>>(temp(),normcorr,temp.getSize());
+#elif _HIP_ENABLED
+		int BSZ = ( (int) ceilf(( float)temp.getSize() /(float)BLOCK_SIZE));
+		hipLaunchKernelGGL(HIP_KERNEL_NAME(HipKernels::hip_kernel_multi<XFLOAT>), dim3(BSZ), dim3(BLOCK_SIZE), 0, temp.getStream(), temp(), normcorr, temp.getSize());
+#elif _SYCL_ENABLED
+		syclKernels::sycl_kernel_multi<XFLOAT>(temp(),normcorr, temp.getSize());
 #else
 		CpuKernels::cpu_kernel_multi<XFLOAT>(temp(),normcorr, temp.getSize());
 #endif
@@ -339,6 +415,18 @@ static void TranslateAndNormCorrect(MultidimArray<RFLOAT > &img_in,
 	else
 		CudaKernels::cuda_kernel_translate2D<XFLOAT><<<BSZ,BLOCK_SIZE,0,temp.getStream()>>>(temp(),img_out(),img_in.zyxdim,img_in.xdim,img_in.ydim,xOff,yOff);
 	//LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
+#elif _HIP_ENABLED
+	int BSZ = ( (int) ceilf(( float)temp.getSize() /(float)BLOCK_SIZE));
+	if (DATA3D)
+		hipLaunchKernelGGL(HIP_KERNEL_NAME(HipKernels::hip_kernel_translate3D<XFLOAT>), dim3(BSZ), dim3(BLOCK_SIZE), 0, temp.getStream(), temp(), img_out(), img_in.zyxdim, img_in.xdim, img_in.ydim, img_in.zdim, xOff, yOff, zOff);
+	else
+		hipLaunchKernelGGL(HIP_KERNEL_NAME(HipKernels::hip_kernel_translate2D<XFLOAT>), dim3(BSZ), dim3(BLOCK_SIZE), 0, temp.getStream(), temp(), img_out(), img_in.zyxdim, img_in.xdim, img_in.ydim, xOff, yOff);
+	//LAUNCH_PRIVATE_ERROR(hipGetLastError(),accMLO->errorStatus);
+#elif _SYCL_ENABLED
+	if (DATA3D)
+		syclKernels::sycl_translate3D<XFLOAT>(temp(),img_out(),img_in.zyxdim,img_in.xdim,img_in.ydim,img_in.zdim,xOff,yOff,zOff);
+	else
+		syclKernels::sycl_translate2D<XFLOAT>(temp(),img_out(),img_in.zyxdim,img_in.xdim,img_in.ydim,xOff,yOff);
 #else
 	if (DATA3D)
 		CpuKernels::cpu_translate3D<XFLOAT>(temp(),img_out(),img_in.zyxdim,img_in.xdim,img_in.ydim,img_in.zdim,xOff,yOff,zOff);
@@ -405,7 +493,7 @@ static void softMaskBackgroundValue(
 {
 	int block_dim = 128; //TODO: set balanced (hardware-dep?)
 #ifdef _CUDA_ENABLED
-		cuda_kernel_softMaskBackgroundValue<<<block_dim,SOFTMASK_BLOCK_SIZE,0, vol.getStream()>>>(
+	cuda_kernel_softMaskBackgroundValue<<<block_dim,SOFTMASK_BLOCK_SIZE,0, vol.getStream()>>>(
 				~vol,
 				vol.getxyz(),
 				vol.getx(),
@@ -419,6 +507,38 @@ static void softMaskBackgroundValue(
 				cosine_width,
 				~g_sum,
 				~g_sum_bg);
+#elif _HIP_ENABLED
+	hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_softMaskBackgroundValue), dim3(block_dim), dim3(SOFTMASK_BLOCK_SIZE), 0, vol.getStream(),
+				~vol,
+				vol.getxyz(),
+				vol.getx(),
+				vol.gety(),
+				vol.getz(),
+				vol.getx()/2,
+				vol.gety()/2,
+				vol.getz()/2,
+				radius,
+				radius_p,
+				cosine_width,
+				~g_sum,
+				~g_sum_bg);
+#elif _SYCL_ENABLED
+	syclKernels::softMaskBackgroundValue(
+			block_dim,
+			SOFTMASK_BLOCK_SIZE,
+			~vol,
+			vol.getxyz(),
+			vol.getx(),
+			vol.gety(),
+			vol.getz(),
+			vol.getx()/2,
+			vol.gety()/2,
+			vol.getz()/2,
+			radius,
+			radius_p,
+			cosine_width,
+			~g_sum,
+			~g_sum_bg);
 #else
 	CpuKernels::softMaskBackgroundValue(
 			block_dim,
@@ -465,6 +585,40 @@ static void cosineFilter(
 			radius_p,
 			cosine_width,
 			sum_bg_total);
+#elif _HIP_ENABLED
+	hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_cosineFilter), dim3(block_dim), dim3(SOFTMASK_BLOCK_SIZE), 0, vol.getStream(),
+			~vol,
+			vol.getxyz(),
+			vol.getx(),
+			vol.gety(),
+			vol.getz(),
+			vol.getx()/2,
+			vol.gety()/2,
+			vol.getz()/2,
+			!do_Mnoise,
+			~Noise,
+			radius,
+			radius_p,
+			cosine_width,
+			sum_bg_total);
+#elif _SYCL_ENABLED
+	syclKernels::cosineFilter(
+			block_dim,
+			SOFTMASK_BLOCK_SIZE,
+			~vol,
+			vol.getxyz(),
+			vol.getx(),
+			vol.gety(),
+			vol.getz(),
+			vol.getx()/2,
+			vol.gety()/2,
+			vol.getz()/2,
+			!do_Mnoise,
+			~Noise,
+			radius,
+			radius_p,
+			cosine_width,
+			sum_bg_total);
 #else
 	CpuKernels::cosineFilter(
 			block_dim,
@@ -493,6 +647,11 @@ void initOrientations(AccPtr<RFLOAT> &pdfs, AccPtr<XFLOAT> &pdf_orientation, Acc
 	int gs = ceil(pdfs.getSize()/(float)(bs));
 	cuda_kernel_initOrientations<<<gs, bs, 0, pdfs.getStream()>>>(~pdfs, ~pdf_orientation, ~pdf_orientation_zeros, pdfs.getSize());
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+#elif _HIP_ENABLED
+	int bs = 512;
+	int gs = ceil(pdfs.getSize()/(float)(bs));
+	hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_initOrientations), dim3(gs), dim3(bs), 0, pdfs.getStream(), ~pdfs, ~pdf_orientation, ~pdf_orientation_zeros, pdfs.getSize());
+	LAUNCH_HANDLE_ERROR(hipGetLastError());
 #else
 	for(int iorientclass=0; iorientclass< pdfs.getSize(); iorientclass++)
 	{
@@ -512,7 +671,7 @@ void initOrientations(AccPtr<RFLOAT> &pdfs, AccPtr<XFLOAT> &pdf_orientation, Acc
 }
 
 void centerFFT_2D(int grid_size, int batch_size, int block_size,
-				cudaStream_t stream,
+				deviceStream_t stream,
 				XFLOAT *img_in,
 				size_t image_size,
 				int xdim,
@@ -529,8 +688,17 @@ void centerFFT_2D(int grid_size, int batch_size, int block_size,
 				ydim,
 				xshift,
 				yshift);
+#elif _HIP_ENABLED
+	dim3 blocks(grid_size, batch_size);
+	hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_centerFFT_2D), blocks, block_size, 0, stream,
+				img_in,
+				image_size,
+				xdim,
+				ydim,
+				xshift,
+				yshift);
 #else
-	CpuKernels::centerFFT_2D<XFLOAT>(batch_size, 0, image_size/2,
+	centerFFT_2D_CPU<XFLOAT>(batch_size, 0, image_size/2,
 				img_in,
 				image_size,
 				xdim,
@@ -557,8 +725,17 @@ void centerFFT_2D(int grid_size, int batch_size, int block_size,
 				ydim,
 				xshift,
 				yshift);
+#elif _HIP_ENABLED
+	dim3 blocks(grid_size, batch_size);
+	hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_centerFFT_2D), dim3(blocks), dim3(block_size), 0, 0,
+				img_in,
+				image_size,
+				xdim,
+				ydim,
+				xshift,
+				yshift);
 #else
-	CpuKernels::centerFFT_2D<XFLOAT>(batch_size, 0, image_size/2,
+	centerFFT_2D_CPU<XFLOAT>(batch_size, 0, image_size/2,
 			img_in,
 			image_size,
 			xdim,
@@ -569,7 +746,7 @@ void centerFFT_2D(int grid_size, int batch_size, int block_size,
 }
 
 void centerFFT_3D(int grid_size, int batch_size, int block_size,
-				cudaStream_t stream,
+				deviceStream_t stream,
 				XFLOAT *img_in,
 				size_t image_size,
 				int xdim,
@@ -590,8 +767,19 @@ void centerFFT_3D(int grid_size, int batch_size, int block_size,
 				xshift,
 				yshift,
 				zshift);
+#elif _HIP_ENABLED
+	dim3 blocks(grid_size, batch_size);
+	hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_centerFFT_3D), dim3(blocks), dim3(block_size), 0, stream,
+				img_in,
+				image_size,
+				xdim,
+				ydim,
+				zdim,
+				xshift,
+				yshift,
+				zshift);
 #else
-	CpuKernels::centerFFT_3D<XFLOAT>(batch_size, (size_t)0, (size_t)image_size/2,
+	centerFFT_3D_CPU<XFLOAT>(batch_size, (size_t)0, (size_t)image_size/2,
 			img_in,
 			image_size,
 			xdim,
@@ -616,12 +804,12 @@ void kernel_exponentiate_weights_fine(	XFLOAT *g_pdf_orientation,
 										unsigned long *d_job_idx,
 										unsigned long *d_job_num,
 										long int job_num,
-										cudaStream_t stream)
+										deviceStream_t stream)
 {
 	long block_num = ceil((double)job_num / (double)SUMW_BLOCK_SIZE);
 
 #ifdef _CUDA_ENABLED
-cuda_kernel_exponentiate_weights_fine<<<block_num,SUMW_BLOCK_SIZE,0,stream>>>(
+	cuda_kernel_exponentiate_weights_fine<<<block_num,SUMW_BLOCK_SIZE,0,stream>>>(
 		g_pdf_orientation,
 		g_pdf_orientation_zeros,
 		g_pdf_offset,
@@ -635,6 +823,54 @@ cuda_kernel_exponentiate_weights_fine<<<block_num,SUMW_BLOCK_SIZE,0,stream>>>(
 		d_job_idx,
 		d_job_num,
 		job_num);
+#elif _HIP_ENABLED
+	hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_exponentiate_weights_fine), dim3(block_num), dim3(SUMW_BLOCK_SIZE), 0, stream,
+		g_pdf_orientation,
+		g_pdf_orientation_zeros,
+		g_pdf_offset,
+		g_pdf_offset_zeros,
+		g_weights,
+		min_diff2,
+		oversamples_orient,
+		oversamples_trans,
+		d_rot_id,
+		d_trans_idx,
+		d_job_idx,
+		d_job_num,
+		job_num);
+#elif _SYCL_ENABLED
+ #ifdef USE_ONEDPL
+	syclGpuKernels::sycl_kernel_exponentiate_weights_fine(
+		g_pdf_orientation,
+		g_pdf_orientation_zeros,
+		g_pdf_offset,
+		g_pdf_offset_zeros,
+		g_weights,
+		min_diff2,
+		oversamples_orient,
+		oversamples_trans,
+		d_rot_id,
+		d_trans_idx,
+		d_job_idx,
+		d_job_num,
+		job_num,
+		stream);
+ #else
+	syclKernels::exponentiate_weights_fine(
+		g_pdf_orientation,
+		g_pdf_orientation_zeros,
+		g_pdf_offset,
+		g_pdf_offset_zeros,
+		g_weights,
+		min_diff2,
+		oversamples_orient,
+		oversamples_trans,
+		d_rot_id,
+		d_trans_idx,
+		d_job_idx,
+		d_job_num,
+		job_num);
+ #endif
 #else
 	CpuKernels::exponentiate_weights_fine(
 		g_pdf_orientation,
@@ -658,11 +894,16 @@ cuda_kernel_exponentiate_weights_fine<<<block_num,SUMW_BLOCK_SIZE,0,stream>>>(
 void run_griddingCorrect(RFLOAT *vol, int interpolator, RFLOAT rrval, RFLOAT r_min_nn,
 								size_t iX, size_t iY, size_t iZ)
 {
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	dim3 bs(32,4,2);
 	dim3 gs(ceil(iX/(float)bs.x), ceil(iY/(float)bs.y), ceil(iZ/(float)bs.z));
 	cuda_kernel_griddingCorrect<<<gs,bs>>>(vol, interpolator, rrval, r_min_nn, iX, iY, iZ);
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+#elif _HIP_ENABLED
+	dim3 bs(32,4,2);
+	dim3 gs(ceil(iX/(float)bs.x), ceil(iY/(float)bs.y), ceil(iZ/(float)bs.z));
+	hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_griddingCorrect), gs, bs, 0, 0, vol, interpolator, rrval, r_min_nn, iX, iY, iZ);
+	LAUNCH_HANDLE_ERROR(hipGetLastError());
 #endif
 }
 
@@ -670,15 +911,15 @@ void run_padTranslatedMap(
 		RFLOAT *d_in, RFLOAT *d_out,
 		size_t isX, size_t ieX, size_t isY, size_t ieY, size_t isZ, size_t ieZ, //Input dimensions
 		size_t osX, size_t oeX, size_t osY, size_t oeY, size_t osZ, size_t oeZ,  //Output dimensions
-		cudaStream_t stream)
+		deviceStream_t stream)
 {
-#ifdef CUDA
 	size_t iszX = ieX - isX + 1; 
 	size_t iszY = ieY - isY + 1; 
 	size_t iszZ = ieZ - isZ + 1; 
 	size_t oszX = oeX - osX + 1; 
 	size_t oszY = oeY - osY + 1; 
-	size_t oszZ = oeZ - osZ + 1; 
+	size_t oszZ = oeZ - osZ + 1;
+#ifdef _CUDA_ENABLED
    
 	if(iszX == oszX && iszY == oszY && iszZ == oszZ)
 	{
@@ -695,15 +936,33 @@ void run_padTranslatedMap(
 				);
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	}
+#elif _HIP_ENABLED
+	
+	if(iszX == oszX && iszY == oszY && iszZ == oszZ)
+	{
+		hipCpyDeviceToDevice(d_in, d_out, iszX*iszY*iszZ, stream);
+	}
+	else
+	{
+		dim3 block_dim(16,4,2);
+		dim3 grid_dim(ceil(oszX / (float) block_dim.x), ceil(oszY / (float) block_dim.y), ceil(oszZ / (float) block_dim.z));
+		hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_window_transform<RFLOAT>), grid_dim, block_dim, 0, stream,
+				d_in, d_out,
+				iszX, iszY, iszZ, //Input dimensions
+				isX-osX, isY-osY, isZ-osZ, oszX, oszY, oszZ  //Output dimensions
+				);
+		LAUNCH_HANDLE_ERROR(hipGetLastError());
+	}
 #endif
 }
 
-void run_CenterFFTbySign(Complex *img_in, int xSize, int ySize, int zSize, cudaStream_t stream)
+void run_CenterFFTbySign(Complex *img_in, int xSize, int ySize, int zSize, deviceStream_t stream)
 {
-#ifdef CUDA
-	dim3 bs(32,4,2);
-	dim3 gs(ceil(xSize/(float)bs.x), ceil(ySize/(float)bs.y), ceil(zSize/(float)bs.z));
-	if(sizeof(RFLOAT) == sizeof(double))
+#ifdef _CUDA_ENABLED
+    dim3 bs(32,4,2);
+    dim3 gs(ceil(xSize/(float)bs.x), ceil(ySize/(float)bs.y), ceil(zSize/(float)bs.z));
+
+    if(sizeof(RFLOAT) == sizeof(double))
 		cuda_kernel_centerFFTbySign<<<gs,bs, 0, stream>>>(
 				(double2*)img_in,
 				xSize,
@@ -716,8 +975,24 @@ void run_CenterFFTbySign(Complex *img_in, int xSize, int ySize, int zSize, cudaS
 				ySize,
 				zSize);
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+#elif _HIP_ENABLED
+    dim3 bs(32,4,2);
+	dim3 gs(ceil(xSize/(float)bs.x), ceil(ySize/(float)bs.y), ceil(zSize/(float)bs.z));
+
+	if(sizeof(RFLOAT) == sizeof(double))
+		hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_centerFFTbySign), gs, bs, 0, stream,
+				(double2*)img_in,
+				xSize,
+				ySize,
+				zSize);
+	else
+		hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_centerFFTbySign), gs, bs, 0, stream,
+				(float2*)img_in,
+				xSize,
+				ySize,
+				zSize);
+	LAUNCH_HANDLE_ERROR(hipGetLastError());
 #endif
 }
 
 #endif //ACC_UTILITIES_H_
-

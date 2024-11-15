@@ -100,7 +100,7 @@ f2Vector PhaseLineAverage::findBounds(
 	const int d = phase.zdim;
 	
 	float minVal = std::numeric_limits<float>::max();
-	float maxVal = -std::numeric_limits<float>::max();
+	float maxVal = std::numeric_limits<float>::lowest();
 	
 	for (int z = 0; z < d; z++)
 	for (int y = 0; y < h; y++)

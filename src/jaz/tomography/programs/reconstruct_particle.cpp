@@ -19,7 +19,6 @@
 #include <mpi.h>
 #include <iostream>
 
-
 using namespace gravis;
 
 
@@ -62,6 +61,7 @@ void ReconstructParticleProgram::readBasicParameters(int argc, char *argv[])
 	cropSize = textToInteger(parser.getOption("--crop", "Size of (additionally output) cropped image", "-1"));
 
 	do_whiten = parser.checkOption("--whiten", "Whiten the noise by flattening the power spectrum");
+    do_ctf = !parser.checkOption("--no_ctf", "Do not apply CTFs");
 
 	binning = textToDouble(parser.getOption("--bin", "Binning factor", "1"));
 	taper = textToDouble(parser.getOption("--taper", "Taper against the sphere by this number of pixels (only if cropping)", "10"));
@@ -101,9 +101,12 @@ void ReconstructParticleProgram::run()
 	Log::beginSection("Initialising");
 
 	TomogramSet tomoSet(optimisationSet.tomograms, true);
-	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories, true);
+	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories, true, &tomoSet);
 
-	std::vector<std::vector<ParticleIndex>> particles = particleSet.splitByTomogram(tomoSet, true);
+    if (!particleSet.hasHalfSets())
+        Log::warn("The input particles  in "+optimisationSet.particles+ " have no rlnRandomSubset to specify halfsets, joining all particles in half1");
+
+    std::vector<std::vector<ParticleIndex>> particles = particleSet.splitByTomogram(tomoSet, true);
 	
 	const int tc = particles.size();
 	const int s = boxSize;
@@ -112,7 +115,6 @@ void ReconstructParticleProgram::run()
 	const int s02D = (int)(binning * s + 0.5);
 	
 	const bool flip_value = true;
-	const bool do_ctf = true;
 
 	Tomogram tomo0 = tomoSet.loadTomogram(0, false);
 	const double binnedOutPixelSize = tomo0.optics.pixelSize * binning;
@@ -168,7 +170,7 @@ void ReconstructParticleProgram::run()
 
 	if (no_reconstruction) return;
 
-	finalise(dataImgFS, ctfImgFS, binnedOutPixelSize);
+	finalise(dataImgFS, ctfImgFS, particleSet, binnedOutPixelSize);
 
 	// Delete temporary files
 	// No error checking - do not bother the user if it fails
@@ -197,7 +199,7 @@ void ReconstructParticleProgram::processTomograms(
 	const int sh = s/2 + 1;
 	const int tc = tomoIndices.size();
 
-	if (verbosity > 0 && !per_tomogram_progress)
+    if (verbosity > 0 && !per_tomogram_progress)
 	{
 		int total_particles_on_first_thread = 0;
 
@@ -336,9 +338,9 @@ void ReconstructParticleProgram::processTomograms(
 
 			const ParticleIndex part_id = particles[t][p];
 
-			const d3Vector pos = particleSet.getPosition(part_id);
+			const d3Vector pos = particleSet.getPosition(part_id, tomogram.centre);
 			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
-						part_id, fc, tomogram.optics.pixelSize);
+						part_id, fc, tomogram.centre, tomogram.optics.pixelSize);
 			std::vector<d4Matrix> projCut(fc), projPart(fc);
 
 			const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
@@ -350,15 +352,16 @@ void ReconstructParticleProgram::processTomograms(
 					particleStack[th], projCut, inner_threads, circle_crop);
 
 
-			const d4Matrix particleToTomo = particleSet.getMatrix4x4(part_id, s,s,s);
+			const d4Matrix particleToTomo = particleSet.getMatrix4x4(part_id, tomogram.centre, s,s,s);
 
-			const int halfSet = particleSet.getHalfSet(part_id);
+            const int halfSet = (particleSet.hasHalfSets()) ? particleSet.getHalfSet(part_id) : 0;
 
 			const int og = particleSet.getOpticsGroup(part_id);
 
 			const BufferedImage<double>* gammaOffset =
 				aberrationsCache.hasSymmetrical? &aberrationsCache.symmetrical[og] : 0;
 
+            const float sign = flip_value? -1.f : 1.f;
 			for (int f = 0; f < fc; f++)
 			{
 				if (!isVisible[f]) continue;
@@ -372,13 +375,12 @@ void ReconstructParticleProgram::processTomograms(
 					BufferedImage<float> ctfImg(sh,s);
 					ctf.draw(s, s, binnedPixelSize, gammaOffset, &ctfImg(0,0,0));
 
-					const float scale = flip_value? -1.f : 1.f;
 
 					for (int y = 0; y < s;  y++)
 					{
 						for (int x = 0; x < xRanges(y,f); x++)
 						{
-							const float c = scale * ctfImg(x,y) * doseWeights(x,y,f);
+							const float c = sign * ctfImg(x,y) * doseWeights(x,y,f);
 
 							particleStack[th](x,y,f) *= c;
 							weightStack[th](x,y,f) = c * c;
@@ -391,7 +393,12 @@ void ReconstructParticleProgram::processTomograms(
 						}
 					}
 				}
+
+                // If we're not doing CTF premultiplication, we may still want to invert the contrast
+                if (!do_ctf) particleStack[th] *= sign;
+
 			}
+
 
 			if (aberrationsCache.hasAntisymmetrical)
 			{
@@ -436,8 +443,8 @@ void ReconstructParticleProgram::processTomograms(
 			}
 
 			//Save temporary files
-
-			for (int half = 0; half < 2; half++)
+            int halfmax = particleSet.hasHalfSets() ? 2 : 1;
+			for (int half = 0; half < halfmax; half++)
 			{
 				BufferedImage<double> tmpDataImg(sh, s, s*2);
 
@@ -496,6 +503,7 @@ void ReconstructParticleProgram::processTomograms(
 void ReconstructParticleProgram::finalise(
 	std::vector<BufferedImage<dComplex>>& dataImgFS,
 	std::vector<BufferedImage<double>>& ctfImgFS,
+    const ParticleSet& particleSet,
 	const double binnedOutPixelSize)
 {
 	const int s = dataImgFS[0].ydim;
@@ -504,27 +512,41 @@ void ReconstructParticleProgram::finalise(
 
 	std::vector<BufferedImage<double>> dataImgRS(2), dataImgDivRS(2);
 
-	BufferedImage<dComplex> dataImgFS_both = dataImgFS[0] + dataImgFS[1];
-	BufferedImage<double> ctfImgFS_both = ctfImgFS[0] + ctfImgFS[1];
+	BufferedImage<dComplex> dataImgFS_both;
+	BufferedImage<double> ctfImgFS_both;
 
 
 	Log::beginSection("Reconstructing");
 
-	for (int half = 0; half < 2; half++)
-	{
-		Log::print("Half " + ZIO::itoa(half));
+    if (particleSet.hasHalfSets())
+    {
+        dataImgFS_both = dataImgFS[0] + dataImgFS[1];
+        ctfImgFS_both = ctfImgFS[0] + ctfImgFS[1];
 
-		dataImgRS[half] = BufferedImage<double>(s,s,s);
-		dataImgDivRS[half] = BufferedImage<double>(s,s,s);
+        for (int half = 0; half < 2; half++)
+        {
+            Log::print("Half " + ZIO::itoa(half));
 
-		reconstruct(
-			dataImgRS[half], dataImgDivRS[half], ctfImgFS[half],
-			dataImgFS[half]);
+            dataImgRS[half] = BufferedImage<double>(s,s,s);
+            dataImgDivRS[half] = BufferedImage<double>(s,s,s);
 
-		writeOutput(
-			dataImgDivRS[half], dataImgRS[half], ctfImgFS[half],
-			"half"+ZIO::itoa(half+1), binnedOutPixelSize);
-	}
+            reconstruct(
+                    dataImgRS[half], dataImgDivRS[half], ctfImgFS[half],
+                    dataImgFS[half]);
+
+            writeOutput(
+                    dataImgDivRS[half], dataImgRS[half], ctfImgFS[half],
+                    "half"+ZIO::itoa(half+1), binnedOutPixelSize);
+        }
+    }
+    else
+    {
+        dataImgFS_both = dataImgFS[0];
+        ctfImgFS_both = ctfImgFS[0];
+
+        dataImgRS[0] = BufferedImage<double>(s,s,s);
+        dataImgDivRS[0] = BufferedImage<double>(s,s,s);
+    }
 
 	reconstruct(
 		dataImgRS[0], dataImgDivRS[0], ctfImgFS_both,
@@ -534,12 +556,7 @@ void ReconstructParticleProgram::finalise(
 		dataImgDivRS[0], dataImgRS[0], ctfImgFS[0],
 			"merged", binnedOutPixelSize);
 
-	optimisationSet.refMap1 = outDir + "half1.mrc";
-	optimisationSet.refMap2 = outDir + "half2.mrc";
-	optimisationSet.refFSC = "";
-	optimisationSet.write(outDir + "optimisation_set.star");
-
-	Log::endSection();
+    Log::endSection();
 }
 
 void ReconstructParticleProgram::symmetrise(
@@ -547,22 +564,26 @@ void ReconstructParticleProgram::symmetrise(
 		std::vector<BufferedImage<double> >& ctfImgFS,
 		double binnedOutPixelSize)
 {
-	if (symmName != "C1" && symmName != "c1")
+	if ((symmName != "C1" && symmName != "c1") || nr_helical_asu > 1)
 	{
 		std::vector<gravis::d4Matrix> symmetryMatrices;
 
-		if (nr_helical_asu == 1)
-		{
-			Log::print("Applying point-group symmetries");
+        if (symmName != "C1" && symmName != "c1")
+        {
+            Log::print("Applying point-group symmetries");
 
-			symmetryMatrices = Symmetry::getPointGroupMatrices(symmName);
-		}
-		else
+            symmetryMatrices = Symmetry::getPointGroupMatrices(symmName);
+        }
+        if (nr_helical_asu > 1)
 		{
 			Log::print("Applying helical symmetries");
 
-			symmetryMatrices = Symmetry::getHelicalSymmetryMatrices(
+			std::vector<gravis::d4Matrix> helicalSymmetryMatrices;
+            helicalSymmetryMatrices = Symmetry::getHelicalSymmetryMatrices(
 						nr_helical_asu, helical_twist, helical_rise/binnedOutPixelSize);
+            symmetryMatrices.insert(symmetryMatrices.end(),
+                        helicalSymmetryMatrices.begin(),
+                        helicalSymmetryMatrices.end());
 		}
 
 		for (int half = 0; half < 2; half++)

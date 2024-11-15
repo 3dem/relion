@@ -91,6 +91,7 @@ public:
 
 	bool refIs3D;
 	bool dataIs3D;
+    bool shiftsIs3D;
 
 	int device_id;
 
@@ -113,6 +114,7 @@ public:
 			transformer2(cudaStreamPerThread, bundle->allocator, baseMLOptimiser->mymodel.data_dim),
 			refIs3D(baseMLO->mymodel.ref_dim == 3),
 			dataIs3D(baseMLO->mymodel.data_dim == 3),
+            shiftsIs3D(baseMLO->mymodel.data_dim == 3 || baseMLO->mydata.is_tomo),
 			bundle(bundle),
 			device_id(bundle->device_id),
 #ifdef TIMING_FILES

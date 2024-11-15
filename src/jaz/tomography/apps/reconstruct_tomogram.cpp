@@ -9,7 +9,9 @@ int main(int argc, char *argv[])
 		TomoBackprojectProgram program;
 
 		program.readParameters(argc, argv);
+        program.initialise();
 		program.run();
+        program.writeOutput();
 	}
 	catch (RelionError e)
 	{

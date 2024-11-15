@@ -8,7 +8,7 @@ void Damage::applyWeight(
 		RawImage<float>& stack,
 		double pixelSize,
 		const std::vector<double>& doses,
-		int num_threads)
+		int num_threads, double BfactorPerElectronDose)
 {
 	const int w  = stack.xdim;
 	const int h  = stack.ydim;
@@ -24,17 +24,33 @@ void Damage::applyWeight(
 
 		const int wh = frame_FS.xdim;
 
-		for (int y = 0; y < h;  y++)
-		for (int x = 0; x < wh; x++)
-		{
-			const double xx = x / (pixelSize * w);
-			const double yy = (y < h/2? y : y - h) / (pixelSize * h);
+		if (BfactorPerElectronDose > 0.)
+        {
+           double bfac = - BfactorPerElectronDose *  doses[f] / 4.;
+            for (int y = 0; y < h;  y++)
+                for (int x = 0; x < wh; x++)
+                {
+                    const double xx = x / (pixelSize * w);
+                    const double yy = (y < h/2? y : y - h) / (pixelSize * h);
 
-			const double k = sqrt(xx*xx + yy*yy);
+                    const double k2 = xx*xx + yy*yy;
+                    frame_FS(x,y) *= exp(bfac * k2);
+                }
 
-			frame_FS(x,y) *= getWeight(doses[f], k);
-		}
+        }
+        else
+        {
+            for (int y = 0; y < h;  y++)
+                for (int x = 0; x < wh; x++)
+                {
+                    const double xx = x / (pixelSize * w);
+                    const double yy = (y < h/2? y : y - h) / (pixelSize * h);
 
+                    const double k = sqrt(xx*xx + yy*yy);
+
+                    frame_FS(x,y) *= getWeight(doses[f], k);
+                }
+        }
 		FFT::inverseFourierTransform(frame_FS, frame);
 
 		stack.getSliceRef(f).copyFrom(frame);
@@ -45,7 +61,7 @@ void Damage::applyWeight(
 		RawImage<fComplex>& stack,
 		double pixelSize,
 		const std::vector<double>& doses,
-		int num_threads)
+		int num_threads, double BfactorPerElectronDose)
 {
 	const int wh = stack.xdim;
 	const int h  = stack.ydim;
@@ -54,17 +70,35 @@ void Damage::applyWeight(
 
 	for (int f = 0; f < fc; f++)
 	{
-		for (int y = 0; y < h;  y++)
-		for (int x = 0; x < wh; x++)
-		{
-			const double xx = x / (pixelSize * w);
-			const double yy = (y < h/2? y : y - h) / (pixelSize * h);
+		if (BfactorPerElectronDose > 0.)
+        {
+           double bfac = - BfactorPerElectronDose *  doses[f] / 4.;
+            for (int y = 0; y < h;  y++)
+                for (int x = 0; x < wh; x++)
+                {
+                    const double xx = x / (pixelSize * w);
+                    const double yy = (y < h/2? y : y - h) / (pixelSize * h);
 
-			const double k = sqrt(xx*xx + yy*yy);
+                    const double k2 = xx*xx + yy*yy;
+                    stack(x,y, f) *= exp(bfac * k2);
+                }
 
-			stack(x,y,f) *= getWeight(doses[f], k);
-		}
-	}
+        }
+        else
+        {
+            for (int y = 0; y < h;  y++)
+                for (int x = 0; x < wh; x++)
+                {
+                    const double xx = x / (pixelSize * w);
+                    const double yy = (y < h/2? y : y - h) / (pixelSize * h);
+
+                    const double k = sqrt(xx*xx + yy*yy);
+
+                    stack(x,y,f) *= getWeight(doses[f], k);
+                }
+        }
+    }
+
 }
 
 std::vector<double> Damage::criticalDamageVector(double pixelSize, int boxSize)
@@ -100,36 +134,50 @@ std::vector<double> Damage::weightVector(double dose, double pixelSize, int boxS
 	return out;
 }
 
-BufferedImage<float> Damage::weightImage(double dose, double pixelSize, int boxSize)
+BufferedImage<float> Damage::weightImage(double dose, double pixelSize, int boxSize, double BfactorPerElectronDose)
 {
-	const double a = 0.245;
-	const double b = -1.665;
-	const double c = 2.81;
-	
+
 	const int s = boxSize;
 	const int sh = s/2 + 1;
-	
-	
+
 	BufferedImage<float> out(sh,s);
 	
-	for (int y = 0; y < s;  y++)
-	for (int x = 0; x < sh; x++)
-	{
-		double xx = x;
-		double yy = y < s/2? y : y - s;
-		double r = sqrt(xx*xx + yy*yy);
-		
-		const double k = r / (boxSize * pixelSize);
-		const double d0 = a * pow(k, b) + c;
+	if (BfactorPerElectronDose > 0.)
+    {
+        double bfac = -BfactorPerElectronDose * dose / 4.;
+        for (int y = 0; y < s;  y++)
+            for (int x = 0; x < sh; x++)
+            {
+                double xx = x / (boxSize * pixelSize);
+                double yy = (y < s/2? y : y - s) / (boxSize * pixelSize);
+                double k2 = xx*xx + yy*yy;
+                out(x,y) = (float) exp(bfac * k2);
+            }
+    }
+    else
+    {
+        const double a = 0.245;
+        const double b = -1.665;
+        const double c = 2.81;
 
-		out(x,y) = (float) exp(-0.5 * dose / d0);
-	}
-	
+        for (int y = 0; y < s;  y++)
+            for (int x = 0; x < sh; x++)
+            {
+                double xx = x;
+                double yy = y < s/2? y : y - s;
+                double r = sqrt(xx*xx + yy*yy);
+
+                const double k = r / (boxSize * pixelSize);
+                const double d0 = a * pow(k, b) + c;
+
+                out(x,y) = (float) exp(-0.5 * dose / d0);
+            }
+    }
 	return out;
 }
 
 BufferedImage<float> Damage::weightStack_GG(
-		const std::vector<double> &doses, double pixelSize, int boxSize)
+		const std::vector<double> &doses, double pixelSize, int boxSize, double BfactorPerElectronDose)
 {
 	const int fc = doses.size();
 	const int s = boxSize;
@@ -139,7 +187,7 @@ BufferedImage<float> Damage::weightStack_GG(
 			
 	for (int f = 0; f < fc; f++)
 	{
-		BufferedImage<float> df = weightImage(doses[f], pixelSize, boxSize);
+		BufferedImage<float> df = weightImage(doses[f], pixelSize, boxSize, BfactorPerElectronDose);
 		
 		for (int y = 0; y < s;  y++)
 		for (int x = 0; x < sh; x++)
@@ -153,7 +201,8 @@ BufferedImage<float> Damage::weightStack_GG(
 
 double Damage::getWeight(double dose, double k)
 {
-	const double a = 0.245;
+
+    const double a = 0.245;
 	const double b = -1.665;
 	const double c = 2.81;
 	
@@ -731,7 +780,7 @@ void Damage::renormalise(
 {
 	const int tc = B_t.size();
 	
-	double B_max = -std::numeric_limits<double>::max();
+	double B_max = std::numeric_limits<double>::lowest();
 	
 	for (int t = 0; t < tc; t++)
 	{

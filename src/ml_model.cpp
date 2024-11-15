@@ -1037,10 +1037,51 @@ void MlModel::initialiseFromImages(
 					 + integerToString(box_size_first_optics_group) + " px!\n";
 			}
 
-			if (!_do_trust_ref_size)
-				REPORT_ERROR("ERROR " + mesg + "\nIf you want to re-scale and/or re-box input particles into the pixel size and the box size of the reference, re-run the program with the --trust_ref_size option.");
-			else if (verb)
-				std::cerr << " WARNING " << mesg;
+
+            if (_do_trust_ref_size)
+            {
+                if (verb > 0) std::cerr << " WARNING: " << mesg;
+                RFLOAT pixel_size_first_optics_group = _mydata.getOpticsPixelSize(0);
+                int box_size_first_optics_group = _mydata.getOpticsImageSize(0);
+
+                int newsize = ROUND(ori_size * (pixel_size / pixel_size_first_optics_group));
+                newsize -= newsize % 2; //make even in case it is not already
+
+                RFLOAT real_angpix = ori_size * pixel_size / newsize;
+                if (verb > 0 && fabs(real_angpix - pixel_size_first_optics_group) > 0.001)
+                    std::cerr << "WARNING: Although the requested resized pixel size is " << pixel_size_first_optics_group << " A/px, the actual resized pixel size of the reference will be " << real_angpix << " A/px due to rounding of the box size to an even number. " << std::endl;
+
+                if (verb > 0) std::cerr << "WARNING: Resizing input reference(s) to pixel_size= " << real_angpix << " and box size= " << box_size_first_optics_group << " ..." << std::endl;
+
+                ori_size = box_size_first_optics_group;
+                pixel_size = real_angpix;
+
+                for (int iclass = 0; iclass < nr_classes; iclass++)
+                {
+                    resizeMap(Iref[iclass], newsize);
+                    Iref[iclass].setXmippOrigin();
+                    if (ref_dim == 2)
+                    {
+                        Iref[iclass].window(FIRST_XMIPP_INDEX(box_size_first_optics_group),
+                                            FIRST_XMIPP_INDEX(box_size_first_optics_group),
+                                            LAST_XMIPP_INDEX(box_size_first_optics_group),
+                                            LAST_XMIPP_INDEX(box_size_first_optics_group));
+                    } else if (ref_dim == 3)
+                    {
+                        Iref[iclass].window(FIRST_XMIPP_INDEX(box_size_first_optics_group),
+                                            FIRST_XMIPP_INDEX(box_size_first_optics_group),
+                                            FIRST_XMIPP_INDEX(box_size_first_optics_group),
+                                            LAST_XMIPP_INDEX(box_size_first_optics_group),
+                                            LAST_XMIPP_INDEX(box_size_first_optics_group),
+                                            LAST_XMIPP_INDEX(box_size_first_optics_group));
+                    }
+                }
+
+            }
+            else
+            {
+                REPORT_ERROR("ERROR " + mesg + "\nIf you want to re-scale and/or re-box input particles into the pixel size and the box size of the reference, re-run the program with the --trust_ref_size option.");
+            }
 		}
 
 	}
@@ -1053,7 +1094,7 @@ void MlModel::initialiseFromImages(
 		do_average_unaligned = true;
 		do_generate_seeds = false; // after SGD introduction, this is now done in the estimation of initial sigma2 step!
 		refs_are_ctf_corrected = true;
-		if (_is_3d_model || data_dim == 3)
+		if (_is_3d_model || data_dim == 3 || _mydata.is_tomo)
 		{
 			ref_dim = 3;
 			img().initZeros(ori_size, ori_size, ori_size);
@@ -1798,15 +1839,7 @@ void MlWsumModel::initZeros()
 
 }
 
-//#define DEBUG_PACK
-#ifdef DEBUG_PACK
-#define MAX_PACK_SIZE	  100000
-#else
-// Approximately 1024*1024*1024/8/2 ~ 0.5 Gb
-#define MAX_PACK_SIZE 67101000
-#endif
-
-void MlWsumModel::pack(MultidimArray<RFLOAT> &packed)
+unsigned long long MlWsumModel::getPackSize()
 {
 	unsigned long long packed_size = 0;
 	int spectral_size = (ori_size / 2) + 1;
@@ -1823,14 +1856,31 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed)
 
 	// for all class-related stuff
 	// data is complex: multiply by two!
-	packed_size += nr_classes * nr_bodies * 2 * (unsigned long long)BPref[0].getSize();
-	packed_size += nr_classes * nr_bodies * (unsigned long long)BPref[0].getSize();
-	packed_size += nr_classes * nr_bodies * (unsigned long long)nr_directions;
+	packed_size += nr_classes * nr_bodies * 2 * (unsigned long long) BPref[0].getSize(); // BPref.data
+	packed_size += nr_classes * nr_bodies * (unsigned long long) BPref[0].getSize(); // BPref.weight
+	packed_size += nr_classes * nr_bodies * (unsigned long long) nr_directions; // pdf_directions
+
 	// for pdf_class
 	packed_size += nr_classes;
+
 	// for priors for each class
 	if (ref_dim==2)
 		packed_size += nr_classes*2;
+
+	return packed_size;
+}
+
+//#define DEBUG_PACK
+#ifdef DEBUG_PACK
+#define MAX_PACK_SIZE	  100000
+#else
+// Approximately 1024*1024*1024/8/2 ~ 0.5 Gb
+#define MAX_PACK_SIZE 67101000
+#endif
+
+void MlWsumModel::pack(MultidimArray<RFLOAT> &packed)
+{
+	unsigned long long packed_size = getPackSize();
 
 	// Get memory for the packed array
 	packed.clear();

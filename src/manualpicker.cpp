@@ -42,7 +42,6 @@ RFLOAT global_coord_scale;
 RFLOAT global_lowpass;
 RFLOAT global_highpass;
 bool global_do_topaz_denoise;
-FileName global_topaz_exe;
 RFLOAT global_particle_diameter;
 RFLOAT global_sigma_contrast;
 RFLOAT global_black_val;
@@ -137,7 +136,7 @@ void cb_viewmic(Fl_Widget* w, void* data)
 		command += " --particle_radius " + floatToString(rad);
 		if (global_do_topaz_denoise)
 		{
-			command += " --topaz_denoise --topaz_exe " + global_topaz_exe;
+                    command += " --topaz_denoise ";
 		}
 		command += " --lowpass " + floatToString(global_lowpass);
 		command += " --highpass " + floatToString(global_highpass);
@@ -159,7 +158,7 @@ void cb_viewmic(Fl_Widget* w, void* data)
 		}
 
 		command += " &";
-		std::cerr << " command= " << command << std::endl;
+		//std::cerr << " command= " << command << std::endl;
 		int res = system(command.c_str());
 	}
 
@@ -251,6 +250,7 @@ int manualpickerGuiWindow::fill()
 {
 	color(GUI_BACKGROUND_COLOR);
 
+	this->callback(cb_closing);
 
 	Fl_Menu_Bar *menubar = new Fl_Menu_Bar(0, 0, w(), 25);
 	if (do_allow_save)
@@ -581,8 +581,14 @@ void manualpickerGuiWindow::cb_menubar_quit(Fl_Widget* w, void* v)
 
 void manualpickerGuiWindow::cb_menubar_quit_i()
 {
-	cb_menubar_save_i();
+	cb_menubar_recount_i();
 	exit(0);
+}
+
+void manualpickerGuiWindow::cb_closing(Fl_Widget* w, void* v)
+{
+	manualpickerGuiWindow* T=(manualpickerGuiWindow*)w;
+	T->cb_menubar_quit_i();
 }
 
 void manualpickerGuiWindow::cb_menubar_recount(Fl_Widget* w, void* v)
@@ -590,6 +596,7 @@ void manualpickerGuiWindow::cb_menubar_recount(Fl_Widget* w, void* v)
 	manualpickerGuiWindow* T=(manualpickerGuiWindow*)v;
 	T->cb_menubar_recount_i();
 }
+
 void manualpickerGuiWindow::cb_menubar_recount_i()
 {
 
@@ -698,7 +705,6 @@ void ManualPicker::read(int argc, char **argv)
 	global_lowpass = textToFloat(parser.getOption("--lowpass", "Lowpass filter in Angstroms for the micrograph (0 for no filtering)","0"));
 	global_highpass = textToFloat(parser.getOption("--highpass", "Highpass filter in Angstroms for the micrograph (0 for no filtering)","0"));
 	global_do_topaz_denoise = parser.checkOption("--topaz_denoise", "Or instead of filtering, use Topaz denoising before picking (on GPU 0)");
-	global_topaz_exe = parser.getOption("--topaz_exe", "Name of topaz executable", "topaz");
 	global_ctfscale = textToFloat(parser.getOption("--ctf_scale", "Relative scale for the CTF-image display", "1"));
 	global_ctfsigma = textToFloat(parser.getOption("--ctf_sigma_contrast", "Sigma-contrast for the CTF-image display", "3"));
 	global_minimum_fom = textToFloat(parser.getOption("--minimum_pick_fom", "Minimum value for rlnAutopickFigureOfMerit to display picks", "-9999."));
@@ -783,10 +789,6 @@ void ManualPicker::initialise()
 			global_lowpass = new_nyquist;
 		std::cout << " Set low-pass filter to " << global_lowpass << " due to downscaling of " << global_micscale << std::endl;
 	}
-
-	std::cerr << " NOTE: in order to write the new list of coordinate STAR files, you need to re-count the particles or quite this program through the File menu. Do NOT kill the program using the operating system's window manager!" << std::endl;
-
-
 }
 
 void ManualPicker::run()

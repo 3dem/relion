@@ -67,7 +67,7 @@ void LocalParticleRefineProgram::run()
 
 		const int tc = particles.size();
 
-		AberrationsCache aberrationsCache(particleSet.optTable, boxSize, particleSet.getOriginalPixelSize(0));
+		AberrationsCache aberrationsCache(particleSet.optTable, boxSize, particleSet.getTiltSeriesPixelSize(0));
 
 	Log::endSection();
 

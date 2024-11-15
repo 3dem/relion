@@ -386,10 +386,6 @@ public:
 	MetaDataTable MD_optimiser, MD_select;
 	std::vector<classFeatures> features_all_classes, preread_features_all_classes;
 
-	FileName fn_pytorch_model;
-	FileName fn_pytorch_script;
-	FileName python_interpreter;
-
 public:
 
 	ClassRanker(){}
@@ -414,16 +410,6 @@ public:
 
 	// Execute the program
 	void run();
-
-	/* Get path to the default pytorch model [LINUX ONLY]
-	 * Check if file exists, return empty string otherwise
-	 */
-	static std::string get_default_pytorch_model_path();
-
-	/* Get path to the python script for executing pytorch model [LINUX ONLY]
-	 * Check if file exists, return empty string otherwise
-	 */
-	static std::string get_python_script_path();
 
 private:
 
@@ -465,7 +451,7 @@ private:
 
 	void writeFeatures();
 
-	void deployTorchModel(FileName &model_path, std::vector<float> &features, std::vector<float> &subimages, std::vector<float> &score);
+	void deployTorchModel(std::vector<float> &features, std::vector<float> &subimages, std::vector<float> &score);
 
 	void performRanking();
 };

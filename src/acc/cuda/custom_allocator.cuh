@@ -20,6 +20,7 @@
 #include "src/parallel.h"
 
 #ifdef CUSTOM_ALLOCATOR_MEMGUARD
+#include "src/acc/cuda/shortcuts.cuh"
 #include <execinfo.h>
 #include <cxxabi.h>
 #endif
@@ -535,7 +536,7 @@ public:
 					_printState();
 
 					fflush(stdout);
-					CRITICAL(ERRCUDACAOOM);
+					CRITICAL(ERRGPUCAOOM);
 				}
 			}
 

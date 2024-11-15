@@ -45,7 +45,7 @@ void AlignProgramMpi::run()
 
 	initialise();
 
-	AberrationsCache aberrationsCache(particleSet.optTable, boxSize, particleSet.getOriginalPixelSize(0));
+	AberrationsCache aberrationsCache(particleSet.optTable, boxSize, particleSet.getTiltSeriesPixelSize(0));
 
 	if (verbosity > 0)
 	{
@@ -53,8 +53,18 @@ void AlignProgramMpi::run()
 	}
 
 	std::vector<std::vector<int>> tomoIndices = ParticleSet::splitEvenly(particles, nodeCount);
+    if(verbosity > 0)
+    {
+        Log::beginSection("Parallel tasks will be distributed as follows");
+        for (int i = 0; i < nodeCount; i++)
+        {
+            Log::print(" Rank " + ZIO::itoa(i) + " will process " + ZIO::itoa(tomoIndices[i].size()) + " tomograms");
+        }
+        Log::print(" Progress below is only given for the process on Rank 0 ...");
+        Log::endSection();
+    }
 
-	processTomograms(tomoIndices[rank], aberrationsCache, false);
+	processTomograms(tomoIndices[rank], aberrationsCache, true);
 
 	MPI_Barrier(MPI_COMM_WORLD);
 

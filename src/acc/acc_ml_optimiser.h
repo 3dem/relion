@@ -5,6 +5,9 @@
 
 #ifdef ALTCPU
 #include <tbb/spin_mutex.h>
+#elif _SYCL_ENABLED
+#include "src/acc/sycl/sycl_virtual_dev.h"
+using deviceStream_t = virtualSYCL*;
 #endif
 
 /*
@@ -136,22 +139,27 @@ public:
 
 	unsigned long part_id;
 
+	bool is_tomo;
+
 	std::vector<MultidimArray<Complex > > Fimg, Fimg_nomask, local_Fimgs_shifted, local_Fimgs_shifted_nomask;
-	std::vector<MultidimArray<RFLOAT> > Fctf, local_Fctf, local_Minvsigma2, FstMulti;
+	std::vector<MultidimArray<RFLOAT> > Fctf, local_Fctf;
+    MultidimArray<RFLOAT> FstMulti, local_Minvsigma2;
 	std::vector<int> pointer_dir_nonzeroprior, pointer_psi_nonzeroprior;
 	std::vector<RFLOAT> directions_prior, psi_prior, local_sqrtXi2;
-	std::vector<RFLOAT> highres_Xi2_img, min_diff2;
+	std::vector<RFLOAT> highres_Xi2_img;
+    RFLOAT min_diff2;
 	MultidimArray<bool> Mcoarse_significant;
 	// And from storeWeightedSums
-	std::vector<RFLOAT> sum_weight, significant_weight, max_weight;
-	std::vector< std::vector<RFLOAT> > sum_weight_class;
-	std::vector<Matrix1D<RFLOAT> > old_offset, prior;
+	RFLOAT sum_weight, significant_weight, max_weight;
+	std::vector<RFLOAT> sum_weight_class;
+	Matrix1D<RFLOAT> old_offset, prior;
 	std::vector<MultidimArray<RFLOAT> > power_img;
 	MultidimArray<XFLOAT> Mweight;
-	std::vector<Indices> max_index;
+	Indices max_index;
 
-	OptimisationParamters (unsigned nr_images, unsigned long part_id):
+	OptimisationParamters (unsigned nr_images, unsigned long part_id, bool is_tomo):
 		metadata_offset(0),
+        is_tomo(is_tomo),
 		part_id(part_id)
 	{
 		power_img.resize(nr_images);
@@ -159,10 +167,6 @@ public:
 		Fimg.resize(nr_images);
 		Fimg_nomask.resize(nr_images);
 		Fctf.resize(nr_images);
-		old_offset.resize(nr_images);
-		prior.resize(nr_images);
-		max_index.resize(nr_images);
-		sum_weight_class.resize(nr_images);
 	};
 };
 
@@ -334,6 +338,32 @@ public:
 		trans_idx.setSize(newSize);
 		ihidden_overs.setSize(newSize);
 	}
+
+#ifdef _SYCL_ENABLED
+	void setStream_all(deviceStream_t dev)
+	{
+		weights.setStream(dev);
+		rot_id.setStream(dev);
+		rot_idx.setStream(dev);
+		trans_idx.setStream(dev);
+		ihidden_overs.setStream(dev);
+	}
+
+	void setAccType_all(AccType accT)
+	{
+		weights.setAccType(accT);
+		rot_id.setAccType(accT);
+		rot_idx.setAccType(accT);
+		trans_idx.setAccType(accT);
+		ihidden_overs.setAccType(accT);
+	}
+
+	void setStreamAccType_all(deviceStream_t dev, AccType accT = accSYCL)
+	{
+		setStream_all(dev);
+		setAccType_all(accT);
+	}
+#endif
 
 	void host_alloc_all()
 	{

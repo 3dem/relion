@@ -42,11 +42,11 @@ class ObservationModel
 		ObservationModel(const MetaDataTable &opticsMdt, bool do_die_upon_error = true);
 
 
-			MetaDataTable opticsMdt;
+			MetaDataTable opticsMdt, generalMdt;
 
 			bool
 				hasEvenZernike, hasOddZernike, hasMagMatrices,
-				hasBoxSizes, hasMultipleMtfs;
+				hasBoxSizes, hasMultipleMtfs, isTomoStack2D;
 
 
 
@@ -56,7 +56,7 @@ class ObservationModel
 		// expecting the changes to propagate into the optics star-file
 		std::vector<double> angpix, originalAngpix, lambda, Cs;
 		std::vector<int> boxSizes;
-		std::vector<bool> CtfPremultiplied;
+		std::vector<bool> CtfPremultiplied, CtfCorrected;
 		std::vector<std::vector<double> > evenZernikeCoeffs, oddZernikeCoeffs;
 		std::vector<Matrix2D<RFLOAT> > magMatrices;
 		std::vector<std::string> fnMtfs, groupNames;
@@ -150,7 +150,7 @@ class ObservationModel
 				int verb = 0, bool do_die_upon_error = true);
 
 		static void saveNew(
-				MetaDataTable& particlesMdt, MetaDataTable& opticsMdt,
+				MetaDataTable& particlesMdt, MetaDataTable& opticsMdt, MetaDataTable& generalMdt,
 				std::string filename, std::string _tablename = "particles");
 
 		void save(
@@ -193,8 +193,10 @@ class ObservationModel
 		// returns a zero-indexed value (it exists to ensure this)
 		int getOpticsGroup(const MetaDataTable& particlesMdt, long int particle = -1) const;
 
-		bool getCtfPremultiplied(int og) const;
+        bool getCtfPremultiplied(int og) const;
+        bool getCtfCorrected(int og) const;
 		void setCtfPremultiplied(int og, bool val);
+		void setCtfCorrected(int og, bool val);
 
 		std::string getGroupName(int og);
 
@@ -218,6 +220,10 @@ class ObservationModel
 		   and translate the indices in particle table partMdt.
 		   (Merely changing the order in opticsMdt would fail if groups were missing.) */
 		void sortOpticsGroups(MetaDataTable& partMdt);
+
+        /* Remove unused optics groups, e.g. after a subset of the particles have been selected
+           and also renumber the groups in the particle table partMdt */
+        void removeUnusedOpticsGroups(MetaDataTable& partMdt);
 
 		/* Return the set of optics groups present in partMdt */
 		std::vector<int> getOptGroupsPresent_oneBased(const MetaDataTable& partMdt) const;

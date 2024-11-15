@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+
+# Get the directory of the currently executing script
+script_dir="$(dirname "$0")"
+
+# Custom function to exit with status 1
+exit_with_error() {
+  echo "One or more download tasks failed. See above error messages."
+  exit 1
+}
+
+
+# Call Class Ranker weight download ##############################################
+echo "Attempting to download weights for class ranker..."
+
+target_path="$script_dir/relion_python_classranker"
+
+if [ -x "$target_path" ]; then
+  # Execute the target binary
+  "$target_path"
+  if [ $? -ne 0 ]; then
+    # Unsuccessful, trap the EXIT signal to call the custom exit function
+    trap 'exit_with_error' EXIT
+  fi
+else
+  echo "Error: $target_binary not found or not executable in $script_dir."
+  exit 1
+fi
+
+# Call Blush weight download #####################################################
+echo "Attempting to download weights for Blush..."
+
+target_path="$script_dir/relion_python_blush"
+
+if [ -x "$target_path" ]; then
+  # Execute the target binary
+  "$target_path"
+  if [ $? -ne 0 ]; then
+    # Unsuccessful, trap the EXIT signal to call the custom exit function
+    trap 'exit_with_error' EXIT
+  fi
+else
+  echo "Error: $target_binary not found or not executable in $script_dir."
+  exit 1
+fi
+
+# ModelAngelo weight download ####################################################
+echo "Attempting to download weights for ModelAngelo..."
+target_path="$script_dir/relion_python_modelangelo"
+
+if [ -x "$target_path" ]; then
+  # Execute the target binary
+  "$target_path" setup_weights --bundle-name nucleotides && \
+  "$target_path" setup_weights --bundle-name nucleotides_no_seq
+  if [ $? -ne 0 ]; then
+    # Unsuccessful, trap the EXIT signal to call the custom exit function
+    trap 'exit_with_error' EXIT
+  fi
+else
+  echo "Error: $target_binary not found or not executable in $script_dir."
+  exit 1
+fi
+
+# Exit
+exit 0
+

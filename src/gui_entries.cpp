@@ -308,10 +308,9 @@ void GuiEntry::cb_browse_i()
 	Fl::scheme("gtk+");
 	Fl_File_Chooser * G_chooser = new Fl_File_Chooser("", joboption.pattern.c_str(), Fl_File_Chooser::SINGLE, "");
 
-	if (joboption.directory=="CURRENT_ODIR")
-		G_chooser->directory(current_browse_directory.c_str());
-	else
-		G_chooser->directory(joboption.directory.c_str());
+	FileName mydir = joboption.directory;
+    mydir.replaceAllSubstrings("CURRENT_ODIR", current_browse_directory);
+    G_chooser->directory(mydir.c_str());
 	G_chooser->color(GUI_BACKGROUND_COLOR);
 	G_chooser->show();
 
@@ -349,10 +348,10 @@ void GuiEntry::cb_browse_node_i() {
 	Fl::scheme("gtk+");
 	Fl_File_Chooser * G_chooser = new Fl_File_Chooser("", joboption.pattern.c_str(), Fl_File_Chooser::SINGLE, "");
 
-	//FileName mylabel = get_node_label(joboption.node_type);
-	// PIPELINER
 	FileName mylabel = joboption.node_type;
-	std::string fn_dir = ".Nodes/" + mylabel.beforeFirstOf(".");
+    std::string fn_dir = (joboption.node_type_depth == 1) ?
+        ".Nodes/" + mylabel.beforeFirstOf(".") : ".Nodes/" + mylabel.beforeNthOf('.', joboption.node_type_depth);
+
 	G_chooser->directory(fn_dir.c_str());
 	G_chooser->color(GUI_BACKGROUND_COLOR);
 	G_chooser->show();

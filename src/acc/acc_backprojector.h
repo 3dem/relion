@@ -3,12 +3,21 @@
 
 #ifdef _CUDA_ENABLED
 #  include <cuda_runtime.h>
+using deviceStream_t = cudaStream_t;
+#elif _HIP_ENABLED
+#  include <hip/hip_runtime.h>
+using deviceStream_t = hipStream_t;
+#elif _SYCL_ENABLED
+#  include "src/acc/sycl/sycl_virtual_dev.h"
+using deviceStream_t = virtualSYCL*;
+#else
+using deviceStream_t = float;
 #endif
 #include "src/complex.h"
 #include "src/acc/settings.h"
 #include "src/acc/acc_ptr.h"
 
-#ifndef _CUDA_ENABLED
+#ifdef ALTCPU
 #  include <tbb/spin_mutex.h>
 #endif
 
@@ -22,8 +31,8 @@ public:
 	XFLOAT padding_factor;
 	size_t mdlXYZ;
 
-#ifndef _CUDA_ENABLED
-tbb::spin_mutex *mutexes;
+#ifdef ALTCPU
+	tbb::spin_mutex *mutexes;
 #endif
 
 	size_t allocaton_size;
@@ -31,7 +40,7 @@ tbb::spin_mutex *mutexes;
 
 	XFLOAT *d_mdlReal, *d_mdlImag, *d_mdlWeight;
 
-	cudaStream_t stream;
+	deviceStream_t stream;
 
 public:
 
@@ -43,12 +52,15 @@ public:
 				allocaton_size(0), voxelCount(0),
 				d_mdlReal(NULL), d_mdlImag(NULL), d_mdlWeight(NULL),
 				stream(0)
-#ifndef _CUDA_ENABLED
-, mutexes(0)
+#ifdef ALTCPU
+				, mutexes(0)
 #endif
 	{}
 
 	size_t setMdlDim(
+#ifdef _SYCL_ENABLED
+			deviceStream_t dev,
+#endif
 			int xdim, int ydim, int zdim,
 			int inity, int initz,
 			int max_r, XFLOAT paddingFactor);
@@ -73,13 +85,13 @@ public:
 			int imgZ,
 			unsigned long imageCount,
 			bool data_is_3D,
-			cudaStream_t optStream);
+			deviceStream_t optStream);
 
 	void getMdlData(XFLOAT *real, XFLOAT *imag, XFLOAT * weights);
 	void getMdlDataPtrs(XFLOAT *& real, XFLOAT *& imag, XFLOAT *& weights);
 
-	void setStream(cudaStream_t s) { stream = s; }
-	cudaStream_t getStream() { return stream; }
+	void setStream(deviceStream_t s) { stream = s; }
+	deviceStream_t getStream() { return stream; }
 
 	void clear();
 

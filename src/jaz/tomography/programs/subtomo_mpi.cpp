@@ -70,16 +70,13 @@ void SubtomoProgramMpi::readParameters(int argc, char *argv[])
 
 void SubtomoProgramMpi::run()
 {
-	TomogramSet tomogramSet(optimisationSet.tomograms, verb > 0);
+	TomogramSet tomogramSet(optimisationSet.tomograms, node->isLeader());
 
-	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories, verb > 0);
-	std::vector<std::vector<ParticleIndex> > particles = particleSet.splitByTomogram(tomogramSet, verb > 0);
+	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories, node->isLeader(), &tomogramSet);
+	std::vector<std::vector<ParticleIndex> > particles = particleSet.splitByTomogram(tomogramSet, node->isLeader());
 
 	if (cropSize < 0) cropSize = boxSize;
 
-	bool do_ctf = true;
-
-	const long int tc = particles.size();
 	const long int s2D = boxSize;
 
 	const long int s3D = cropSize;
@@ -88,12 +85,9 @@ void SubtomoProgramMpi::run()
 	const long int s02D = (int)(binning * s2D + 0.5);
 
 	const double relative_box_scale = cropSize / (double) boxSize;
-	const double binned_pixel_size = binning * particleSet.getOriginalPixelSize(0);
+	const double binned_pixel_size = binning * particleSet.getTiltSeriesPixelSize(0);
 
-	if (node->isLeader())
-	{
-		initialise(particleSet, particles, tomogramSet);
-	}
+    initialise(particleSet, particles, tomogramSet, node->isLeader());
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
@@ -104,6 +98,16 @@ void SubtomoProgramMpi::run()
 
 
 	std::vector<std::vector<int>> tomoIndices = ParticleSet::splitEvenly(particles, nodeCount);
+    if(verb>0)
+    {
+        Log::beginSection("Parallel tasks will be distributed as follows");
+        for (int i = 0; i < nodeCount; i++)
+        {
+            Log::print(" Rank " + ZIO::itoa(i) + " will process " + ZIO::itoa(tomoIndices[i].size()) + " tomograms");
+        }
+        Log::print(" Progress below is only given for the process on Rank 0 ...");
+        Log::endSection();
+    }
 
 	processTomograms(
 			tomoIndices[rank],
@@ -115,7 +119,6 @@ void SubtomoProgramMpi::run()
 			s2D,
 			s3D,
 			relative_box_scale,
-			do_ctf,
 			verb,
 			dummy,
 			dummy);

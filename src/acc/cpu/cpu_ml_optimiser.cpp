@@ -24,7 +24,7 @@
 #ifdef ALTCPU
 
 // Make sure we build for CPU
-#include "src/acc/cpu/cuda_stubs.h"
+#include "src/acc/cpu/device_stubs.h"
 
 #include "src/ml_optimiser.h"
 
@@ -120,49 +120,53 @@ void MlDataBundle::setup(MlOptimiser *baseMLO)
 	coarseProjectionPlans.resize(nr_classes);
 
 	//Can we pre-generate projector plan and corresponding euler matrices for all particles
-	if (!baseMLO->do_skip_align && !baseMLO->do_skip_rotate && !baseMLO->do_auto_refine && baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
-		for (int iclass = 0; iclass < nr_classes; iclass++)
+	if (baseMLO->do_skip_align || baseMLO->do_skip_rotate || baseMLO->do_auto_refine || baseMLO->mymodel.orientational_prior_mode != NOPRIOR || baseMLO->mydata.is_tomo)
+		generateProjectionPlanOnTheFly = true;
+	else
+		generateProjectionPlanOnTheFly = false;
+
+	for (int iclass = 0; iclass < nr_classes; iclass++)
+	{
+		//If doing predefined projector plan at all and is this class significant
+		if (!generateProjectionPlanOnTheFly && baseMLO->mymodel.pdf_class[iclass] > 0.)
 		{
-			//If doing predefined projector plan at all and is this class significant
-			if (baseMLO->mymodel.pdf_class[iclass] > 0.)
-			{
-				std::vector<int> exp_pointer_dir_nonzeroprior;
-				std::vector<int> exp_pointer_psi_nonzeroprior;
-				std::vector<RFLOAT> exp_directions_prior;
-				std::vector<RFLOAT> exp_psi_prior;
+			std::vector<int> exp_pointer_dir_nonzeroprior;
+			std::vector<int> exp_pointer_psi_nonzeroprior;
+			std::vector<RFLOAT> exp_directions_prior;
+			std::vector<RFLOAT> exp_psi_prior;
 
-				long unsigned itrans_max = baseMLO->sampling.NrTranslationalSamplings() - 1;
-				long unsigned nr_idir = baseMLO->sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior);
-				long unsigned nr_ipsi = baseMLO->sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior );
+			long unsigned itrans_max = baseMLO->sampling.NrTranslationalSamplings() - 1;
+			long unsigned nr_idir = baseMLO->sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior);
+			long unsigned nr_ipsi = baseMLO->sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior );
 
-				coarseProjectionPlans[iclass].setup(
-						baseMLO->sampling,
-						exp_directions_prior,
-						exp_psi_prior,
-						exp_pointer_dir_nonzeroprior,
-						exp_pointer_psi_nonzeroprior,
-						NULL, //Mcoarse_significant
-						baseMLO->mymodel.pdf_class,
-						baseMLO->mymodel.pdf_direction,
-						nr_idir,
-						nr_ipsi,
-						0, //idir_min
-						nr_idir - 1, //idir_max
-						0, //ipsi_min
-						nr_ipsi - 1, //ipsi_max
-						0, //itrans_min
-						itrans_max,
-						0, //current_oversampling
-						1, //nr_oversampled_rot
-						iclass,
-						true, //coarse
-						!IS_NOT_INV,
-						baseMLO->do_skip_align,
-						baseMLO->do_skip_rotate,
-						baseMLO->mymodel.orientational_prior_mode
-						);
-			}
+			coarseProjectionPlans[iclass].setup(
+					baseMLO->sampling,
+					exp_directions_prior,
+					exp_psi_prior,
+					exp_pointer_dir_nonzeroprior,
+					exp_pointer_psi_nonzeroprior,
+					NULL, //Mcoarse_significant
+					baseMLO->mymodel.pdf_class,
+					baseMLO->mymodel.pdf_direction,
+					nr_idir,
+					nr_ipsi,
+					0, //idir_min
+					nr_idir - 1, //idir_max
+					0, //ipsi_min
+					nr_ipsi - 1, //ipsi_max
+					0, //itrans_min
+					itrans_max,
+					0, //current_oversampling
+					1, //nr_oversampled_rot
+					iclass,
+					true, //coarse
+					!IS_NOT_INV,
+					baseMLO->do_skip_align,
+					baseMLO->do_skip_rotate,
+					baseMLO->mymodel.orientational_prior_mode
+					);
 		}
+	}
 };
 
 

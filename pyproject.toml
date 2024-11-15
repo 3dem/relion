@@ -1,0 +1,158 @@
+# https://peps.python.org/pep-0517/
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools-scm>=6.2"]
+build-backend = "setuptools.build_meta"
+
+# https://peps.python.org/pep-0621/
+[project]
+name = "relion"
+description = "Python programs for RELION"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "BSD 3-Clause License"}
+authors = [
+  {email = "alisterburt@gmail.com"},
+  {name = "Alister Burt"},
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+]
+dynamic = ["version"]
+dependencies = [
+    "numpy",
+    "pandas",
+    "starfile>=0.5.6",
+    "mrcfile",
+    "mdocfile",
+    "typer",
+    "rich",
+    "einops",
+    "lil_aretomo",
+    "yet-another-imod-wrapper>=0.0.9",
+    "makefun",
+    "lru-dict",
+    "superqt",
+    "morphosamplers",
+]
+
+# extras
+# https://peps.python.org/pep-0621/#dependencies-optional-dependencies
+[project.optional-dependencies]
+test = [
+    "pytest>=6.0",
+    "pytest-cov",
+]
+dev = [
+    "black",
+    "cruft",
+    "flake8-bugbear",
+    "flake8-docstrings",
+    "flake8-pyprojecttoml",
+    "flake8-typing-imports",
+    "flake8",
+    "ipython",
+    "isort",
+    "mypy",
+    "pdbpp",
+    "pre-commit",
+    "pydocstyle",
+    "pytest-cov",
+    "pytest",
+    "rich",
+]
+vis = [
+    "napari",
+    "napari-threedee",
+    "qtpy",
+    "psygnal",
+    "pyqt5",
+]
+
+
+[project.urls]
+homepage = "https://github.com/3dem/relion"
+repository = "https://github.com/3dem/relion"
+
+# same as console_scripts entry point
+[project.scripts]
+relion_tomo_import = "tomography_python_programs.import_tilt_series:cli"
+relion_tomo_exclude_tilt_images = "tomography_python_programs.exclude_tilt_images:cli"
+relion_tomo_align_tilt_series = "tomography_python_programs.align_tilt_series:cli"
+relion_tomo_view = "tomography_python_programs.view:cli"
+relion_tomo_pick = "tomography_python_programs.pick:cli"
+relion_tomo_get_particle_poses = "tomography_python_programs.get_particle_poses:cli"
+relion_tomo_denoise = "tomography_python_programs.denoise:cli"
+
+
+# Entry points
+# https://peps.python.org/pep-0621/#entry-points
+# [project.entry-points."spam.magical"]
+# tomatoes = "spam:main_tomatoes"
+
+# https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html
+[tool.setuptools]
+zip-safe = false
+include-package-data = true
+packages = {find = {where = ["src"], exclude=[]}}
+
+[tool.setuptools.package-data]
+"*" = ["py.typed"]
+
+
+# https://github.com/pypa/setuptools_scm/#pyprojecttoml-usage
+[tool.setuptools_scm]
+
+# https://pycqa.github.io/isort/docs/configuration/options.html
+[tool.isort]
+profile = "black"
+src_paths = ["src/tomography_python_programs", "tests"]
+
+# https://flake8.pycqa.org/en/latest/user/options.html
+# https://gitlab.com/durko/flake8-pyprojecttoml
+[tool.flake8]
+exclude = "docs,.eggs,examples,_version.py"
+max-line-length = 88
+ignore = "E203"
+min-python-version = "3.8.0"
+docstring-convention = "all" # use numpy convention, while allowing D417
+extend-ignore = """
+E203  # whitespace before ':'
+D107,D203,D212,D213,D402,D413,D415,D416  # numpy
+D100  # missing docstring in public module
+D401  # imperative mood
+W503  # line break before binary operator
+"""
+per-file-ignores = [
+    "tests/*:D",
+]
+
+
+# http://www.pydocstyle.org/en/stable/usage.html
+[tool.pydocstyle]
+match_dir = "src/tomography_python_programs"
+convention = "numpy"
+add_select = "D402,D415,D417"
+ignore = "D100,D213,D401,D413,D107"
+
+# https://docs.pytest.org/en/6.2.x/customize.html
+[tool.pytest.ini_options]
+minversion = "6.0"
+testpaths = ["src/tomography_python_programs/tests"]
+filterwarnings = [
+    "error",
+]
+
+# https://mypy.readthedocs.io/en/stable/config_file.html
+[tool.mypy]
+files = "src/**/"
+strict = true
+disallow_any_generics = false
+disallow_subclassing_any = false
+show_error_codes = true
+pretty = true
+
+

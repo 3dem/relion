@@ -22,6 +22,8 @@
 #include "src/motioncorr_runner.h"
 #ifdef _CUDA_ENABLED
 #include "src/acc/cuda/cuda_mem_utils.h"
+#elif _HIP_ENABLED
+#include "src/acc/hip/hip_mem_utils.h"
 #endif
 #include "src/micrograph_model.h"
 #include "src/matrix2d.h"
@@ -89,7 +91,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 void MotioncorrRunner::addClArgs()
 {
 	int gen_section = parser.addSection("General options");
-	fn_in = parser.getOption("--i", "STAR file with all input micrographs, or a Linux wildcard with all micrographs to operate on");
+	fn_in = parser.getOption("--i", "STAR file with all input micrographs, the tomography tilt series, or a Linux wildcard with all micrographs to operate on");
 	fn_out = parser.getOption("--o", "Name for the output directory", "MotionCorr");
 	do_skip_logfile = parser.checkOption("--skip_logfile", "Skip generation of tracks-part of the logfile.pdf");
 	n_threads = textToInteger(parser.getOption("--j", "Number of threads per movie (= process)", "1"));
@@ -103,7 +105,7 @@ void MotioncorrRunner::addClArgs()
 	if (first_frame_sum < 1) first_frame_sum = 1;
 	last_frame_sum =  textToInteger(parser.getOption("--last_frame_sum", "Last movie frame used in output sum (0 or negative: use all)", "-1"));
 	eer_grouping = textToInteger(parser.getOption("--eer_grouping", "EER grouping", "40"));
-	eer_upsampling = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 = 4K or 2 = 8K)", "1"));
+	eer_upsampling = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 = physical or 2 = 2x super-resolution)", "1"));
 
 	int motioncor2_section = parser.addSection("MOTIONCOR2 options");
 	do_motioncor2 = parser.checkOption("--use_motioncor2", "Use Shawn Zheng's MOTIONCOR2.");
@@ -118,6 +120,7 @@ void MotioncorrRunner::addClArgs()
 	group = textToInteger(parser.getOption("--group_frames", "Average together this many frames before calculating the beam-induced shifts", "1"));
 	fn_defect = parser.getOption("--defect_file","Location of a MOTIONCOR2-style detector defect file (x y w h) or a defect map (1 means bad)", "");
 	fn_archive = parser.getOption("--archive","Location of the directory for archiving movies in 4-byte MRC format","");
+ 	even_odd_split = parser.checkOption("--even_odd_split", "Generate two images summed from odd and even movie frames. Later used for denoising in tomography.");
 	fn_other_motioncor2_args = parser.getOption("--other_motioncor2_args", "Additional arguments to MOTIONCOR2", "");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread, e.g 0:1:2:3", "");
 
@@ -204,6 +207,7 @@ void MotioncorrRunner::initialise()
 	}
 	else if (do_own)
 	{
+
 		if (patch_x <= 0 || patch_y <= 0) {
 			REPORT_ERROR("The number of patches must be a positive integer.");
 		}
@@ -226,26 +230,43 @@ void MotioncorrRunner::initialise()
 		REPORT_ERROR("ERROR: when not providing an input STAR file, it is mandatory to provide the voltage in kV through --voltage.");
 	}
 
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 	if (do_motioncor2)
 	{
 		if (gpu_ids.length() > 0)
 			untangleDeviceIDs(gpu_ids, allThreadIDs);
 		else if (verb>0)
 			std::cout << "gpu-ids not specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
-		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+		HANDLE_ERROR(accGPUGetDeviceCount(&devCount));
 	}
 #endif
 
 	// Set up which micrograph movies to process
+    is_tomo = false;
 	if (fn_in.isStarFile())
 	{
-		MetaDataTable MDin;
-		ObservationModel::loadSafely(fn_in, obsModel, MDin, "movies", verb);
-		if (MDin.numberOfObjects() > 0 && !MDin.containsLabel(EMDL_MICROGRAPH_MOVIE_NAME))
+        MetaDataTable MDin;
+
+        // Check if this is a TomographyExperiment starfile, and if so, unpack into one large metadatatable
+        if (tomogramSet.read(fn_in, 1))
+        {
+            is_tomo = true;
+            tomogramSet.generateSingleMetaDataTable(MDin, obsModel);
+        }
+        else
+        {
+            ObservationModel::loadSafely(fn_in, obsModel, MDin, "movies", verb);
+        }
+        if (MDin.numberOfObjects() == 0)
+        {
+            REPORT_ERROR("ERROR: no input movies to work on.");
+        }
+
+        if (MDin.numberOfObjects() > 0 && !MDin.containsLabel(EMDL_MICROGRAPH_MOVIE_NAME))
 			REPORT_ERROR("The input STAR file does not contain the rlnMicrographMovieName column. Are you sure you imported files as movies, not single frame images?");
 
 		fn_micrographs.clear();
+        pre_exposure_micrographs.clear();
 		optics_group_micrographs.clear();
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
 		{
@@ -256,6 +277,17 @@ void MotioncorrRunner::initialise()
 			int optics_group;
 			MDin.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group);
 			optics_group_micrographs.push_back(optics_group);
+
+            RFLOAT my_pre_exposure;
+            if (MDin.getValue(EMDL_MICROGRAPH_PRE_EXPOSURE, my_pre_exposure))
+            {
+                pre_exposure_micrographs.push_back(my_pre_exposure);
+            }
+            else
+            {
+                pre_exposure_micrographs.push_back(0.0);
+            }
+
 		}
 	}
 	else
@@ -290,6 +322,10 @@ void MotioncorrRunner::initialise()
 		}
 	}
 
+	// Make sure fn_out ends with a slash
+	if (fn_out[fn_out.length() - 1] != '/')
+		fn_out += "/";
+
 	// First backup the given list of all micrographs
 	std::vector<int> optics_group_given_all = optics_group_micrographs;
 	std::vector<FileName> fn_mic_given_all = fn_micrographs;
@@ -309,11 +345,22 @@ void MotioncorrRunner::initialise()
 
 		if (continue_old)
 		{
-			FileName fn_avg = getOutputFileNames(fn_mic_given_all[imic]);
-			if (exists(fn_avg) && exists(fn_avg.withoutExtension() + ".star") &&
-                            (grouping_for_ps <= 0 || exists(fn_avg.withoutExtension() + "_PS.mrc")))
+			if (even_odd_split)
 			{
-				process_this = false; // already done
+				FileName fn_avg = getOutputFileNames(fn_mic_given_all[imic],true);
+				if (exists(fn_avg))
+				{
+			    		process_this = false; // already done
+				}
+			}
+			else
+			{
+				FileName fn_avg = getOutputFileNames(fn_mic_given_all[imic]);
+				if (exists(fn_avg) && exists(fn_avg.withoutExtension() + ".star") &&
+                            (grouping_for_ps <= 0 || exists(fn_avg.withoutExtension() + "_PS.mrc")))
+				{
+					process_this = false; // already done
+				}
 			}
 		}
 
@@ -344,10 +391,6 @@ void MotioncorrRunner::initialise()
 			optics_group_ori_micrographs.push_back(optics_group_given_all[imic]);
 		}
 	}
-
-	// Make sure fn_out ends with a slash
-	if (fn_out[fn_out.length()-1] != '/')
-		fn_out += "/";
 
 	// Make all output directories if necessary
 	FileName prevdir="";
@@ -424,7 +467,7 @@ void MotioncorrRunner::prepareGainReference(bool write_gain)
 	fn_gain_reference =fn_new_gain;
 }
 
-FileName MotioncorrRunner::getOutputFileNames(FileName fn_mic)
+FileName MotioncorrRunner::getOutputFileNames(FileName fn_mic, bool continue_even_odd)
 {
 	// If there are any dots in the filename, replace them by underscores
 	FileName fn_root = fn_mic.withoutExtension();
@@ -437,8 +480,14 @@ FileName MotioncorrRunner::getOutputFileNames(FileName fn_mic)
 			break;
 		fn_root.replace(pos, 1, "_");
 	}
-
+	if (continue_even_odd)
+	{
+		return fn_out + fn_root + "_EVN.mrc";
+	}
+	else
+	{
 	return fn_out + fn_root + ".mrc";
+	}
 }
 
 void MotioncorrRunner::run()
@@ -470,7 +519,10 @@ void MotioncorrRunner::run()
 
 		Micrograph mic(fn_micrographs[imic], fn_gain_reference, bin_factor, eer_upsampling, eer_grouping);
 
-		// Get angpix and voltage from the optics groups:
+        // Set per-micrograph pre_exposure
+        mic.pre_exposure = pre_exposure + pre_exposure_micrographs[imic];
+
+        // Get angpix and voltage from the optics groups:
 		obsModel.opticsMdt.getValue(EMDL_CTF_VOLTAGE, voltage, optics_group_micrographs[imic]-1);
 		obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix, optics_group_micrographs[imic]-1);
 
@@ -560,7 +612,7 @@ bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, int rank)
 	{
 		command += " -Kv " + floatToString(voltage);
 		command += " -FmDose " + floatToString(dose_per_frame);
-		command += " -InitDose " + floatToString(pre_exposure);
+		command += " -InitDose " + floatToString(mic.pre_exposure);
 	}
 
 	if (fn_defect != "")
@@ -570,7 +622,12 @@ bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, int rank)
 		else
 			command += " -DefectMap " + fn_defect;
 	}
-
+	
+	if (even_odd_split)
+	{
+		command += " -SplitSum 1 ";
+	}
+	
 	if (fn_archive != "")
 		command += " -ArcDir " + fn_archive;
 
@@ -817,7 +874,6 @@ void MotioncorrRunner::saveModel(Micrograph &mic) {
 	mic.angpix = angpix;
 	mic.voltage = voltage;
 	mic.dose_per_frame = dose_per_frame;
-	mic.pre_exposure = pre_exposure;
 	mic.fnDefect = fn_defect;
 
 	FileName fn_avg = getOutputFileNames(mic.getMovieFilename());
@@ -855,7 +911,19 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 			{
 				MDavg.setValue(EMDL_CTF_POWER_SPECTRUM, fn_avg.withoutExtension() + "_PS.mrc");
 			}
-			MDavg.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
+		if (is_tomo)
+        	{
+			if (even_odd_split)
+			{
+				FileName even_micrograph = fn_avg.withoutExtension() + "_EVN.mrc";
+				FileName odd_micrograph = fn_avg.withoutExtension() + "_ODD.mrc";
+				MDavg.setValue(EMDL_MICROGRAPH_EVEN, even_micrograph); 
+				MDavg.setValue(EMDL_MICROGRAPH_ODD, odd_micrograph);
+			}
+			MDavg.setValue(EMDL_MICROGRAPH_PRE_EXPOSURE, pre_exposure_micrographs[imic]);
+
+        	}
+                MDavg.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
 			MDavg.setValue(EMDL_MICROGRAPH_METADATA_NAME, fn_avg.withoutExtension() + ".star");
 			MDavg.setValue(EMDL_IMAGE_OPTICS_GROUP, optics_group_ori_micrographs[imic]);
 			FileName fn_star = fn_avg.withoutExtension() + ".star";
@@ -899,24 +967,38 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 
 	}
 
+    if (verb > 0) progress_bar(fn_ori_micrographs.size());
+
 	// Write out STAR files at the end
-	// In the opticsMdt, set EMDL_MICROGRAPH_PIXEL_SIZE (i.e. possibly binned pixel size).
+	// In the opticsMdt, set EMDL_MICROGRAPH_PIXEL_SIZE (i.e. possibly binned pixel size) for SPA and EMDL_TOMO_TILT_SERIES_PIXEL_SIZE for STA
 	// Keep EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE for MTF correction
-	FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
-	{
-		RFLOAT my_angpix;
-		obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, my_angpix);
-		my_angpix *= bin_factor;
-		obsModel.opticsMdt.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, my_angpix);
-	}
-	obsModel.save(MDavg, fn_out + "corrected_micrographs.star", "micrographs");
-
-	if (verb > 0 )
-	{
-		progress_bar(fn_ori_micrographs.size());
-
-		std::cout << " Done! Written: " << fn_out << "corrected_micrographs.star" << std::endl;
-	}
+	if (is_tomo)
+    {
+        FOR_ALL_OBJECTS_IN_METADATA_TABLE(tomogramSet.globalTable)
+        {
+            RFLOAT my_angpix;
+            tomogramSet.globalTable.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, my_angpix);
+            my_angpix *= bin_factor;
+            tomogramSet.globalTable.setValue(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, my_angpix);
+        }
+        if (tomogramSet.globalTable.containsLabel(EMDL_MICROGRAPH_PIXEL_SIZE))
+            tomogramSet.globalTable.deactivateLabel(EMDL_MICROGRAPH_PIXEL_SIZE);
+        tomogramSet.convertBackFromSingleMetaDataTable(MDavg);
+        tomogramSet.write(fn_out+"corrected_tilt_series.star");
+        if (verb > 0) std::cout << " Written: " << fn_out << "corrected_tilt_series.star" << std::endl;
+    }
+    else
+    {
+        FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
+	    {
+            RFLOAT my_angpix;
+            obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, my_angpix);
+            my_angpix *= bin_factor;
+            obsModel.opticsMdt.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, my_angpix);
+    	}
+        obsModel.save(MDavg, fn_out + "corrected_micrographs.star", "micrographs");
+        if (verb > 0) std::cout << " Written: " << fn_out << "corrected_micrographs.star" << std::endl;
+    }
 
 	if (verb > 0) std::cout << " Now generating logfile.pdf ... " << std::endl;
 
@@ -1023,9 +1105,10 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 		logfile << "Limitted the number of IO threads per movie to " << n_io_threads << " thread(s)." << std::endl;
 	}
 
-	Image<float> Ihead, Igain, Iref;
+	Image<float> Ihead, Igain, Iref, Iref_odd, Iref_even;
 	std::vector<MultidimArray<fComplex> > Fframes;
 	std::vector<Image<float> > Iframes;
+	std::vector<Image<float> > Irefframes;
 	std::vector<int> frames; // 0-indexed
 
 	RFLOAT output_angpix = angpix * bin_factor;
@@ -1069,6 +1152,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 
 	const int n_frames = frames.size();
 	Iframes.resize(n_frames);
+	Irefframes.resize(n_frames);
 	Fframes.resize(n_frames);
 
 	std::vector<RFLOAT> xshifts(n_frames), yshifts(n_frames);
@@ -1113,7 +1197,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	RCTIC(TIMING_READ_GAIN);
 	if (fn_gain_reference != "") {
 		if (isEER)
-			EERRenderer::loadEERGain(fn_gain_reference, Igain(), eer_upsampling);
+			renderer.loadEERGain(fn_gain_reference, Igain());
 		else
 			Igain.read(fn_gain_reference);
 
@@ -1410,6 +1494,8 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
         }
 
 	Iref().reshape(ny, nx);
+	Iref_even().reshape(ny, nx);
+	Iref_odd().reshape(ny, nx);
 	Iref().initZeros();
 	RCTIC(TIMING_GLOBAL_IFFT);
 	#pragma omp parallel for num_threads(n_threads)
@@ -1628,10 +1714,16 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 skip_fitting:
 	if (!do_dose_weighting || save_noDW) {
 		Iref().initZeros(Iframes[0]());
+		Iref_odd().initZeros(Iframes[0]());
+		Iref_even().initZeros(Iframes[0]());
+
+		for (int iframe = 0; iframe < n_frames; iframe++){
+			Irefframes[iframe]().initZeros(Iframes[iframe]());	
+		}
 
 		RCTIC(TIMING_REAL_SPACE_INTERPOLATION);
 		logfile << "Summing frames before dose weighting: ";
-		realSpaceInterpolation(Iref, Iframes, mic.model, logfile);
+		realSpaceInterpolation_withoutsum(Irefframes, Iframes, mic.model, logfile);
 		logfile << " done" << std::endl;
 		RCTOC(TIMING_REAL_SPACE_INTERPOLATION);
 
@@ -1641,11 +1733,49 @@ skip_fitting:
 			binNonSquareImage(Iref, bin_factor);
 		}
 		RCTOC(TIMING_BINNING);
+		
+		// Sum frames and save aligned stack
+		for (int iframe = 0; iframe < n_frames; iframe++)
+		{
+		#pragma omp parallel for num_threads(n_threads)
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iref()) {
+			DIRECT_MULTIDIM_ELEM(Iref(), n) += DIRECT_MULTIDIM_ELEM(Irefframes[iframe](), n);
+			}
+
+		// save odd even aligned stack
+		if (even_odd_split)
+		{
+		if ( iframe % 2 == 0)
+		{
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iref_even()) {
+			DIRECT_MULTIDIM_ELEM(Iref_even(), n) += DIRECT_MULTIDIM_ELEM(Irefframes[iframe](), n);			
+		}
+		}
+		else
+		{
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iref_odd()) {
+			DIRECT_MULTIDIM_ELEM(Iref_odd(), n) += DIRECT_MULTIDIM_ELEM(Irefframes[iframe](), n);			
+
+		}
+		}
+		}
+		}
 
 		// Final output
                 Iref.setSamplingRateInHeader(output_angpix, output_angpix);
 		Iref.write(!do_dose_weighting ? fn_avg : fn_avg_noDW, -1, false, WRITE_OVERWRITE, write_float16 ? Float16: Float);
 		logfile << "Written aligned but non-dose weighted sum to " << (!do_dose_weighting ? fn_avg : fn_avg_noDW) << std::endl;
+		// ODD-EVEN Output
+		if (even_odd_split)
+		{
+		Iref_odd.setSamplingRateInHeader(output_angpix, output_angpix);
+		Iref_even.setSamplingRateInHeader(output_angpix, output_angpix);
+
+		Iref_odd.write(fn_avg.withoutExtension() + "_ODD.mrc", -1, false, WRITE_OVERWRITE, write_float16 ? Float16: Float);
+		Iref_even.write(fn_avg.withoutExtension() + "_EVN.mrc", -1, false, WRITE_OVERWRITE, write_float16 ? Float16: Float);
+		logfile << "Written aligned but non-dose weighted sum of odd frames to " << (fn_avg.withoutExtension() + "_ODD.mrc") << std::endl;
+		logfile << "Written aligned but non-dose weighted sum of even frames to " << (fn_avg.withoutExtension() + "_EVN.mrc") << std::endl;
+		}
 	}
 
 	// Dose weighting
@@ -1655,10 +1785,12 @@ skip_fitting:
 			REPORT_ERROR("Sorry, dose weighting is supported only for 300, 200 or 100 kV");
 		}
 
+        logfile << "Pre-exposure: = " << pre_exposure << std::endl;
+
 		std::vector <RFLOAT> doses(n_frames);
 		for (int iframe = 0; iframe < n_frames; iframe++) {
 			// dose AFTER each frame.
-			doses[iframe] = pre_exposure + dose_per_frame * (frames[iframe] + 1);
+			doses[iframe] = mic.pre_exposure + dose_per_frame * (frames[iframe] + 1);
 			if (std::abs(voltage - 200) <= 2) {
 				doses[iframe] /= 0.8; // 200 kV electron is more damaging.
 			} else if (std::abs(voltage - 100) <= 2) {
@@ -1736,6 +1868,186 @@ void MotioncorrRunner::interpolateShifts(std::vector<int> &group_start, std::vec
 #ifdef DEBUG_OWN
 		std::cout << "iframe = " << iframe << " igroup " << cur_group << " x " << interpolated_xshifts[iframe] << " y " << interpolated_yshifts[iframe] << std::endl;
 #endif
+	}
+}
+
+void MotioncorrRunner::realSpaceInterpolation_withoutsum(std::vector<Image<float> > &Ialignedframes, std::vector<Image<float> > &Iframes, MotionModel *model, std::ostream &logfile) {
+	int model_version = MOTION_MODEL_NULL;
+	if (model != NULL) {
+		model_version = model->getModelVersion();
+	}
+
+	const int n_frames = Iframes.size();
+	if (model_version == MOTION_MODEL_NULL) {
+		// Simple sum
+		for (int iframe = 0; iframe < n_frames; iframe++) {
+			logfile << "." << std::flush;
+
+			#pragma omp parallel for num_threads(n_threads)
+//			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum()) {
+//				DIRECT_MULTIDIM_ELEM(Isum(), n) += DIRECT_MULTIDIM_ELEM(Iframes[iframe](), n);
+//			}
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Ialignedframes[iframe]()) {
+				DIRECT_MULTIDIM_ELEM(Ialignedframes[iframe](), n) += DIRECT_MULTIDIM_ELEM(Iframes[iframe](), n);
+			}
+		}
+	} else if (model_version == MOTION_MODEL_THIRD_ORDER_POLYNOMIAL) { // Optimised code
+		ThirdOrderPolynomialModel *polynomial_model = (ThirdOrderPolynomialModel*)model;
+		realSpaceInterpolation_ThirdOrderPolynomial_withoutsum(Ialignedframes, Iframes, *polynomial_model, logfile);
+	} else { // general code
+		const int nx = XSIZE(Iframes[0]()), ny = YSIZE(Iframes[0]());
+		for (int iframe = 0; iframe < n_frames; iframe++) {
+			logfile << "." << std::flush;
+			const RFLOAT z = iframe;
+
+			#pragma omp parallel for num_threads(n_threads)
+			for (int iy = 0; iy < ny; iy++) {
+				const RFLOAT y = (RFLOAT)iy / ny - 0.5;
+				for (int ix = 0; ix < nx; ix++) {
+					const RFLOAT x = (RFLOAT)ix / nx - 0.5;
+					bool valid = true;
+
+					RFLOAT x_fitted, y_fitted;
+					model->getShiftAt(z, x, y, x_fitted, y_fitted);
+					x_fitted = ix - x_fitted; y_fitted = iy - y_fitted;
+
+					int x0 = FLOOR(x_fitted);
+					int y0 = FLOOR(y_fitted);
+					const int x1 = x0 + 1;
+					const int y1 = y0 + 1;
+
+					// some conditions might seem redundant but necessary when overflow happened
+					if (x0 < 0 || x1 < 0) {x0 = 0; valid = false;}
+					if (y0 < 0 || y1 < 0) {y0 = 0; valid = false;}
+					if (x1 >= nx || x0 >= nx - 1) {x0 = nx - 1; valid = false;}
+					if (y1 >= ny || y1 >= ny - 1) {y0 = ny - 1; valid = false;}
+					if (!valid) {
+/*						DIRECT_A2D_ELEM(Isum(), iy, ix) += DIRECT_A2D_ELEM(Iframes[iframe](), y0, x0);
+						if (std::isnan(DIRECT_A2D_ELEM(Isum(), iy, ix))) {
+							std::cerr << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << std::endl;
+						}
+*/						DIRECT_A2D_ELEM(Ialignedframes[iframe](), iy, ix) += DIRECT_A2D_ELEM(Iframes[iframe](), y0, x0);
+						if (std::isnan(DIRECT_A2D_ELEM(Ialignedframes[iframe](), iy, ix))) {
+							std::cerr << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << std::endl;
+						}
+
+						continue;
+					}
+
+					const RFLOAT fx = x_fitted - x0;
+					const RFLOAT fy = y_fitted - y0;
+
+					const RFLOAT d00 = DIRECT_A2D_ELEM(Iframes[iframe](), y0, x0);
+					const RFLOAT d01 = DIRECT_A2D_ELEM(Iframes[iframe](), y0, x1);
+					const RFLOAT d10 = DIRECT_A2D_ELEM(Iframes[iframe](), y1, x0);
+					const RFLOAT d11 = DIRECT_A2D_ELEM(Iframes[iframe](), y1, x1);
+
+					const RFLOAT dx0 = LIN_INTERP(fx, d00, d01);
+					const RFLOAT dx1 = LIN_INTERP(fx, d10, d11);
+					const RFLOAT val = LIN_INTERP(fy, dx0, dx1);
+#ifdef DEBUG_OWN
+					if (std::isnan(val)) {
+						std::cerr << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << " d00 " << d00 << " d01 " << d01 << " d10 " << d10 << " d11 " << d11 << " dx0 " << dx0 << " dx1 " << dx1 << std::endl;
+					}
+#endif
+					//DIRECT_A2D_ELEM(Isum(), iy, ix) += val;
+					DIRECT_A2D_ELEM(Ialignedframes[iframe](), iy, ix) += val;
+				} // y
+			} // x
+		} // frame
+	} // general model
+}
+
+void MotioncorrRunner::realSpaceInterpolation_ThirdOrderPolynomial_withoutsum(std::vector<Image<float> > &Ialignedframes, std::vector<Image<float> > &Iframes, ThirdOrderPolynomialModel &model, std::ostream &logfile) {
+	const int n_frames = Iframes.size();
+	const int nx = XSIZE(Iframes[0]()), ny = YSIZE(Iframes[0]());
+	const Matrix1D<RFLOAT> coeffX = model.coeffX, coeffY = model.coeffY;
+
+	for (int iframe = 0; iframe < n_frames; iframe++) {
+		logfile << "." << std::flush;
+
+		const RFLOAT z = iframe, z2 = iframe * iframe;
+		const RFLOAT z3 = z * z2;
+		// Common terms
+		const RFLOAT x_C0 = coeffX(0)  * z + coeffX(1)  * z2 + coeffX(2)  * z3;
+		const RFLOAT x_C1 = coeffX(3)  * z + coeffX(4)  * z2 + coeffX(5)  * z3;
+		const RFLOAT x_C2 = coeffX(6)  * z + coeffX(7)  * z2 + coeffX(8)  * z3;
+		const RFLOAT x_C3 = coeffX(9)  * z + coeffX(10) * z2 + coeffX(11) * z3;
+		const RFLOAT x_C4 = coeffX(12) * z + coeffX(13) * z2 + coeffX(14) * z3;
+		const RFLOAT x_C5 = coeffX(15) * z + coeffX(16) * z2 + coeffX(17) * z3;
+		const RFLOAT y_C0 = coeffY(0)  * z + coeffY(1)  * z2 + coeffY(2)  * z3;
+		const RFLOAT y_C1 = coeffY(3)  * z + coeffY(4)  * z2 + coeffY(5)  * z3;
+		const RFLOAT y_C2 = coeffY(6)  * z + coeffY(7)  * z2 + coeffY(8)  * z3;
+		const RFLOAT y_C3 = coeffY(9)  * z + coeffY(10) * z2 + coeffY(11) * z3;
+		const RFLOAT y_C4 = coeffY(12) * z + coeffY(13) * z2 + coeffY(14) * z3;
+		const RFLOAT y_C5 = coeffY(15) * z + coeffY(16) * z2 + coeffY(17) * z3;
+
+		#pragma omp parallel for num_threads(n_threads)
+		for (int iy = 0; iy < ny; iy++) {
+			const RFLOAT y = (RFLOAT)iy / ny - 0.5;
+			for (int ix = 0; ix < nx; ix++) {
+				const RFLOAT x = (RFLOAT)ix / nx - 0.5;
+				bool valid = true;
+
+				RFLOAT x_fitted = x_C0 + (x_C1 + x_C2 * x) * x + (x_C3 + x_C4 * y + x_C5 * x) * y;
+				RFLOAT y_fitted = y_C0 + (y_C1 + y_C2 * x) * x + (y_C3 + y_C4 * y + y_C5 * x) * y;
+
+#ifdef VALIDATE_OPTIMISED_CODE
+				RFLOAT x_fitted2, y_fitted2;
+				model.getShiftAt(z, x, y, x_fitted2, y_fitted2);
+				if (abs(x_fitted - x_fitted2) > 1E-4 || abs(y_fitted - y_fitted2) > 1E-4) {
+					std::cout << "error at " << x << ", " << y << " : " << x_fitted << " " << x_fitted2 << " " << y_fitted << " " << y_fitted2 << std::endl;
+				}
+#endif
+				x_fitted = ix - x_fitted; y_fitted = iy - y_fitted;
+
+				int x0 = FLOOR(x_fitted);
+				int y0 = FLOOR(y_fitted);
+				const int x1 = x0 + 1;
+				const int y1 = y0 + 1;
+
+				// some conditions might seem redundant but necessary when overflow happened
+				if (x0 < 0 || x1 < 0) {x0 = 0; valid = false;}
+				if (y0 < 0 || y1 < 0) {y0 = 0; valid = false;}
+				if (x1 >= nx || x0 >= nx - 1) {x0 = nx - 1; valid = false;}
+				if (y1 >= ny || y0 >= ny - 1) {y0 = ny - 1; valid = false;}
+				if (!valid) {
+/*					DIRECT_A2D_ELEM(Isum(), iy, ix) += DIRECT_A2D_ELEM(Iframes[iframe](), y0, x0);
+#ifdef DEBUG_OWN
+					if (std::isnan(DIRECT_A2D_ELEM(Isum(), iy, ix))) {
+						std::cerr << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << std::endl;
+					}
+#endif
+*/					DIRECT_A2D_ELEM(Ialignedframes[iframe](), iy, ix) += DIRECT_A2D_ELEM(Iframes[iframe](), y0, x0);
+#ifdef DEBUG_OWN
+					if (std::isnan(DIRECT_A2D_ELEM(Ialignedframes[iframe](), iy, ix))) {
+						std::cerr << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << std::endl;
+					}
+#endif
+					continue;
+				}
+
+				const RFLOAT fx = x_fitted - x0;
+				const RFLOAT fy = y_fitted - y0;
+
+//				std::cout << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << std::endl;
+				const RFLOAT d00 = DIRECT_A2D_ELEM(Iframes[iframe](), y0, x0);
+				const RFLOAT d01 = DIRECT_A2D_ELEM(Iframes[iframe](), y0, x1);
+				const RFLOAT d10 = DIRECT_A2D_ELEM(Iframes[iframe](), y1, x0);
+				const RFLOAT d11 = DIRECT_A2D_ELEM(Iframes[iframe](), y1, x1);
+
+				const RFLOAT dx0 = LIN_INTERP(fx, d00, d01);
+				const RFLOAT dx1 = LIN_INTERP(fx, d10, d11);
+				const RFLOAT val = LIN_INTERP(fy, dx0, dx1);
+#ifdef DEBUG_OWN
+				if (std::isnan(val)) {
+					std::cerr << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << " d00 " << d00 << " d01 " << d01 << " d10 " << d10 << " d11 " << d11 << " dx0 " << dx0 << " dx1 " << dx1 << std::endl;
+				}
+#endif
+				//DIRECT_A2D_ELEM(Isum(), iy, ix) += val;
+				DIRECT_A2D_ELEM(Ialignedframes[iframe](), iy, ix) += val;
+			}
+		}
 	}
 }
 

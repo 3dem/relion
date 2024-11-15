@@ -24,6 +24,9 @@
 #ifdef ALTCPU
 	#include <tbb/enumerable_thread_specific.h>
 	#include <complex>
+#elif _SYCL_ENABLED
+	#include "src/acc/sycl/sycl_virtual_dev.h"
+	using deviceStream_t = virtualSYCL*;
 #endif
 
 #include <string>
@@ -40,6 +43,7 @@
 #include "src/helix.h"
 #include "src/local_symmetry.h"
 #include "src/acc/settings.h"
+#include <src/jaz/tomography/optimisation_set.h>
 
 #define ML_SIGNIFICANT_WEIGHT 1.e-8
 #define METADATA_LINE_LENGTH METADATA_LINE_LENGTH_ALL
@@ -99,10 +103,13 @@ class MlOptimiser
 public:
 
 	// For GPU-maps
-	std::vector<int> cudaDevices;
-	std::vector<int> cudaOptimiserDeviceMap;
-	std::vector<void*> cudaOptimisers;
+	std::vector<int> gpuDevices;
+	std::vector<int> gpuOptimiserDeviceMap;
+	std::vector<void*> gpuOptimisers;
 	std::vector<void*> accDataBundles;
+#if _SYCL_ENABLED
+	std::vector<deviceStream_t> syclDeviceList;
+#endif
 
 #ifdef ALTCPU
 	std::vector<void*> cpuOptimisers;
@@ -146,7 +153,10 @@ public:
 	// Optimiser set table for subtomo
 	MetaDataTable optimisationSet;
 
-	// Generate a 3D model from 2D particles de novo?
+    // For relion-4.1 tomogram-processing as 2D stacks: filenames for tomogramSet and motionTrajectories
+    FileName fn_tomo, fn_motion;
+
+    // Generate a 3D model from 2D particles de novo?
 	bool is_3d_model;
 
 	//User-specified pixel size for the reference
@@ -295,6 +305,9 @@ public:
 
 	// Flag to keep sigma2_noise fixed
 	bool fix_sigma_noise;
+
+	// Hidden flag as the lower bound for offset sampling
+	RFLOAT min_sigma2_offset;
 
 	//  Use images only up to a certain resolution in the expectation step (one for each optics_group)
 	// image_coarse_size is for first pass, image_current_size is for second pass, image_full_size is original image size
@@ -452,6 +465,14 @@ public:
 	bool do_gpu;
 	bool anticipate_oom;
 
+	// Use SYCL resources
+	bool do_sycl;
+	bool do_sycl_levelzero;
+	bool do_sycl_cuda;
+	bool do_sycl_hip;
+	bool do_sycl_opencl;
+	bool do_sycl_cpu;
+
 	// Use alternate cpu implementation
 	bool do_cpu;
 
@@ -481,6 +502,13 @@ public:
 
 	/** Perform reconstruction outside of relion_refine, e.g. for learned priors */
 	bool do_external_reconstruct;
+
+	/** Perform reconstruction using the Blush algorithm */
+	bool do_blush;
+    	bool skip_spectral_trailing;
+
+	/** Argumetns to pass to the Blush call */
+	std::string blush_args;
 
 	/* Flag whether to use the Adaptive approach as by Tagare et al (2010) J. Struc. Biol.
 	 * where two passes through the integrations are made: a first one with a coarse angular sampling and
@@ -618,7 +646,12 @@ public:
 	// Prepare for automated 2D class average selection: nice to have access to unmasked reference
 	bool do_write_unmasked_refs;
 
-	/////////// Keep track of hidden variable changes ////////////////////////
+    // User-specified (and fixed) directional offset searches in X/Y/Z directions (in Angstroms)
+    RFLOAT offset_range_x, offset_range_y, offset_range_z;
+    // Remove priors from particle star file after user-specified offset searches?
+    bool remove_offset_priors_again;
+
+    /////////// Keep track of hidden variable changes ////////////////////////
 
 	// Changes from one iteration to the next in the angles
 	RFLOAT current_changes_optimal_orientations, sum_changes_optimal_orientations;
@@ -760,6 +793,7 @@ public:
             gridding_nr_iter(0),
             do_use_reconstruct_images(0),
             fix_sigma_noise(0),
+			min_sigma2_offset(2.),
             current_changes_optimal_offsets(0),
             smallest_changes_optimal_classes(0),
             do_print_metadata_labels(0),
@@ -787,6 +821,10 @@ public:
             do_scale_correction(0),
             ctf_phase_flipped(0),
             nr_iter_wo_large_hidden_variable_changes(0),
+            do_external_reconstruct(false),
+            do_blush(false),
+            skip_spectral_trailing(false),
+            blush_args(""),
             adaptive_oversampling(0),
             nr_iter(0),
             intact_ctf_first_peak(0),
@@ -825,6 +863,7 @@ public:
             debug_split_random_half(0),
             random_seed(0),
             do_gpu(0),
+			do_sycl(0), do_sycl_levelzero(0), do_sycl_cuda(0), do_sycl_hip(0), do_sycl_opencl(0), do_sycl_cpu(0),
             anticipate_oom(0),
             do_helical_refine(0),
             do_preread_images(0),
@@ -888,6 +927,10 @@ public:
 		tbbCpuOptimiser = CpuOptimiserType((void*)NULL);
 #endif
 	};
+
+#ifdef _SYCL_ENABLED
+	~MlOptimiser();
+#endif
 
 	/** ========================== I/O operations  =========================== */
 	/// Print help message
@@ -972,9 +1015,6 @@ public:
 	/* Check whether everything fits into memory, possibly adjust nr_pool and setup thread task managers */
 	void expectationSetupCheckMemory(int myverb = 1);
 
-	/* For on-the-fly shifts, precalculates AB-matrices */
-	void precalculateABMatrices();
-
 	/* Perform the expectation integration over all k, phi and series elements for a number (some) of pooled particles
 	 * The number of pooled particles is determined by max_nr_pool and some memory checks in expectationSetup()
 	 */
@@ -1054,15 +1094,15 @@ public:
 			std::vector<MultidimArray<Complex > > &exp_Fimg,
 			std::vector<MultidimArray<Complex > > &exp_Fimg_nomask,
 			std::vector<MultidimArray<RFLOAT> > &exp_Fctf,
-			std::vector<Matrix1D<RFLOAT> > &exp_old_offset,
-			std::vector<Matrix1D<RFLOAT> > &exp_prior,
+			Matrix1D<RFLOAT> &exp_old_offset,
+			Matrix1D<RFLOAT> &exp_prior,
 			std::vector<MultidimArray<RFLOAT> > &exp_power_img,
 			std::vector<RFLOAT> &exp_highres_Xi2_img,
 			std::vector<int> &exp_pointer_dir_nonzeroprior,
 			std::vector<int> &exp_pointer_psi_nonzeroprior,
 			std::vector<RFLOAT> &exp_directions_prior,
 			std::vector<RFLOAT> &exp_psi_prior,
-			std::vector<MultidimArray<RFLOAT> > &exp_STweight);
+			MultidimArray<RFLOAT> &exp_STweight);
 
 	/* Store all shifted FourierTransforms in a vector
 	 * also store precalculated 2D matrices with 1/sigma2_noise
@@ -1073,13 +1113,14 @@ public:
 			std::vector<MultidimArray<Complex > > &exp_Fimg,
 			std::vector<MultidimArray<Complex > > &exp_Fimg_nomask,
 			std::vector<MultidimArray<RFLOAT> > &exp_Fctf,
+            Matrix1D<RFLOAT> &exp_old_offset,
 			std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted,
 			std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted_nomask,
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
 			std::vector<RFLOAT> &exp_local_sqrtXi2,
-			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
-			std::vector<MultidimArray<RFLOAT> > &exp_STweight,
-			std::vector<MultidimArray<RFLOAT> > &exp_local_STMulti);
+			MultidimArray<RFLOAT> &exp_local_Minvsigma2,
+			MultidimArray<RFLOAT> &exp_STweight,
+			MultidimArray<RFLOAT> &exp_local_STMulti);
 
 	// Given exp_Mcoarse_significant, check for iorient whether any of the particles has any significant (coarsely sampled) translation
 	bool isSignificantAnyImageAnyTranslation(long int iorient,
@@ -1090,19 +1131,20 @@ public:
 			int exp_ipass, int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,
-			std::vector<RFLOAT> &exp_min_diff2,
+			RFLOAT &exp_min_diff2,
 			std::vector<RFLOAT> &exp_highres_Xi2_img,
 			std::vector<MultidimArray<Complex > > &exp_Fimg,
 			std::vector<MultidimArray<RFLOAT> > &exp_Fctf,
+            Matrix1D<RFLOAT> &exp_old_offset,
 			MultidimArray<RFLOAT> &exp_Mweight,
 			MultidimArray<bool> &exp_Mcoarse_significant,
 			std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
 			std::vector<RFLOAT> &exp_directions_prior, std::vector<RFLOAT> &exp_psi_prior,
 			std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted,
-			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
+			MultidimArray<RFLOAT> &exp_local_Minvsigma2,
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
 			std::vector<RFLOAT> &exp_local_sqrtXi,
-			std::vector<MultidimArray<RFLOAT> > &exp_STweight);
+			MultidimArray<RFLOAT> &exp_STweight);
 
 	// Convert all squared difference terms to weights.
 	// Also calculates exp_sum_weight and, for adaptive approach, also exp_significant_weight
@@ -1111,8 +1153,8 @@ public:
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,
 			MultidimArray<RFLOAT> &exp_Mweight, MultidimArray<bool> &exp_Mcoarse_significant,
-			std::vector<RFLOAT> &exp_significant_weight, std::vector<RFLOAT> &exp_sum_weight,
-			std::vector<Matrix1D<RFLOAT> > &exp_old_offset, std::vector<Matrix1D<RFLOAT> > &exp_prior, std::vector<RFLOAT> &exp_min_diff2,
+			RFLOAT &exp_significant_weight, RFLOAT &exp_sum_weight,
+			Matrix1D<RFLOAT> &exp_old_offset, Matrix1D<RFLOAT> &exp_prior, RFLOAT &exp_min_diff2,
 			std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
 			std::vector<RFLOAT> &exp_directions_prior, std::vector<RFLOAT> &exp_psi_prior);
 
@@ -1121,27 +1163,27 @@ public:
 			int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,
-			std::vector<RFLOAT> &exp_min_diff2,
+			RFLOAT &exp_min_diff2,
 			std::vector<RFLOAT> &exp_highres_Xi2_img,
 			std::vector<MultidimArray<Complex > > &exp_Fimg,
 			std::vector<MultidimArray<Complex > > &exp_Fimg_nomask,
 			std::vector<MultidimArray<RFLOAT> > &exp_Fctf,
 			std::vector<MultidimArray<RFLOAT> > &exp_power_img,
-			std::vector<Matrix1D<RFLOAT> > &exp_old_offset,
-			std::vector<Matrix1D<RFLOAT> > &exp_prior,
+			Matrix1D<RFLOAT> &exp_old_offset,
+			Matrix1D<RFLOAT> &exp_prior,
 			MultidimArray<RFLOAT> &exp_Mweight,
 			MultidimArray<bool> &exp_Mcoarse_significant,
-			std::vector<RFLOAT> &exp_significant_weight,
-			std::vector<RFLOAT> &exp_sum_weight,
-			std::vector<RFLOAT> &exp_max_weight,
+			RFLOAT &exp_significant_weight,
+			RFLOAT &exp_sum_weight,
+			RFLOAT &exp_max_weight,
 			std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
 			std::vector<RFLOAT> &exp_directions_prior, std::vector<RFLOAT> &exp_psi_prior,
 			std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted,
 			std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted_nomask,
-			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
+			MultidimArray<RFLOAT> &exp_local_Minvsigma2,
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
 			std::vector<RFLOAT> &exp_local_sqrtXi2,
-			std::vector<MultidimArray<RFLOAT> > &exp_STweight);
+			MultidimArray<RFLOAT> &exp_STweight);
 
 	/** Monitor the changes in the optimal translations, orientations and class assignments for some particles */
 	void monitorHiddenVariableChanges(long int my_first_part_id, long int my_last_part_id);
@@ -1182,6 +1224,9 @@ public:
 	// Apply the Multiplicity weights to correct for Images and CTFs to properly estimate squared differences and averages
 	void applySubtomoCorrection(MultidimArray<Complex > &Fimg, MultidimArray<Complex > &Fimg_nomask ,
 								MultidimArray<RFLOAT> &Fctf, MultidimArray<RFLOAT> &FstMulti);
+
+    // Use phase-shifts in FourierTransform to prevent another interpolation for projected (non-integer) shifts in 2D subtomo stacks
+    void selfTranslateSubtomoStack2D(MultidimArray<RFLOAT> &I1, const Matrix1D<RFLOAT> &v, long int part_id, int img_id);
 
 };
 

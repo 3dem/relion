@@ -64,7 +64,7 @@ void FlexAnalyser::initialise()
 	if (fn_data == "")
 		REPORT_ERROR("ERROR: please provide the --data argument!");
 	else
-		data.read(fn_data);
+		data.read(fn_data, "", "");
 
 	if (verb > 0)
 		std::cout << " Reading in model.star file ..." << std::endl;
@@ -350,7 +350,7 @@ void FlexAnalyser::make3DModelOneParticle(long int part_id, long int imgno, std:
 	data.MDimg.getValue(EMDL_ORIENT_PSI, psi, part_id);
 	Euler_angles2matrix(rot, tilt, psi, Aori, false);
 
-	RFLOAT my_pixel_size = data.getImagePixelSize(part_id, 0);
+	RFLOAT my_pixel_size = data.getImagePixelSize(part_id);
 
 	Image<RFLOAT> img;
 	MultidimArray<RFLOAT> sumw;

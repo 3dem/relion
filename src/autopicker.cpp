@@ -109,10 +109,10 @@ void AutoPicker::read(int argc, char **argv)
 	do_only_unfinished = parser.checkOption("--only_do_unfinished", "Only autopick those micrographs for which the coordinate file does not yet exist");
 	do_gpu = parser.checkOption("--gpu", "Use GPU acceleration when availiable");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
-#ifndef _CUDA_ENABLED
+#if !defined _CUDA_ENABLED && !defined _HIP_ENABLED
 if(do_gpu)
 	{
-		std::cerr << "+ WARNING : Relion was compiled without CUDA of at least version 7.0 - you do NOT have support for GPUs" << std::endl;
+		std::cerr << "+ WARNING : Relion was compiled without CUDA >= 7.0 or HIP with ROCm >= 4.0 - you do NOT have support for GPUs" << std::endl;
 		do_gpu = false;
 	}
 #endif
@@ -157,10 +157,10 @@ if(do_gpu)
 	topaz_downscale = textToInteger(parser.getOption("--topaz_downscale", "Downscale factor for topaz", "-1"));
 	topaz_model = parser.getOption("--topaz_model", "Saved model model from topaz train for topaz extract. Leave this empty to use the default (general) model.", "");
 	topaz_radius = textToInteger(parser.getOption("--topaz_radius", "Particle radius (in pix) for topaz extract (default is from particle diameter)", "-1"));
-	fn_topaz_exe = parser.getOption("--topaz_exe", "Name of topaz executable", "topaz");
 	topaz_additional_args = parser.getOption("--topaz_args", "Additional arguments to be passed to topaz", "");
 	topaz_workers = textToInteger(parser.getOption("--topaz_workers", "Number of topaz workers for parallelized training", "1"));
 	do_topaz_plot = parser.checkOption("--topaz_plot", "Plot intermediate information for helical picking in topaz (developmental)");
+    fn_topaz_exe = parser.getOption("--fn_topaz_exe", "Topaz executable (default is using relion_python_topaz from conda install)", "relion_python_topaz");
 
 	int helix_section = parser.addSection("Helix options");
 	autopick_helical_segments = parser.checkOption("--helix", "Are the references 2D helical segments? If so, in-plane rotation angles (psi) are estimated for the references.");
@@ -390,6 +390,8 @@ void AutoPicker::initialise(int rank)
 		if (verb > 0)
 		{
 			std::cout << " + Will use topaz for picking particle coordinates" << std::endl;
+            if (autopick_helical_segments)
+                std::cout << " + Will use modified topaz algorithm for helical segment picking" << std::endl;
 		}
 	}
 	else if (fn_ref == "")
@@ -726,26 +728,10 @@ void AutoPicker::initialise(int rank)
 			}
 			else if (do_topaz_extract)
 			{
-				if (autopick_helical_segments)
-				{
-					topaz_radius = ROUND((helical_tube_diameter) / (2. * angpix * topaz_downscale)); // 100% of particle radius for picking!
-					if (verb > 0)
-						std::cout << " + Setting topaz radius to " << topaz_radius << " downscaled pixels (based on helical_tube_diameter/2)" << std::endl;
-				}
-				else
-				{
-					topaz_radius = ROUND((particle_diameter) / (2. * angpix * topaz_downscale)); // 100% of particle radius for picking!
-					if (verb > 0)
-						std::cout << " + Setting topaz radius to " << topaz_radius << " downscaled pixels (based on particle_diameter/2)" << std::endl;
-				}
+                topaz_radius = ROUND((particle_diameter) / (2. * angpix * topaz_downscale)); // 100% of particle radius for picking!
+                if (verb > 0)
+                    std::cout << " + Setting topaz radius to " << topaz_radius << " downscaled pixels (based on particle_diameter/2)" << std::endl;
 			}
-		}
-
-		// If topaz helical picker: sert default threshold to 1
-		if (autopick_helical_segments && do_topaz_extract && topaz_threshold < -5.)
-		{
-			topaz_threshold = -1.;
-			std::cout << " + Setting default topaz threshold for helical picking to " << topaz_threshold << std::endl;
 		}
 
 	}
@@ -971,11 +957,11 @@ void AutoPicker::initialise(int rank)
 #endif
 }
 
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 void AutoPicker::deviceInitialise()
 {
 	int devCount;
-	cudaGetDeviceCount(&devCount);
+	accGPUGetDeviceCount(&devCount);
 
 	std::vector < std::vector < std::string > > allThreadIDs;
 	untangleDeviceIDs(gpu_ids, allThreadIDs);

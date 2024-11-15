@@ -18,6 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/gui_jobwindow.h"
+#include "src/gui_entries.h"
 JobWindow::JobWindow(int _x, int _y, int _w, int _h, const char* title ) : Fl_Box(_x,_y,_w,_h,title)
 {
 	clear();
@@ -361,7 +362,7 @@ void JobWindow::initialise(int my_job_type, bool _is_tomo)
 	}
 	else if (my_job_type == PROC_3DCLASS)
 	{
-		myjob.initialise(my_job_type);
+        myjob.initialise(my_job_type);
 		initialiseClass3DWindow();
 	}
 	else if (my_job_type == PROC_3DAUTO)
@@ -409,11 +410,46 @@ void JobWindow::initialise(int my_job_type, bool _is_tomo)
 		myjob.initialise(my_job_type);
 		initialiseCtfrefineWindow();
 	}
+	else if (my_job_type == PROC_MODELANGELO)
+	{
+		myjob.initialise(my_job_type);
+		initialiseModelAngeloWindow();
+	}
+	else if (my_job_type == PROC_DYNAMIGHT)
+	{
+		myjob.initialise(my_job_type);
+		initialiseDynaMightWindow();
+	}
 	else if (my_job_type == PROC_TOMO_IMPORT)
 	{
 		myjob.initialise(my_job_type);
 		initialiseTomoImportWindow();
 	}
+    else if (my_job_type == PROC_TOMO_EXCLUDE_TILT_IMAGES)
+    {
+        myjob.initialise(my_job_type);
+        initialiseTomoExcludeTiltImagesWindow();
+    }
+    else if (my_job_type == PROC_TOMO_RECONSTRUCT_TOMOGRAM)
+    {
+        myjob.initialise(my_job_type);
+        initialiseTomoReconstructTomogramsWindow();
+    }
+    else if (my_job_type == PROC_TOMO_ALIGN_TILTSERIES)
+    {
+        myjob.initialise(my_job_type);
+        initialiseTomoAlignTiltseriesWindow();
+    }
+    else if (my_job_type == PROC_TOMO_DENOISE_TOMOGRAM)
+    {
+        myjob.initialise(my_job_type);
+        initialiseTomoDenoiseTomogramsWindow();
+    }
+    else if (my_job_type == PROC_TOMO_PICK_TOMOGRAM)
+    {
+        myjob.initialise(my_job_type);
+        initialiseTomoPickTomogramsWindow();
+    }
 	else if (my_job_type == PROC_TOMO_SUBTOMO)
 	{
 		myjob.initialise(my_job_type);
@@ -429,11 +465,11 @@ void JobWindow::initialise(int my_job_type, bool _is_tomo)
 		myjob.initialise(my_job_type);
 		initialiseTomoAlignWindow();
 	}
-	else if (my_job_type == PROC_TOMO_RECONSTRUCT)
-	{
-		myjob.initialise(my_job_type);
-		initialiseTomoReconParWindow();
-	}
+    else if (my_job_type == PROC_TOMO_RECONSTRUCT)
+    {
+            myjob.initialise(my_job_type);
+            initialiseTomoReconParWindow();
+    }
 	else if (my_job_type == PROC_EXTERNAL)
 	{
 		myjob.initialise(my_job_type);
@@ -521,29 +557,32 @@ void JobWindow::initialiseMotioncorrWindow()
 	tab1->label("I/O");
 	resetHeight();
 
-	place("input_star_mics", TOGGLE_DEACTIVATE);
+    place("input_star_mics", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	place("first_frame_sum", TOGGLE_DEACTIVATE);
-	place("last_frame_sum", TOGGLE_DEACTIVATE);
-	place("dose_per_frame", TOGGLE_DEACTIVATE);
-	place("pre_exposure", TOGGLE_DEACTIVATE);
+    if (!is_tomo) place("first_frame_sum", TOGGLE_DEACTIVATE);
+    if (!is_tomo) place("last_frame_sum", TOGGLE_DEACTIVATE);
+    if (!is_tomo) place("dose_per_frame", TOGGLE_DEACTIVATE);
+	if (!is_tomo) place("pre_exposure", TOGGLE_DEACTIVATE);
 	place("eer_grouping", TOGGLE_DEACTIVATE);
 	place("do_float16", TOGGLE_DEACTIVATE);
+	if (is_tomo) place("do_even_odd_split");
 
 	// Add a little spacer
 	current_y += STEPY/2;
+    if (!is_tomo)
+    {
+        group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+        group1->end();
+        place("do_dose_weighting", TOGGLE_DEACTIVATE, group1);
+        group1->begin();
+        place("do_save_noDW", TOGGLE_DEACTIVATE);
+        group1->end();
 
-	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group1->end();
-	place("do_dose_weighting", TOGGLE_DEACTIVATE, group1);
-	group1->begin();
-	place("do_save_noDW", TOGGLE_DEACTIVATE);
-	group1->end();
-
-	guientries["do_dose_weighting"].cb_menu_i(); // make default active
+        guientries["do_dose_weighting"].cb_menu_i(); // make default active
+    }
 
 	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group2->end();
@@ -583,14 +622,14 @@ void JobWindow::initialiseMotioncorrWindow()
 
 void JobWindow::initialiseCtffindWindow()
 {
-	setupTabs(3);
+	setupTabs(2);
 
 	tab1->begin();
 	tab1->label("I/O");
 	resetHeight();
 
-	place("input_star_mics", TOGGLE_DEACTIVATE);
-	place("use_noDW", TOGGLE_DEACTIVATE);
+    place("input_star_mics", TOGGLE_DEACTIVATE);
+	if (!is_tomo) place("use_noDW", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -617,20 +656,11 @@ void JobWindow::initialiseCtffindWindow()
 	tab2->label("CTFFIND-4.1");
 	resetHeight();
 
-	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group2->end();
-
-	place("use_ctffind4", TOGGLE_DEACTIVATE, group2);
-	group2->begin();
-
 	place("fn_ctffind_exe", TOGGLE_DEACTIVATE);
 	place("use_given_ps", TOGGLE_DEACTIVATE);
 	place("slow_search", TOGGLE_DEACTIVATE);
 
 	place("ctf_win", TOGGLE_DEACTIVATE);
-
-	group2->end();
-	guientries["use_ctffind4"].cb_menu_i(); // make default active
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -642,34 +672,16 @@ void JobWindow::initialiseCtffindWindow()
 	place("dfmax", TOGGLE_DEACTIVATE);
 	place("dfstep", TOGGLE_DEACTIVATE);
 
+	// Add a little spacer
+	current_y += STEPY/2;
+
+    if (is_tomo)
+    {
+        place("localsearch_nominal_defocus", TOGGLE_DEACTIVATE);
+        place("exp_factor_dose", TOGGLE_DEACTIVATE);
+    }
 	tab2->end();
 
-	tab3->begin();
-	tab3->label("Gctf");
-	resetHeight();
-
-	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group4->end();
-
-	place("use_gctf", TOGGLE_DEACTIVATE, group4);
-	group4->begin();
-
-	place("fn_gctf_exe", TOGGLE_DEACTIVATE);
-	place("do_ignore_ctffind_params", TOGGLE_DEACTIVATE);
-	place("do_EPA", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-	place("other_gctf_args", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-	place("gpu_ids", TOGGLE_LEAVE_ACTIVE);
-
-	group4->end();
-	guientries["use_gctf"].cb_menu_i(); // make default active
-
-	tab3->end();
 }
 
 void JobWindow::initialiseManualpickWindow()
@@ -712,13 +724,7 @@ void JobWindow::initialiseManualpickWindow()
 	place("highpass");
 	place("angpix");
 
-	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group2->end();
-	place("do_topaz_denoise", TOGGLE_DEACTIVATE, group2);
-	group2->begin();
-	place("fn_topaz_exec", TOGGLE_DEACTIVATE);
-	group2->end();
-	guientries["do_topaz_denoise"].cb_menu_i();
+	place("do_topaz_denoise", TOGGLE_DEACTIVATE);
 
 	tab2->end();
 	tab3->begin();
@@ -783,11 +789,35 @@ void JobWindow::initialiseAutopickWindow()
 	tab3->label("Topaz");
 	resetHeight();
 
-	place("fn_topaz_exec");
+    place("fn_topaz_exe", TOGGLE_DEACTIVATE);
 	place("topaz_particle_diameter", TOGGLE_DEACTIVATE);
 
-	// Add a little spacer
-	current_y += STEPY/2;
+    // Add a little spacer
+    current_y += STEPY/4;
+
+    group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group5->end();
+    place("do_topaz_train", TOGGLE_DEACTIVATE, group5);
+    group5->begin();
+
+    place("topaz_nr_particles", TOGGLE_DEACTIVATE);
+    place("topaz_train_picks", TOGGLE_DEACTIVATE);
+
+    group6 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group6->end();
+
+    place("do_topaz_train_parts", TOGGLE_DEACTIVATE, group6);
+
+    group6->begin();
+    place("topaz_train_parts", TOGGLE_DEACTIVATE);
+    group6->end();
+    guientries["do_topaz_train_parts"].cb_menu_i();
+
+    group5->end();
+    guientries["do_topaz_train"].cb_menu_i();
+
+    // Add a little spacer
+    current_y += STEPY/4;
 
 	group7 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group7->end();
@@ -797,37 +827,24 @@ void JobWindow::initialiseAutopickWindow()
 
 	group7->begin();
 	place("topaz_model", TOGGLE_DEACTIVATE);
-	group7->end();
-	guientries["do_topaz_pick"].cb_menu_i();
 
-	// Add a little spacer
-	current_y += STEPY/2;
+    group8 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group8->end();
 
-	group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group5->end();
-	place("do_topaz_train", TOGGLE_DEACTIVATE, group5);
-	group5->begin();
+    place("do_topaz_filaments", TOGGLE_DEACTIVATE, group8);
 
-	place("topaz_nr_particles", TOGGLE_DEACTIVATE);
-	place("topaz_train_picks", TOGGLE_DEACTIVATE);
+    group8->begin();
+    place2("topaz_filament_threshold", "topaz_hough_length", "Threshold, Hough length (A)", TOGGLE_DEACTIVATE);
+    group8->end();
+    guientries["do_topaz_filaments"].cb_menu_i();
 
-	group6 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group6->end();
+    group7->end();
+    guientries["do_topaz_pick"].cb_menu_i();
 
-	place("do_topaz_train_parts", TOGGLE_DEACTIVATE, group6);
+    // Add a little spacer
+    current_y += STEPY/4;
 
-	group6->begin();
-	place("topaz_train_parts", TOGGLE_DEACTIVATE);
-	group6->end();
-	guientries["do_topaz_train_parts"].cb_menu_i();
-
-	group5->end();
-	guientries["do_topaz_train"].cb_menu_i();
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	place("topaz_other_args", TOGGLE_DEACTIVATE);
+    place("topaz_other_args", TOGGLE_DEACTIVATE);
 
 	tab3->end();
 	tab4->begin();
@@ -1064,7 +1081,7 @@ Pixels values higher than this many times the image stddev will be replaced with
 
 void JobWindow::initialiseSelectWindow()
 {
-	setupTabs(4);
+	setupTabs(5);
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -1089,7 +1106,6 @@ void JobWindow::initialiseSelectWindow()
 	place("rank_threshold", TOGGLE_DEACTIVATE);
 	place("select_nr_parts", TOGGLE_DEACTIVATE);
 	place("select_nr_classes", TOGGLE_DEACTIVATE);
-	place("python_exe", TOGGLE_DEACTIVATE);
 
 	group6->end();
 	guientries["do_class_ranker"].cb_menu_i();
@@ -1164,6 +1180,21 @@ void JobWindow::initialiseSelectWindow()
 	guientries["do_remove_duplicates"].cb_menu_i();
 	tab4->end();
 
+    tab5->begin();
+	tab5->label("Filaments");
+	resetHeight();
+
+	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group3->end();
+	place("do_filaments", TOGGLE_DEACTIVATE, group3);
+	group3->begin();
+	place("dendrogram_threshold", TOGGLE_LEAVE_ACTIVE);
+	place("dendrogram_minclass", TOGGLE_LEAVE_ACTIVE);
+	group3->end();
+	guientries["do_filaments"].cb_menu_i();
+	tab5->end();
+
+
 	// Always deactivate the queue option
 	guientries["do_queue"].deactivate_option = TOGGLE_ALWAYS_DEACTIVATE;
 	myjob.joboptions["do_queue"].setString("No");
@@ -1178,6 +1209,9 @@ void JobWindow::initialiseClass2DWindow()
 	resetHeight();
 
 	place("fn_img", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY/2;
+
 	place("fn_cont", TOGGLE_REACTIVATE);
 
 	tab1->end();
@@ -1351,7 +1385,13 @@ void JobWindow::initialiseInimodelWindow()
 	tab1->label("I/O");
 	resetHeight();
 
-	place("fn_img", TOGGLE_DEACTIVATE);
+    if (is_tomo)
+        placeTomoInput(true, true, true, false);
+    else
+        place("fn_img", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY/2;
+
 	place("fn_cont", TOGGLE_REACTIVATE);
 
 	tab1->end();
@@ -1388,6 +1428,13 @@ void JobWindow::initialiseInimodelWindow()
 	place("do_solvent", TOGGLE_DEACTIVATE);
 	place("sym_name", TOGGLE_DEACTIVATE);
 	place("do_run_C1", TOGGLE_DEACTIVATE);
+
+    if (is_tomo)
+    {
+        // Add a little spacer
+        current_y += STEPY/2;
+        place("sigma_tilt", TOGGLE_DEACTIVATE);
+    }
 
 	tab3->end();
 
@@ -1431,10 +1478,19 @@ void JobWindow::initialiseClass3DWindow()
 	tab1->label("I/O");
 	resetHeight();
 
-	place("fn_img", TOGGLE_DEACTIVATE);
+    if (is_tomo)
+        placeTomoInput(true, true, true, false);
+    else
+        place("fn_img", TOGGLE_DEACTIVATE);
+
+    current_y += STEPY/2;
+
+    place("fn_ref", TOGGLE_DEACTIVATE);
+    place("fn_mask");
+
+	current_y += STEPY/2;
+
 	place("fn_cont", TOGGLE_REACTIVATE);
-	place("fn_ref", TOGGLE_DEACTIVATE);
-	place("fn_mask");
 
 	tab1->end();
 	tab2->begin();
@@ -1442,6 +1498,7 @@ void JobWindow::initialiseClass3DWindow()
 	resetHeight();
 
 	place("ref_correct_greyscale", TOGGLE_DEACTIVATE);
+    place("trust_ref_size", TOGGLE_DEACTIVATE);
 	place("ini_high", TOGGLE_DEACTIVATE);
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -1495,6 +1552,11 @@ void JobWindow::initialiseClass3DWindow()
 
 	place("highres_limit", TOGGLE_DEACTIVATE);
 
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("do_blush", TOGGLE_DEACTIVATE);
+
 	tab4->end();
 
 	tab5->begin();
@@ -1526,6 +1588,13 @@ void JobWindow::initialiseClass3DWindow()
 
 	current_y += STEPY/2;
 	place("allow_coarser");
+
+    if (is_tomo)
+    {
+        // Add a little spacer
+        current_y += STEPY/2;
+        place("sigma_tilt", TOGGLE_DEACTIVATE);
+    }
 
 	group3->end();
 	guientries["dont_skip_align"].cb_menu_i(); // to make default effective
@@ -1612,16 +1681,19 @@ void JobWindow::initialiseAutorefineWindow()
 	tab1->label("I/O");
 	resetHeight();
 
-	if (is_tomo)
-	{
-		place("in_optimisation", TOGGLE_DEACTIVATE);
-		current_y += STEPY /2 ;
-	}
+    if (is_tomo)
+        placeTomoInput(true, true, true, false);
+    else
+        place("fn_img", TOGGLE_DEACTIVATE);
 
-	place("fn_img", TOGGLE_DEACTIVATE);
+    current_y += STEPY/2;
+
+    place("fn_ref", TOGGLE_DEACTIVATE);
+    place("fn_mask");
+
+    current_y += STEPY/2;
+
 	place("fn_cont", TOGGLE_REACTIVATE);
-	place("fn_ref", TOGGLE_DEACTIVATE);
-	place("fn_mask");
 
 	tab1->end();
 	tab2->begin();
@@ -1629,6 +1701,7 @@ void JobWindow::initialiseAutorefineWindow()
 	resetHeight();
 
 	place("ref_correct_greyscale", TOGGLE_DEACTIVATE);
+    place("trust_ref_size", TOGGLE_DEACTIVATE);
 	place("ini_high", TOGGLE_DEACTIVATE);
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -1663,6 +1736,11 @@ void JobWindow::initialiseAutorefineWindow()
 
 	place("do_solvent_fsc");
 
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("do_blush", TOGGLE_DEACTIVATE);
+
 	tab4->end();
 	tab5->begin();
 	tab5->label("Auto-sampling");
@@ -1677,6 +1755,13 @@ void JobWindow::initialiseAutorefineWindow()
 	place("relax_sym");
 	current_y += STEPY/2;
 	place("auto_faster");
+
+    if (is_tomo)
+    {
+        // Add a little spacer
+        current_y += STEPY/2;
+        place("sigma_tilt", TOGGLE_DEACTIVATE);
+    }
 
 	tab5->end();
 	tab6->begin();
@@ -1767,6 +1852,10 @@ void JobWindow::initialiseMultiBodyWindow()
 	current_y += STEPY/2;
 
 	place("do_subtracted_bodies", TOGGLE_DEACTIVATE);
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("do_blush", TOGGLE_DEACTIVATE);
 
 	tab1->end();
 	tab2->begin();
@@ -2007,12 +2096,6 @@ void JobWindow::initialisePostprocessWindow()
 	tab1->begin();
 	tab1->label("I/O");
 	resetHeight();
-
-	if (is_tomo)
-	{
-		place("in_optimisation", TOGGLE_DEACTIVATE);
-		current_y += STEPY /2 ;
-	}
 
 	place("fn_in", TOGGLE_DEACTIVATE); //(current_y, "One of the 2 unfiltered half-maps:", NODE_HALFMAP, "", "MRC map files (*half1_class001_unfil.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
 	place("fn_mask", TOGGLE_DEACTIVATE); //(current_y, "Solvent mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask where the protein is white (1) and the solvent is black (0). Often, the softer the mask the higher resolution estimates you will get. A soft edge of 5-10 pixels is often a good edge width.");
@@ -2279,6 +2362,124 @@ void JobWindow::initialiseCtfrefineWindow()
 
 	tab2->end();
 }
+void JobWindow::initialiseDynaMightWindow()
+{
+    setupTabs(2);
+
+    tab1->begin();
+    tab1->label("I/O");
+    resetHeight();
+
+    place("fn_star", TOGGLE_DEACTIVATE);
+    place("fn_map", TOGGLE_DEACTIVATE);
+    //place("fn_mask", TOGGLE_DEACTIVATE);
+
+ 	current_y += STEPY /2 ;
+
+    place("nr_gaussians", TOGGLE_DEACTIVATE);
+    place("initial_threshold", TOGGLE_DEACTIVATE);
+    place("reg_factor", TOGGLE_DEACTIVATE);
+
+    current_y += STEPY /2 ;
+
+    place("fn_dynamight_exe", TOGGLE_DEACTIVATE);
+    place("gpu_id");
+    place("do_preload");
+
+    tab1->end();
+
+
+
+
+    tab2->begin();
+    tab2->label("Tasks");
+    resetHeight();
+
+    place("fn_checkpoint", TOGGLE_REACTIVATE);
+    current_y += STEPY /2 ;
+
+    group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group1->end();
+
+    place("do_visualize", TOGGLE_REACTIVATE, group1, false);
+    group1->begin();
+    place("halfset");
+    group1->end();
+
+    current_y += STEPY /2 ;
+
+    group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group2->end();
+
+    place("do_inverse", TOGGLE_REACTIVATE, group2, false);
+    group2->begin();
+    place("nr_epochs");
+    place("do_store_deform");
+    group2->end();
+
+    current_y += STEPY /2 ;
+
+    group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group3->end();
+    place("do_reconstruct",TOGGLE_REACTIVATE, group3, false);
+    group3->begin();
+    place("backproject_batchsize");
+    group3->end();
+
+    // Make defaults active
+    guientries["do_visualize"].cb_menu_i();
+    guientries["do_inverse"].cb_menu_i();
+    guientries["do_reconstruct"].cb_menu_i();
+
+    tab2->end();
+}
+
+void JobWindow::initialiseModelAngeloWindow()
+{
+    setupTabs(2);
+
+    tab1->begin();
+    tab1->label("I/O");
+    resetHeight();
+
+    // I/O
+    place("fn_map", TOGGLE_DEACTIVATE);
+    place("p_seq", TOGGLE_DEACTIVATE);
+    place("d_seq", TOGGLE_DEACTIVATE);
+    place("r_seq", TOGGLE_DEACTIVATE);
+
+ 	current_y += STEPY /2 ;
+    place("fn_modelangelo_exe", TOGGLE_DEACTIVATE);
+    place("gpu_id", TOGGLE_DEACTIVATE);
+
+    tab1->end();
+
+    tab2->begin();
+    tab2->label("Hmmer");
+    resetHeight();
+
+    group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group1->end();
+
+    place("do_hhmer", TOGGLE_LEAVE_ACTIVE, group1, false);
+	current_y += STEPY /2 ;
+
+    group1->begin();
+    place("fn_lib", TOGGLE_LEAVE_ACTIVE);
+    place("alphabet", TOGGLE_LEAVE_ACTIVE);
+
+	current_y += STEPY /2 ;
+    place("F1", TOGGLE_LEAVE_ACTIVE);
+    place("F2", TOGGLE_LEAVE_ACTIVE);
+    place("F3", TOGGLE_LEAVE_ACTIVE);
+    place("E", TOGGLE_LEAVE_ACTIVE);
+
+
+    group1->end();
+    //guientries["do_hmmer"].cb_menu_i();
+
+    tab2->end();
+}
 
 void JobWindow::initialiseExternalWindow()
 {
@@ -2320,28 +2521,26 @@ void JobWindow::initialiseExternalWindow()
 }
 
 void JobWindow::placeTomoInput(bool has_tomograms, bool has_particles,
-							   bool has_trajectories, bool has_manifolds, bool has_halfmaps, bool has_postprocess)
+							   bool has_trajectories, bool has_manifolds)
 {
-	tab1->begin();
-	tab1->label("I/O");
-	resetHeight();
 
-	place("in_optimisation", TOGGLE_DEACTIVATE);
+    place("in_optimisation", TOGGLE_DEACTIVATE);
 
-	current_y += STEPY /2 ;
+    group0 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group0->end();
+    place("use_direct_entries", TOGGLE_DEACTIVATE, group0, false);
+    group0->begin();
 
 	if (has_particles) place("in_particles", TOGGLE_DEACTIVATE);
 	if (has_tomograms) place("in_tomograms", TOGGLE_DEACTIVATE);
 	if (has_trajectories) place("in_trajectories", TOGGLE_DEACTIVATE);
-	if (has_manifolds) place("in_manifolds", TOGGLE_DEACTIVATE);
-	if (has_halfmaps) place("in_halfmaps", TOGGLE_DEACTIVATE);
-	if (has_postprocess)
-	{
-		place("in_refmask", TOGGLE_DEACTIVATE);
-		place("in_post", TOGGLE_DEACTIVATE);
-	}
+    if (has_manifolds) place("in_manifolds", TOGGLE_DEACTIVATE);
 
-	tab1->end();
+    group0->end();
+	guientries["use_direct_entries"].cb_menu_i(); // make default active
+
+    // Place a little spacer
+    current_y += STEPY /2 ;
 
 }
 
@@ -2349,124 +2548,366 @@ void JobWindow::initialiseTomoImportWindow()
 {
 	setupTabs(3);
 
-	tab1->begin();
-	tab1->label("Tomograms");
+    tab1->begin();
+	tab1->label("General");
 	resetHeight();
 
-	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group1->end();
-	place("do_tomo", TOGGLE_DEACTIVATE, group1, false);
-	group1->begin();
+    place("movie_files", TOGGLE_DEACTIVATE);
+    place("images_are_motion_corrected", TOGGLE_DEACTIVATE);
+    place("mdoc_files", TOGGLE_DEACTIVATE);
+    place("optics_group_name", TOGGLE_DEACTIVATE);
+    place("prefix", TOGGLE_DEACTIVATE);
 
-	place("tomo_star", TOGGLE_DEACTIVATE);
-	place("io_tomos", TOGGLE_DEACTIVATE);
-	place("angpix", TOGGLE_DEACTIVATE);
+    // Add a little spacer
+    current_y += STEPY/2;
+
+    place("angpix", TOGGLE_DEACTIVATE);
 	place("kV", TOGGLE_DEACTIVATE);
 	place("Cs", TOGGLE_DEACTIVATE);
 	place("Q0", TOGGLE_DEACTIVATE);
 
-	// Add a little spacer
-	current_y += STEPY/2;
+    tab1->end();
 
-	place("dose", TOGGLE_DEACTIVATE);
-	place("order_list", TOGGLE_DEACTIVATE);
-	place("do_flipYZ", TOGGLE_DEACTIVATE);
-	place("do_flipZ", TOGGLE_DEACTIVATE);
-	place("hand", TOGGLE_DEACTIVATE);
-
-	group1->end();
-	guientries["do_tomo"].cb_menu_i(); // make default active
-
-	tab1->end();
-
-	tab2->begin();
-	tab2->label("Coordinates");
+    tab2->begin();
+	tab2->label("Tilt series");
 	resetHeight();
 
-	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group2->end();
-	place("do_coords", TOGGLE_DEACTIVATE, group2, false);
-	group2->begin();
+    place("dose_rate", TOGGLE_DEACTIVATE);
+    place("dose_is_per_movie_frame", TOGGLE_DEACTIVATE);
 
-	place("part_star", TOGGLE_DEACTIVATE);
-	place("part_tomos", TOGGLE_DEACTIVATE);
-	// Add a little spacer
-	current_y += STEPY/2;
-	place("do_coords_flipZ", TOGGLE_DEACTIVATE);
-
-	group2->end();
-	guientries["do_coords"].cb_menu_i(); // make default active
+    current_y += STEPY/2;
+    place("tilt_axis_angle", TOGGLE_DEACTIVATE);
+    place("mtf_file", TOGGLE_DEACTIVATE);
+    place("flip_tiltseries_hand", TOGGLE_DEACTIVATE);
 
 	tab2->end();
 
-	tab3->begin();
-	tab3->label("Others");
+    tab3->begin();
+    tab3->label("Coordinates");
+    resetHeight();
+
+    group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group1->end();
+
+    place("do_coords", TOGGLE_DEACTIVATE, group1, false);
+
+    group1->begin();
+    place("in_coords", TOGGLE_DEACTIVATE);
+    place("remove_substring", TOGGLE_DEACTIVATE);
+    place("remove_substring2", TOGGLE_DEACTIVATE);
+
+    // Add a little spacer
+    current_y += STEPY/2;
+
+    place("is_center", TOGGLE_DEACTIVATE, group2, false);
+    place("scale_factor", TOGGLE_DEACTIVATE);
+    place("add_factor", TOGGLE_DEACTIVATE);
+
+    group1->end();
+    guientries["do_coords"].cb_menu_i(); // make default active
+
+    tab3->end();
+
+}
+
+void JobWindow::initialiseTomoAlignTiltseriesWindow()
+{
+    setupTabs(3);
+
+    tab1->begin();
+    tab1->label("I/O");
+    resetHeight();
+
+    place("in_tiltseries", TOGGLE_DEACTIVATE);
+
+    // Add a little spacer
+    current_y += STEPY/2;
+
+    place("tomogram_thickness", TOGGLE_DEACTIVATE);
+
+    // Add a little spacer
+    current_y += STEPY/2;
+
+    place("fn_batchtomo_exe", TOGGLE_DEACTIVATE);
+    place("fn_aretomo_exe", TOGGLE_DEACTIVATE);
+
+    tab1->end();
+    tab2->begin();
+    tab2->label("IMOD");
+    resetHeight();
+
+
+    // Add a little spacer
+	current_y += STEPY/2;
+
+    group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group1->end();
+    place("do_imod_fiducials", TOGGLE_DEACTIVATE, group1, false);
+    group1->begin();
+
+    place("fiducial_diameter", TOGGLE_DEACTIVATE);
+    group1->end();
+    guientries["do_imod_fiducials"].cb_menu_i(); // make default active
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+    group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group2->end();
+    place("do_imod_patchtrack", TOGGLE_DEACTIVATE, group2, false);
+    group2->begin();
+
+    place("patch_size", TOGGLE_DEACTIVATE);
+    place("patch_overlap", TOGGLE_DEACTIVATE);
+    group2->end();
+    guientries["do_imod_patchtrack"].cb_menu_i(); // make default active
+
+    tab2->end();
+
+    tab3->begin();
+    tab3->label("AreTomo2");
+    resetHeight();
+
+    group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group3->end();
+    place("do_aretomo2", TOGGLE_DEACTIVATE, group3, false);
+    group3->begin();
+
+    // Add a little spacer
+    current_y += STEPY/2;
+    group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group4->end();
+    place("do_aretomo_tiltcorrect", TOGGLE_DEACTIVATE, group4, false);
+    group4->begin();
+    place("aretomo_tiltcorrect_angle", TOGGLE_DEACTIVATE);
+    group4->end();
+    guientries["do_aretomo_tiltcorrect"].cb_menu_i(); // make default active
+
+    // Add a little spacer
+    current_y += STEPY/2;
+    group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group5->end();
+    place("do_aretomo_ctf", TOGGLE_DEACTIVATE, group5, false);
+    group5->begin();
+    place("do_aretomo_phaseshift", TOGGLE_DEACTIVATE);
+    group5->end();
+    guientries["do_aretomo_ctf"].cb_menu_i(); // make default active
+
+    // Add a little spacer
+    current_y += STEPY/2;
+    place("other_aretomo_args", TOGGLE_DEACTIVATE);
+    place("gpu_ids");
+    group3->end();
+    guientries["do_aretomo2"].cb_menu_i(); // make default active
+
+    tab3->end();
+
+
+}
+
+void JobWindow::initialiseTomoReconstructTomogramsWindow()
+{
+    setupTabs(2);
+
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
+    
+    place("in_tiltseries", TOGGLE_DEACTIVATE);
+
+    current_y += STEPY /2 ;
+
+    place("generate_split_tomograms", TOGGLE_DEACTIVATE);
+
+    current_y += STEPY /2 ;
+
+    group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group1->end();
+    place("do_proj", TOGGLE_DEACTIVATE, group1, false);
+
+    group1->begin();
+    place("centre_proj", TOGGLE_DEACTIVATE);
+    place("thickness_proj", TOGGLE_DEACTIVATE);
+    group1->end();
+    guientries["do_proj"].cb_menu_i();
+
+    tab1-> end();
+
+
+    tab2->begin();
+	tab2->label("Reconstruct");
 	resetHeight();
 
-	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group3->end();
 
-	place("do_other", TOGGLE_DEACTIVATE, group3, false);
-	group3->begin();
+    place("xdim", TOGGLE_DEACTIVATE);
+    place("ydim", TOGGLE_DEACTIVATE);
+    place("zdim", TOGGLE_DEACTIVATE);
+    place("binned_angpix", TOGGLE_DEACTIVATE);
+    
 
-	// Add a little spacer
-	current_y += STEPY/2;
+    current_y += STEPY /2 ;
 
-	place("fn_in_other", TOGGLE_DEACTIVATE);
-	place("node_type", TOGGLE_DEACTIVATE);
+    place ("tiltangle_offset");
+    place("tomo_name", TOGGLE_REACTIVATE);
 
-	// Add a little spacer
-	current_y += STEPY/2;
+    current_y += STEPY /2 ;
 
-	place("optics_group_particles", TOGGLE_DEACTIVATE);
+    group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group2->end();
+    place("do_fourier", TOGGLE_DEACTIVATE, group2, false);
 
-	group3->end();
-	guientries["do_other"].cb_menu_i(); // make default active
+    group2->begin();
+    place("ctf_intact_first_peak", TOGGLE_DEACTIVATE);
+    group2->end();
+    guientries["do_fourier"].cb_menu_i();
 
-	tab3->end();
+    tab2->end();
+
+}
+
+void JobWindow::initialiseTomoDenoiseTomogramsWindow()
+{
+    setupTabs(3);
+
+    tab1->begin();
+    tab1->label("I/O");
+    resetHeight();
+
+    place("in_tomoset", TOGGLE_DEACTIVATE);
+
+    current_y += STEPY/2;
+    
+    place("cryocare_path");
+    place("gpu_ids");
+
+    tab2->begin();
+    tab2->label("CryoCARE: Train");
+    resetHeight();
+
+    group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group1->end();
+    place("do_cryocare_train", TOGGLE_DEACTIVATE, group1, false);
+
+    current_y += STEPY /2 ;
+
+    group1->begin();
+    place("tomograms_for_training", TOGGLE_DEACTIVATE);
+    place("number_training_subvolumes", TOGGLE_DEACTIVATE);
+    place("subvolume_dimensions", TOGGLE_DEACTIVATE);
+    group1->end();
+    guientries["do_cryocare_train"].cb_menu_i(); 
+
+    tab2->end();
+
+    tab3->begin();
+    tab3->label("CryoCARE: Predict");
+    resetHeight();
+
+    group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group2->end();
+    place("do_cryocare_predict", TOGGLE_DEACTIVATE, group2, false);
+
+    current_y += STEPY /2 ;
+
+    group2->begin();
+    place("care_denoising_model", TOGGLE_DEACTIVATE);
+    place3("ntiles_x", "ntiles_y", "ntiles_z", "Number of tiles in X,Y,Z:", TOGGLE_DEACTIVATE);
+    
+    current_y += STEPY /2 ;
+
+    place("denoising_tomo_name", TOGGLE_DEACTIVATE);
+    
+    group2->end();
+    guientries["do_cryocare_predict"].cb_menu_i(); 
+
+    tab3->end();
+}
+
+void JobWindow::initialiseTomoPickTomogramsWindow()
+{
+
+    setupTabs(1);
+
+    tab1->begin();
+    tab1->label("I/O");
+    resetHeight();
+
+    place("in_tomoset", TOGGLE_DEACTIVATE);
+    //place("cache_size", TOGGLE_DEACTIVATE);
+
+    // Add a little spacer
+    current_y += STEPY/2;
+
+    place("pick_mode", TOGGLE_DEACTIVATE);
+
+    // Add a little spacer
+    current_y += STEPY/2;
+
+    place("particle_spacing", TOGGLE_DEACTIVATE);
+
+    // Add a little spacer
+    current_y += STEPY/2;
+
+    place("in_star_file", TOGGLE_DEACTIVATE);
+
+    tab1->end();
+
 }
 
 void JobWindow::initialiseTomoSubtomoWindow()
 {
 	setupTabs(2);
 
-	placeTomoInput(true, true, true, false, false, false);
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
+
+	placeTomoInput(true, true, true, false);
+
+	tab1->end();
 
 	tab2->begin();
 	tab2->label("Reconstruct");
 	resetHeight();
 
+    place("binning", TOGGLE_DEACTIVATE);
 	place("box_size", TOGGLE_DEACTIVATE);
 	place("crop_size", TOGGLE_DEACTIVATE);
-	place("binning", TOGGLE_DEACTIVATE);
 
     current_y += STEPY /2 ;
 
+    place ("max_dose", TOGGLE_DEACTIVATE);
+    place ("min_frames", TOGGLE_DEACTIVATE);
+
+    current_y += STEPY /2 ;
+
+    place("do_stack2d", TOGGLE_DEACTIVATE);
     place("do_float16", TOGGLE_DEACTIVATE);
 
-	current_y += STEPY /2 ;
+    current_y += STEPY /2 ;
 
-	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group1->end();
-	place("do_cone_weight", TOGGLE_DEACTIVATE, group1);
-
-	group1->begin();
-
-	place("cone_angle", TOGGLE_DEACTIVATE);
-
-	group1->end();
-	guientries["do_cone_weight"].cb_menu_i();
+    place("do_real_subtomo", TOGGLE_DEACTIVATE);
 
 	tab2->end();
 }
 
 void JobWindow::initialiseTomoCtfRefineWindow()
 {
-	setupTabs(3);
+	setupTabs(2);
 
-	placeTomoInput(true, true, true, false, true, true);
+    tab1->begin();
+    tab1->label("I/O");
+    resetHeight();
 
-	tab2->begin();
+    placeTomoInput(true, true, true, false);
+
+    place("in_halfmaps", TOGGLE_DEACTIVATE);
+    place("in_refmask", TOGGLE_DEACTIVATE);
+    place("in_post", TOGGLE_DEACTIVATE);
+
+    tab1->end();
+
+    tab2->begin();
 	tab2->label("Defocus");
 	resetHeight();
 
@@ -2510,11 +2951,13 @@ void JobWindow::initialiseTomoCtfRefineWindow()
 	guientries["do_scale"].cb_menu_i();
 
 	tab2->end();
-	tab3->begin();
+
+    /*
+    tab3->begin();
 	tab3->label("Aberrations");
 	resetHeight();
 
-	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group3->end();
 	place("do_odd_aberr", TOGGLE_DEACTIVATE, group3);
 
@@ -2539,20 +2982,31 @@ void JobWindow::initialiseTomoCtfRefineWindow()
 	guientries["do_even_aberr"].cb_menu_i();
 
 	tab3->end();
+    */
 }
 
 void JobWindow::initialiseTomoAlignWindow()
 {
-	setupTabs(4);
+	setupTabs(3);
 
-	placeTomoInput(true, true, true, false, true, true);
+    tab1->begin();
+    tab1->label("I/O");
+    resetHeight();
+
+	placeTomoInput(true, true, true, false);
+
+    place("in_halfmaps", TOGGLE_DEACTIVATE);
+    place("in_refmask", TOGGLE_DEACTIVATE);
+    place("in_post", TOGGLE_DEACTIVATE);
+
+    tab1->end();
 
 	tab2->begin();
 	tab2->label("Polish");
 	resetHeight();
 
 	place("box_size", TOGGLE_DEACTIVATE);
-	place("max_error", TOGGLE_DEACTIVATE);
+    place("max_error", TOGGLE_DEACTIVATE);
 
 	current_y += STEPY /2 ;
 
@@ -2586,60 +3040,77 @@ void JobWindow::initialiseTomoAlignWindow()
 	guientries["do_motion"].cb_menu_i();
 
 	tab3->end();
-	tab4->begin();
-	tab4->label("Deformations");
-	resetHeight();
-
-	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group4->end();
-	place("do_deform", TOGGLE_DEACTIVATE, group4);
-
-	current_y += STEPY /2 ;
-
-	group4->begin();
-
-	place("def_w", TOGGLE_DEACTIVATE);
-	place("def_h", TOGGLE_DEACTIVATE);
-	place("def_model", TOGGLE_DEACTIVATE);
-	place("lambda", TOGGLE_DEACTIVATE);
-
-	current_y += STEPY /2 ;
-
-	place("do_frame_def", TOGGLE_DEACTIVATE);
-
-	group4->end();
-	guientries["do_deform"].cb_menu_i();
-	tab4->end();
 }
 
 void JobWindow::initialiseTomoReconParWindow()
 {
-	setupTabs(2);
+	setupTabs(3);
 
-	placeTomoInput(true, true, true, false, false, false);
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
+
+    placeTomoInput(true, true, true, false);
+
+    tab1->end();
 
 	tab2->begin();
 	tab2->label("Average");
 	resetHeight();
 
-	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group1->end();
-	place("do_from2d", TOGGLE_DEACTIVATE, group1);
-
-	group1->begin();
+    place("binning", TOGGLE_DEACTIVATE);
 	place("box_size", TOGGLE_DEACTIVATE);
 	place("crop_size", TOGGLE_DEACTIVATE);
-	place("binning", TOGGLE_DEACTIVATE);
-	place("snr", TOGGLE_DEACTIVATE);
-	place("fn_mask", TOGGLE_DEACTIVATE);
 
-	group1->end();
-	guientries["do_from2d"].cb_menu_i();
+	current_y += STEPY /2 ;
+
+	place("snr", TOGGLE_DEACTIVATE);
 
 	current_y += STEPY /2 ;
 
 	place("sym_name", TOGGLE_DEACTIVATE);
 
 	tab2->end();
+
+    tab3->begin();
+	tab3->label("Helix");
+	resetHeight();
+
+    group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group1->end();
+    place("do_helix", TOGGLE_DEACTIVATE, group1);
+
+    current_y += STEPY /2 ;
+
+    group1->begin();
+
+    place("helical_nr_asu");
+    place("helical_twist");
+    place("helical_rise");
+    place("helical_tube_outer_diameter");
+    place("helical_z_percentage");
+
+    group1->end();
+    guientries["do_helix"].cb_menu_i();
+
+    tab3->end();
+
+
 }
 
+void JobWindow::initialiseTomoExcludeTiltImagesWindow()
+{
+    setupTabs(1);
+
+    tab1->begin();
+    tab1->label("I/O");
+    resetHeight();
+
+    place("in_tiltseries", TOGGLE_DEACTIVATE);
+
+    // Add a little spacer
+    current_y += STEPY/2;
+
+    place("cache_size", TOGGLE_DEACTIVATE);
+    tab1->end();
+}

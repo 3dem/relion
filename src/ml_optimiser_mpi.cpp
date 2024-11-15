@@ -20,15 +20,21 @@
 #include "src/ml_optimiser_mpi.h"
 #include "src/ml_optimiser.h"
 #ifdef _CUDA_ENABLED
-#include "src/acc/cuda/cuda_ml_optimiser.h"
-#endif
-#ifdef ALTCPU
+	#include "src/acc/cuda/cuda_ml_optimiser.h"
+#elif _HIP_ENABLED
+	#include "src/acc/hip/hip_ml_optimiser.h"
+#elif _SYCL_ENABLED
+    #include <vector>
+	#include <cstring>
+	#include <tuple>
+    #include <algorithm>
+    #include "src/acc/sycl/sycl_ml_optimiser.h"
+#elif ALTCPU
 	#include <tbb/tbb.h>
 	#include "src/acc/cpu/cpu_ml_optimiser.h"
 #endif
 #include <stdio.h>
 #include <stdlib.h>
-
 
 //#define PRINT_GPU_MEM_INFO
 //#define DEBUG
@@ -106,7 +112,7 @@ void MlOptimiserMpi::initialise()
 	}
 
 	grad_pseudo_halfsets = gradient_refine && !do_split_random_halves;
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
     /************************************************************************/
 	//Setup GPU related resources
 	int devCount, deviceAffinity;
@@ -129,24 +135,28 @@ void MlOptimiserMpi::initialise()
 		// ------------------------------ FIGURE OUT GLOBAL DEVICE MAP------------------------------------------
 		if (!node->isLeader())
 		{
-			cudaDeviceProp deviceProp;
+			accGPUDeviceProp deviceProp;
 			int compatibleDevices(0);
 			// Send device count seen by this follower
-			HANDLE_ERROR(cudaGetDeviceCount(&devCount));
+			HANDLE_ERROR(accGPUGetDeviceCount(&devCount));
 			for(int i=0; i<devCount; i++ )
 			{
-				HANDLE_ERROR(cudaGetDeviceProperties(&deviceProp, i));
+				HANDLE_ERROR(accGPUGetDeviceProperties(&deviceProp, i));
+			#ifdef _CUDA_ENABLED
 				if(deviceProp.major>CUDA_CC_MAJOR)
 					compatibleDevices+=1;
 				else if(deviceProp.major==CUDA_CC_MAJOR && deviceProp.minor>=CUDA_CC_MINOR)
 					compatibleDevices+=1;
+			#elif _HIP_ENABLED
+				compatibleDevices+=1;
+			#endif
 				//else
 				//std::cout << "Rank " << node->rank  << " found a " << deviceProp.name << " GPU with compute-capability " << deviceProp.major << "." << deviceProp.minor << std::endl;
 			}
 			if(compatibleDevices==0)
-				REPORT_ERROR("You have no GPUs compatible with RELION (CUDA-capable and compute-capability >= 3.5");
+				REPORT_ERROR("You have no GPUs compatible with RELION (CUDA/HIP-capable with supported GPU targets");
 			else if(compatibleDevices!=devCount)
-				std::cerr << "WARNING : at least one of your GPUs is not compatible with RELION (CUDA-capable and compute-capability >= 3.5)" << std::endl;
+				std::cerr << "WARNING : at least one of your GPUs is not compatible with RELION (CUDA/HIP-capable with supported GPU targets)" << std::endl;
 
 
 			node->relion_MPI_Send(&devCount, 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
@@ -294,18 +304,18 @@ void MlOptimiserMpi::initialise()
 				//Only make a new bundle of not existing on device
 				int bundleId(-1);
 
-				for (int j = 0; j < cudaDevices.size(); j++)
-					if (cudaDevices[j] == deviceAffinity)
+				for (int j = 0; j < gpuDevices.size(); j++)
+					if (gpuDevices[j] == deviceAffinity)
 						bundleId = j;
 
 				if (bundleId == -1)
 				{
-					bundleId = cudaDevices.size();
-					cudaDevices.push_back(deviceAffinity);
-					cudaDeviceShares.push_back(1);
+					bundleId = gpuDevices.size();
+					gpuDevices.push_back(deviceAffinity);
+					gpuDeviceShares.push_back(1);
 				}
-				HANDLE_ERROR(cudaSetDevice(deviceAffinity));
-				cudaOptimiserDeviceMap.push_back(bundleId);
+				HANDLE_ERROR(accGPUSetDevice(deviceAffinity));
+				gpuOptimiserDeviceMap.push_back(bundleId);
 			}
 		}
 
@@ -315,7 +325,7 @@ void MlOptimiserMpi::initialise()
 
         if (! node->isLeader())
         {
-            int devCount = cudaDevices.size();
+            int devCount = gpuDevices.size();
             node->relion_MPI_Send(&devCount, 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
 
             for (int i = 0; i < devCount; i++)
@@ -326,7 +336,7 @@ void MlOptimiserMpi::initialise()
 				std::string didS(buffer, len);
 				std::stringstream didSs;
 
-				didSs << "Device " << cudaDevices[i] << " on " << didS;
+				didSs << "Device " << gpuDevices[i] << " on " << didS;
 				didS = didSs.str();
 
 //				std::cout << "SENDING: " << didS << std::endl;
@@ -337,7 +347,7 @@ void MlOptimiserMpi::initialise()
 
             for (int i = 0; i < devCount; i++)
 			{
-	        	node->relion_MPI_Recv(&cudaDeviceShares[i], 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD, status);
+	        	node->relion_MPI_Recv(&gpuDeviceShares[i], 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD, status);
 //	        	std::cout << "Received: " << bundle->rank_shared_count << std::endl;
             }
 		}
@@ -414,11 +424,11 @@ void MlOptimiserMpi::initialise()
 			if (!node->isLeader())
 			{
 				unsigned long long boxLim (10000);
-				for (int i = 0; i < cudaDevices.size(); i ++)
+				for (int i = 0; i < gpuDevices.size(); i ++)
 				{
 					MlDeviceBundle b(this);
-					b.setDevice(cudaDevices[i]);
-					unsigned long long t = b.checkFixedSizedObjects(cudaDeviceShares[i]);
+					b.setDevice(gpuDevices[i]);
+					unsigned long long t = b.checkFixedSizedObjects(gpuDeviceShares[i]);
 					boxLim = ((t < boxLim) ? t : boxLim );
 				}
 				node->relion_MPI_Send(&boxLim, 1, MPI_UNSIGNED_LONG_LONG, 0, MPITAG_INT, MPI_COMM_WORLD);
@@ -433,7 +443,7 @@ void MlOptimiserMpi::initialise()
 				}
 
 				Experiment temp;
-				temp.read(fn_data);
+				temp.read(fn_data, fn_tomo, fn_motion, true, true);
 
 				int t_ori_size = temp.getOpticsImageSize(0);
 				//temp.MDopt.getValue(EMDL_IMAGE_SIZE, t_ori_size, 0);
@@ -466,7 +476,251 @@ will still yield good performance and possibly a more stable execution. \n" << s
 		mymodel.do_gpu = do_gpu;
 	}
 	/************************************************************************/
-#endif // CUDA
+#endif // _CUDA_ENABLED or _HIP_ENABLED
+#ifdef _SYCL_ENABLED
+	/************************************************************************/
+	//Setup SYCL
+	/************************************************************************/
+	if (do_sycl)
+	{
+		if (node->isLeader())
+		{
+			if (! std::isdigit(*gpu_ids.begin()))
+			{
+				std::cout << std::string(80, '*') << std::endl;
+				std::cout << "GPU-ids not specified and MPI/threads will automatically be mapped to available devices."<< std::endl;
+			}
+
+			std::vector<std::vector<std::string>> allThreadIDs;
+			untangleDeviceIDs(gpu_ids, allThreadIDs);
+			if( allThreadIDs.size()>0 && allThreadIDs.size()<(node->size-1) ) // if one or more devices are specified, but not for all ranks, extend selection to all ranks by modulus
+			{
+				const int N = allThreadIDs.size();
+				allThreadIDs.resize(node->size-1);
+				for (int rank = 1; rank<(node->size-1); rank++)
+					allThreadIDs[rank] = allThreadIDs[rank%N];
+			}
+
+			MPI_Status status;
+			int nHead, cSize, nodeSize, devCount;
+			std::cout << std::string(80, '*') << std::endl;
+			for (int follower = 1; follower < node->size; follower++)
+			{
+				if (allThreadIDs[follower-1].size() == 0)
+				{
+					std::cout << std::string(80, '*') << std::endl;
+					std::cout << "GPU-ids not specified for this rank, threads will automatically be mapped to available devices."<< std::endl;
+				}
+
+				MPI_Probe(follower, MPITAG_IDENTIFIER, MPI_COMM_WORLD, &status);
+				MPI_Get_count(&status, MPI_CHAR, &cSize);
+				char *hName = (char*)malloc((cSize+1) * sizeof(char));
+				MPI_Recv(hName, cSize, MPI_CHAR, follower, MPITAG_IDENTIFIER, MPI_COMM_WORLD, &status);
+				hName[cSize] = '\0';
+
+				MPI_Recv(&nHead, 1, MPI_INT, follower, MPITAG_INT+100, MPI_COMM_WORLD, &status);
+				if (nHead == 1)
+				{
+					MPI_Recv(&nodeSize, 1, MPI_INT, follower, MPITAG_INT+200, MPI_COMM_WORLD, &status);
+					std::cout << "Host " << hName << " has " << nodeSize << " rank(s).\n";
+				}
+
+				if(allThreadIDs[follower-1].size() != nr_threads)
+				{
+					std::cout << " Follower " << follower << " @ " << hName << " will distribute threads over devices: ";
+					for (int j = 0; j < allThreadIDs[follower-1].size(); j++)
+						std::cout << " "  << allThreadIDs[follower-1][j];
+					std::cout  << std::endl;
+				}
+				else
+				{
+					std::cout << " Follower " << follower << " @ " << hName << " will use explicit mapping to assign devices: ";
+					for (int j = 0; j < allThreadIDs[follower-1].size(); j++)
+						std::cout << " "  << allThreadIDs[follower-1][j];
+					std::cout  << std::endl;
+				}
+
+				MPI_Recv(&devCount, 1, MPI_INT, follower, MPITAG_INT+300, MPI_COMM_WORLD, &status);
+				for (int k = 0; k < devCount; k++)
+				{
+					int devIndex;
+					MPI_Recv(&devIndex, 1, MPI_INT, follower, MPITAG_INT+400, MPI_COMM_WORLD, &status);
+					int nSplit;
+					MPI_Recv(&nSplit, 1, MPI_INT, follower, MPITAG_INT+500, MPI_COMM_WORLD, &status);
+					std::cout << "  Device " << devIndex << " on follower " << follower << " is split between " << nSplit << " thread(s).\n";
+				}
+				for (int j = 0; j < nr_threads; j++)
+				{
+					MPI_Probe(follower, MPITAG_IDENTIFIER+100, MPI_COMM_WORLD, &status);
+					MPI_Get_count(&status, MPI_CHAR, &cSize);
+					char *dName = (char*)malloc((cSize+1) * sizeof(char));
+					MPI_Recv(dName, cSize, MPI_CHAR, follower, MPITAG_IDENTIFIER+100, MPI_COMM_WORLD, &status);
+					dName[cSize] = '\0';
+
+					std::cout << "   Thread " << j << " on follower " << follower << " mapped to device " << dName << std::endl;
+					free(dName);
+				}
+				free(hName);
+			}
+			std::cout << std::string(80, '*') << std::endl << std::flush;
+		}
+		else
+		{
+			char* pEnvSubSub = std::getenv("relionSyclUseSubSubDevice");
+			char* pEnvInOrderQueue = std::getenv("relionSyclUseInOrderQueue");
+			char* pEnvAsyncSubmission = std::getenv("relionSyclUseAsyncSubmission");
+
+			std::string strSubSub = (pEnvSubSub == nullptr) ? "0" : pEnvSubSub;
+			std::string strInOrderQueue = (pEnvInOrderQueue == nullptr) ? "0" : pEnvInOrderQueue;
+			std::string strAsyncSubmission = (pEnvAsyncSubmission == nullptr) ? "0" : pEnvAsyncSubmission;
+
+			std::transform(strSubSub.begin(), strSubSub.end(), strSubSub.begin(), [](unsigned char c){return static_cast<char>(std::tolower(c));});
+			std::transform(strInOrderQueue.begin(), strInOrderQueue.end(), strInOrderQueue.begin(), [](unsigned char c){return static_cast<char>(std::tolower(c));});
+			std::transform(strAsyncSubmission.begin(), strAsyncSubmission.end(), strAsyncSubmission.begin(), [](unsigned char c){return static_cast<char>(std::tolower(c));});
+
+			const bool isSubSub = (strSubSub == "1" || strSubSub == "on") ? true : false;
+			const bool isInOrderQueue = (strInOrderQueue == "1" || strInOrderQueue == "on") ? true : false;
+			const bool isAsyncSubmission = (strAsyncSubmission == "1" || strAsyncSubmission == "on") ? true : false;
+			const auto syclOpt = std::make_tuple(isSubSub, isInOrderQueue, isAsyncSubmission);
+
+			if (node->rank == 1)
+			{	// Only MPI rank 1 prints SYCL device information
+				if (do_sycl_levelzero)
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclOpt, syclBackendType::levelZero, true);
+				else if (do_sycl_cuda)
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclOpt, syclBackendType::CUDA, true);
+				else if (do_sycl_hip)
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclOpt, syclBackendType::HIP, true);
+				else if (do_sycl_opencl)
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclOpt, syclBackendType::openCL, true);
+				else
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::cpu, syclOpt, syclBackendType::openCL, true);
+			}
+			else
+			{
+				if (do_sycl_levelzero)
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclOpt, syclBackendType::levelZero, false);
+				else if (do_sycl_cuda)
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclOpt, syclBackendType::CUDA, false);
+				else if (do_sycl_hip)
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclOpt, syclBackendType::HIP, false);
+				else if (do_sycl_opencl)
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::gpu, syclOpt, syclBackendType::openCL, false);
+				else
+					syclDeviceList = MlOptimiserSYCL::getDevices(syclDeviceType::cpu, syclOpt, syclBackendType::openCL, false);
+			}
+
+			const int devCount = syclDeviceList.size();
+			if (devCount == 0)
+				REPORT_ERROR("You have no SYCL device available");
+
+			std::vector<std::vector<std::string>> allThreadIDs;
+			untangleDeviceIDs(gpu_ids, allThreadIDs);
+			if( allThreadIDs.size()>0 && allThreadIDs.size()<(node->size-1) ) // if one or more devices are specified, but not for all ranks, extend selection to all ranks by modulus
+			{
+				const int N = allThreadIDs.size();
+				allThreadIDs.resize(node->size-1);
+				for (int rank = 1; rank<(node->size-1); rank++)
+					allThreadIDs[rank] = allThreadIDs[rank%N];
+			}
+
+			bool fullAutomaticMapping;
+			bool semiAutomaticMapping;
+			if (allThreadIDs[node->rank-1].size()==0 || ! std::isdigit(*gpu_ids.begin()) )
+			{
+				fullAutomaticMapping = true;
+				semiAutomaticMapping = true;
+			}
+			else
+			{
+				fullAutomaticMapping=false;
+				if(allThreadIDs[node->rank-1].size() != nr_threads)
+					semiAutomaticMapping = true;
+				else
+					semiAutomaticMapping = false;
+			}
+
+			// MPI-3 standard support this MPI_COMM_TYPE_SHARED type
+			MPI_Comm nodeComm;
+			MPI_Comm_split_type(node->followerC, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL, &nodeComm);
+
+			int nodeRank, nodeSize;
+			MPI_Comm_rank(nodeComm, &nodeRank);
+			MPI_Comm_size(nodeComm, &nodeSize);
+
+			for (int i = 0; i < nr_threads; i ++)
+			{
+				int dev_id;
+				if (semiAutomaticMapping)
+				{
+					if (fullAutomaticMapping)
+					{
+#if 1
+						// Do not span multiple devices between threads for automatic mapping
+						dev_id = devCount * ((node->rank-1)%nodeSize) / nodeSize;
+#else
+						if (nodeSize > 1)
+							dev_id = (devCount*( ((node->rank-1)%nodeSize)*nr_threads + i )) / (nodeSize*nr_threads);
+						else
+							dev_id = devCount*i / nr_threads;
+#endif
+					}
+					else
+						dev_id = textToInteger(allThreadIDs[node->rank-1][i % (allThreadIDs[node->rank-1]).size()].c_str());
+				}
+				else
+					dev_id = textToInteger(allThreadIDs[node->rank-1][i].c_str());
+
+				if (dev_id < 0 || dev_id > devCount-1)
+					REPORT_ERROR("You have specified SYCL device number which is not available");
+
+				//Only make a new bundle of not existing on device
+				int bundleId(-1);
+
+				for (int j = 0; j < gpuDevices.size(); j++)
+					if (gpuDevices[j] == dev_id)
+						bundleId = j;
+
+				if (bundleId == -1)
+				{
+					bundleId = gpuDevices.size();
+					gpuDevices.push_back(dev_id);
+				}
+				gpuOptimiserDeviceMap.push_back(bundleId);
+			}
+
+			std::string hostName = node->getHostName();
+			MPI_Send(hostName.c_str(), hostName.size(), MPI_CHAR, 0, MPITAG_IDENTIFIER, MPI_COMM_WORLD);
+			if (nodeRank == 0)  // Print only once per node
+			{
+				const int nHead = 1;
+				MPI_Send(&nHead, 1, MPI_INT, 0, MPITAG_INT+100, MPI_COMM_WORLD);
+				MPI_Send(&nodeSize, 1, MPI_INT, 0, MPITAG_INT+200, MPI_COMM_WORLD);
+			}
+			else
+			{
+				const int nHead = 0;
+				MPI_Send(&nHead, 1, MPI_INT, 0, MPITAG_INT+100, MPI_COMM_WORLD);
+			}
+
+			const int usedDeviceCount = gpuDevices.size();
+			MPI_Send(&usedDeviceCount, 1, MPI_INT, 0, MPITAG_INT+300, MPI_COMM_WORLD);
+			for (int k = 0; k < usedDeviceCount; k++)
+			{
+				MPI_Send(&gpuDevices[k], 1, MPI_INT, 0, MPITAG_INT+400, MPI_COMM_WORLD);
+				const int nSplit = std::count(gpuOptimiserDeviceMap.cbegin(), gpuOptimiserDeviceMap.cend(), k);
+				MPI_Send(&nSplit, 1, MPI_INT, 0, MPITAG_INT+500, MPI_COMM_WORLD);
+			}
+
+			for (int j = 0; j < nr_threads; j++)
+			{
+				std::string devName = syclDeviceList[gpuDevices[gpuOptimiserDeviceMap[j]]]->getName();
+				MPI_Send(devName.c_str(), devName.size(), MPI_CHAR, 0, MPITAG_IDENTIFIER+100, MPI_COMM_WORLD);
+			}
+		}
+		node->barrierWait();
+	}
+#endif	// End of SYCL
 
 	// Split the data into two random halves
 	if (do_split_random_halves)
@@ -491,25 +745,28 @@ will still yield good performance and possibly a more stable execution. \n" << s
 
 	initialiseWorkLoad();
 
-	// Only the first follower calculates the sigma2_noise spectra and sets initial guesses for Iref
-	if (node->rank == 1)
-	{
-		MlOptimiser::initialiseSigma2Noise();
-		MlOptimiser::initialiseReferences();
-    }
+	// Only the first follower calculates the sigma2_noise spectra (and if fn_ref == None, later sets initial guesses for Iref)
+	if (node->rank == 1) MlOptimiser::initialiseSigma2Noise();
 
-	//Now the first follower broadcasts resulting Iref and sigma2_noise to everyone else
+        MlOptimiser::initialiseReferences();
+
+	// Now the first follower broadcasts resulting sigma2_noise to everyone else
 	for (int i = 0; i < mymodel.sigma2_noise.size(); i++)
 	{
 		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.sigma2_noise[i]),
 							   MULTIDIM_SIZE(mymodel.sigma2_noise[i]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
 	}
-	for (int i = 0; i < mymodel.Iref.size(); i++)
-	{
-		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Iref[i]),
-							   MULTIDIM_SIZE(mymodel.Iref[i]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
-	}
 
+	// Also broadcast Iref if that was set in initialiseSigma2Noise
+        if (fn_ref == "None")
+        {
+            for (int i = 0; i < mymodel.Iref.size(); i++)
+            {
+		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Iref[i]),
+                                       MULTIDIM_SIZE(mymodel.Iref[i]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
+            }
+        }
+        
 	// Initialise the data_versus_prior ratio to get the initial current_size right
 	if (iter == 0 && !do_initialise_bodies && !node->isLeader())
 		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
@@ -546,6 +803,12 @@ void MlOptimiserMpi::initialiseWorkLoad()
 	// Get the same random number generator seed for all mpi nodes
 	if (random_seed == -1)
 	{
+#ifdef USE_MPI_COLLECTIVE
+		if (node->isLeader())
+			random_seed = time(NULL);
+
+		node->relion_MPI_Bcast(&random_seed, 1, MPI_INT, 0, MPI_COMM_WORLD);
+#else
 		if (node->isLeader())
 		{
 			random_seed = time(NULL);
@@ -557,6 +820,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
 			MPI_Status status;
 			node->relion_MPI_Recv(&random_seed, 1, MPI_INT, 0, MPITAG_RANDOMSEED, MPI_COMM_WORLD, status);
 		}
+#endif
 	}
 
 	// Also randomize random-number-generator for perturbations on the angles
@@ -569,34 +833,42 @@ void MlOptimiserMpi::initialiseWorkLoad()
 	}
 
 	// Set the number of particles per group, but only Leader has full data.star in memory!
-        // Pre-relion-4-onesigma-branch, mymodel.nr_particles_per_group was set in initial noise estimation, but this is no longer the case...
-        if (do_split_random_halves)
-        {
-            // First do half-set 1
-            if (node->isLeader()) mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group, 1);
-            for (int follower = 1; follower < node->size; follower+=2)
-            {
-                MPI_Status status;
-                if (node->isLeader()) node->relion_MPI_Send(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, follower, MPITAG_METADATA, MPI_COMM_WORLD);
-                else if (node->rank == follower) node->relion_MPI_Recv(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
-            }
+	// Pre-relion-4-onesigma-branch, mymodel.nr_particles_per_group was set in initial noise estimation, but this is no longer the case...
+	if (do_split_random_halves)
+	{
+		// First do half-set 1
+		if (node->isLeader()) mydata.getNumberOfParticlesPerGroup(mymodel.nr_particles_per_group, 1);
+#ifdef USE_MPI_COLLECTIVE
+		if (node->myRandomSubset() != 2)
+			node->relion_MPI_Bcast(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, node->root_oddC);
+#else
+		for (int follower = 1; follower < node->size; follower+=2)
+		{
+			MPI_Status status;
+			if (node->isLeader()) node->relion_MPI_Send(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, follower, MPITAG_METADATA, MPI_COMM_WORLD);
+			else if (node->rank == follower) node->relion_MPI_Recv(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
+		}
+#endif
 
-
-            // Then do half-set 2
-            if (node->isLeader()) mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group, 2);
-            for (int follower = 2; follower < node->size; follower+=2)
-            {
-                MPI_Status status;
-                if (node->isLeader()) node->relion_MPI_Send(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, follower, MPITAG_METADATA, MPI_COMM_WORLD);
-                else if (node->rank == follower) node->relion_MPI_Recv(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
-            }
-
-        }
-        else
-        {
-            if (node->isLeader()) mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
-            node->relion_MPI_Bcast(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPI_COMM_WORLD);
-        }
+		// Then do half-set 2
+		if (node->isLeader()) mydata.getNumberOfParticlesPerGroup(mymodel.nr_particles_per_group, 2);
+#ifdef USE_MPI_COLLECTIVE
+		if (node->myRandomSubset() != 1)
+			node->relion_MPI_Bcast(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, node->root_evenC);
+#else
+		for (int follower = 2; follower < node->size; follower+=2)
+		{
+			MPI_Status status;
+			if (node->isLeader()) node->relion_MPI_Send(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, follower, MPITAG_METADATA, MPI_COMM_WORLD);
+			else if (node->rank == follower) node->relion_MPI_Recv(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
+		}
+#endif
+	}
+	else
+	{
+		if (node->isLeader()) mydata.getNumberOfParticlesPerGroup(mymodel.nr_particles_per_group);
+		node->relion_MPI_Bcast(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPI_COMM_WORLD);
+	}
 
 	if (node->isLeader())
 	{
@@ -725,7 +997,7 @@ void MlOptimiserMpi::expectation()
 	MultidimArray<long int> first_last_nr_images(6);
 	int first_follower = 1;
 	// Use maximum of 100 particles for 3D and 10 particles for 2D estimations
-	int n_trials_acc = (mymodel.ref_dim==3 && mymodel.data_dim != 3) ? 100 : 10;
+	int n_trials_acc = (mymodel.ref_dim==3 && (mymodel.data_dim != 3|| mydata.is_tomo) ) ? 100 : 10;
 	n_trials_acc = XMIPP_MIN(n_trials_acc, mydata.numberOfParticles());
 	MPI_Status status;
 
@@ -869,10 +1141,6 @@ void MlOptimiserMpi::expectation()
 		int myverb = (node->rank == first_follower) ? 1 : 0;
 		MlOptimiser::expectationSetupCheckMemory(myverb);
 
-		// F. Precalculate AB-matrices for on-the-fly shifts
-		// Use tabulated sine and cosine values instead for 2D helical segments / 3D helical sub-tomogram averaging with on-the-fly shifts
-		if ( (do_shifts_onthefly) && (!((do_helical_refine) && (!ignore_helical_symmetry)))  && !(do_grad && iter > 1))
-			precalculateABMatrices();
 	}
 	// Follower 1 sends has_converged to everyone else (in particular the leader needs it!)
 	node->relion_MPI_Bcast(&has_converged, 1, MPI_INT, first_follower, MPI_COMM_WORLD);
@@ -885,7 +1153,6 @@ void MlOptimiserMpi::expectation()
 
 	// Wait until expected angular errors have been calculated
 	MPI_Barrier(MPI_COMM_WORLD);
-	sleep(1);
 #ifdef TIMING
 	timer.toc(TIMING_EXP_4a);
 #endif
@@ -898,7 +1165,7 @@ void MlOptimiserMpi::expectation()
 #define JOB_LEN_FN_RECIMG  (first_last_nr_images(5))
 #define JOB_NPAR  (JOB_LAST - JOB_FIRST + 1)
 
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 	/************************************************************************/
 	//GPU memory setup
 
@@ -907,13 +1174,13 @@ void MlOptimiserMpi::expectation()
 
 	if (do_gpu && ! node->isLeader())
 	{
-		for (int i = 0; i < cudaDevices.size(); i ++)
+		for (int i = 0; i < gpuDevices.size(); i ++)
 		{
 #ifdef TIMING
 		timer.tic(TIMING_EXP_4b);
 #endif
 			MlDeviceBundle *b = new MlDeviceBundle(this);
-			b->setDevice(cudaDevices[i]);
+			b->setDevice(gpuDevices[i]);
 			b->setupFixedSizedObjects();
 			accDataBundles.push_back((void*)b);
 #ifdef TIMING
@@ -923,19 +1190,19 @@ void MlOptimiserMpi::expectation()
 
 		std::vector<unsigned> threadcountOnDevice(accDataBundles.size(),0);
 
-		for (int i = 0; i < cudaOptimiserDeviceMap.size(); i ++)
+		for (int i = 0; i < gpuOptimiserDeviceMap.size(); i ++)
 		{
 			std::stringstream didSs;
 			didSs << "RRr" << node->rank << "t" << i;
-			MlOptimiserCuda *b = new MlOptimiserCuda(this, (MlDeviceBundle*) accDataBundles[cudaOptimiserDeviceMap[i]],didSs.str().c_str());
+			MlOptimiserAccGPU *b = new MlOptimiserAccGPU(this, (MlDeviceBundle*) accDataBundles[gpuOptimiserDeviceMap[i]],didSs.str().c_str());
 			b->resetData();
-			cudaOptimisers.push_back((void*)b);
-			threadcountOnDevice[cudaOptimiserDeviceMap[i]] ++;
+			gpuOptimisers.push_back((void*)b);
+			threadcountOnDevice[gpuOptimiserDeviceMap[i]] ++;
 		}
 
 		int devCount;
-		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
-		HANDLE_ERROR(cudaDeviceSynchronize());
+		HANDLE_ERROR(accGPUGetDeviceCount(&devCount));
+		HANDLE_ERROR(accGPUDeviceSynchronize());
 
 		for (int i = 0; i < accDataBundles.size(); i ++)
 		{
@@ -945,21 +1212,37 @@ void MlOptimiserMpi::expectation()
 				CRITICAL(ERR_GPUID);
 			}
 			else
-				HANDLE_ERROR(cudaSetDevice(((MlDeviceBundle*)accDataBundles[i])->device_id));
+				HANDLE_ERROR(accGPUSetDevice(((MlDeviceBundle*)accDataBundles[i])->device_id));
 
 			size_t free, total, allocationSize;
-			HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
+			HANDLE_ERROR(accGPUMemGetInfo( &free, &total ));
 
-			free = (float) free / (float)cudaDeviceShares[i];
+			free = (float) free / (float)gpuDeviceShares[i];
 			size_t required_free = requested_free_gpu_memory + GPU_THREAD_MEMORY_OVERHEAD_MB*1000*1000*threadcountOnDevice[i];
 
 			if (free < required_free)
 			{
 				printf("WARNING: Ignoring required free GPU memory amount of %zu MB, due to space insufficiency.\n", required_free/1000000);
-				allocationSize = (double)free *0.7;
+				#ifdef _CUDA_ENABLED
+					allocationSize = (double)free *0.7;
+				#elif defined _HIP_ENABLED
+					allocationSize = (double)free *0.7;
+				#endif
 			}
 			else
-				allocationSize = free - required_free;
+			{
+				#ifdef _CUDA_ENABLED	
+					allocationSize = free - required_free;
+				#elif defined _HIP_ENABLED
+					allocationSize = free - required_free;
+					// allocationSize = (double)free *0.5;
+					// #ifdef DEBUG_HIP
+					// 	printf("WARNING: due to 296623 ticket, use 50%% of free GPU memory as allocationSize %zu MB.\n", allocationSize/1000000);
+					// #else
+					// 	printf("WARNING: Using 50%% of free GPU memory as allocationSize %zu MB.\n", allocationSize/1000000);
+					// #endif
+				#endif
+			}
 
 			if (allocationSize < 200000000)
 				printf("WARNING: The available space on the GPU after initialization (%zu MB) might be insufficient for the expectation step.\n", allocationSize/1000000);
@@ -979,11 +1262,33 @@ void MlOptimiserMpi::expectation()
 		for (int i = 0; i < accDataBundles.size(); i ++)
 			((MlDeviceBundle*)accDataBundles[i])->setupTunableSizedObjects(allocationSizes[i]);
 	}
-#endif // CUDA
+#endif // _CUDA_ENABLED or _HIP_ENABLED
+#ifdef _SYCL_ENABLED
+	if (do_sycl && ! node->isLeader())
+	{
+		char* pEnvStream = std::getenv("relionSyclUseStream");
+		std::string strStream = (pEnvStream == nullptr) ? "0" : pEnvStream;
+		std::transform(strStream.begin(), strStream.end(), strStream.begin(), [](unsigned char c){return static_cast<char>(std::tolower(c));});
+		const bool isStream = (strStream == "1" || strStream == "on") ? true : false;
+
+		for (int i = 0; i < gpuDevices.size(); i++)
+		{
+			accDataBundles.push_back((void*)(new MlSyclDataBundle(syclDeviceList[gpuDevices[i]])));
+			((MlSyclDataBundle*)accDataBundles[i])->setup(this);
+		}
+
+		for (int i = 0; i < gpuOptimiserDeviceMap.size(); i++)
+		{
+			MlOptimiserSYCL *b = new MlOptimiserSYCL(this, (MlSyclDataBundle*)accDataBundles[gpuOptimiserDeviceMap[i]], isStream, "sycl_optimiser");
+			b->resetData();
+			b->threadID = i;
+			gpuOptimisers.push_back((void*)b);
+		}
+	}
+#endif
 #ifdef ALTCPU
 	/************************************************************************/
 	//CPU memory setup
-	MPI_Barrier(MPI_COMM_WORLD);   // Is this really necessary?
 	if (do_cpu  && ! node->isLeader())
 	{
 		unsigned nr_classes = mymodel.PPref.size();
@@ -1218,7 +1523,7 @@ void MlOptimiserMpi::expectation()
 					else
 					{
 						// new in 3.1: first send the image_size of these particles (as no longer necessarily the same as mymodel.ori_size...)
-						int my_image_size = mydata.getOpticsImageSize(mydata.getOpticsGroup(JOB_FIRST, 0));
+						int my_image_size = mydata.getOpticsImageSize(mydata.getOpticsGroup(JOB_FIRST));
 						node->relion_MPI_Send(&my_image_size, 1, MPI_INT, this_follower, MPITAG_IMAGE_SIZE, MPI_COMM_WORLD);
 
 						// Send imagedata to the followers
@@ -1390,7 +1695,7 @@ void MlOptimiserMpi::expectation()
 			}
 //		TODO: define MPI_COMM_SLAVES!!!!	MPI_Barrier(node->MPI_COMM_SLAVES);
 
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 			if (do_gpu)
 			{
 				for (int i = 0; i < accDataBundles.size(); i ++)
@@ -1436,10 +1741,10 @@ void MlOptimiserMpi::expectation()
 #ifdef TIMING
 		timer.tic(TIMING_EXP_8);
 #endif
-				for (int i = 0; i < cudaOptimisers.size(); i ++)
-					delete (MlOptimiserCuda*) cudaOptimisers[i];
+				for (int i = 0; i < gpuOptimisers.size(); i ++)
+					delete (MlOptimiserAccGPU*) gpuOptimisers[i];
 
-				cudaOptimisers.clear();
+				gpuOptimisers.clear();
 
 
 				for (int i = 0; i < accDataBundles.size(); i ++)
@@ -1448,7 +1753,7 @@ void MlOptimiserMpi::expectation()
 					((MlDeviceBundle*)accDataBundles[i])->allocator->syncReadyEvents();
 					((MlDeviceBundle*)accDataBundles[i])->allocator->freeReadyAllocs();
 
-#ifdef DEBUG_CUDA
+#if defined DEBUG_CUDA || defined DEBUG_HIP
 					if (((MlDeviceBundle*) accDataBundles[i])->allocator->getNumberOfAllocs() != 0)
 					{
 						printf("DEBUG_ERROR: Non-zero allocation count encountered in custom allocator between iterations.\n");
@@ -1467,7 +1772,58 @@ void MlOptimiserMpi::expectation()
 		timer.toc(TIMING_EXP_8);
 #endif
 			}
-#endif // CUDA
+#endif // DEBUG_CUDA or DEBUG_HIP
+#ifdef _SYCL_ENABLED
+			/************************************************************************/
+			if (do_sycl)
+			{
+				for (int i = 0; i < accDataBundles.size(); i++)
+				{
+					MlSyclDataBundle *b = (MlSyclDataBundle*)accDataBundles[i];
+					b->syncAllBackprojects();
+
+					for (int j = 0; j < b->projectors.size(); j++)
+						b->projectors[j].clear();
+
+					for (int j = 0; j < b->backprojectors.size(); j++)
+					{
+						unsigned long s = wsum_model.BPref[j].data.nzyxdim;
+						deviceStream_t stream = b->backprojectors[j].stream;
+						XFLOAT *reals = (XFLOAT*)(stream->syclMalloc(s * sizeof(XFLOAT), syclMallocType::host));
+						XFLOAT *imags = (XFLOAT*)(stream->syclMalloc(s * sizeof(XFLOAT), syclMallocType::host));
+						XFLOAT *weights = (XFLOAT*)(stream->syclMalloc(s * sizeof(XFLOAT), syclMallocType::host));
+
+						b->backprojectors[j].getMdlData(reals, imags, weights);
+
+						for (unsigned long n = 0; n < s; n++)
+						{
+							wsum_model.BPref[j].data.data[n].real += (RFLOAT) reals[n];
+							wsum_model.BPref[j].data.data[n].imag += (RFLOAT) imags[n];
+							wsum_model.BPref[j].weight.data[n] += (RFLOAT) weights[n];
+						}
+
+						stream->syclFree(reals);
+						stream->syclFree(imags);
+						stream->syclFree(weights);
+
+						b->backprojectors[j].clear();
+					}
+
+					for (int j = 0; j < b->coarseProjectionPlans.size(); j++)
+						b->coarseProjectionPlans[j].clear();
+				}
+
+				for (int i = 0; i < gpuOptimisers.size(); i++)
+					delete (MlOptimiserSYCL*)gpuOptimisers[i];
+
+				gpuOptimisers.clear();
+
+				for (int i = 0; i < accDataBundles.size(); i++)
+					delete (MlSyclDataBundle*)accDataBundles[i];
+
+				accDataBundles.clear();
+			}
+#endif
 #ifdef ALTCPU
 			if (do_cpu)
 			{
@@ -1689,6 +2045,25 @@ void MlOptimiserMpi::combineAllWeightedSums()
 	// Only combine weighted sums if there are more than one followers per subset!
 	if ((node->size - 1)/nr_halfsets > 1)
 	{
+#ifdef USE_MPI_COLLECTIVE
+		if (!node->isLeader())
+		{
+			// First all followers pack up their wsum_model
+			wsum_model.pack(Mpack);
+			Msum.initZeros(Mpack);
+
+			if (do_split_random_halves)
+				node->relion_MPI_Allreduce(MULTIDIM_ARRAY(Mpack), MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Mpack), MY_MPI_DOUBLE, MPI_SUM, node->splitC);
+			else
+				node->relion_MPI_Allreduce(MULTIDIM_ARRAY(Mpack), MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Mpack), MY_MPI_DOUBLE, MPI_SUM, node->followerC);
+ #ifdef DEBUG
+			if (node->rank == 1) std::cerr << " MPI_Allreduce MULTIDIM_SIZE(Mpack)= "<< MULTIDIM_SIZE(Mpack) << std::endl;
+ #endif
+
+			Mpack.clear();
+			wsum_model.unpack(Msum);
+		}
+#else
 		// Loop over possibly multiple instances of Mpack of maximum size
 		int piece = 0;
 		int nr_pieces = 1;
@@ -1806,6 +2181,7 @@ void MlOptimiserMpi::combineAllWeightedSums()
 		} // end for piece
 
 		MPI_Barrier(MPI_COMM_WORLD);
+#endif
 	}
 
 #ifdef TIMING
@@ -1875,6 +2251,34 @@ void MlOptimiserMpi::combineWeightedSumsTwoRandomHalves()
 	MultidimArray<RFLOAT> Mpack, Msum;
 	MPI_Status status;
 
+#ifdef USE_MPI_COLLECTIVE
+	// The leader does not have a wsum_model!
+	if (!node->isLeader())
+	{
+		if (node->rank == 1)
+		{
+			if (verb > 0) std::cout << " Combining two random halves ..."<< std::endl;
+			wsum_model.pack(Mpack);
+			Msum.resize(wsum_model.getPackSize());
+			node->relion_MPI_Recv(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, 2, MPITAG_PACK, MPI_COMM_WORLD, status);
+			Mpack += Msum;
+			Msum.clear();
+		}
+		else if (node->rank == 2)
+		{
+			wsum_model.pack(Mpack);
+			node->relion_MPI_Send(MULTIDIM_ARRAY(Mpack), MULTIDIM_SIZE(Mpack), MY_MPI_DOUBLE, 1, MPITAG_PACK, MPI_COMM_WORLD);
+		}
+		else
+			Mpack.resize(wsum_model.getPackSize());
+
+		// rank one sends Mpack to everyone else
+		node->relion_MPI_Bcast(MULTIDIM_ARRAY(Mpack), MULTIDIM_SIZE(Mpack), MY_MPI_DOUBLE, 0, node->followerC);
+
+		// Everyone unpacks the new Mpack
+		wsum_model.unpack(Mpack);
+	}
+#else
 	int piece = 0;
 	int nr_pieces = 1;
 	long int pack_size;
@@ -1937,6 +2341,7 @@ void MlOptimiserMpi::combineWeightedSumsTwoRandomHalves()
 			Mpack.clear();
 		}
 	}
+#endif
 }
 
 void MlOptimiserMpi::maximization()
@@ -1961,7 +2366,12 @@ void MlOptimiserMpi::maximization()
 
 	if (verb > 0)
 	{
-		std::cout << " Maximization ..."<< std::endl;
+        if (do_blush && skip_spectral_trailing)
+            std::cout << " Maximization (using Blush regularization without spectral trailing)..." << std::endl;
+        else if (do_blush)
+            std::cout << " Maximization (with Blush regularization)..." << std::endl;
+        else
+            std::cout << " Maximization..." << std::endl;
 		init_progress_bar(mymodel.nr_classes);
 	}
 
@@ -2026,7 +2436,7 @@ void MlOptimiserMpi::maximization()
 								(do_join_random_halves || do_always_join_random_halves),
                                 do_correct_tau2_by_avgctf2);
 
-						if (do_external_reconstruct)
+						if (do_external_reconstruct || do_blush)
 						{
 							FileName fn_ext_root;
 							if (iter > -1) fn_ext_root.compose(fn_out+"_it", iter, "", 3);
@@ -2043,6 +2453,8 @@ void MlOptimiserMpi::maximization()
 									mymodel.pixel_size,
 									particle_diameter,
 									(do_join_random_halves || do_always_join_random_halves),
+									do_blush,
+									blush_args,
 									mymodel.tau2_fudge_factor,
 									node->rank==1); // only first followers is verbose
 						}
@@ -2093,7 +2505,7 @@ void MlOptimiserMpi::maximization()
 					}
 
 					// Apply local symmetry according to a list of masks and their operators
-					if ( (fn_local_symmetry_masks.size() >= 1) && (fn_local_symmetry_operators.size() >= 1) && (!has_converged) )
+					if ( (fn_local_symmetry_masks.size() != 0) && (fn_local_symmetry_operators.size() != 0) && (!has_converged) )
 						applyLocalSymmetry(mymodel.Iref[ith_recons], fn_local_symmetry_masks, fn_local_symmetry_operators);
 
 					// Shaoda Jul26,2015 - Helical symmetry local refinement
@@ -2164,7 +2576,7 @@ void MlOptimiserMpi::maximization()
 									(do_join_random_halves || do_always_join_random_halves),
                                     do_correct_tau2_by_avgctf2);
 
-							if (do_external_reconstruct)
+							if (do_external_reconstruct || do_blush)
 							{
 								FileName fn_ext_root;
 								if (iter > -1) fn_ext_root.compose(fn_out+"_it", iter, "", 3);
@@ -2181,6 +2593,8 @@ void MlOptimiserMpi::maximization()
 										mymodel.pixel_size,
 										particle_diameter,
 										(do_join_random_halves || do_always_join_random_halves),
+										do_blush,
+										blush_args,
 										mymodel.tau2_fudge_factor);
 							}
 							else
@@ -2225,7 +2639,7 @@ void MlOptimiserMpi::maximization()
 							}
 
 							// Apply local symmetry according to a list of masks and their operators
-							if ( (fn_local_symmetry_masks.size() >= 1) && (fn_local_symmetry_operators.size() >= 1) && (!has_converged) )
+							if ( (fn_local_symmetry_masks.size() != 0) && (fn_local_symmetry_operators.size() != 0) && (!has_converged) )
 								applyLocalSymmetry(mymodel.Iref[ith_recons], fn_local_symmetry_masks, fn_local_symmetry_operators);
 
 							// Shaoda Jul26,2015 - Helical symmetry local refinement
@@ -2261,9 +2675,11 @@ void MlOptimiserMpi::maximization()
 										mymodel.helical_twist[ith_recons],
 										width_mask_edge);
 							}
-							helical_rise_half2 = mymodel.helical_rise[ith_recons];
-							helical_twist_half2 = mymodel.helical_twist[ith_recons];
 						} // end if !do_join_random_halves
+
+                        // Rank 2 still updates the estimated twist and rise
+                        helical_rise_half2 = mymodel.helical_rise[ith_recons];
+                        helical_twist_half2 = mymodel.helical_twist[ith_recons];
 
 						// But rank 2 always does the unfiltered reconstruction
 						if (do_auto_refine && has_converged)
@@ -2313,6 +2729,27 @@ void MlOptimiserMpi::maximization()
 			{
 				if (!do_join_random_halves)
 				{
+#ifdef USE_MPI_COLLECTIVE
+					if (!node->isLeader())
+					{
+						// first pass halfset1, second pass halfset2
+						int reconstruct_rank = 2 * (ith_recons % ((node->size-1)/2)) + node->myRandomSubset();
+
+						// This is MPI rank in splitC communicator(split random halves run)
+						int split_rank = node->getSplitRank(reconstruct_rank);
+
+						node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]), MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, split_rank, node->splitC);
+						if (do_grad)
+						{
+							node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Igrad1[ith_recons]), MULTIDIM_SIZE(mymodel.Igrad1[ith_recons]), MY_MPI_DOUBLE, split_rank, node->splitC);
+							node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Igrad2[ith_recons]), MULTIDIM_SIZE(mymodel.Igrad2[ith_recons]), MY_MPI_DOUBLE, split_rank, node->splitC);
+						}
+						node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[ith_recons]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[ith_recons]), MY_MPI_DOUBLE, split_rank, node->splitC);
+						node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.fourier_coverage_class[ith_recons]), MULTIDIM_SIZE(mymodel.fourier_coverage_class[ith_recons]), MY_MPI_DOUBLE, split_rank, node->splitC);
+						node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.sigma2_class[ith_recons]), MULTIDIM_SIZE(mymodel.sigma2_class[ith_recons]), MY_MPI_DOUBLE, split_rank, node->splitC);
+//						node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.fsc_halves_class[ibody]), MULTIDIM_SIZE(mymodel.fsc_halves_class[ibody]), MY_MPI_DOUBLE, split_rank, node->splitC);
+					}
+#else
 					MPI_Status status;
 					// Make sure I am sending from the rank where the reconstruction was done (see above) to all other followers of this subset
 					// Loop twice through this, as each class was reconstructed by two different followers!!
@@ -2371,6 +2808,7 @@ void MlOptimiserMpi::maximization()
 							}
 						}
 					}
+#endif
 					// No one should continue until we're all here
 					MPI_Barrier(MPI_COMM_WORLD);
 
@@ -3543,8 +3981,8 @@ void MlOptimiserMpi::iterate()
 		}
 		symmetriseReconstructions();
 
-		if ( (verb > 0) && (node->isLeader()) && (fn_local_symmetry_masks.size() >= 1) && (fn_local_symmetry_operators.size() >= 1) )
-			std::cout << " Applying local symmetry in real space according to " << fn_local_symmetry_operators.size() << " operators..." << std::endl;
+		if ( (verb > 0) && (node->isLeader()) && (fn_local_symmetry_masks.size() != 0) && (fn_local_symmetry_operators.size() != 0) )
+			std::cout << " Applying local symmetry in real space..." << std::endl;
 
 		// Write out data and weight arrays to disc in order to also do an unregularized reconstruction
 #ifndef DEBUG_RECONSTRUCTION

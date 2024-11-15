@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+print_error() {
+echo "
+---------------------------------- PYTHON ERROR ---------------------------------
+   Has RELION been provided a Python interpreter with the correct environment?
+   The interpreter can be passed to RELION either during Cmake configuration by
+     using the Cmake flag -DPYTHON_EXE_PATH=<path/to/python/interpreter>.
+---------------------------------------------------------------------------------
+
+  Using python executable: $1
+"
+}
+
+# Set the Python executable path
+python_executable="@PYTHON_EXE_PATH@"
+
+# Check if the python executable exists
+if [ ! -x "$python_executable" ]; then
+    # Check for default python executable
+    python_executable=$(command -v python)
+
+    if [ -z "$python_executable" ]; then
+        print_error "$python_executable"
+        exit 1
+    fi
+fi
+
+# Run the Python script with forwarded arguments
+"$python_executable" -c "from tomography_python_programs.view import cli; exit(cli())" "$@"
+
+# Check the return status of the python command
+if [ $? -ne 0 ]; then
+    print_error "$python_executable"
+    exit 2
+fi
+
+# Exit
+exit 0
+

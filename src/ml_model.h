@@ -525,6 +525,9 @@ public:
 	// Initialize all weighted sums to zero (with resizing the BPrefs to current_size)
 	void initZeros();
 
+	// Return the current pack size
+	unsigned long long getPackSize();
+
 	// Pack entire structure into one large MultidimArray<RFLOAT> for reading/writing to disc
 	// To save memory, the model itself will be cleared after packing.
 	void pack(MultidimArray<RFLOAT> &packed);

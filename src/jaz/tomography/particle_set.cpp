@@ -13,11 +13,118 @@ using namespace gravis;
 ParticleSet::ParticleSet()
 {}
 
-ParticleSet::ParticleSet(std::string filename, std::string motionFilename, bool verbose)
+ParticleSet::ParticleSet(std::string filename, std::string motionFilename, bool verbose, const TomogramSet *tomogramSet)
 {
-	optTable.read(filename, "optics");
-	partTable.read(filename, "particles");
-	
+    if (!read(filename, motionFilename, verbose, tomogramSet))
+        REPORT_ERROR("ERROR: there are no particles in " + filename);
+}
+
+bool ParticleSet::read(std::string filename, std::string motionFilename, bool verbose, const TomogramSet *tomogramSet)
+{
+
+    if (genTable.read(filename,"general"))
+    {
+        genTable.getValueSafely(EMDL_TOMO_SUBTOMOGRAM_STACK2D, is_stack2d);
+    }
+    else
+    {
+        is_stack2d = false;
+        genTable.setIsList(true);
+        genTable.addObject();
+        genTable.setValue(EMDL_TOMO_SUBTOMOGRAM_STACK2D, is_stack2d);
+    }
+
+    optTable.read(filename, "optics");
+    partTable.read(filename, "particles");
+
+    // subtomo can call to this function without a good particleSet yet, when coming straight out of subtomogram particle picking
+    // In that case, initialise optics groups from the tomogramSet
+    if (optTable.numberOfObjects() == 0)
+    {
+
+        // If the tomogramSet globalTable contains opticsGroupName, then use those groups, otherwise each tomogram is its own optics_group
+        std::map<std::string, std::string> tomoname_to_opticsgroupname;
+        size_t nr_tomos = tomogramSet->globalTable.numberOfObjects();
+        for (size_t t = 0; t < nr_tomos; t++)
+        {
+            std::string tomo_name, optics_group_name;
+            tomogramSet->globalTable.getValue(EMDL_TOMO_NAME, tomo_name, t);
+            if (tomogramSet->globalTable.containsLabel(EMDL_IMAGE_OPTICS_GROUP_NAME))
+                tomogramSet->globalTable.getValue(EMDL_IMAGE_OPTICS_GROUP_NAME, optics_group_name, t);
+            else
+                optics_group_name = tomo_name;
+            tomoname_to_opticsgroupname.insert(std::make_pair(tomo_name, optics_group_name));
+        }
+
+        // Check which tomo_names are present in the partTable
+        std::vector<std::string> present_optics_groupnames;
+        std::string my_prev_name="";
+        std::map<std::string, int> opticsgroupname_to_opticsgroup;
+        std::map<std::string, std::string> presentopticsgroupname_to_firsttomoname;
+        FOR_ALL_OBJECTS_IN_METADATA_TABLE(partTable)
+        {
+            std::string myname, myopticsgroupname;
+            partTable.getValue(EMDL_TOMO_NAME, myname);
+            myopticsgroupname = tomoname_to_opticsgroupname[myname];
+            if (myopticsgroupname != my_prev_name)
+            {
+                bool is_new = true;
+                for (size_t i = 0; i < present_optics_groupnames.size(); i++)
+                {
+                    if (myopticsgroupname == present_optics_groupnames[i]) is_new = false;
+                }
+                if (is_new)
+                {
+                    present_optics_groupnames.push_back(myopticsgroupname);
+                    opticsgroupname_to_opticsgroup.insert(std::make_pair(myopticsgroupname, present_optics_groupnames.size()));
+                    presentopticsgroupname_to_firsttomoname.insert(std::make_pair(myopticsgroupname, myname));
+                }
+            }
+            my_prev_name = myopticsgroupname;
+        }
+
+        // construct optics table with those tomo_names that are present in the partTable
+        optTable.setName("optics");
+        if (!tomogramSet->globalTable.containsLabel(EMDL_CTF_VOLTAGE))
+            REPORT_ERROR("ERROR: tomogramSet->globalTable does not contain rlnVoltage label");
+         if (!tomogramSet->globalTable.containsLabel(EMDL_CTF_Q0))
+            REPORT_ERROR("ERROR: tomogramSet->globalTable does not contain rlnAmplitudeContrast label");
+       if (!tomogramSet->globalTable.containsLabel(EMDL_CTF_CS))
+            REPORT_ERROR("ERROR: tomogramSet->globalTable does not contain rlnSphericalAberration label");
+        if (!tomogramSet->globalTable.containsLabel(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE))
+            REPORT_ERROR("ERROR: tomogramSet->globalTable does not contain rlnTomoTiltSeriesPixelSize label");
+        for (size_t i = 0; i < present_optics_groupnames.size(); i++)
+        {
+            int idx = tomogramSet->getTomogramIndex(presentopticsgroupname_to_firsttomoname[present_optics_groupnames[i] ]);
+            double Q0, Cs, kV, tiltSeriesPixelSize;
+            tomogramSet->globalTable.getValue(EMDL_CTF_VOLTAGE, kV, idx);
+            tomogramSet->globalTable.getValue(EMDL_CTF_CS, Cs, idx);
+            tomogramSet->globalTable.getValue(EMDL_CTF_Q0, Q0, idx);
+            tomogramSet->globalTable.getValue(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, tiltSeriesPixelSize, idx);
+
+            optTable.addObject();
+            optTable.setValue(EMDL_CTF_VOLTAGE, kV);
+            optTable.setValue(EMDL_CTF_CS, Cs);
+            optTable.setValue(EMDL_CTF_Q0, Q0);
+            optTable.setValue(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, tiltSeriesPixelSize);
+            optTable.setValue(EMDL_IMAGE_OPTICS_GROUP, opticsgroupname_to_opticsgroup[ present_optics_groupnames[i] ]);
+            optTable.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME, present_optics_groupnames[i]);
+        }
+
+        // Now also set optics groups in partTable
+        FOR_ALL_OBJECTS_IN_METADATA_TABLE(partTable)
+        {
+            std::string myname;
+            partTable.getValue(EMDL_TOMO_NAME, myname);
+            partTable.setValue(EMDL_IMAGE_OPTICS_GROUP, opticsgroupname_to_opticsgroup[tomoname_to_opticsgroupname[myname] ]);
+        }
+
+    }
+
+    
+    long int pc = partTable.numberOfObjects();
+    if (pc == 0) return false;
+
 	if (!optTable.containsLabel(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE))
 	{
 		REPORT_ERROR("ParticleSet::ParticleSet: "
@@ -66,6 +173,8 @@ ParticleSet::ParticleSet(std::string filename, std::string motionFilename, bool 
 	{
 		motionTrajectories = Trajectory::read(motionFilename, *this);
 	}
+
+    return true;
 }
 
 void ParticleSet::reserve(int particleNumber)
@@ -124,7 +233,7 @@ std::vector<std::vector<ParticleIndex> > ParticleSet::splitByTomogram(const Tomo
 
 	std::map<std::string, int> name_to_index;
 
-	for (int t = 0; t < tc; t++)
+    for (int t = 0; t < tc; t++)
 	{
 		const std::string name = tomogramSet.globalTable.getString(EMDL_TOMO_NAME, t);
 		name_to_index[name] = t;
@@ -243,20 +352,29 @@ int ParticleSet::getTotalParticleNumber() const
 	return partTable.numberOfObjects();
 }
 
-d3Vector ParticleSet::getPosition(ParticleIndex particle_id) const
+d3Vector ParticleSet::getPosition(ParticleIndex particle_id, const gravis::d3Vector &tomo_centre, bool apply_origin_shifts) const
 {
 	const int og = getOpticsGroup(particle_id);
 	
-	const double originalPixelSize = optTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, og);
+	const double tiltSeriesPixelSize = getTiltSeriesPixelSize(og);
 
-	const d3Matrix A_subtomogram = getSubtomogramMatrix(particle_id);
+    d3Vector out = getParticleCoordDecenteredPixel(particle_id, tomo_centre, tiltSeriesPixelSize);
 
-	d3Vector out = getParticleCoord(particle_id) - (A_subtomogram * getParticleOffset(particle_id)) / originalPixelSize;
-	
-	out.x += 1.0;
-	out.y += 1.0;
-	out.z += 1.0;
-	
+    if (apply_origin_shifts)
+    {
+        const d3Matrix A_subtomogram = getSubtomogramMatrix(particle_id);
+
+        out -= (A_subtomogram * getParticleOffset(particle_id)) / tiltSeriesPixelSize;
+    }
+
+    // SHWS & ABurt 19Jul2022: let's no longer do this in relion-4.1 (also 25nov22)
+    // SHWS 17jan24: put '+1' back in because relion5 doesn't go as high resolution as tutorial data set as relion4....
+    // SHWS 2feb24: we can't do this anymore now...
+    //out.x += 1.0;
+	//out.y += 1.0;
+	//out.z += 1.0;
+
+
 	return out;
 }
 
@@ -308,34 +426,34 @@ d3Matrix ParticleSet::getMatrix3x3(ParticleIndex particle_id) const
 
 
 // This maps coordinates from particle space to tomogram space.
-d4Matrix ParticleSet::getMatrix4x4(ParticleIndex particle_id, double w, double h, double d) const
+d4Matrix ParticleSet::getMatrix4x4(ParticleIndex particle_id, const gravis::d3Vector &tomo_centre, double w, double h, double d) const
 {
-	d3Matrix A = getMatrix3x3(particle_id);
-	d3Vector pos = getPosition(particle_id);
-	
-	int cx = ((int)w) / 2;
-	int cy = ((int)h) / 2;
-	int cz = ((int)d) / 2;
-	
-	gravis::d4Matrix Tc(
-		1, 0, 0, -cx,
-		0, 1, 0, -cy,
-		0, 0, 1, -cz,
-		0, 0, 0, 1);
-	
-	d4Matrix R(
-		A(0,0), A(0,1), A(0,2), 0.0,
-		A(1,0), A(1,1), A(1,2), 0.0,
-		A(2,0), A(2,1), A(2,2), 0.0,
-		0.0,    0.0,    0.0,    1.0   );
-	
-	d4Matrix Ts(
-		1, 0, 0, pos.x,
-		0, 1, 0, pos.y,
-		0, 0, 1, pos.z,
-		0, 0, 0, 1);
-	
-	return Ts * R * Tc;
+        d3Matrix A = getMatrix3x3(particle_id);
+        d3Vector pos = getPosition(particle_id, tomo_centre, true);
+
+        int cx = ((int)w) / 2;
+        int cy = ((int)h) / 2;
+        int cz = ((int)d) / 2;
+
+        gravis::d4Matrix Tc(
+                1, 0, 0, -cx,
+                0, 1, 0, -cy,
+                0, 0, 1, -cz,
+                0, 0, 0, 1);
+
+        d4Matrix R(
+                A(0,0), A(0,1), A(0,2), 0.0,
+                A(1,0), A(1,1), A(1,2), 0.0,
+                A(2,0), A(2,1), A(2,2), 0.0,
+                0.0,    0.0,    0.0,    1.0   );
+
+        d4Matrix Ts(
+                1, 0, 0, pos.x,
+                0, 1, 0, pos.y,
+                0, 0, 1, pos.z,
+                0, 0, 0, 1);
+
+        return Ts * R * Tc;
 }
 
 t4Vector<d3Matrix> ParticleSet::getMatrixDerivativesOverParticleAngles(
@@ -365,41 +483,33 @@ std::string ParticleSet::getName(ParticleIndex particle_id) const
 
 int ParticleSet::getHalfSet(ParticleIndex particle_id) const
 {
-	int s;
-	partTable.getValueSafely(EMDL_PARTICLE_RANDOM_SUBSET, s, particle_id.value);
+	if (!hasHalfSets())
+        REPORT_ERROR("ERROR: function getHalfSet was called without having halfsets in the particle star file.");
+
+    int s;
+	partTable.getValue(EMDL_PARTICLE_RANDOM_SUBSET, s, particle_id.value);
 	return s - 1;
 }
 
-
-void ParticleSet::moveParticleTo(ParticleIndex particle_id, gravis::d3Vector pos)
+bool ParticleSet::hasHalfSets() const
 {
-	partTable.setValue(EMDL_IMAGE_COORD_X, pos.x - 1.0, particle_id.value);
-	partTable.setValue(EMDL_IMAGE_COORD_Y, pos.y - 1.0, particle_id.value);
-	partTable.setValue(EMDL_IMAGE_COORD_Z, pos.z - 1.0, particle_id.value);
-	
-	partTable.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, 0.0, particle_id.value);
-	partTable.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, 0.0, particle_id.value);
-	partTable.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, 0.0, particle_id.value);
+    return partTable.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET);
 }
 
-void ParticleSet::shiftParticleBy(ParticleIndex particle_id, gravis::d3Vector shift)
-{
-	double x, y, z;
-	
-	partTable.getValueSafely(EMDL_IMAGE_COORD_X, x, particle_id.value);
-	partTable.getValueSafely(EMDL_IMAGE_COORD_Y, y, particle_id.value);
-	partTable.getValueSafely(EMDL_IMAGE_COORD_Z, z, particle_id.value);
-	
-	partTable.setValue(EMDL_IMAGE_COORD_X, x + shift.x, particle_id.value);
-	partTable.setValue(EMDL_IMAGE_COORD_Y, y + shift.y, particle_id.value);
-	partTable.setValue(EMDL_IMAGE_COORD_Z, z + shift.z, particle_id.value);
-}
-
-void ParticleSet::write(const std::string& filename) const
+void ParticleSet::write(const std::string& filename)
 {
 	std::ofstream ofs(filename);
 
+    genTable.setName("general");
+    genTable.setValue(EMDL_TOMO_SUBTOMOGRAM_STACK2D, is_stack2d);
+    genTable.write(ofs);
 	optTable.write(ofs);
+
+    // Remove spurious uncentered coordinates in pixels from relion-4 files
+    if (partTable.containsLabel(EMDL_IMAGE_COORD_X)) partTable.deactivateLabel(EMDL_IMAGE_COORD_X);
+    if (partTable.containsLabel(EMDL_IMAGE_COORD_Y)) partTable.deactivateLabel(EMDL_IMAGE_COORD_Y);
+    if (partTable.containsLabel(EMDL_IMAGE_COORD_Z)) partTable.deactivateLabel(EMDL_IMAGE_COORD_Z);
+
 	partTable.write(ofs);
 }
 
@@ -445,17 +555,27 @@ void ParticleSet::writeTrajectories(const std::string &filename) const
 void ParticleSet::setImageFileNames(std::string data, std::string weight, ParticleIndex particle_id)
 {
 	partTable.setValue(EMDL_IMAGE_NAME, data, particle_id.value);
-	partTable.setValue(EMDL_CTF_IMAGE, weight, particle_id.value);
+    if (weight != "")
+	    partTable.setValue(EMDL_CTF_IMAGE, weight, particle_id.value);
 }
 
 d3Vector ParticleSet::getParticleOffset(ParticleIndex particle_id) const
 {
 	d3Vector out;
 	
-	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_X_ANGSTROM, out.x, particle_id.value);
-	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, out.y, particle_id.value);
-	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, out.z, particle_id.value);
-	
+	if (partTable.containsLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM))
+        partTable.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, out.x, particle_id.value);
+	else
+        out.x = 0.;
+	if (partTable.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM))
+        partTable.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, out.y, particle_id.value);
+	else
+        out.y = 0.;
+    if (partTable.containsLabel(EMDL_ORIENT_ORIGIN_Z_ANGSTROM))
+        partTable.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, out.z, particle_id.value);
+    else
+        out.z = 0.;
+
 	return out;
 }
 
@@ -466,29 +586,55 @@ void ParticleSet::setParticleOffset(ParticleIndex particle_id, const d3Vector& v
 	partTable.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, v.z, particle_id.value);
 }
 
-d3Vector ParticleSet::getParticleCoord(ParticleIndex particle_id) const
+d3Vector ParticleSet::getParticleCoordDecenteredPixel(ParticleIndex particle_id, const gravis::d3Vector &tomo_centre, RFLOAT tiltSeriesPixelSize) const
 {
 	d3Vector out;
-	
-	partTable.getValueSafely(EMDL_IMAGE_COORD_X, out.x, particle_id.value);
-	partTable.getValueSafely(EMDL_IMAGE_COORD_Y, out.y, particle_id.value);
-	partTable.getValueSafely(EMDL_IMAGE_COORD_Z, out.z, particle_id.value);
-	
+
+    if (partTable.containsLabel(EMDL_IMAGE_CENT_COORD_X_ANGST) &&
+        partTable.containsLabel(EMDL_IMAGE_CENT_COORD_Y_ANGST) &&
+        partTable.containsLabel(EMDL_IMAGE_CENT_COORD_Z_ANGST))
+    {
+        partTable.getValue(EMDL_IMAGE_CENT_COORD_X_ANGST, out.x, particle_id.value);
+        partTable.getValue(EMDL_IMAGE_CENT_COORD_Y_ANGST, out.y, particle_id.value);
+        partTable.getValue(EMDL_IMAGE_CENT_COORD_Z_ANGST, out.z, particle_id.value);
+
+        // Inside Jasenko's code, all coordinates are in decentered pixels, convert now from centered Angstroms (centre_tomo is in pixels)
+        out /= tiltSeriesPixelSize;
+        out += tomo_centre;
+    }
+    else if (partTable.containsLabel(EMDL_IMAGE_COORD_X) &&
+             partTable.containsLabel(EMDL_IMAGE_COORD_Y) &&
+             partTable.containsLabel(EMDL_IMAGE_COORD_Z))
+    {
+        // Maintain backwards compatibility with relion-4
+        partTable.getValue(EMDL_IMAGE_COORD_X, out.x, particle_id.value);
+        partTable.getValue(EMDL_IMAGE_COORD_Y, out.y, particle_id.value);
+        partTable.getValue(EMDL_IMAGE_COORD_Z, out.z, particle_id.value);
+
+    }
+    else
+        REPORT_ERROR("Cannot find particle coordinates (rlnCenteredCoordinateX/Y/ZAngst) in particle star file");
+
 	return out;
 }
 
-void ParticleSet::setParticleCoord(ParticleIndex particle_id, const d3Vector& v)
+void ParticleSet::setParticleCoordDecenteredPixel(ParticleIndex particle_id, d3Vector v, const gravis::d3Vector &tomo_centre, RFLOAT tiltSeriesPixelSize)
 {
-	partTable.setValue(EMDL_IMAGE_COORD_X, v.x, particle_id.value);
-	partTable.setValue(EMDL_IMAGE_COORD_Y, v.y, particle_id.value);
-	partTable.setValue(EMDL_IMAGE_COORD_Z, v.z, particle_id.value);
+
+    // Inside Jasenko's code all coordinates are in decentered pixels, convert now to centered Angstroms (centre_tomo is in pixels)
+    v -= tomo_centre;
+    v *= tiltSeriesPixelSize;
+
+	partTable.setValue(EMDL_IMAGE_CENT_COORD_X_ANGST, v.x, particle_id.value);
+	partTable.setValue(EMDL_IMAGE_CENT_COORD_Y_ANGST, v.y, particle_id.value);
+	partTable.setValue(EMDL_IMAGE_CENT_COORD_Z_ANGST, v.z, particle_id.value);
 }
 
 int ParticleSet::getOpticsGroup(ParticleIndex particle_id) const
 {
 	if (!partTable.containsLabel(EMDL_IMAGE_OPTICS_GROUP))
 	{
-		REPORT_ERROR("ParticleSet::getPixelSize: pixel size (rlnImagePixelSize) missing from optics table");
+		REPORT_ERROR("ParticleSet::getOpticsGroup: optics group (rlnOpticsGroup) is missing from optics table");
 	}
 	
 	int out;
@@ -506,23 +652,11 @@ int ParticleSet::numberOfOpticsGroups() const
 	return optTable.numberOfObjects();
 }
 
-double ParticleSet::getBinnedPixelSize(int opticsGroup) const
-{
-	if (!optTable.containsLabel(EMDL_IMAGE_PIXEL_SIZE))
-	{
-		REPORT_ERROR("ParticleSet::getBinnedPixelSize: pixel size (rlnImagePixelSize) missing from optics table");
-	}
-	
-	double out;
-	optTable.getValueSafely(EMDL_IMAGE_PIXEL_SIZE, out, opticsGroup);
-	return out;
-}
-
-double ParticleSet::getOriginalPixelSize(int opticsGroup) const
+double ParticleSet::getTiltSeriesPixelSize(int opticsGroup) const
 {
 	if (!optTable.containsLabel(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE))
 	{
-		REPORT_ERROR("ParticleSet::getOriginalPixelSize: tilt series pixel size (rlnTomoTiltSeriesPixelSize) missing from optics table");
+		REPORT_ERROR("ParticleSet::getTiltSeriesPixelSize: tilt series pixel size (rlnTomoTiltSeriesPixelSize) missing from optics table");
 	}
 	
 	double out;
@@ -530,9 +664,22 @@ double ParticleSet::getOriginalPixelSize(int opticsGroup) const
 	return out;
 }
 
-std::vector<d3Vector> ParticleSet::getTrajectoryInPixels(ParticleIndex particle_id, int fc, double pixelSize, bool from_original_coordinate) const
+std::vector<int> ParticleSet::getVisibleFrames(ParticleIndex particle_id) const
 {
-	const d3Vector p0 = (from_original_coordinate) ? getParticleCoord(particle_id) : getPosition(particle_id);
+   	if (!partTable.containsLabel(EMDL_TOMO_VISIBLE_FRAMES))
+    {
+        REPORT_ERROR("ParticleSet::getVisibileFrames: frame visibility vector (rlnTomoVisibleFrames) missing from particles table");
+    }
+
+       std::vector<int> out;
+       partTable.getValue(EMDL_TOMO_VISIBLE_FRAMES, out, particle_id.value);
+       return out;
+
+}
+
+std::vector<d3Vector> ParticleSet::getTrajectoryInPixels(ParticleIndex particle_id, int fc, const gravis::d3Vector &tomo_centre, double pixelSize, bool from_original_coordinate) const
+{
+    const d3Vector p0 = getPosition(particle_id, tomo_centre, !from_original_coordinate);
 
 	if (hasMotion)
 	{

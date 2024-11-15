@@ -23,11 +23,20 @@
 class MlDataBundle
 {
 public:
+	//The CPU accelerated projector set
 	std::vector< AccProjector > projectors;
+
+	//The CPU accelerated back-projector set
 	std::vector< AccBackprojector > backprojectors;
+
+	//Used for precalculations of projection setup
+	bool generateProjectionPlanOnTheFly;
 	std::vector< AccProjectorPlan > coarseProjectionPlans;
 
 	void setup(MlOptimiser *baseMLO);
+
+	MlDataBundle() : generateProjectionPlanOnTheFly {false}
+	{}
 
 	~MlDataBundle()
 	{
@@ -35,6 +44,7 @@ public:
 		backprojectors.clear();
 	}
 };
+
 
 class MlOptimiserCpu
 {
@@ -49,6 +59,7 @@ public:
 
 	bool refIs3D;
 	bool dataIs3D;
+    bool shiftsIs3D;
 
 	int thread_id;
 
@@ -69,75 +80,28 @@ public:
 			transformer2(baseMLOptimiser->mymodel.data_dim),
 			refIs3D(baseMLO->mymodel.ref_dim == 3),
             dataIs3D(baseMLO->mymodel.data_dim == 3),
+            shiftsIs3D(baseMLO->mymodel.data_dim == 3 || baseMLO->mydata.is_tomo),
 #ifdef TIMING_FILES
 			timer(timing_fnm),
 #endif
-			generateProjectionPlanOnTheFly(false),
+			generateProjectionPlanOnTheFly(b->generateProjectionPlanOnTheFly),
 			thread_id(-1),
 			bundle(b),
 			classStreams(0)
 	{
-		//Can we pre-generate projector plan and corresponding euler matrices for all particles
-		if (baseMLO->do_skip_align || baseMLO->do_skip_rotate || baseMLO->do_auto_refine || baseMLO->mymodel.orientational_prior_mode != NOPRIOR)
-			generateProjectionPlanOnTheFly = true;
-		else
-			generateProjectionPlanOnTheFly = false;
 	};
 	
 	void resetData();
 
     void expectationOneParticle(unsigned long my_ori_particle, int thread_id);
 	
-	CudaCustomAllocator *getAllocator()	
+	void *getAllocator()	
 	{
-		return ((CudaCustomAllocator *)0);
+		return nullptr;
 	};
 
 	~MlOptimiserCpu()
 	{}
 
 };
-
-/*
-class ApplyFoo {
-    float *const my_a;
-public:
-    void operator()( const blocked_range<size_t>& r ) const {
-        float *a = my_a;
-        for( size_t i=r.begin(); i!=r.end(); ++i ) 
-           Foo(a[i]);
-    }
-    ApplyFoo( float a[] ) :
-        my_a(a)
-    {}
-};
-
-// Called as follows:  
-// tbb::parallel_for(tbb::blocked_range<size_t>(my_first_ori_particle, my_last_ori_particle+1), 
-//     cpuThreadExpectationSomeParticles(this));
-class cpuThreadExpectationSomeParticles {
-	MlOptimiser *const my_optimiser;
-public:
-	void operator()( const tbb::blocked_range<size_t>& r ) const {
-		MlOptimiser *mloptimiser = my_optimiser;
-		MlOptimiser::CpuOptimiserType::reference ref = mloptimiser->tbbCpuOptimiser.local();
-		MlOptimiserCpu *cpuOptimiser = (MlOptimiserCpu *)ref;
-		if(cpuOptimiser == NULL) 
-		{           
-			 cpuOptimiser = new MlOptimiserCpu(mloptimiser, "cpu_optimiser");
-			 cpuOptimiser->resetData();
-			 cpuOptimiser->setupFixedSizedObjects();
-			 cpuOptimiser->setupTunableSizedObjects();
-			 ref = cpuOptimiser;
-        }
-		for( size_t i=r.begin(); i!=r.end(); ++i ) 
-		{
-			cpuOptimiser->expectationOneParticle(i);
-		}
-	}
-	cpuThreadExpectationSomeParticles( MlOptimiser *optimiser ) :
-		my_optimiser(optimiser)
-	{}
-};
- */
 #endif

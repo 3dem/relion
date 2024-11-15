@@ -28,7 +28,8 @@ class TomoExtraction
 				RawImage<tComplex<T>>& out,
 				gravis::d4Matrix& projOut,
 				int num_threads = 1,
-				bool circle_crop = true);
+				bool circle_crop = true,
+                FFT::Normalization normalization = FFT::Both);
 		
 		template <typename T>
 		static void extractAt3D_Fourier(
@@ -39,7 +40,8 @@ class TomoExtraction
 				RawImage<tComplex<T>>& out,
 				std::vector<gravis::d4Matrix>& projOut,
 				int num_threads = 1,
-				bool circle_crop = true);
+				bool circle_crop = true,
+                FFT::Normalization normalization = FFT::Both);
 		
 		template <typename T>
 		static void extractAt2D_Fourier(
@@ -50,7 +52,8 @@ class TomoExtraction
 				RawImage<tComplex<T>>& out,
 				std::vector<gravis::d4Matrix>& projOut,
 				int num_threads = 1,
-				bool circle_crop = true);
+				bool circle_crop = true,
+                FFT::Normalization normalization = FFT::Both);
 		
 		template <typename T>
 		static void extractAt3D_real(
@@ -106,7 +109,8 @@ void TomoExtraction::extractFrameAt3D_Fourier(
 		RawImage<tComplex<T>>& out,
 		gravis::d4Matrix& projOut,
 		int num_threads,
-		bool circle_crop)
+		bool circle_crop,
+        FFT::Normalization normalization)
 {
 	std::vector<gravis::d4Matrix> projVec;
 	
@@ -114,7 +118,7 @@ void TomoExtraction::extractFrameAt3D_Fourier(
 
 	extractAt2D_Fourier(
 		stack.getConstSliceRef(f), s, bin, {tomogram.projectionMatrices[f]},
-		{center2D}, {true}, out, projVec, num_threads, circle_crop);
+		{center2D}, {true}, out, projVec, num_threads, circle_crop, normalization);
 	
 	projOut = projVec[0];
 }
@@ -128,7 +132,8 @@ void TomoExtraction::extractAt3D_Fourier(
 		RawImage<tComplex<T>>& out,
 		std::vector<gravis::d4Matrix>& projOut,
 		int num_threads,
-		bool circle_crop)
+		bool circle_crop,
+        FFT::Normalization normalization)
 {
 	const int fc = tomogram.frameCount;
 	std::vector<gravis::d2Vector> centers(fc);
@@ -140,7 +145,7 @@ void TomoExtraction::extractAt3D_Fourier(
 	
 	extractAt2D_Fourier(
 		stack, s, bin, tomogram.projectionMatrices, centers, isVisible,
-		out, projOut, num_threads, circle_crop);
+		out, projOut, num_threads, circle_crop, normalization);
 }
 
 template <typename T>
@@ -152,7 +157,8 @@ void TomoExtraction::extractAt2D_Fourier(
 		RawImage<tComplex<T>>& out,
 		std::vector<gravis::d4Matrix>& projOut,
 		int num_threads,
-		bool circle_crop)
+		bool circle_crop,
+        FFT::Normalization normalization)
 {
 	const int sh = s/2 + 1;
 	const int fc = stack.zdim;
@@ -176,7 +182,8 @@ void TomoExtraction::extractAt2D_Fourier(
 	
 	if (circle_crop) 
 	{
-		cropCircle(smallStack, 0, EDGE_FALLOFF, num_threads);
+		// this includes a mean subtraction!
+        cropCircle(smallStack, 0, EDGE_FALLOFF, num_threads);
 	}
 	
 	std::vector<gravis::d2Vector> posInNewImg(fc);
@@ -193,7 +200,7 @@ void TomoExtraction::extractAt2D_Fourier(
 	
 	BufferedImage<tComplex<T>> smallStackFS(sh,s,fc);
 
-	NewStackHelper::FourierTransformStack_fast(smallStack, smallStackFS, true, num_threads);
+	NewStackHelper::FourierTransformStack_fast(smallStack, smallStackFS, true, num_threads, normalization);
 
 	if (bin != 1.0)
 	{

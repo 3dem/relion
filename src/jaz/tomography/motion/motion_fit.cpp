@@ -48,7 +48,7 @@ MotionFit::MotionFit(
 	
 	for (int p = 0; p < pc; p++)
 	{
-		initialPos[p] = dataSet.getPosition(partIndices[p]);
+		initialPos[p] = dataSet.getPosition(partIndices[p], tomoCentre);
 	}
 	
 	minusCentre = d4Matrix(

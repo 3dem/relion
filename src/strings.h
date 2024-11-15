@@ -50,6 +50,8 @@
 #include <string>
 #include <iostream>
 #include <sstream>
+#include <algorithm>
+#include <cctype>
 #include <string.h>
 #include <stdio.h>
 #include "src/macros.h"
@@ -302,24 +304,15 @@ std::string simplify( const std::string& str );
 /** Remove trailing spaces */
 void trim(std::string& str);
 
+/** Remove trailing spaces and new lines */
+std::string trim2(const std::string& str);
+
 /** Remove consecutive spaces.
  *
  * All consecutive spaces are replaced by a single one and starting and
  * finishing spaces are removed
  */
 std::string removeSpaces(const std::string& _str);
-
-/** Remove quotes.
- *
- * This function removes the first character if it is a RFLOAT or single quote,
- * as well as the last character. The char pointer might be moved.
- *
- * @code
- * char str[10] = "\"Hello\"";
- * (&str);
- * @endcode
- */
-void removeQuotes(char** _str);
 //@}
 
 /** @name Tokenization

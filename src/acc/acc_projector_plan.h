@@ -6,6 +6,10 @@
 #include "src/healpix_sampling.h"
 #include <iostream>
 #include <fstream>
+#ifdef _SYCL_ENABLED
+#include "src/acc/sycl/sycl_virtual_dev.h"
+using deviceStream_t = virtualSYCL*;
+#endif
 
 class AccProjectorPlan
 {
@@ -13,16 +17,32 @@ public:
 	AccPtr< long unsigned> iorientclasses;
 	AccPtr<XFLOAT> eulers;
 	long unsigned orientation_num;
+#ifdef _SYCL_ENABLED
+	deviceStream_t devAcc;
+#endif
 
 	AccProjectorPlan():
 		orientation_num(0)
     {};
 	
-	AccProjectorPlan(CudaCustomAllocator *allocator):
+	#ifdef _HIP_ENABLED
+		AccProjectorPlan(HipCustomAllocator *allocator):
+    #else
+ 		AccProjectorPlan(CudaCustomAllocator *allocator):
+	#endif
 		iorientclasses(allocator),
 		eulers(allocator),
 		orientation_num(0)
 	{};
+
+	#ifdef _SYCL_ENABLED
+		AccProjectorPlan(deviceStream_t dev):
+			iorientclasses((CudaCustomAllocator*)0),
+			eulers((CudaCustomAllocator*)0),
+			orientation_num(0),
+			devAcc(dev)
+	{};
+	#endif
 
 	//Copy constructor
 	AccProjectorPlan( const AccProjectorPlan& other ):
@@ -96,6 +116,10 @@ public:
 			do_skip_align, do_skip_rotate, orientational_prior_mode,
 			dummyRL, dummyRL);
 	}
+
+#ifdef _SYCL_ENABLED
+	void setSyclDevice(deviceStream_t dev);
+#endif
 
 	void printTo(std::ostream &os); // print
 

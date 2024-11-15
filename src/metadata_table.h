@@ -46,7 +46,7 @@
 #include "src/metadata_container.h"
 #include "src/metadata_label.h"
 
-#define CURRENT_MDT_VERSION 30001
+#define CURRENT_MDT_VERSION 50001
 
 /** For all objects.
  @code
@@ -124,7 +124,7 @@ class MetaDataTable
 	long current_objectID;
 
 	// Number of labels of each type
-	long doubleLabels, intLabels, boolLabels, stringLabels, doubleVectorLabels, unknownLabels;
+	long doubleLabels, intLabels, boolLabels, stringLabels, intVectorLabels, doubleVectorLabels, unknownLabels;
 
 	// Is this a 2D table or a 1D list?
 	bool isList;
@@ -190,7 +190,8 @@ public:
 	RFLOAT getAngleInRad(EMDLabel label, long objectID = -1) const;
 	bool getBool(EMDLabel label, long objectID = -1) const;
 	std::string getString(EMDLabel label, long objectID = -1) const;
-	std::vector<double> getDoubleVector(EMDLabel label, long objectID = -1) const;
+    std::vector<int> getIntVector(EMDLabel label, long objectID = -1) const;
+    std::vector<double> getDoubleVector(EMDLabel label, long objectID = -1) const;
 
 	std::string getUnknownLabelNameAt(int i) const;
 
@@ -403,6 +404,7 @@ bool MetaDataTable::isTypeCompatible(EMDLabel label, T& value) const
 	              std::is_same<FileName, U>::value || std::is_same<std::string, U>::value ||
 	              std::is_same<double, U>::value || std::is_same<float, U>::value ||
 	              std::is_same<int, U>::value || std::is_same<long, U>::value ||
+	              std::is_same<std::vector<int>, U>::value ||
 	              std::is_same<std::vector<double>, U>::value || std::is_same<std::vector<float>, U>::value,
 	              "Compile error: wrong type given to MetaDataTable::getValur or setValue");
 
@@ -414,6 +416,8 @@ bool MetaDataTable::isTypeCompatible(EMDLabel label, T& value) const
 		return EMDL::isDouble(label);
 	else if (std::is_same<int, U>::value || std::is_same<long, U>::value)
 		return EMDL::isInt(label);
+    else if (std::is_same<std::vector<int>, U>::value )
+        return EMDL::isIntVector(label);
 	else if (std::is_same<std::vector<double>, U>::value || std::is_same<std::vector<float>, U>::value)
 		return EMDL::isVector(label);
 	else
@@ -467,7 +471,7 @@ void MetaDataTable::getValueSafely(EMDLabel label, T& value, long objectID) cons
 template<class T>
 bool MetaDataTable::setValue(EMDLabel label, const T &value, long int objectID)
 {
-	if (label < 0 || label >= EMDL_LAST_LABEL) return false;
+    if (label < 0 || label >= EMDL_LAST_LABEL) return false;
 	if (label == EMDL_UNKNOWN_LABEL)
 		REPORT_ERROR("MetaDataTable::setValue does not support unknown label.");
 
@@ -500,5 +504,6 @@ bool MetaDataTable::setValue(EMDLabel label, const T &value, long int objectID)
 		return false;
 	}
 }
+
 
 #endif

@@ -299,7 +299,8 @@ int main(int argc, char *argv[])
 	
 	ObservationModel::saveNew(
 		particles_table, 
-		obs_model.opticsMdt, 
+		obs_model.opticsMdt,
+        obs_model.generalMdt,
 		outDir+"rotated_particles.star");
 	
 	

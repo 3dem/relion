@@ -53,7 +53,8 @@ MetaDataTable::MetaDataTable()
 	intLabels(0),
 	boolLabels(0),
 	stringLabels(0),
-	doubleVectorLabels(0),
+    intVectorLabels(0),
+    doubleVectorLabels(0),
 	unknownLabels(0),
 	isList(false),
 	name(""),
@@ -73,6 +74,7 @@ MetaDataTable::MetaDataTable(const MetaDataTable &MD)
 	intLabels(MD.intLabels),
 	boolLabels(MD.boolLabels),
 	stringLabels(MD.stringLabels),
+    intVectorLabels(MD.intVectorLabels),
 	doubleVectorLabels(MD.doubleVectorLabels),
 	unknownLabels(MD.unknownLabels),
 	isList(MD.isList),
@@ -103,7 +105,8 @@ MetaDataTable& MetaDataTable::operator = (const MetaDataTable &MD)
 		intLabels = MD.intLabels;
 		boolLabels = MD.boolLabels;
 		stringLabels = MD.stringLabels;
-		doubleVectorLabels = MD.doubleVectorLabels;
+        intVectorLabels = MD.intVectorLabels;
+        doubleVectorLabels = MD.doubleVectorLabels;
 		unknownLabels = MD.unknownLabels;
 
 		isList = MD.isList;
@@ -285,6 +288,33 @@ bool MetaDataTable::getValueToString(EMDLabel label, std::string &value, long ob
 			if (!getValue(label, v, objectID)) return false;
 			snprintf(buffer,13, "%12d", (int)v);
 		}
+		else if (EMDL::isIntVector(label))
+		{
+			std::vector<int> v;
+			getValue(label, v, objectID);
+
+			if (v.size() == 0)
+			{
+				value = "[]";
+			}
+			else
+			{
+				std::stringstream sts;
+
+				sts << std::setprecision(12);
+				sts << '[';
+
+				for (int i = 0; i < v.size()-1; i++)
+				{
+					sts << v[i] << ',';
+				}
+
+				sts << v[v.size()-1] << ']';
+
+				value = sts.str();
+			}
+			return true;
+		}
 		else if (EMDL::isDoubleVector(label))
 		{
 			std::vector<double> v;
@@ -363,6 +393,13 @@ std::string MetaDataTable::getString(EMDLabel label, long objectID) const
 	return out;
 }
 
+std::vector<int> MetaDataTable::getIntVector(EMDLabel label, long objectID) const
+{
+	std::vector<int> out(0);
+	getValue(label, out, objectID);
+	return out;
+}
+
 std::vector<double> MetaDataTable::getDoubleVector(EMDLabel label, long objectID) const
 {
 	std::vector<double> out(0);
@@ -413,6 +450,30 @@ bool MetaDataTable::setValueFromString(
 		{
 			bool v;
 			i >> v;
+			return setValue(label, v, objectID);
+		}
+		else if (EMDL::isIntVector(label))
+		{
+			std::vector<int> v;
+			v.reserve(32);
+
+			char* temp = new char[value.size()+1];
+			strcpy(temp, value.c_str());
+
+			char* token;
+			char* rest = temp;
+
+			while ((token = strtok_r(rest, "[,]", &rest)) != 0)
+			{
+				int d;
+				std::stringstream sts(token);
+				sts >> d;
+
+				v.push_back(d);
+			}
+
+			delete[] temp;
+
 			return setValue(label, v, objectID);
 		}
 		else if (EMDL::isDoubleVector(label))
@@ -719,6 +780,17 @@ void MetaDataTable::addLabel(EMDLabel label, std::string unknownLabel)
 
 			stringLabels++;
 		}
+		else if (EMDL::isIntVector(label))
+		{
+			id = intVectorLabels;
+
+			for (long i = 0; i < objects.size(); i++)
+			{
+				objects[i]->intVectors.push_back(std::vector<int>());
+			}
+
+			intVectorLabels++;
+		}
 		else if (EMDL::isDoubleVector(label))
 		{
 			id = doubleVectorLabels;
@@ -788,7 +860,7 @@ void MetaDataTable::append(const MetaDataTable& mdt)
 	for (long i = 0; i < mdt.objects.size(); i++)
 	{
 		objects.push_back(new MetaDataContainer(
-			this, doubleLabels, intLabels, boolLabels, stringLabels, doubleVectorLabels, unknownLabels));
+			this, doubleLabels, intLabels, boolLabels, stringLabels, intVectorLabels, doubleVectorLabels, unknownLabels));
 
 		setObjectUnsafe(mdt.getObject(i), objects.size() - 1);
 	}
@@ -862,6 +934,10 @@ void MetaDataTable::setObjectUnsafe(MetaDataContainer* data, long objectID)
 			{
 				obj->strings[myOff] = data->strings[srcOff];
 			}
+            else if (EMDL::isIntVector(label))
+            {
+                obj->intVectors[myOff] = data->intVectors[srcOff];
+            }
 			else if (EMDL::isDoubleVector(label))
 			{
 				obj->doubleVectors[myOff] = data->doubleVectors[srcOff];
@@ -893,7 +969,7 @@ void MetaDataTable::setObjectUnsafe(MetaDataContainer* data, long objectID)
 void MetaDataTable::addObject()
 {
 	objects.push_back(new MetaDataContainer(
-		this, doubleLabels, intLabels, boolLabels, stringLabels, doubleVectorLabels, unknownLabels));
+		this, doubleLabels, intLabels, boolLabels, stringLabels, intVectorLabels, doubleVectorLabels, unknownLabels));
 
 	current_objectID = objects.size()-1;
 }
@@ -901,7 +977,7 @@ void MetaDataTable::addObject()
 void MetaDataTable::addObject(MetaDataContainer* data)
 {
 	objects.push_back(new MetaDataContainer(
-		this, doubleLabels, intLabels, boolLabels, stringLabels, doubleVectorLabels, unknownLabels));
+		this, doubleLabels, intLabels, boolLabels, stringLabels, intVectorLabels, doubleVectorLabels, unknownLabels));
 
 	setObject(data, objects.size()-1);
 	current_objectID = objects.size()-1;
@@ -910,7 +986,7 @@ void MetaDataTable::addObject(MetaDataContainer* data)
 void MetaDataTable::addValuesOfDefinedLabels(MetaDataContainer* data)
 {
 	objects.push_back(new MetaDataContainer(
-		this, doubleLabels, intLabels, boolLabels, stringLabels, doubleVectorLabels, unknownLabels));
+		this, doubleLabels, intLabels, boolLabels, stringLabels, intVectorLabels, doubleVectorLabels, unknownLabels));
 
 	setValuesOfDefinedLabels(data, objects.size()-1);
 	current_objectID = objects.size()-1;
@@ -1329,29 +1405,34 @@ void MetaDataTable::write(std::ostream& out) const
 		}
 
 		// Write actual data block
+        //SHWS 31jul2024: writing of large STAR files on our ceph file system was very slow.
+        //SHWS 31jul2024: writing big data blocks (10,000 lines) in one go is much, much faster
+        std::ostringstream dataBlockStream;
 		for (long int idx = 0; idx < objects.size(); idx++)
 		{
 			std::string entryComment = "";
 
-			for (long i = 0; i < activeLabels.size(); i++)
+            for (long i = 0; i < activeLabels.size(); i++)
 			{
 				EMDLabel l = activeLabels[i];
 
 				if (l == EMDL_UNKNOWN_LABEL)
 				{
-					out.width(10);
 					std::string token, val;
 					long offset = unknownLabelPosition2Offset[i];
 					val = objects[idx]->unknowns[offset];
 					escapeStringForSTAR(val);
-					out << val << " ";
+					dataBlockStream << std::setw(10) << val << " ";
+                    //out.width(10);
+                    //out << val << " ";
 				}
 				else if (l != EMDL_COMMENT && l != EMDL_SORTED_IDX)
 				{
-					out.width(10);
 					std::string val;
 					getValueToString(l, val, idx, true); // escape=true
-					out << val << " ";
+					dataBlockStream << std::setw(10) << val << " ";
+                    //out.width(10);
+                    //out << val << " ";
 				}
 				if (l == EMDL_COMMENT)
 				{
@@ -1360,12 +1441,24 @@ void MetaDataTable::write(std::ostream& out) const
 			}
 			if (entryComment != std::string(""))
 			{
-				out << "# " << entryComment;
+				dataBlockStream << "# " << entryComment;
+                //out << "# " << entryComment;
 			}
-			out << "\n";
+            dataBlockStream << "\n";
+			//out << "\n";
+
+            if ((idx+1)%100000 == 0)
+            {
+                out << dataBlockStream.str();
+                dataBlockStream.str("");
+                dataBlockStream.clear();
+            }
+
 		}
 		// Finish table with a white-line
-		out << " \n";
+        dataBlockStream << " \n";
+        //out << " \n";
+        out << dataBlockStream.str();
 
 	}
 	else // isList
@@ -1980,6 +2073,7 @@ MetaDataTable subsetMetaDataTable(MetaDataTable &MDin, EMDLabel label, std::stri
 		REPORT_ERROR("subsetMetadataTable ERROR: input MetaDataTable does not contain label: " +  EMDL::label2Str(label));
 
 	MetaDataTable MDout;
+    MDout.setName(MDin.getName());
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
 	{
 		std::string val;
@@ -1999,11 +2093,14 @@ MetaDataTable subsetMetaDataTable(MetaDataTable &MDin, EMDLabel label, std::stri
 MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label, RFLOAT threshold, RFLOAT origin_scale, FileName fn_removed, bool verb)
 {
 	// Sanity check
-	if (!MDin.containsLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM) || !MDin.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM))
-		REPORT_ERROR("You need rlnOriginXAngst and rlnOriginYAngst to remove duplicated particles");
+    if (!MDin.containsLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM) || !MDin.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM))
+        REPORT_ERROR("You need rlnOriginXAngst and rlnOriginYAngst to remove duplicated particles");
 
-	if (!MDin.containsLabel(EMDL_IMAGE_COORD_X) && !MDin.containsLabel(EMDL_IMAGE_COORD_Y))
-		REPORT_ERROR("You need rlnCoordinateX, rlnCoordinateY to remove duplicated particles");
+    if (mic_label == EMDL_MICROGRAPH_NAME && !MDin.containsLabel(EMDL_IMAGE_COORD_X) && !MDin.containsLabel(EMDL_IMAGE_COORD_Y))
+        REPORT_ERROR("You need rlnCoordinateX, rlnCoordinateY to remove duplicated particles");
+
+    if (mic_label == EMDL_TOMO_NAME && !MDin.containsLabel(EMDL_IMAGE_CENT_COORD_X_ANGST) && !MDin.containsLabel(EMDL_IMAGE_CENT_COORD_Y_ANGST))
+        REPORT_ERROR("You need rlnCenteredCoordinateXAngst, rlnCenteredCoordinateYAngst to remove duplicated particles");
 
 	if (!MDin.containsLabel(mic_label))
 		REPORT_ERROR("STAR file does not contain " + EMDL::label2Str(mic_label));
@@ -2014,12 +2111,12 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
     std::vector<RFLOAT> zs;
 
     bool dataIs3D = false;
-    if (MDin.containsLabel(EMDL_IMAGE_COORD_Z))
+    if (MDin.containsLabel(EMDL_IMAGE_CENT_COORD_Z_ANGST))
     {
         if (!MDin.containsLabel(EMDL_ORIENT_ORIGIN_Z_ANGSTROM))
             REPORT_ERROR("You need rlnOriginZAngst to remove duplicated 3D particles");
         dataIs3D = true;
-         zs.resize(MDin.numberOfObjects(), 0.0);
+        zs.resize(MDin.numberOfObjects(), 0.0);
     }
 
     RFLOAT threshold_sq = threshold * threshold;
@@ -2032,17 +2129,29 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
 		MDin.getValue(mic_label, mic_name);
 
 		RFLOAT val1, val2;
-		MDin.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, val1);
-		MDin.getValue(EMDL_IMAGE_COORD_X, val2);
-		xs[current_object] = -val1 * origin_scale + val2;
-		MDin.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, val1);
-		MDin.getValue(EMDL_IMAGE_COORD_Y, val2);
-		ys[current_object] = -val1 * origin_scale + val2;
-
+        if (mic_label == EMDL_MICROGRAPH_NAME)
+        {
+		    MDin.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, val1);
+            MDin.getValue(EMDL_IMAGE_COORD_X, val2);
+            xs[current_object] = -val1 * origin_scale + val2;
+            MDin.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, val1);
+            MDin.getValue(EMDL_IMAGE_COORD_Y, val2);
+            ys[current_object] = -val1 * origin_scale + val2;
+        }
+        if (mic_label == EMDL_TOMO_NAME)
+        {
+		    MDin.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, val1);
+            MDin.getValue(EMDL_IMAGE_CENT_COORD_X_ANGST, val2);
+            xs[current_object] = -val1 * origin_scale + val2;
+            MDin.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, val1);
+            MDin.getValue(EMDL_IMAGE_CENT_COORD_Y_ANGST, val2);
+            ys[current_object] = -val1 * origin_scale + val2;
+        }
 		if (dataIs3D)
         {
             MDin.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, val1);
-            MDin.getValue(EMDL_IMAGE_COORD_Z, val2);
+            if (mic_label == EMDL_MICROGRAPH_NAME) MDin.getValue(EMDL_IMAGE_COORD_Z, val2);
+            if (mic_label == EMDL_TOMO_NAME) MDin.getValue(EMDL_IMAGE_CENT_COORD_Z_ANGST, val2);
             zs[current_object] = -val1 * origin_scale + val2;
         }
 
@@ -2098,3 +2207,5 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
 
 	return MDout;
 }
+
+

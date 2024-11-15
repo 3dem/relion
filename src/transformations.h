@@ -165,6 +165,9 @@ void alignWithZ(const Matrix1D< RFLOAT >& axis, Matrix2D< RFLOAT > &m, bool homo
  */
 void translation3DMatrix(const Matrix1D< RFLOAT >& v, Matrix2D< RFLOAT > &m);
 
+void translation3DMatrix(const RFLOAT xshift, const RFLOAT yshift, const RFLOAT zshift, Matrix2D< RFLOAT > &m);
+
+
 /** Creates a scaling matrix (4x4) for volumes
  * @ingroup GeometricalTransformations
  *

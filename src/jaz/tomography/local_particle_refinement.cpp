@@ -43,10 +43,10 @@ LocalParticleRefinement::LocalParticleRefinement(
 
 	if (this->maxFrame < 0) this->maxFrame = fc-1;
 
-	position = particleSet.getPosition(particle_id);
+	position = particleSet.getPosition(particle_id, tomogram.centre, true);
 
 	const std::vector<d3Vector> trajectory = particleSet.getTrajectoryInPixels(
-				particle_id, fc, pixelSize);
+				particle_id, fc, tomogram.centre, pixelSize);
 	
 	isVisible = tomogram.determineVisiblity(trajectory, s/2.0);
 
@@ -59,7 +59,7 @@ LocalParticleRefinement::LocalParticleRefinement(
 			observations, tomo_to_image, 1, false);
 
 	const d4Matrix particle_to_tomo = particleSet.getMatrix4x4(
-			particle_id, s, s, s);
+			particle_id, tomogram.centre, s, s, s);
 
 	Pt.resize(fc);
 	CTFs.resize(fc);

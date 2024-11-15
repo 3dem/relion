@@ -608,11 +608,25 @@ void HealpixSampling::writeAllOrientationsToBild(FileName fn_bild, std::string r
     Matrix1D<RFLOAT> v(3);
 	out << ".color " << rgb << std::endl;
 
+    //SHWS 31jul2024: writing of large STAR files on our ceph file system was very slow.
+    //SHWS 31jul2024: writing big data blocks (100,000 lines) in one go is much, much faster
+    std::ostringstream dataBlockStream;
 	for (unsigned long int ipix = 0; ipix < rot_angles.size(); ipix++)
 	{
 		Euler_angles2direction(rot_angles[ipix], tilt_angles[ipix], v);
-		out <<  ".sphere " << XX(v) << " " << YY(v) << " " << ZZ(v)  << " " <<  floatToString(size) << std::endl;
-	}
+        dataBlockStream <<  ".sphere " << XX(v) << " " << YY(v) << " " << ZZ(v)  << " " <<  floatToString(size) << "\n";
+        //out <<  ".sphere " << XX(v) << " " << YY(v) << " " << ZZ(v)  << " " <<  floatToString(size) << std::endl;
+
+        if ((ipix+1)%100000 == 0)
+        {
+            out << dataBlockStream.str();
+            dataBlockStream.str("");
+            dataBlockStream.clear();
+        }
+
+    }
+
+    out << dataBlockStream.str();
 
 	out.close();
 
@@ -641,12 +655,27 @@ void HealpixSampling::writeNonZeroPriorOrientationsToBild(FileName fn_bild, RFLO
 	out <<  ".sphere " << XX(v) << " " << YY(v) << " " << ZZ(v) << " " <<  floatToString(size) << std::endl;
 
 	out << ".color " << rgb << std::endl;
+
+    //SHWS 31jul2024: writing of large STAR files on our ceph file system was very slow.
+    //SHWS 31jul2024: writing big data blocks (100,000 lines) in one go is much, much faster
+    std::ostringstream dataBlockStream;
 	for (unsigned long int ipix = 0; ipix < pointer_dir_nonzeroprior.size(); ipix++)
 	{
 		long int idir = pointer_dir_nonzeroprior[ipix];
 		Euler_angles2direction(rot_angles[idir], tilt_angles[idir], v);
-		out <<  ".sphere " << XX(v) << " " << YY(v) << " " << ZZ(v) << " " << floatToString(size) << std::endl;
-	}
+		//out <<  ".sphere " << XX(v) << " " << YY(v) << " " << ZZ(v) << " " << floatToString(size) << std::endl;
+        dataBlockStream <<  ".sphere " << XX(v) << " " << YY(v) << " " << ZZ(v) << " " << floatToString(size) << "\n";
+
+        if ((ipix+1)%100000 == 0)
+        {
+            out << dataBlockStream.str();
+            dataBlockStream.str("");
+            dataBlockStream.clear();
+        }
+
+    }
+
+    out << dataBlockStream.str();
 
 	out.close();
 
@@ -1741,7 +1770,7 @@ void HealpixSampling::getTranslationsInPixel(long int itrans, int oversampling_o
 		RFLOAT over_xoff = 0., over_yoff = 0., over_zoff = 0.;
 		for (int itrans_overx = 0; itrans_overx < nr_oversamples; itrans_overx++)
 		{
-			if ( (do_helical_refine) && (!is_3d_trans) ) // Helical reconstruction with 2D segments
+			if ( do_helical_refine ) // Helical reconstruction with 2D segments
 				over_xoff = translations_x[itrans] - 0.5 * h_step + (0.5 + itrans_overx) * h_step / nr_oversamples;
 			else
 				over_xoff = translations_x[itrans] - 0.5 * offset_step + (0.5 + itrans_overx) * offset_step / nr_oversamples;
@@ -1752,10 +1781,7 @@ void HealpixSampling::getTranslationsInPixel(long int itrans, int oversampling_o
 				{
 					for (int itrans_overz = 0; itrans_overz < nr_oversamples; itrans_overz++)
 					{
-						if (do_helical_refine) // Helical reconstruction in 3D subtomogram averaging
-							over_zoff = translations_z[itrans] - 0.5 * h_step + (0.5 + itrans_overz) * h_step / nr_oversamples;
-						else
-							over_zoff = translations_z[itrans] - 0.5 * offset_step + (0.5 + itrans_overz) * offset_step / nr_oversamples;
+                        over_zoff = translations_z[itrans] - 0.5 * offset_step + (0.5 + itrans_overz) * offset_step / nr_oversamples;
 
 						my_translations_x.push_back(over_xoff / my_pixel_size);
 						my_translations_y.push_back(over_yoff / my_pixel_size);
@@ -1789,17 +1815,14 @@ void HealpixSampling::getTranslationsInPixel(long int itrans, int oversampling_o
 		for (int iover = 0; iover < my_translations_x.size(); iover++)
 		{
 			// If doing helical refinement, DONT put perturbation onto translations along helical axis???
-			if ( (do_helical_refine) && (!is_3d_trans) ) // Helical reconstruction with 2D segments
+			if ( do_helical_refine ) // Helical reconstruction with 2D segments
 				my_translations_x[iover] += myperturb_helical;
 			else
 				my_translations_x[iover] += myperturb;
 			my_translations_y[iover] += myperturb;
 			if (is_3d_trans)
 			{
-				if (do_helical_refine)
-					my_translations_z[iover] += myperturb_helical; // Helical reconstruction in 3D subtomogram averaging
-				else
-					my_translations_z[iover] += myperturb;
+                my_translations_z[iover] += myperturb;
 			}
 		}
 	}
@@ -2016,6 +2039,10 @@ void HealpixSampling::writeBildFileOrientationalDistribution(MultidimArray<RFLOA
     RFLOAT width = width_frac * PI*R*(getAngularSampling()/360.);
     Matrix1D<RFLOAT> v(3);
 
+    //SHWS 31jul2024: writing of large STAR files on our ceph file system was very slow.
+    //SHWS 31jul2024: writing big data blocks (100,000 lines) in one go is much, much faster
+    std::ostringstream dataBlockStream;
+
     for (long int iang = 0; iang < rot_angles.size(); iang++)
     {
      	RFLOAT pdf = DIRECT_A1D_ELEM(pdf_direction, iang);
@@ -2039,7 +2066,9 @@ void HealpixSampling::writeBildFileOrientationalDistribution(MultidimArray<RFLOA
 			{
 				// In multi-body refinement, the rotations are relative to (rot,tilt)=(0,90) to prevent problems with psi-prior!!!
 				Matrix2D<RFLOAT> A;
-				rotation3DMatrix(90., 'Y', A, false);
+                //SHWS 2feb2024: found bug in rotation around Y: reverse direction!
+                //rotation3DMatrix(90., 'Y', A, false);
+                rotation3DMatrix(-90., 'Y', A, false);
 				v = (*Aorient).transpose() * A * v;
 			}
 
@@ -2056,20 +2085,41 @@ void HealpixSampling::writeBildFileOrientationalDistribution(MultidimArray<RFLOA
 					ABS((R - Rp) * ZZ(v)) > 0.01)
 			{
 				// The width of the cylinders will be determined by the sampling:
-				fh_bild << ".color " << colscale << " 0 " << 1. - colscale << std::endl;
-				fh_bild << ".cylinder "
-						<< R  * XX(v) + offset + XX(offsetp) << " "
-						<< R  * YY(v) + offset + YY(offsetp) << " "
-						<< R  * ZZ(v) + offset + ZZ(offsetp) << " "
-						<< Rp * XX(v) + offset + XX(offsetp) << " "
-						<< Rp * YY(v) + offset + YY(offsetp) << " "
-						<< Rp * ZZ(v) + offset + ZZ(offsetp) << " "
-						<< width
-						<<"\n";
+				//fh_bild << ".color " << colscale << " 0 " << 1. - colscale << std::endl;
+				//fh_bild << ".cylinder "
+				//		<< R  * XX(v) + offset + XX(offsetp) << " "
+				//		<< R  * YY(v) + offset + YY(offsetp) << " "
+				//		<< R  * ZZ(v) + offset + ZZ(offsetp) << " "
+				//		<< Rp * XX(v) + offset + XX(offsetp) << " "
+				//		<< Rp * YY(v) + offset + YY(offsetp) << " "
+				//		<< Rp * ZZ(v) + offset + ZZ(offsetp) << " "
+				//		<< width
+				//		<<"\n";
+                dataBlockStream << ".color " << colscale << " 0 " << 1. - colscale << "\n";
+                dataBlockStream << ".cylinder "
+                        << R  * XX(v) + offset + XX(offsetp) << " "
+                        << R  * YY(v) + offset + YY(offsetp) << " "
+                        << R  * ZZ(v) + offset + ZZ(offsetp) << " "
+                        << Rp * XX(v) + offset + XX(offsetp) << " "
+                        << Rp * YY(v) + offset + YY(offsetp) << " "
+                        << Rp * ZZ(v) + offset + ZZ(offsetp) << " "
+                        << width
+                        <<"\n";
 			}
+
+            if ((iang+1)%100000 == 0)
+            {
+                fh_bild << dataBlockStream.str();
+                dataBlockStream.str("");
+                dataBlockStream.clear();
+            }
+
      	}
 
     }
+
+
+    fh_bild << dataBlockStream.str();
 
     // Close and write file to disc
     fh_bild.close();

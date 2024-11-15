@@ -1078,7 +1078,7 @@ void BackProjector::updateSSNRarrays(RFLOAT tau2_fudge,
 	// Average (inverse of) sigma2 in reconstruction
 	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(sigma2)
 	{
-		if (DIRECT_A1D_ELEM(sigma2, i) > 1e-10)
+		if (DIRECT_A1D_ELEM(sigma2, i) > 1e-20)
 			DIRECT_A1D_ELEM(sigma2, i) = DIRECT_A1D_ELEM(counter, i) / DIRECT_A1D_ELEM(sigma2, i);
 		else if (DIRECT_A1D_ELEM(sigma2, i) == 0)
 			DIRECT_A1D_ELEM(sigma2, i) = 0.;
@@ -1207,11 +1207,13 @@ void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
                                         FileName &fn_out,
                                         MultidimArray<RFLOAT> &fsc_halves_io,
                                         MultidimArray<RFLOAT> &tau2_io,
-										MultidimArray<RFLOAT> &sigma2_ref,
-										MultidimArray<RFLOAT> &data_vs_prior,
-										RFLOAT pixel_size,
-										RFLOAT particle_diameter,
-										bool is_whole_instead_of_half,
+                                        MultidimArray<RFLOAT> &sigma2_ref,
+                                        MultidimArray<RFLOAT> &data_vs_prior,
+                                        RFLOAT pixel_size,
+                                        RFLOAT particle_diameter,
+                                        bool is_whole_instead_of_half,
+                                        bool do_blush,
+                                        std::string blush_args,
                                         RFLOAT tau2_fudge,
                                         int verb)
 {
@@ -1278,21 +1280,50 @@ void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
 	MDtau.write(fh);
 	fh.close();
 
-
-	// Make the system call: program name plus the STAR file for the external reconstruction program as its first argument
-	char *my_exec = getenv ("RELION_EXTERNAL_RECONSTRUCT_EXECUTABLE");
-	char default_exec[]=DEFAULT_EXTERNAL_RECONSTRUCT;
-	if (my_exec == NULL)
+	if (do_blush)
 	{
-		my_exec = default_exec;
+		//run python wrapper command
+		std::string cmd = "relion_python_blush " + fn_star;
+
+		cmd += " " + blush_args;
+
+		FILE* pipe = popen(cmd.c_str(), "r");
+		if (!pipe)
+			throw std::runtime_error("Failed to dispatch command: " + cmd);
+
+		char buffer[128];
+		std::string result;
+
+		// read till end of process
+		while (!feof(pipe))
+			if (fgets(buffer, 128, pipe) != nullptr)
+				result += buffer;
+
+		pclose(pipe);
+
+		if (trim2(result) != "success")
+		{
+			std::cerr << std::endl << "Something went wrong in the external Python call..." << std::endl;
+			std::cerr << "Command: " << cmd << std::endl;
+			std::cerr << result << std::endl;
+			exit(1);
+		}
 	}
-	std::string command = std::string(my_exec) + " " + fn_star;
-
-	if (verb > 0) std::cout << std::endl << " + Making system call for external reconstruction: " << command << std::endl;
-
-	int res = system(command.c_str());
-	if (res) REPORT_ERROR(" ERROR: there was something wrong with system call: " + command);
-	else if (verb > 0) std::cout << " + External reconstruction finished successfully, reading result back in ... " << std::endl;
+	else
+	{
+		// Make the system call: program name plus the STAR file for the external reconstruction program as its first argument
+		char *my_exec = getenv("RELION_EXTERNAL_RECONSTRUCT_EXECUTABLE");
+		char default_exec[] = DEFAULT_EXTERNAL_RECONSTRUCT;
+		if (my_exec == NULL)
+			my_exec = default_exec;
+		std::string command = std::string(my_exec) + " " + fn_star;
+		if (verb > 0)
+			std::cout << std::endl << " + Making system call for external reconstruction: " << command << std::endl;
+		int res = system(command.c_str());
+		if (res) REPORT_ERROR(" ERROR: there was something wrong with system call: " + command);
+		else if (verb > 0)
+			std::cout << " + External reconstruction finished successfully, reading result back in ... " << std::endl;
+	}
 
 	// Read the resulting map back into memory
 	Iweight.read(fn_recons);
@@ -1395,6 +1426,15 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	ttt()=weight;
 	ttt.write("reconstruct_initial_weight.spi");
 	std::cerr << " pad_size= " << pad_size << " padding_factor= " << padding_factor << " max_r2= " << max_r2 << std::endl;
+    FourierTransformer transformer2;
+    ttt().resize(vol_out);
+    transformer2.setReal(ttt()); // Fake set real. 1. Allocate space for Fconv 2. calculate plans.
+	MultidimArray<Complex>& Fconv2 = transformer2.getFourierReference();
+    Fconv2.initZeros(); // to remove any stuff from the input volume
+    Projector::decenter(data, Fconv2, max_r2);
+    windowToOridimRealSpace(transformer2, ttt(), printTimes);
+    ttt.write("reconstruct_initial_data.spi");
+    std::cerr << "DEBUG_RECONSTRUCT: Written out reconstruct_initial_weight.spi and reconstruct_initial_data.spi" << std::endl;
 #endif
 
 	// Set Fconv to the right size

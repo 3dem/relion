@@ -132,13 +132,16 @@ public:
 	// Overall scale-factor of CTF
 	RFLOAT scale;
 
+        // Niko Grigorieff's exponential decay
+        RFLOAT dose;
+
 	// Phase-shift from a phase-plate (in rad)
 	RFLOAT phase_shift;
 
 	/** Empty constructor. */
 	CTF() :
 		kV(200), DeltafU(0), DeltafV(0), azimuthal_angle(0), phase_shift(0),
-		Cs(0), Bfac(0), Q0(0), scale(1), obsModel(0), opticsGroup(0)
+                    Cs(0), Bfac(0), dose(-1.), Q0(0), scale(1), obsModel(0), opticsGroup(0)
 	{}
 
 	// Read CTF parameters from particle table partMdt and optics table opticsMdt.
@@ -156,12 +159,12 @@ public:
 
 	/** Just set all values explicitly */
 	void setValues(RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng,
-	               RFLOAT _voltage, RFLOAT _Cs, RFLOAT _Q0, RFLOAT _Bfac, RFLOAT _scale = 1., RFLOAT _phase_shift = 0.);
+	               RFLOAT _voltage, RFLOAT _Cs, RFLOAT _Q0, RFLOAT _Bfac, RFLOAT _scale = 1., RFLOAT _phase_shift = 0., RFLOAT _dose = -1.0 );
 
 	/** Set all values explicitly in 3.1 */
 	void setValuesByGroup(ObservationModel* obs, int opticsGroup,
 	                      RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng,
-	                      RFLOAT _Bfac = 0.0, RFLOAT _scale = 1.0, RFLOAT _phase_shift = 0.0);
+	                      RFLOAT _Bfac = 0.0, RFLOAT _scale = 1.0, RFLOAT _phase_shift = 0.0, RFLOAT _dose = -1.0 );
 
 
 	/** Read from a single MetaDataTable */
@@ -215,8 +218,20 @@ public:
 
 		if (do_damping)
 		{
-			RFLOAT E = exp(K4 * u2); // B-factor decay (K4 = -Bfac/4);
-			retval *= E;
+                    RFLOAT E;
+                    if (dose >= 0.)
+                    {
+                        // Niko Grigorieff's formulae
+                        //RFLOAT d0 = 0.245 * pow(sqrt(u2), -1.665) + 2.81;
+                        // sqrt = ^0.5; -1.665*0.5 = -0.8325
+                        RFLOAT d0 = 0.245 * pow(u2, -0.8325) + 2.81;
+                        E = exp(-0.5 * dose / d0);
+                    }
+                    else
+                    {
+			            E = exp(K4 * u2); // B-factor decay (K4 = -Bfac/4);
+                    }
+                    retval *= E;
 		}
 
 		if (do_abs)

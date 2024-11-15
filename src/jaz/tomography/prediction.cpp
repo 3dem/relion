@@ -25,7 +25,7 @@ using namespace gravis;
 
 BufferedImage<fComplex> Prediction::predictModulated(
 		ParticleIndex particle_id, const ParticleSet& dataSet, d4Matrix proj, int s,
-		const CTF& ctf, double pixelSize,
+		const CTF& ctf, const gravis::d3Vector &tomo_centre, double pixelSize,
 		const AberrationsCache& aberrationsCache,
 		const std::vector<BufferedImage<fComplex>>& referenceFS,
 		HalfSet halfSet,
@@ -35,7 +35,7 @@ BufferedImage<fComplex> Prediction::predictModulated(
 		const int* xRanges)
 {
 	BufferedImage<fComplex> prediction = predictFS(
-				particle_id, dataSet, proj, s, referenceFS, halfSet, xRanges);
+				particle_id, dataSet, proj, s, tomo_centre, referenceFS, halfSet, xRanges);
 
 	const int og = dataSet.getOpticsGroup(particle_id);
 	
@@ -84,14 +84,14 @@ BufferedImage<fComplex> Prediction::predictModulated(
 }
 
 BufferedImage<fComplex> Prediction::predictFS(
-		ParticleIndex particle_id, const ParticleSet& dataSet, d4Matrix proj, int s,
+		ParticleIndex particle_id, const ParticleSet& dataSet, d4Matrix proj, int s, const gravis::d3Vector &tomo_centre,
 		const std::vector<BufferedImage<fComplex>>& referenceFS,
 		HalfSet halfSet,
 		const int* xRanges)
 {
 	const int sh = s/2 + 1;
 
-	const d4Matrix particleToTomo = dataSet.getMatrix4x4(particle_id, s, s, s);
+	const d4Matrix particleToTomo = dataSet.getMatrix4x4(particle_id, tomo_centre, s, s, s);
 	const d4Matrix projPart = proj * particleToTomo;
 
 	const int hs0 = dataSet.getHalfSet(particle_id);
@@ -171,7 +171,7 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 		const ParticleIndex part_id = partIndices[p];
 		
 		const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(
-					part_id, fc, tomogram.optics.pixelSize);
+					part_id, fc, tomogram.centre, tomogram.optics.pixelSize);
 		
 		d4Matrix projCut;
 		
@@ -197,8 +197,9 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 
 			BufferedImage<fComplex> prediction = Prediction::predictModulated(
 					part_id, dataSet, projCut, s, 
-					tomogram.getCtf(f, dataSet.getPosition(part_id)),
-					tomogram.optics.pixelSize,
+					tomogram.getCtf(f, dataSet.getPosition(part_id, tomogram.centre, true)),
+					tomogram.centre,
+                    tomogram.optics.pixelSize,
 					aberrationsCache,
 					referenceMap.image_FS, halfSet,
 					AmplitudeAndPhaseModulated,
@@ -381,12 +382,13 @@ void Prediction::predictMicrograph(
 		const ParticleIndex part_id = partIndices[p];
 
 		const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(
-					part_id, fc, tomogram.optics.pixelSize);
+					part_id, fc, tomogram.centre, tomogram.optics.pixelSize);
 
 		BufferedImage<fComplex> prediction_FS = Prediction::predictModulated(
 				part_id, dataSet, tomogram.projectionMatrices[f], s,
-				tomogram.getCtf(f, dataSet.getPosition(part_id)),
-				tomogram.optics.pixelSize,
+				tomogram.getCtf(f, dataSet.getPosition(part_id, tomogram.centre, true)),
+				tomogram.centre,
+                tomogram.optics.pixelSize,
 				aberrationsCache,
 				referenceMap.image_FS,
 				halfSet,

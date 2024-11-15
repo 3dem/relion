@@ -140,6 +140,7 @@ enum EMDLabel
 
 	EMDL_CTF_ASTIGMATISM,
 	EMDL_CTF_BFACTOR, ///< B-factor
+    EMDL_CTF_BFACTOR_PERELECTRONDOSE, // Relative B-factor dose-weighting per e/A^2 dose
 	EMDL_CTF_MAXRES, ///< Maximum resolution with Thon rings
 	EMDL_CTF_VALIDATIONSCORE, ///< Gctf-based validation score for CTF fit
 	EMDL_CTF_SCALEFACTOR, ///< linear scale-factor
@@ -155,6 +156,7 @@ enum EMDLabel
 	EMDL_CTF_ENERGY_LOSS, ///< Energy loss
 	EMDL_CTF_FOM, ///< ctffind FOM (CC) for quality of CTF-fit
 	EMDL_CTF_IMAGE, ///< name of an image describing the CTF model
+	EMDL_CTF_ICERINGDENSITY, ///< sum of image power in ice ring
 	EMDL_CTF_LENS_STABILITY, ///< Lens stability
 	EMDL_CTF_MAGNIFICATION, ///< Magnification used for CTF-determination (deprecated)
 	EMDL_CTF_PHASESHIFT, ///< Phase-shift from a phase plate
@@ -185,7 +187,10 @@ enum EMDLabel
 	EMDL_IMAGE_MAG_MATRIX_10,
 	EMDL_IMAGE_MAG_MATRIX_11,
 
-	EMDL_IMAGE_COORD_X,
+    EMDL_IMAGE_CENT_COORD_X_ANGST,
+    EMDL_IMAGE_CENT_COORD_Y_ANGST,
+    EMDL_IMAGE_CENT_COORD_Z_ANGST,
+    EMDL_IMAGE_COORD_X,
 	EMDL_IMAGE_COORD_Y,
 	EMDL_IMAGE_COORD_Z,
 	EMDL_IMAGE_FRAME_NR,
@@ -343,7 +348,8 @@ enum EMDLabel
 	EMDL_OPTIMISER_CHANGES_OPTIMAL_CLASSES,
 	EMDL_OPTIMISER_COARSE_SIZE,
 	EMDL_OPTIMISER_DATA_ARE_CTF_PHASE_FLIPPED,
-	EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED,
+    EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED,
+    EMDL_OPTIMISER_DATA_ARE_CTF_CORRECTED,
 	EMDL_OPTIMISER_DATA_STARFILE,
 	EMDL_OPTIMISER_DO_AUTO_REFINE,
 	EMDL_OPTIMISER_DO_AUTO_SAMPLING,
@@ -353,6 +359,8 @@ enum EMDLabel
 	EMDL_OPTIMISER_DO_CORRECT_NORM,
 	EMDL_OPTIMISER_DO_CORRECT_SCALE,
 	EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT,
+	EMDL_OPTIMISER_DO_BLUSH,
+	EMDL_OPTIMISER_DO_BLUSH_NO_SPECTRAL_TRAILING,
 	EMDL_OPTIMISER_DO_REALIGN_MOVIES,
 	EMDL_OPTIMISER_DO_MAP,
 	EMDL_OPTIMISER_GRAD_REFINE,
@@ -432,6 +440,9 @@ enum EMDLabel
 	EMDL_OPTIMISER_NR_ITERATIONS,
 	EMDL_OPTIMISER_NR_ITER_WO_RESOL_GAIN,
 	EMDL_OPTIMISER_NR_ITER_WO_HIDDEN_VAR_CHANGES,
+    EMDL_OPTIMISER_OFFSET_RANGE_X,
+    EMDL_OPTIMISER_OFFSET_RANGE_Y,
+    EMDL_OPTIMISER_OFFSET_RANGE_Z,
 	EMDL_OPTIMISER_OPTICS_STARFILE,
 	EMDL_OPTIMISER_OUTPUT_ROOTNAME,
 	EMDL_OPTIMISER_PARTICLE_DIAMETER,
@@ -498,7 +509,8 @@ enum EMDLabel
 	EMDL_PIPELINE_JOB_COUNTER,
 	EMDL_PIPELINE_NODE_NAME,
 	EMDL_PIPELINE_NODE_TYPE,
-	EMDL_PIPELINE_NODE_TYPE_LABEL,
+    EMDL_PIPELINE_NODE_TYPE_LABEL,
+    EMDL_PIPELINE_NODE_TYPE_DEPTH,
 	EMDL_PIPELINE_PROCESS_ALIAS,
 	EMDL_PIPELINE_PROCESS_NAME,
 	EMDL_PIPELINE_PROCESS_TYPE,
@@ -606,28 +618,55 @@ enum EMDLabel
 
 	EMDL_TOMO_NAME,
 	EMDL_TOMO_TILT_SERIES_NAME,
+    EMDL_TOMO_TILT_SERIES_STARFILE,
+	EMDL_TOMO_TILT_MOVIE_FRAMECOUNT,
+    EMDL_TOMO_ETOMO_DIRECTIVE_FILE,
+    EMDL_TOMO_ARETOMO_TILTANGLE_OFFSET,
+    EMDL_TOMO_ARETOMO_TILTAXIS_SCORE,
+    EMDL_TOMO_IMOD_LEAVEOUT_ERROR,
+    EMDL_TOMO_IMOD_ERROR_MEAN,
+    EMDL_TOMO_IMOD_ERROR_STDDEV,
 	EMDL_TOMO_FRAME_COUNT,
-	EMDL_TOMO_SIZE_X,
+	EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME,
+    EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF1_FILE_NAME,
+	EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF2_FILE_NAME,
+    EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_FILE_NAME,
+    EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_HALF1_FILE_NAME,
+    EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_HALF2_FILE_NAME,
+	EMDL_TOMO_DENOISED_TOMOGRAM_FILE_NAME,
+    EMDL_TOMO_SIZE_X,
 	EMDL_TOMO_SIZE_Y,
 	EMDL_TOMO_SIZE_Z,
 	EMDL_TOMO_PROJECTION_X,
 	EMDL_TOMO_PROJECTION_Y,
 	EMDL_TOMO_PROJECTION_Z,
 	EMDL_TOMO_PROJECTION_W,
+    EMDL_TOMO_XTILT,
+    EMDL_TOMO_YTILT,
+    EMDL_TOMO_ZROT,
+    EMDL_TOMO_XSHIFT_ANGST,
+    EMDL_TOMO_YSHIFT_ANGST,
 	EMDL_TOMO_HANDEDNESS,
 	EMDL_TOMO_FIDUCIALS_STARFILE,
 	EMDL_TOMO_TILT_SERIES_PIXEL_SIZE,
-	EMDL_TOMO_SUBTOMOGRAM_ROT,
+	EMDL_MICROGRAPH_EVEN,
+	EMDL_MICROGRAPH_ODD,
+    EMDL_TOMO_SUBTOMOGRAM_ROT,
 	EMDL_TOMO_SUBTOMOGRAM_TILT,
 	EMDL_TOMO_SUBTOMOGRAM_PSI,
+    EMDL_TOMO_SUBTOMOGRAM_STACK2D,
 	EMDL_TOMO_SUBTOMOGRAM_BINNING,
-	EMDL_TOMO_PARTICLE_NAME,
+    EMDL_TOMO_TOMOGRAM_BINNING,
+    EMDL_TOMO_TOMOGRAM_THICKNESS,
+    EMDL_TOMO_PARTICLE_NAME,
 	EMDL_TOMO_PARTICLE_ID,
 	EMDL_TOMO_MANIFOLD_INDEX,
 	EMDL_TOMO_MANIFOLD_TYPE,
 	EMDL_TOMO_MANIFOLD_PARAMETERS,
 	EMDL_TOMO_DEFOCUS_SLOPE,
-
+	EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE,
+	EMDL_TOMO_NOMINAL_TILT_AXIS_ANGLE,
+	EMDL_TOMO_NOMINAL_DEFOCUS,
 	EMDL_TOMO_PARTICLES_FILE_NAME,
 	EMDL_TOMO_TOMOGRAMS_FILE_NAME,
 	EMDL_TOMO_MANIFOLDS_FILE_NAME,
@@ -636,6 +675,7 @@ enum EMDLabel
 	EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME,
 	EMDL_TOMO_REFERENCE_MASK_FILE_NAME,
 	EMDL_TOMO_REFERENCE_FSC_FILE_NAME,
+    EMDL_TOMO_VISIBLE_FRAMES,
 
 	EMDL_TOMO_IMPORT_OFFSET_X,
 	EMDL_TOMO_IMPORT_OFFSET_Y,
@@ -673,7 +713,7 @@ enum EMDLabel
 
 enum EMDLabelType
 {
-	EMDL_INT, EMDL_BOOL, EMDL_DOUBLE, EMDL_STRING, EMDL_DOUBLE_VECTOR, EMDL_UNKNOWN
+	EMDL_INT, EMDL_BOOL, EMDL_DOUBLE, EMDL_STRING, EMDL_INT_VECTOR, EMDL_DOUBLE_VECTOR, EMDL_UNKNOWN
 };
 
 class EMDL
@@ -702,7 +742,8 @@ public:
 	static bool isString(const EMDLabel &label);
 	static bool isDouble(const EMDLabel &label);
 	static bool isNumber(const EMDLabel &label);
-	static bool isDoubleVector(const EMDLabel &label);
+    static bool isIntVector(const EMDLabel &label);
+    static bool isDoubleVector(const EMDLabel &label);
 	static bool isVector(const EMDLabel &label);
 	static bool isUnknown(const EMDLabel &label);
 
@@ -827,7 +868,8 @@ private:
         EMDL::addLabel(EMDL_CLASS_PREDICTED_SCORE, EMDL_DOUBLE, "rlnPredictedClassScore", "2D class merit scores predicted by RELION model.");
 
 		EMDL::addLabel(EMDL_CTF_ASTIGMATISM, EMDL_DOUBLE, "rlnCtfAstigmatism", "Absolute value of the difference between defocus in U- and V-direction (in A)");
-		EMDL::addLabel(EMDL_CTF_BFACTOR, EMDL_DOUBLE, "rlnCtfBfactor", "B-factor (in A^2) that describes CTF power spectrum fall-off");
+        EMDL::addLabel(EMDL_CTF_BFACTOR, EMDL_DOUBLE, "rlnCtfBfactor", "B-factor (in A^2) that describes CTF power spectrum fall-off");
+        EMDL::addLabel(EMDL_CTF_BFACTOR_PERELECTRONDOSE, EMDL_DOUBLE, "rlnCtfBfactorPerElectronDose", "Relative factor with which to multiply B-factors per e/A^2 dose");
 		EMDL::addLabel(EMDL_CTF_MAXRES, EMDL_DOUBLE, "rlnCtfMaxResolution", "Estimated maximum resolution (in A) of significant CTF Thon rings");
 		EMDL::addLabel(EMDL_CTF_VALIDATIONSCORE, EMDL_DOUBLE, "rlnCtfValidationScore", "Gctf-based validation score for the quality of the CTF fit");
 		EMDL::addLabel(EMDL_CTF_SCALEFACTOR, EMDL_DOUBLE, "rlnCtfScalefactor", "Linear scale-factor on the CTF (values between 0 and 1)");
@@ -842,7 +884,8 @@ private:
 		EMDL::addLabel(EMDL_CTF_ENERGY_LOSS, EMDL_DOUBLE, "rlnEnergyLoss", "Energy loss (in eV)");
 		EMDL::addLabel(EMDL_CTF_FOM, EMDL_DOUBLE, "rlnCtfFigureOfMerit", "Figure of merit for the fit of the CTF (not used inside relion_refine)");
 		EMDL::addLabel(EMDL_CTF_IMAGE, EMDL_STRING, "rlnCtfImage", "Name of an image with all CTF values");
-		EMDL::addLabel(EMDL_CTF_LENS_STABILITY, EMDL_DOUBLE, "rlnLensStability", "Lens stability (in ppm)");
+		EMDL::addLabel(EMDL_CTF_ICERINGDENSITY, EMDL_DOUBLE, "rlnCtfIceRingDensity", "Power of the image in the ice ring frequency range (0.25-0.28 A-1)");
+        EMDL::addLabel(EMDL_CTF_LENS_STABILITY, EMDL_DOUBLE, "rlnLensStability", "Lens stability (in ppm)");
 		EMDL::addLabel(EMDL_CTF_MAGNIFICATION, EMDL_DOUBLE, "rlnMagnification", "Magnification at the detector (in times)");
 		EMDL::addLabel(EMDL_CTF_PHASESHIFT, EMDL_DOUBLE, "rlnPhaseShift", "Phase-shift from a phase-plate (in degrees)");
 		EMDL::addLabel(EMDL_CTF_CONVERGENCE_CONE, EMDL_DOUBLE, "rlnConvergenceCone", "Convergence cone (in mrad)");
@@ -872,6 +915,9 @@ private:
 		EMDL::addLabel(EMDL_IMAGE_MAG_MATRIX_10, EMDL_DOUBLE, "rlnMagMat10", "Anisotropic magnification matrix, element 2,1");
 		EMDL::addLabel(EMDL_IMAGE_MAG_MATRIX_11, EMDL_DOUBLE, "rlnMagMat11", "Anisotropic magnification matrix, element 2,2");
 
+        EMDL::addLabel(EMDL_IMAGE_CENT_COORD_X_ANGST, EMDL_DOUBLE, "rlnCenteredCoordinateXAngst", "X-Position of an image in a micrograph (in Angstroms, with the center being 0,0)");
+        EMDL::addLabel(EMDL_IMAGE_CENT_COORD_Y_ANGST, EMDL_DOUBLE, "rlnCenteredCoordinateYAngst", "Y-Position of an image in a micrograph (in Angstroms, with the center being 0,0)");
+        EMDL::addLabel(EMDL_IMAGE_CENT_COORD_Z_ANGST, EMDL_DOUBLE, "rlnCenteredCoordinateZAngst", "Z-Position of an image in a 3D micrograph, i.e. tomogram (in Angstroms, with the center being 0,0,0)");
 		EMDL::addLabel(EMDL_IMAGE_COORD_X, EMDL_DOUBLE, "rlnCoordinateX", "X-Position of an image in a micrograph (in pixels)");
 		EMDL::addLabel(EMDL_IMAGE_COORD_Y, EMDL_DOUBLE, "rlnCoordinateY", "Y-Position of an image in a micrograph (in pixels)");
 		EMDL::addLabel(EMDL_IMAGE_COORD_Z, EMDL_DOUBLE, "rlnCoordinateZ", "Z-Position of an image in a 3D micrograph, i.e. tomogram (in pixels)");
@@ -952,7 +998,7 @@ private:
 		EMDL::addLabel(EMDL_MICROGRAPH_SHIFT_Y, EMDL_DOUBLE, "rlnMicrographShiftY", "Y shift of a (patch of) micrograph");
 		EMDL::addLabel(EMDL_MICROGRAPH_MOTION_COEFFS_IDX, EMDL_INT, "rlnMotionModelCoeffsIdx", "Index of a coefficient of a motion model");
 		EMDL::addLabel(EMDL_MICROGRAPH_MOTION_COEFF, EMDL_DOUBLE, "rlnMotionModelCoeff", "A coefficient of a motion model");
-		EMDL::addLabel(EMDL_MICROGRAPH_EER_UPSAMPLING, EMDL_INT, "rlnEERUpsampling", "EER upsampling ratio (1 = 4K, 2 = 8K)");
+		EMDL::addLabel(EMDL_MICROGRAPH_EER_UPSAMPLING, EMDL_INT, "rlnEERUpsampling", "EER upsampling ratio (1 = physical, 2 = 2x super-resolution)");
 		EMDL::addLabel(EMDL_MICROGRAPH_EER_GROUPING, EMDL_INT, "rlnEERGrouping", "The number of hardware frames to group");
 
 		EMDL::addLabel(EMDL_MLMODEL_ACCURACY_ROT, EMDL_DOUBLE, "rlnAccuracyRotations", "Estimated accuracy (in degrees) with which rotations can be assigned");
@@ -1030,16 +1076,19 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_CHANGES_OPTIMAL_ORIENTS, EMDL_DOUBLE, "rlnChangesOptimalOrientations", "The average change in optimal orientation in the last iteration (in degrees) ");
 		EMDL::addLabel(EMDL_OPTIMISER_CHANGES_OPTIMAL_CLASSES, EMDL_DOUBLE, "rlnChangesOptimalClasses", "The number of particles that changed their optimal clsas assignment in the last iteration");
 		EMDL::addLabel(EMDL_OPTIMISER_DATA_ARE_CTF_PHASE_FLIPPED, EMDL_BOOL, "rlnCtfDataArePhaseFlipped", "Flag to indicate that the input images have been phase-flipped");
-		EMDL::addLabel(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, EMDL_BOOL, "rlnCtfDataAreCtfPremultiplied", "Flag to indicate that the input images have been premultiplied with their CTF");
+        EMDL::addLabel(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, EMDL_BOOL, "rlnCtfDataAreCtfPremultiplied", "Flag to indicate that the input images have been premultiplied with their CTF");
+        EMDL::addLabel(EMDL_OPTIMISER_DATA_ARE_CTF_CORRECTED, EMDL_BOOL, "rlnCtfDataAreCtfCorrected", "Flag to indicate that the input images have been corrected for their CTFs already");
 		EMDL::addLabel(EMDL_OPTIMISER_DATA_STARFILE, EMDL_STRING, "rlnExperimentalDataStarFile", "STAR file with metadata for the experimental images");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_CORRECT_CTF, EMDL_BOOL, "rlnDoCorrectCtf", "Flag to indicate that CTF-correction should be performed");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_CORRECT_MAGNIFICATION, EMDL_BOOL, "rlnDoCorrectMagnification", "Flag to indicate that (per-group) magnification correction should be performed");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_CORRECT_NORM, EMDL_BOOL, "rlnDoCorrectNorm", "Flag to indicate that (per-image) normalisation-error correction should be performed");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_CORRECT_SCALE, EMDL_BOOL, "rlnDoCorrectScale", "Flag to indicate that internal (per-group) intensity-scale correction should be performed");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT, EMDL_BOOL, "rlnDoExternalReconstruct", "Flag to indicate that the reconstruction will be performed outside relion_refine, e.g. for learned priors");
+		EMDL::addLabel(EMDL_OPTIMISER_DO_BLUSH, EMDL_BOOL, "rlnDoBlush", "Flag to indicate that the reconstruction will be performed with Blush regularization.");
+		EMDL::addLabel(EMDL_OPTIMISER_DO_BLUSH_NO_SPECTRAL_TRAILING, EMDL_BOOL, "rlnBlushNoSpectralTrailing", "Flag to indicate that Blush regularization will be performed without spectral trailing.");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_REALIGN_MOVIES, EMDL_BOOL, "rlnDoRealignMovies", "Flag to indicate that individual frames of movies are being re-aligned");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_MAP, EMDL_BOOL, "rlnDoMapEstimation", "Flag to indicate that MAP estimation should be performed (otherwise ML estimation)");
-        EMDL::addLabel(EMDL_OPTIMISER_GRAD_REFINE, EMDL_BOOL, "rlnDoGradientRefine", "Perform gradient refine.");
+		EMDL::addLabel(EMDL_OPTIMISER_GRAD_REFINE, EMDL_BOOL, "rlnDoGradientRefine", "Perform gradient refine.");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_GRAD, EMDL_BOOL, "rlnDoStochasticGradientDescent", "Flag to indicate that gradient refinement should be performed (otherwise expectation maximisation)");
 		EMDL::addLabel(EMDL_OPTIMISER_GRAD_EM_ITERS, EMDL_INT, "rlnGradEmIters", "Finish gradient optimization with this many iterations of Expectation-Maximization.");
 		EMDL::addLabel(EMDL_OPTIMISER_GRAD_HAS_CONVERGED, EMDL_BOOL, "rlnGradHasConverged", "Has gradient refinement converged.");
@@ -1119,7 +1168,10 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_NR_ITERATIONS, EMDL_INT, "rlnNumberOfIterations", "Maximum number of iterations to be performed");
 		EMDL::addLabel(EMDL_OPTIMISER_NR_ITER_WO_RESOL_GAIN, EMDL_INT, "rlnNumberOfIterWithoutResolutionGain", "Number of iterations that have passed without a gain in resolution");
 		EMDL::addLabel(EMDL_OPTIMISER_NR_ITER_WO_HIDDEN_VAR_CHANGES, EMDL_INT, "rlnNumberOfIterWithoutChangingAssignments", "Number of iterations that have passed without large changes in orientation and class assignments");
-		EMDL::addLabel(EMDL_OPTIMISER_OPTICS_STARFILE, EMDL_STRING, "rlnOpticsStarFile", "STAR file with metadata for the optical groups (new as of version 3.1)");
+        EMDL::addLabel(EMDL_OPTIMISER_OFFSET_RANGE_X,EMDL_DOUBLE, "rlnOffsetRangeX", "Search range for offsets in the X-direction (in Angstrom)");
+        EMDL::addLabel(EMDL_OPTIMISER_OFFSET_RANGE_Y,EMDL_DOUBLE, "rlnOffsetRangeY", "Search range for offsets in the Y-direction (in Angstrom)");
+        EMDL::addLabel(EMDL_OPTIMISER_OFFSET_RANGE_Z,EMDL_DOUBLE, "rlnOffsetRangeZ", "Search range for offsets in the Z-direction (in Angstrom)");
+        EMDL::addLabel(EMDL_OPTIMISER_OPTICS_STARFILE, EMDL_STRING, "rlnOpticsStarFile", "STAR file with metadata for the optical groups (new as of version 3.1)");
 		EMDL::addLabel(EMDL_OPTIMISER_OUTPUT_ROOTNAME, EMDL_STRING, "rlnOutputRootName", "Rootname for all output files (this may include a directory structure, which should then exist)");
 		EMDL::addLabel(EMDL_OPTIMISER_PARTICLE_DIAMETER, EMDL_DOUBLE, "rlnParticleDiameter", "Diameter of the circular mask to be applied to all experimental images (in Angstroms)");
 		EMDL::addLabel(EMDL_OPTIMISER_RADIUS_MASK_3D_MAP, EMDL_INT, "rlnRadiusMaskMap", "Radius of the spherical mask to be applied to all references (in Angstroms)");
@@ -1188,7 +1240,8 @@ private:
 		EMDL::addLabel(EMDL_PIPELINE_JOB_COUNTER, EMDL_INT, "rlnPipeLineJobCounter", "Number of the last job in the pipeline");
 		EMDL::addLabel(EMDL_PIPELINE_NODE_NAME, EMDL_STRING , "rlnPipeLineNodeName", "Name of a Node in the pipeline");
 		EMDL::addLabel(EMDL_PIPELINE_NODE_TYPE, EMDL_INT, "rlnPipeLineNodeType", "Type of a Node in the pipeline");
-		EMDL::addLabel(EMDL_PIPELINE_NODE_TYPE_LABEL, EMDL_STRING, "rlnPipeLineNodeTypeLabel", "Name for the Node Type in the pipeline");
+        EMDL::addLabel(EMDL_PIPELINE_NODE_TYPE_LABEL, EMDL_STRING, "rlnPipeLineNodeTypeLabel", "Name for the Node Type in the pipeline");
+        EMDL::addLabel(EMDL_PIPELINE_NODE_TYPE_DEPTH, EMDL_INT, "rlnPipeLineNodeTypeLabelDepth", "How many levels down to use for .Nodes directory (only 1 by default)");
 		EMDL::addLabel(EMDL_PIPELINE_PROCESS_ALIAS, EMDL_STRING , "rlnPipeLineProcessAlias", "Alias of a Process in the pipeline");
 		EMDL::addLabel(EMDL_PIPELINE_PROCESS_NAME, EMDL_STRING , "rlnPipeLineProcessName", "Name of a Process in the pipeline");
 		EMDL::addLabel(EMDL_PIPELINE_PROCESS_TYPE, EMDL_INT, "rlnPipeLineProcessType", "Type of a Process in the pipeline");
@@ -1290,10 +1343,33 @@ private:
 
 		EMDL::addLabel(EMDL_TOMO_NAME, EMDL_STRING, "rlnTomoName", "Arbitrary name for a tomogram");
 		EMDL::addLabel(EMDL_TOMO_TILT_SERIES_NAME, EMDL_STRING, "rlnTomoTiltSeriesName", "Tilt series file name");
+        EMDL::addLabel(EMDL_TOMO_TILT_SERIES_STARFILE, EMDL_STRING, "rlnTomoTiltSeriesStarFile", "Tilt series starfile");
+		EMDL::addLabel(EMDL_TOMO_TILT_MOVIE_FRAMECOUNT, EMDL_INT, "rlnTomoTiltMovieFrameCount", "Number of frames in the tilt series movies");
+		EMDL::addLabel(EMDL_TOMO_ETOMO_DIRECTIVE_FILE, EMDL_STRING, "rlnEtomoDirectiveFile", "Location of the etomo directive file (.edf) from tilt series alignment");
+        EMDL::addLabel(EMDL_TOMO_ARETOMO_TILTANGLE_OFFSET, EMDL_DOUBLE, "rlnAreTomoTiltangleOffset", "Tiltangle offset (in degrees) as refined during tiltseries alignment by AreTomo2");
+        EMDL::addLabel(EMDL_TOMO_ARETOMO_TILTAXIS_SCORE, EMDL_DOUBLE, "rlnAreTomoTiltAxisScore", "Best score for the tilt axis refinement as reported during tiltseries alignment by AreTomo2");
+        EMDL::addLabel(EMDL_TOMO_IMOD_LEAVEOUT_ERROR, EMDL_DOUBLE, "rlnIMODLeaveOutError", "Leave-out error (in nm) as reported by Imod for tiltseries alignment");
+        EMDL::addLabel(EMDL_TOMO_IMOD_ERROR_MEAN, EMDL_DOUBLE, "rlnIMODResidualErrorMean", "Mean of the residual error (in nm) as reported by Imod for tiltseries alignment");
+        EMDL::addLabel(EMDL_TOMO_IMOD_ERROR_STDDEV, EMDL_DOUBLE, "rlnIMODResidualErrorStddev", "Standard deviation of the residual error (in nm) as reported by Imod for tiltseries alignment");
+        EMDL::addLabel(EMDL_TOMO_FRAME_COUNT, EMDL_INT, "rlnTomoFrameCount", "Number of tilts in a tilt series");
+        EMDL::addLabel(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME, EMDL_STRING, "rlnTomoReconstructedTomogram", "File name of a reconstructed tomogram");
+        EMDL::addLabel(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF1_FILE_NAME, EMDL_STRING, "rlnTomoReconstructedTomogramHalf1", "File name of a reconstructed tomogram from even numbered movie frames or tilt image index");
+        EMDL::addLabel(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF2_FILE_NAME, EMDL_STRING, "rlnTomoReconstructedTomogramHalf2", "File name of a reconstructed tomogram from odd numbered movie frames or tilt image index");
+        EMDL::addLabel(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_FILE_NAME, EMDL_STRING, "rlnTomogramProjection", "File name of a 2D projection of a reconstructed tomogram");
+        EMDL::addLabel(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_HALF1_FILE_NAME, EMDL_STRING, "rlnTomogramProjectionHalf1", "File name of a 2D projection of a reconstructed tomogram from even numbered movie frames or tilt image index");
+        EMDL::addLabel(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_HALF2_FILE_NAME, EMDL_STRING, "rlnTomogramHProjectionalf2", "File name of a 2D projection of a reconstructed tomogram from odd numbered movie frames or tilt image index");
+        EMDL::addLabel(EMDL_TOMO_DENOISED_TOMOGRAM_FILE_NAME, EMDL_STRING, "rlnTomoDenoisedTomogram", "File name of a denoised tomogram");
+
 		EMDL::addLabel(EMDL_TOMO_FRAME_COUNT, EMDL_INT, "rlnTomoFrameCount", "Number of tilts in a tilt series");
 		EMDL::addLabel(EMDL_TOMO_SIZE_X, EMDL_INT, "rlnTomoSizeX", "Width of a bin-1 tomogram in pixels");
 		EMDL::addLabel(EMDL_TOMO_SIZE_Y, EMDL_INT, "rlnTomoSizeY", "Height of a bin-1 tomogram in pixels");
 		EMDL::addLabel(EMDL_TOMO_SIZE_Z, EMDL_INT, "rlnTomoSizeZ", "Depth of a bin-1 tomogram in pixels");
+
+        EMDL::addLabel(EMDL_TOMO_XTILT, EMDL_DOUBLE, "rlnTomoXTilt", "Euler angle for rotation of tomogram around X-axis");
+		EMDL::addLabel(EMDL_TOMO_YTILT, EMDL_DOUBLE, "rlnTomoYTilt", "Euler angle for rotation of tomogram around Y-axis");
+        EMDL::addLabel(EMDL_TOMO_ZROT, EMDL_DOUBLE, "rlnTomoZRot", "Euler angle for rotation of tomogram around Z-axis");
+        EMDL::addLabel(EMDL_TOMO_XSHIFT_ANGST, EMDL_DOUBLE, "rlnTomoXShiftAngst", "X-translation (in A) to align the projection of a tomogram with the tilt series image");
+        EMDL::addLabel(EMDL_TOMO_YSHIFT_ANGST, EMDL_DOUBLE, "rlnTomoYShiftAngst", "Y-translation (in A) to align the projection of a tomogram with the tilt series image");
 
 		EMDL::addLabel(EMDL_TOMO_PROJECTION_X, EMDL_DOUBLE_VECTOR, "rlnTomoProjX", "First row of the projection matrix");
 		EMDL::addLabel(EMDL_TOMO_PROJECTION_Y, EMDL_DOUBLE_VECTOR, "rlnTomoProjY", "Second row of the projection matrix");
@@ -1304,11 +1380,14 @@ private:
 
 		EMDL::addLabel(EMDL_TOMO_FIDUCIALS_STARFILE, EMDL_STRING, "rlnTomoFiducialsStarFile", "STAR file containing the 3D locations of fiducial markers");
 		EMDL::addLabel(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, EMDL_DOUBLE, "rlnTomoTiltSeriesPixelSize", "Pixel size of the original tilt series");
-		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_ROT, EMDL_DOUBLE, "rlnTomoSubtomogramRot", "First Euler angle of a subtomogram (rot, in degrees)");
+        EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_ROT, EMDL_DOUBLE, "rlnTomoSubtomogramRot", "First Euler angle of a subtomogram (rot, in degrees)");
 		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_TILT, EMDL_DOUBLE, "rlnTomoSubtomogramTilt", "Second Euler angle of a subtomogram (tilt, in degrees)");
 		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_PSI, EMDL_DOUBLE, "rlnTomoSubtomogramPsi", "Third Euler angle of a subtomogram (psi, in degrees)");
+        EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_STACK2D, EMDL_BOOL, "rlnTomoSubTomosAre2DStacks", "This flag is set to true if subtomograms are saved as 2D image stacks");
 		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_BINNING, EMDL_DOUBLE, "rlnTomoSubtomogramBinning", "Binning level of a subtomogram");
-		EMDL::addLabel(EMDL_TOMO_PARTICLE_NAME, EMDL_STRING, "rlnTomoParticleName", "Name of each individual particle");
+        EMDL::addLabel(EMDL_TOMO_TOMOGRAM_BINNING, EMDL_DOUBLE, "rlnTomoTomogramBinning", "Binning level of a  reconstructed tomogram");
+        EMDL::addLabel(EMDL_TOMO_TOMOGRAM_THICKNESS, EMDL_DOUBLE, "rlnTomoTomogramThickness", "Estimated thickness of a tomogram (in nm)");
+        EMDL::addLabel(EMDL_TOMO_PARTICLE_NAME, EMDL_STRING, "rlnTomoParticleName", "Name of each individual particle");
 		EMDL::addLabel(EMDL_TOMO_PARTICLE_ID, EMDL_INT, "rlnTomoParticleId", "Unique particle index");
 
 		EMDL::addLabel(EMDL_TOMO_MANIFOLD_INDEX, EMDL_INT, "rlnTomoManifoldIndex", "Index of a 2D manifold in a tomogram");
@@ -1324,6 +1403,10 @@ private:
 		EMDL::addLabel(EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME, EMDL_STRING, "rlnTomoReferenceMap2File", "Name of second reference map file");
 		EMDL::addLabel(EMDL_TOMO_REFERENCE_MASK_FILE_NAME, EMDL_STRING, "rlnTomoReferenceMaskFile", "Name of mask file corresponding to a pair of reference maps");
 		EMDL::addLabel(EMDL_TOMO_REFERENCE_FSC_FILE_NAME, EMDL_STRING, "rlnTomoReferenceFscFile", "Name of FSC STAR file corresponding to a pair of reference maps");
+		EMDL::addLabel(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE, EMDL_DOUBLE, "rlnTomoNominalStageTiltAngle", "Nominal value for the stage tilt angle");
+		EMDL::addLabel(EMDL_TOMO_NOMINAL_TILT_AXIS_ANGLE, EMDL_DOUBLE, "rlnTomoNominalTiltAxisAngle", "Nominal value for the angle of the tilt axis");
+		EMDL::addLabel(EMDL_TOMO_NOMINAL_DEFOCUS, EMDL_DOUBLE, "rlnTomoNominalDefocus", "Nominal value for the defocus in the tilt series image");
+        EMDL::addLabel(EMDL_TOMO_VISIBLE_FRAMES, EMDL_INT_VECTOR, "rlnTomoVisibleFrames", "Frames fromt he tilt series that are included in the 2D stack of a pseudo-subtomogram");
 
 		EMDL::addLabel(EMDL_TOMO_IMPORT_OFFSET_X, EMDL_DOUBLE, "rlnTomoImportOffsetX", "X offset of a tomogram");
 		EMDL::addLabel(EMDL_TOMO_IMPORT_OFFSET_Y, EMDL_DOUBLE, "rlnTomoImportOffsetY", "Y offset of a tomogram");
@@ -1352,6 +1435,8 @@ private:
 
 		EMDL::addLabel(EMDL_TOMO_TILT_MOVIE_INDEX, EMDL_INT, "rlnTomoTiltMovieIndex", "Chronological index of a tilt movie");
 		EMDL::addLabel(EMDL_TOMO_TILT_MOVIE_FILE_NAME, EMDL_STRING, "rlnTomoTiltMovieFile", "Movie containing the frames of a tilt");
+		EMDL::addLabel(EMDL_MICROGRAPH_EVEN, EMDL_STRING, "rlnMicrographNameEven", "Micrograph summed from even frames of motion corrected movie");
+		EMDL::addLabel(EMDL_MICROGRAPH_ODD, EMDL_STRING, "rlnMicrographNameOdd", "Micrograph summed from odd frames of motion corrected movie");
 
 		EMDL::addLabel(EMDL_UNKNOWN_LABEL, EMDL_UNKNOWN, "rlnUnknownLabel", "NON-RELION label: values will be ignored, yet maintained in the STAR file.");
 	 }

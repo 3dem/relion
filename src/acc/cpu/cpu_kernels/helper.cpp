@@ -1,4 +1,4 @@
-#include "src/acc/cpu/cuda_stubs.h"
+#include "src/acc/cpu/device_stubs.h"
 
 #include "src/acc/acc_ptr.h"
 #include "src/acc/acc_projector.h"
@@ -53,8 +53,7 @@ void exponentiate_weights_fine(
 			c_itrans = ( iy - (iy % oversamples_trans))/ oversamples_trans;
 
 			if( g_weights[pos+itrans] < min_diff2 || g_pdf_orientation_zeros[ix] || g_pdf_offset_zeros[c_itrans])
-		// TODO - replace with lowest() when C++11 is supported
-				g_weights[pos+itrans] = -std::numeric_limits<XFLOAT>::max(); //large negative number
+				g_weights[pos+itrans] = std::numeric_limits<XFLOAT>::lowest();
 			else
 				g_weights[pos+itrans] = g_pdf_orientation[ix] + g_pdf_offset[c_itrans] + min_diff2 - g_weights[pos+itrans];
 		}
@@ -334,148 +333,6 @@ void cpu_translate3D(T *	g_image_in,
 		}
 	}
 }
-
-template <typename T>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-inline
-#endif
-void centerFFT_2D(	int     batch_size,
-			size_t	pixel_start,
-			size_t	pixel_end,
-			T		*img_in,
-			size_t	image_size,
-			int		xdim,
-			int		ydim,
-			int		xshift,
-			int		yshift)
-{
-#ifdef DEBUG_CUDA
-	if (image_size > (size_t)std::numeric_limits<int>::max())
-		ACC_PTR_DEBUG_INFO("centerFFT_2D: image_size > std::numeric_limits<int>::max()");
-	if (image_size*(size_t)batch_size > (size_t)std::numeric_limits<int>::max())
-		ACC_PTR_DEBUG_INFO("centerFFT_2D: image_size*batch_size > std::numeric_limits<int>::max()");
-	if (pixel_end > image_size)
-		ACC_PTR_DEBUG_INFO("centerFFT_2D: pixel_end > image_size");
-#endif
-	size_t pix_start = pixel_start;
-	size_t pix_end = pixel_end;
-	for(int batch=0; batch<batch_size; batch++)
-	{
-		for(size_t pixel=pix_start; pixel < pix_end; pixel++)
-		{
-			size_t image_offset = image_size*batch;
-			int y = floorf((XFLOAT)pixel/(XFLOAT)xdim);
-			int x = pixel % xdim;				// also = pixel - y*xdim, but this depends on y having been calculated, i.e. serial evaluation
-
-			int yp = (y + yshift + ydim)%ydim;
-			int xp = (x + xshift + xdim)%xdim;
-
-			size_t n_pixel = (size_t)yp*(size_t)xdim + (size_t)xp;
-
-			T buffer                       = img_in[image_offset + n_pixel];
-			img_in[image_offset + n_pixel] = img_in[image_offset + pixel];
-			img_in[image_offset + pixel]   = buffer;
-		} // tid
-	} // batch
-}
-
-
-template void centerFFT_2D<float>(  	int		batch_size,
-										size_t	pixel_start,
-										size_t	pixel_end,
-                                        float	*img_in,
-                                        size_t	image_size,
-                                        int		xdim,
-                                        int		ydim,
-                                        int		xshift,
-                                        int		yshift);
-template void centerFFT_2D<double>(  	int		batch_size,
-										size_t	pixel_start,
-										size_t	pixel_end,
-                                        double	*img_in,
-                                        size_t	image_size,
-                                        int		xdim,
-                                        int		ydim,
-                                        int		xshift,
-                                        int		yshift);
-
-
-template <typename T>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-inline
-#endif
-void centerFFT_3D(	int     batch_size,
-			size_t	pixel_start,
-			size_t	pixel_end,
-			T        *img_in,
-			size_t	image_size,
-			int		xdim,
-			int		ydim,
-			int		zdim,
-			int		xshift,
-			int		yshift,
-			int		zshift)
-{
-#ifdef DEBUG_CUDA
-	if (image_size > (size_t)std::numeric_limits<int>::max())
-		ACC_PTR_DEBUG_INFO("centerFFT_3D: image_size > std::numeric_limits<int>::max()");
-	if (image_size*(size_t)batch_size > (size_t)std::numeric_limits<int>::max())
-		ACC_PTR_DEBUG_INFO("centerFFT_3D: image_size*batch_size > std::numeric_limits<int>::max()");
-	if (pixel_end > image_size)
-		ACC_PTR_DEBUG_INFO("centerFFT_3D: pixel_end > image_size");
-#endif
-	size_t pix_start = pixel_start;
-	size_t pix_end = pixel_end;
-	int xydim = xdim*ydim;
-	for(int batch=0; batch<batch_size; batch++)
-	{
-		size_t image_offset = image_size*batch;
-		for(size_t pixel = pix_start; pixel < pix_end; pixel++)
-		{
-			int z = floorf((XFLOAT)pixel/(XFLOAT)(xydim));
-			int xy = pixel % xydim;
-			int y = floorf((XFLOAT)xy/(XFLOAT)xdim);
-			int x = xy % xdim;
-
-			int xp = (x + xshift + xdim)%xdim;
-			int yp = (y + yshift + ydim)%ydim;
-			int zp = (z + zshift + zdim)%zdim;
-
-			size_t n_pixel = (size_t)zp*(size_t)xydim + (size_t)yp*(size_t)xdim
-					+ (size_t)xp;
-
-			T buffer                       = img_in[image_offset + n_pixel];
-			img_in[image_offset + n_pixel] = img_in[image_offset + pixel];
-			img_in[image_offset + pixel]   = buffer;
-		} // tid
-	} // batch
-}
-
-
-template void centerFFT_3D<float>(	int     batch_size,
-					size_t	pixel_start,
-					size_t	pixel_end,
-					float    *img_in,
-					size_t	image_size,
-					int		xdim,
-					int		ydim,
-					int		zdim,
-					int		xshift,
-					int		yshift,
-					int		zshift);
-template void centerFFT_3D<double>(  	int     batch_size,
-					size_t	pixel_start,
-					size_t	pixel_end,
-					double	*img_in,
-					size_t	image_size,
-					int		xdim,
-					int		ydim,
-					int		zdim,
-					int		xshift,
-					int		yshift,
-					int		zshift);
 
 /* TODO - if create optimized CPU version of autopicker
  * All these functions need to be converted to use internal loops rather than
@@ -806,6 +663,22 @@ void cpu_kernel_multi( T *A,
 	for (size_t i = 0; i < image_size; i ++)
 		OUT[i] = A[i]*B[i]*S;
 }
+
+template <typename T>
+void cpu_kernel_add(
+	T *A,
+	T  S,
+	size_t size
+)
+{
+#ifdef DEBUG_CUDA
+	if (size < 0)
+		ACC_PTR_DEBUG_INFO("cpu_kernel_add:  image_size < 0");
+#endif
+	for (size_t i = 0; i < size; i ++)
+		A[i] += S;
+}
+
 /*
 void batch_multi(   int     blockIdx_x,
 					int     blockIdx_y,
@@ -1055,8 +928,8 @@ template void CpuKernels::cpu_translate2D<XFLOAT>(XFLOAT *,
 template void CpuKernels::cpu_translate3D<XFLOAT>(XFLOAT *,
     XFLOAT *, size_t, int, int, int, int, int, int);
 
-template void CpuKernels::cpu_kernel_multi<XFLOAT>( XFLOAT *,
-	XFLOAT, size_t);
+template void CpuKernels::cpu_kernel_multi<XFLOAT>( XFLOAT *, XFLOAT, size_t);
+template void CpuKernels::cpu_kernel_add<XFLOAT>( XFLOAT *, XFLOAT, size_t);
 
 template void CpuKernels::cpu_kernel_make_eulers_3D<true, true, true>(int, int,
 		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned long, XFLOAT *, XFLOAT *);

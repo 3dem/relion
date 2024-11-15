@@ -95,10 +95,13 @@ void MlDeviceBundle::setupFixedSizedObjects()
 		HANDLE_ERROR(cudaSetDevice(device_id));
 
 	//Can we pre-generate projector plan and corresponding euler matrices for all particles
-	if (baseMLO->do_skip_align || baseMLO->do_skip_rotate || baseMLO->do_auto_refine || baseMLO->mymodel.orientational_prior_mode != NOPRIOR)
+	if (baseMLO->do_skip_align || baseMLO->do_skip_rotate || baseMLO->do_auto_refine || baseMLO->mymodel.orientational_prior_mode != NOPRIOR || baseMLO->mydata.is_tomo)
 		generateProjectionPlanOnTheFly = true;
 	else
 		generateProjectionPlanOnTheFly = false;
+
+    //std::cerr << "DEBUG: setting generateProjectionPlanOnTheFly = true;" << std::endl;
+    //generateProjectionPlanOnTheFly = true;
 
 	unsigned nr_proj = baseMLO->mymodel.PPref.size();
 	unsigned nr_bproj = baseMLO->wsum_model.BPref.size();

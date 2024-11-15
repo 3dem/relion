@@ -30,7 +30,7 @@ class DualContrastSolution
 template <typename T>
 DualContrastSolution<T>::ConditionInfo::ConditionInfo()
 :	minimum(std::numeric_limits<T>::max()),
-	maximum(-std::numeric_limits<T>::max()),
+	maximum(std::numeric_limits<T>::lowest()),
 	mean(0),
 	std_deviation(0)
 {

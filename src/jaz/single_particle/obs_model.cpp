@@ -47,7 +47,8 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt, bool do_die_
 	lambda(_opticsMdt.numberOfObjects()),
 	Cs(_opticsMdt.numberOfObjects()),
 	boxSizes(_opticsMdt.numberOfObjects(), 0.0),
-	CtfPremultiplied(_opticsMdt.numberOfObjects(), false)
+    CtfPremultiplied(_opticsMdt.numberOfObjects(), false),
+    CtfCorrected(_opticsMdt.numberOfObjects(), false)
 {
 	if (!(opticsMdt.containsLabel(EMDL_IMAGE_PIXEL_SIZE) ||
 	      opticsMdt.containsLabel(EMDL_MICROGRAPH_PIXEL_SIZE) ||
@@ -141,6 +142,12 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt, bool do_die_
 			opticsMdt.getValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, val, i);
 			CtfPremultiplied[i] = val;
 		}
+        if (opticsMdt.containsLabel(EMDL_OPTIMISER_DATA_ARE_CTF_CORRECTED))
+        {
+            bool val;
+            opticsMdt.getValue(EMDL_OPTIMISER_DATA_ARE_CTF_CORRECTED, val, i);
+            CtfCorrected[i] = val;
+        }
 
 		opticsMdt.getValue(EMDL_IMAGE_SIZE, boxSizes[i], i);
 
@@ -384,7 +391,7 @@ void ObservationModel::predictObservation(
 		shiftImageInFourierTransform(dest, dest, s_out, s_out/2 - xoff, s_out/2 - yoff);
 	}
 
-	if (applyCtf)
+	if (applyCtf && !getCtfCorrected(opticsGroup))
 	{
 		CTF ctf;
 		ctf.readByGroup(partMdt, this, particle);
@@ -792,9 +799,26 @@ bool ObservationModel::getCtfPremultiplied(int og) const
 	}
 }
 
+bool ObservationModel::getCtfCorrected(int og) const
+{
+	if (og < CtfCorrected.size())
+	{
+		return CtfCorrected[og];
+	}
+	else
+	{
+		return false;
+	}
+}
+
 void ObservationModel::setCtfPremultiplied(int og, bool val)
 {
 	CtfPremultiplied[og] = val;
+}
+
+void ObservationModel::setCtfCorrected(int og, bool val)
+{
+	CtfCorrected[og] = val;
 }
 
 std::string ObservationModel::getGroupName(int og)
@@ -929,6 +953,52 @@ void ObservationModel::sortOpticsGroups(MetaDataTable& partMdt)
 		partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, i);
 		partMdt.setValue(EMDL_IMAGE_OPTICS_GROUP, old2new[og], i);
 	}
+}
+
+void ObservationModel::removeUnusedOpticsGroups(MetaDataTable& partMdt)
+{
+    std::set<int> usedGroups;
+	for (long int i = 0; i < partMdt.numberOfObjects(); i++)
+	{
+		int og;
+		partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, i);
+        if (usedGroups.find(og) == usedGroups.end())
+		{
+			usedGroups.insert(og);
+		}
+	}
+
+    // Now renumber the remaining optics groups
+	std::map<int,int> old2new;
+    int found = 0;
+    for (int i = 0; i < opticsMdt.numberOfObjects(); i++)
+	{
+		int og;
+		opticsMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, i);
+        if (usedGroups.find(og) == usedGroups.end())
+        {
+            old2new[og] = -1;
+        }
+        else
+        {
+            old2new[og] = found + 1;
+            found++;
+        }
+
+		opticsMdt.setValue(EMDL_IMAGE_OPTICS_GROUP, old2new[og], i);
+	}
+
+    // Remove all unused optics groups from the opticsMdt
+    opticsMdt = subsetMetaDataTable(opticsMdt, EMDL_IMAGE_OPTICS_GROUP, 1, 99999);
+
+    // Change all optics_groups entries in the particle table
+	for (long int i = 0; i < partMdt.numberOfObjects(); i++)
+	{
+		int og;
+		partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, i);
+		partMdt.setValue(EMDL_IMAGE_OPTICS_GROUP, old2new[og], i);
+	}
+
 }
 
 std::vector<int> ObservationModel::getOptGroupsPresent_oneBased(const MetaDataTable& partMdt) const
@@ -1291,6 +1361,10 @@ void ObservationModel::loadSafely(std::string filename, ObservationModel& obsMod
 		{
 			mytablename = "movies";
 		}
+        else if (particlesMdt.read(filename, "tilt_images"))
+        {
+            mytablename = "tilt_images";
+        }
 	}
 	else
 	{
@@ -1319,6 +1393,8 @@ void ObservationModel::loadSafely(std::string filename, ObservationModel& obsMod
 				particlesMdt.setName("particles");
 			else if (particlesMdt.containsLabel(EMDL_MICROGRAPH_MOVIE_NAME))
 				particlesMdt.setName("movies");
+            else if (particlesMdt.containsLabel(EMDL_TOMO_TILT_MOVIE_INDEX))
+                particlesMdt.setName("tilt_images");
 			else
 				particlesMdt.setName("micrographs");
 		}
@@ -1376,16 +1452,31 @@ void ObservationModel::loadSafely(std::string filename, ObservationModel& obsMod
 			}
 		}
 	}
+
+    // Deal with subtomogram_stack2d table
+    obsModel.generalMdt.read(filename, "general");
+    if (obsModel.generalMdt.numberOfObjects() > 0)
+        obsModel.generalMdt.getValue(EMDL_TOMO_SUBTOMOGRAM_STACK2D, obsModel.isTomoStack2D);
+    else
+        obsModel.isTomoStack2D = false;
+
 }
 
 void ObservationModel::saveNew(
 		MetaDataTable &particlesMdt,
 		MetaDataTable &opticsMdt,
+        MetaDataTable &generalMdt,
 		std::string filename,
 		std::string tablename)
 {
 	std::string tmpfilename = filename + ".tmp";
 	std::ofstream of(tmpfilename);
+
+	if (generalMdt.numberOfObjects() > 0)
+    {
+        generalMdt.setName("general");
+        generalMdt.write(of);
+    }
 
 	opticsMdt.setName("optics");
 	opticsMdt.write(of);
@@ -1400,6 +1491,12 @@ void ObservationModel::save(MetaDataTable &particlesMdt, std::string filename, s
 {
 	std::string tmpfilename = filename + ".tmp";
 	std::ofstream of(tmpfilename);
+
+    if (generalMdt.numberOfObjects() > 0)
+    {
+        generalMdt.setName("general");
+        generalMdt.write(of);
+    }
 
 	opticsMdt.setName("optics");
 	opticsMdt.write(of);

@@ -53,7 +53,7 @@ ProtoAlignment::ProtoAlignment(
 	
 	for (int p = 0; p < pc; p++)
 	{
-		initialPos[p] = dataSet.getPosition(partIndices[p]);
+		initialPos[p] = dataSet.getPosition(partIndices[p], tomoCentre);
 	}
 	
 	minusCentre = d4Matrix(
@@ -318,24 +318,6 @@ std::vector<d4Matrix> ProtoAlignment::getProjections(
 	}
 		
 	return out;
-}
-
-void ProtoAlignment::shiftParticles(
-		const std::vector<double> &x,
-		const std::vector<ParticleIndex>& partIndices, 
-		ParticleSet& target) const
-{
-	if (constParticles) return;
-	
-	for (int p = 0; p < pc; p++)
-	{
-		const int part_off = getParticleDataOffset();
-
-		const d3Vector origin = initialPos[p] + d3Vector(
-			x[part_off + 3*p], x[part_off + 3*p+1], x[part_off + 3*p+2]);
-		
-		target.moveParticleTo(partIndices[p], origin);
-	}
 }
 
 std::vector<d3Vector> ProtoAlignment::getParticlePositions(
