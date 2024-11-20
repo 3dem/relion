@@ -186,7 +186,7 @@ void  SchemerOperator::readFromStarFile() const
 	// The localtion is always in input1
 	mystring = schemer_global_strings[input1].value;
 	std::vector< std::string > splits;
-	int nr_splits = splitString(mystring, ",", splits);
+	splitString(mystring, ",", splits);
 	if (splits.size() < 3) REPORT_ERROR("Need at least three comma-separated values for starfilename, tablename and labelname");
 	mystarfile = splits[0];
 	mytable = splits[1];
@@ -396,7 +396,7 @@ bool SchemerOperator::performOperation() const
 		else
 		{
 			std::vector< std::string > splits;
-			int nr_splits = splitString(schemer_global_strings[input1].value, ",", splits);
+			splitString(schemer_global_strings[input1].value, ",", splits);
 			schemer_global_floats[output].value = splits.size();
 		}
 	}
@@ -446,7 +446,7 @@ bool SchemerOperator::performOperation() const
 	{
 
 		std::vector< std::string > splits;
-		int nr_splits = splitString(schemer_global_strings[input1].value, ",", splits);
+		splitString(schemer_global_strings[input1].value, ",", splits);
 		int mypos = ROUND(val2);
 		// for negative Ns, count from the back
 		if (mypos < 0) mypos = splits.size() - mypos + 1;
@@ -1712,7 +1712,7 @@ RelionJob Scheme::prepareJob(FileName current_node)
 				FileName before = mystring.beforeFirstOf("$$");
 				FileName after = mystring.afterFirstOf("$$");
 				std::vector< std::string > splits;
-				int nr_splits = splitString(after, " ", splits);
+				splitString(after, " ", splits);
 				if (splits.size() == 0)
 				{
 					REPORT_ERROR(" ERROR: cannot find anything after $$ sign in string: " + mystring);

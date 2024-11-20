@@ -358,10 +358,10 @@ void removeQuotes(char** _str);
  *
  * Returns a the number of tokens found. The tokens are in the variable results.
  */
-int splitString(const std::string& input,
-                const std::string& delimiter,
-                std::vector< std::string >& results,
-                bool includeEmpties = false);
+void splitString(const std::string& input,
+                 const std::string& delimiter,
+                 std::vector< std::string >& results,
+                 bool includeEmpties = false);
 
 /** Returns first token (char*).
  *
