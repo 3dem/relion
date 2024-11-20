@@ -660,35 +660,73 @@ void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, Micrograph &mic)
 	// Read through the shifts file
 	int frame = first_frame_sum; // 1-indexed
 	bool have_found_final = false;
-	while (getline(in, line, '\n'))
-	{
-	// ignore all commented lines, just read first two lines with data
-		if (line.find("Full-frame alignment shift") != std::string::npos)
-		{
-			have_found_final = true;
+    bool is_version_16 = false;
+
+	while (getline(in, line)) {
+		// Primary check: Detect '-Group' with two valid integers
+		std::size_t pos = line.find("-Group");
+		if (pos != std::string::npos) {
+			std::istringstream ss(line.substr(pos + 6)); // Extract content after '-Group'
+			int group1 = -1, group2 = -1;
+			ss >> group1 >> group2; // Attempt to parse two integers
+
+			if (ss && group1 >= 0 && group2 >= 0) { // Ensure both integers were parsed correctly
+				is_version_16 = true;
+				break; // Exit loop, as version is determined
+			}
 		}
-		else if (have_found_final)
-		{
-			size_t shiftpos = line.find("shift:");
-			if (shiftpos != std::string::npos)
-			{
-				std::vector<std::string> words;
-				tokenize(line.substr(shiftpos+7), words);;
-    				if (words.size() < 2)
-    				{
-    					std::cerr << " fn_log= " << fn_log << std::endl;
-    					REPORT_ERROR("ERROR: unexpected number of words on line from MOTIONCORR logfile: " + line);
-    				}
- 		   		mic.setGlobalShift(frame, textToFloat(words[0]), textToFloat(words[1]));
-				frame++;
-			}
-			else
-			{
-				// Stop now
-				break;
-			}
+
+		// Secondary check: Detect '-InvGain' or '-TiffOrder' parameters
+		if (line.find("-InvGain") != std::string::npos || line.find("-TiffOrder") != std::string::npos) {
+			is_version_16 = true;
+			break; // Exit loop, as version is determined
 		}
 	}
+
+    // Reset stream for parsing content
+    in.clear();
+    in.seekg(0);
+
+    if (is_version_16) {
+        // Parse Full-frame alignment from MotionCor2 1.6
+        while (getline(in, line)) {
+            if (line.find("Frame") != std::string::npos && line.find("x Shift") != std::string::npos) {
+                while (getline(in, line) && !line.empty()) {
+                    std::istringstream ss(line);
+                    int frame;
+                    float x_shift, y_shift;
+                    ss >> frame >> x_shift >> y_shift;
+                    if (ss.fail()) {
+                        std::cerr << "Error: Unexpected line format in 1.6 global shifts: " << line << std::endl;
+                        continue;
+                    }
+                    mic.setGlobalShift(frame, x_shift, y_shift);
+                }
+                break;
+            }
+        }
+    } else {
+        // Parse log format from MotionCor2 1.5
+        while (getline(in, line)) {
+            if (line.find("Full-frame alignment shift") != std::string::npos) {
+                have_found_final = true;
+            } else if (have_found_final) {
+                size_t shiftpos = line.find("shift:");
+                if (shiftpos != std::string::npos) {
+                    std::vector<std::string> words;
+                    tokenize(line.substr(shiftpos + 7), words); // Get shift values after "shift:"
+                    if (words.size() < 2) {
+                        std::cerr << "Error: Unexpected number of words in log: " << line << std::endl;
+                        continue;
+                    }
+                    mic.setGlobalShift(frame, textToFloat(words[0]), textToFloat(words[1]));
+                    frame++;
+                } else {
+                    break; // Stop parsing if shift lines are done
+                }
+            }
+        }
+    }
 	in.close();
 
 	mic.first_frame = first_frame_sum;
