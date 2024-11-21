@@ -653,13 +653,16 @@ void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, Micrograph &mic)
 		return;
 
 	std::string line;
-	bool have_found_final = false;
 
+	// Start reading the ifstream at the top
+	in.seekg(0);
+
+	// Read through the shifts file
 	int frame = first_frame_sum;
-
-	// Start by attempting to parse the log file with the version 1.5 method
+	bool have_found_final = false;
 	while (getline(in, line))
 	{
+	// ignore all commented lines, just read first two lines with data
 		if (line.find("Full-frame alignment shift") != std::string::npos)
 		{
 			have_found_final = true;
@@ -670,18 +673,19 @@ void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, Micrograph &mic)
 			if (shiftpos != std::string::npos)
 			{
 				std::vector<std::string> words;
-				tokenize(line.substr(shiftpos + 7), words); // Get shift values after "shift:"
+				tokenize(line.substr(shiftpos + 7), words);
 				if (words.size() < 2)
 				{
-					std::cerr << "Error: Unexpected number of words in log: " << line << std::endl;
-					continue;
+					std::cerr << " fn_log= " << fn_log << std::endl;
+    				REPORT_ERROR("ERROR: unexpected number of words on line from MOTIONCORR logfile: " + line);
 				}
 				mic.setGlobalShift(frame, textToFloat(words[0]), textToFloat(words[1]));
 				frame++;
 			}
 			else
 			{
-				break; // Stop parsing if shift lines are done
+				// Stop now
+				break;
 			}
 		}
 	}
@@ -704,8 +708,8 @@ void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, Micrograph &mic)
 					ss >> frame >> x_shift >> y_shift;
 					if (ss.fail())
 					{
-						std::cerr << "Error: Unexpected line format in 1.6 global shifts: " << line << std::endl;
-						continue;
+						std::cerr << " fn_log= " << fn_log << std::endl;
+    					REPORT_ERROR("Error: Unexpected line format in 1.6 global shifts: " + line);
 					}
 					mic.setGlobalShift(frame, x_shift, y_shift);
 				}
@@ -713,8 +717,11 @@ void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, Micrograph &mic)
 			}
 		}
 	}
+	in.close();
 
-	// Load local shifts
+	mic.first_frame = first_frame_sum;
+
+	// Read local shifts
 	FileName fn_patch = fn_log.withoutExtension() + "0-Patch-Patch.log";
 	if (!exists(fn_patch))
 	{
