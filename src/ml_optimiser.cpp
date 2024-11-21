@@ -1878,7 +1878,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 			std::vector<std::string> resols;
 			std::vector<RFLOAT> resols_end, resols_start;
 
-			int nresols = splitString(helical_fourier_mask_resols, ",", resols);
+			splitString(helical_fourier_mask_resols, ",", resols);
 			if (resols.size()%2 == 1) REPORT_ERROR("Provide an even number of start-end resolutions for --fourier_exclude_resols");
 			for (int nshell = 0; nshell < resols.size()/2; nshell++)
 			{
