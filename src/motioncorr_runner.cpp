@@ -658,9 +658,9 @@ void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, Micrograph &mic)
 	in.seekg(0);
 
 	// Read through the shifts file
-	int frame = first_frame_sum;
+	int frame = first_frame_sum; // 1-indexed
 	bool have_found_final = false;
-	while (getline(in, line))
+	while (getline(in, line, '\n'))
 	{
 	// ignore all commented lines, just read first two lines with data
 		if (line.find("Full-frame alignment shift") != std::string::npos)
@@ -673,13 +673,13 @@ void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, Micrograph &mic)
 			if (shiftpos != std::string::npos)
 			{
 				std::vector<std::string> words;
-				tokenize(line.substr(shiftpos + 7), words);
-				if (words.size() < 2)
-				{
-					std::cerr << " fn_log= " << fn_log << std::endl;
-    				REPORT_ERROR("ERROR: unexpected number of words on line from MOTIONCORR logfile: " + line);
-				}
-				mic.setGlobalShift(frame, textToFloat(words[0]), textToFloat(words[1]));
+				tokenize(line.substr(shiftpos+7), words);;
+    				if (words.size() < 2)
+    				{
+    					std::cerr << " fn_log= " << fn_log << std::endl;
+    					REPORT_ERROR("ERROR: unexpected number of words on line from MOTIONCORR logfile: " + line);
+    				}
+ 		   		mic.setGlobalShift(frame, textToFloat(words[0]), textToFloat(words[1]));
 				frame++;
 			}
 			else
@@ -709,7 +709,7 @@ void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, Micrograph &mic)
 					if (ss.fail())
 					{
 						std::cerr << " fn_log= " << fn_log << std::endl;
-    					REPORT_ERROR("Error: Unexpected line format in 1.6 global shifts: " + line);
+						REPORT_ERROR("Error: Unexpected line format in 1.6 global shifts: " + line);
 					}
 					mic.setGlobalShift(frame, x_shift, y_shift);
 				}
@@ -723,8 +723,7 @@ void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, Micrograph &mic)
 
 	// Read local shifts
 	FileName fn_patch = fn_log.withoutExtension() + "0-Patch-Patch.log";
-	if (!exists(fn_patch))
-	{
+	if (!exists(fn_patch)) {
 		std::cerr << "warning: failed to load local shifts from MotionCor2 logfile, but this does not affect further processing: " << fn_patch << std::endl;
 		return;
 	}
@@ -734,13 +733,11 @@ void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, Micrograph &mic)
 
 	while (getline(in, line, '\n'))
 	{
-		if (line.find("#") != std::string::npos)
-			continue;
+		if (line.find("#") != std::string::npos) continue;
 
 		std::vector<std::string> words;
 		tokenize(line, words);
-		if (words.size() != 7)
-			continue;
+    		if (words.size() != 7) continue;
 
 		mic.patchZ.push_back(textToFloat(words[0]) + first_frame_sum - 1); // 1-indexed
 		mic.patchX.push_back(textToFloat(words[1]));
