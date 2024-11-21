@@ -235,12 +235,12 @@ class helix_analyse_classes_parameters
         if (fn_groups != "")
         {
         	std::vector<std::string> groups;
-        	int numfound = splitString(fn_groups, ":", groups);
+        	splitString(fn_groups, ":", groups);
         	nr_groups = groups.size();
         	for (int igroup=0; igroup<groups.size(); igroup++)
         	{
         		std::vector<std::string> classes;
-        		int numfound = splitString(groups[igroup], ",", classes);
+        		splitString(groups[igroup], ",", classes);
 
             	for (int iclass=0; iclass<classes.size(); iclass++)
             	{
@@ -251,7 +251,7 @@ class helix_analyse_classes_parameters
 
         	if (fn_group_names != "")
         	{
-        		int numfound = splitString(fn_group_names, ":", group_names);
+        		splitString(fn_group_names, ":", group_names);
         		if (group_names.size() != nr_groups) REPORT_ERROR("ERROR: incorrect number of group names");
         	}
         	else

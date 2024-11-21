@@ -818,14 +818,14 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 
 	std::vector<FileName> my_scheduled_processes;
 	std::vector<std::string> jobids;
-	int njobs = splitString(fn_jobids, " ", jobids);
-	if (njobs == 0)
+	splitString(fn_jobids, " ", jobids);
+	if (jobids.size() == 0)
 	{
 		REPORT_ERROR("PipeLine::runScheduledJobs: Nothing to do...");
 	}
 	else
 	{
-		for (int i = 0; i < njobs; i++)
+		for (int i = 0; i < jobids.size(); i++)
 			my_scheduled_processes.push_back(jobids[i]);
 	}
 
