@@ -47,14 +47,14 @@ void makeHelicalSymmetryList(
 		rise_samplings = ROUND(fabs(rise_max_pix - rise_min_pix) / fabs(rise_step_pix));
 	else
 	{
-		rise_min_pix = (rise_min_pix + rise_max_pix) / 2.;
+		rise_min_pix = (rise_min_pix + rise_max_pix) * 0.5;
 		rise_samplings = 0;
 	}
 	if (search_twist)
 		twist_samplings = ROUND(fabs(twist_max_deg - twist_min_deg) / fabs(twist_step_deg));
 	else
 	{
-		twist_min_deg = (twist_min_deg + twist_max_deg) / 2.;
+		twist_min_deg = (twist_min_deg + twist_max_deg) * 0.5;
 		twist_samplings = 0;
 	}
 
@@ -82,8 +82,8 @@ void makeHelicalSymmetryList(
 
 			twist_dev_deg = fabs(list[ii].twist_deg - tmp_list[jj].twist_deg);
 			rise_dev_pix = fabs(list[ii].rise_pix - tmp_list[jj].rise_pix);
-			twist_avg_deg = (fabs(list[ii].twist_deg) + fabs(tmp_list[jj].twist_deg)) / 2.;
-			rise_avg_pix = (fabs(list[ii].rise_pix) + fabs(tmp_list[jj].rise_pix)) / 2.;
+			twist_avg_deg = (fabs(list[ii].twist_deg) + fabs(tmp_list[jj].twist_deg)) * 0.5;
+			rise_avg_pix = (fabs(list[ii].rise_pix) + fabs(tmp_list[jj].rise_pix)) * 0.5;
 
 			if (twist_avg_deg < err_max)
 			{
@@ -319,8 +319,8 @@ bool localSearchHelicalSymmetry(
 
 	// Initialise refined helical parameters
 	// Check helical parameters
-	rise_refined_A = (rise_min_A + rise_max_A) / 2.;
-	twist_refined_deg = (twist_min_deg + twist_max_deg) / 2.;
+	rise_refined_A = (rise_min_A + rise_max_A) * 0.5;
+	twist_refined_deg = (twist_min_deg + twist_max_deg) * 0.5;
 	checkParametersFor3DHelicalReconstruction(
 			false,
 			true,
@@ -388,7 +388,7 @@ bool localSearchHelicalSymmetry(
 	}
 
 	rise_inistep_pix = (rise_inistep_pix < (1e-5)) ? (1e30) : (rise_inistep_pix);
-	rise_step_pix = 0.01 * ((fabs(rise_local_min_pix) + fabs(rise_local_max_pix)) / 2.);
+	rise_step_pix = 0.01 * ((fabs(rise_local_min_pix) + fabs(rise_local_max_pix)) * 0.5);
 	rise_step_pix = (rise_step_pix < rise_inistep_pix) ? (rise_step_pix) : (rise_inistep_pix);
 	nr_rise_samplings = CEIL(fabs(rise_local_min_pix - rise_local_max_pix) / rise_step_pix);
 	nr_rise_samplings = (nr_rise_samplings > nr_min_samplings) ? (nr_rise_samplings) : (nr_min_samplings);
@@ -590,9 +590,9 @@ bool localSearchHelicalSymmetry(
 
 		// Decrease step size
 		if (search_rise)
-			rise_step_pix /= 2.;
+			rise_step_pix *= 0.5;
 		if (search_twist)
-			twist_step_deg /= 2.;
+			twist_step_deg *= 0.5;
 	}
 
 	if (out_of_range)
@@ -748,8 +748,8 @@ bool checkParametersFor3DHelicalReconstruction(
 		twist_min_deg = twist_max_deg = twist_initial_deg;
 		rise_min_A = rise_max_A = rise_initial_A;
 	}
-	RFLOAT rise_avg_A = (rise_min_A + rise_max_A) / 2.;
-	RFLOAT twist_avg_deg = (twist_min_deg + twist_max_deg) / 2.;
+	RFLOAT rise_avg_A = (rise_min_A + rise_max_A) * 0.5;
+	RFLOAT twist_avg_deg = (twist_min_deg + twist_max_deg) * 0.5;
 
 	// Check helical twist and rise
 	if (verboseOutput)
@@ -945,7 +945,7 @@ void imposeHelicalSymmetryInRealSpace(
 
 	// Crop the central slices
 	v.setXmippOrigin();
-	z_max = ((RFLOAT)(Zdim)) * z_percentage / 2.;
+	z_max = (((RFLOAT)(Zdim)) * z_percentage) * 0.5;
 	if (z_max > (((RFLOAT)(FINISHINGZ(v))) - 1.))
 		z_max = (((RFLOAT)(FINISHINGZ(v))) - 1.);
 	z_min = -z_max;
@@ -1340,7 +1340,7 @@ void cutZCentralPartOfSoftMask(
 	if (cosine_width < 0.001)
 		REPORT_ERROR("helix.cpp::cutZCentralPartOfSoftMask(): Cosine width for soft edge should larger than 0!");
 
-	idz_e = ((RFLOAT)(Zdim)) * z_percentage / 2.;
+	idz_e = (((RFLOAT)(Zdim)) * z_percentage) * 0.5;
 	idz_s = idz_e * (-1.);
 	idz_s_w = idz_s - cosine_width;
 	idz_e_w = idz_e + cosine_width;
@@ -1386,8 +1386,8 @@ void createCylindricalReference(
 			|| (cosine_width < 0.) )
 		REPORT_ERROR("helix.cpp::createCylindricalReference(): Parameter(s) error!");
 
-	inner_radius_pix = inner_diameter_pix / 2.;
-	outer_radius_pix = outer_diameter_pix / 2.;
+	inner_radius_pix = inner_diameter_pix * 0.5;
+	outer_radius_pix = outer_diameter_pix * 0.5;
 
 	v.clear();
 	v.resize(box_size, box_size, box_size);
@@ -1435,10 +1435,10 @@ void createCylindricalReferenceWithPolarity(
 		REPORT_ERROR("helix.cpp::createCylindricalReferenceWithPolarity(): Parameter(s) error!");
 
 	// Set top and bottom radii
-	top_radius_pix = outer_diameter_pix / 2.;
-	bottom_radius_pix = outer_diameter_pix * ratio_topbottom / 2.;
+	top_radius_pix = outer_diameter_pix * 0.5;
+	bottom_radius_pix = (outer_diameter_pix * ratio_topbottom) * 0.5;
 	if (inner_diameter_pix > 0.)
-		bottom_radius_pix = (inner_diameter_pix / 2.) + ratio_topbottom * (outer_diameter_pix / 2. - inner_diameter_pix / 2.);
+		bottom_radius_pix = (inner_diameter_pix * 0.5) + ratio_topbottom * (outer_diameter_pix * 0.5 - inner_diameter_pix * 0.5);
 
 	v.clear();
 	v.resize(box_size, box_size, box_size);
@@ -1446,7 +1446,7 @@ void createCylindricalReferenceWithPolarity(
 
 	r_min = r_max = -1.;
 	if (inner_diameter_pix > 0.)
-		r_min = inner_diameter_pix / 2.;
+		r_min = inner_diameter_pix * 0.5;
     for (long int k=STARTINGZ(v); k<=FINISHINGZ(v); k++)
     {
     	r_max = top_radius_pix - (top_radius_pix - bottom_radius_pix) * ((RFLOAT)(k - STARTINGZ(v))) / ((RFLOAT)(box_size));
@@ -1736,8 +1736,8 @@ void applySoftSphericalMask(
 	//if (cosine_width > 0.05 * r_max)
 	//	r_max -= 2. * cosine_width;
 	//r_max *= 0.45;
-	if ( (sphere_diameter > 0.01) && ((sphere_diameter / 2.) < r_max) )
-		r_max = sphere_diameter / 2.;
+	if ( (sphere_diameter > 0.01) && ((sphere_diameter * 0.5) < r_max) )
+		r_max = sphere_diameter * 0.5;
 	r_max_edge = r_max + cosine_width;
 
 	FOR_ALL_ELEMENTS_IN_ARRAY3D(v)
@@ -1828,7 +1828,7 @@ void convertHelicalTubeCoordsToMetaDataTable(
     if (fn_in.getExtension() != "star")
     	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): MetadataTable should have .star extension. Error(s) in " + fn_in);
 
-    half_box_size_pix = box_size_pix / 2.;
+    half_box_size_pix = box_size_pix * 0.5;
     psi_prior_flip_ratio = UNIMODAL_PSI_PRIOR_FLIP_RATIO;
     if (bimodal_angular_priors)
     {
@@ -1931,8 +1931,8 @@ void convertHelicalTubeCoordsToMetaDataTable(
     	if (!cut_into_segments)
     	{
 			MD_out.addObject();
-	    	MD_out.setValue(EMDL_IMAGE_COORD_X, ((x1 + x2) / 2.));
-	    	MD_out.setValue(EMDL_IMAGE_COORD_Y, ((y1 + y2) / 2.));
+	    	MD_out.setValue(EMDL_IMAGE_COORD_X, ((x1 + x2) * 0.5));
+	    	MD_out.setValue(EMDL_IMAGE_COORD_Y, ((y1 + y2) * 0.5));
 	    	MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, (tube_id + 1));
 	    	MD_out.setValue(EMDL_ORIENT_TILT_PRIOR, 90.);
 	    	MD_out.setValue(EMDL_ORIENT_PSI_PRIOR, -psi_deg);
@@ -2324,7 +2324,7 @@ void convertHelicalSegmentCoordsToMetaDataTable(
 		REPORT_ERROR("helix.cpp::convertHelicalSegmentCoordsToMetaDataTable(): Wrong dimensions or box size!");
 
 	RFLOAT x = 0., y = 0., z = 0.;
-	RFLOAT half_box_size_pix = box_size_pix / 2.;
+	RFLOAT half_box_size_pix = box_size_pix * 0.5;
 	RFLOAT psi_prior_flip_ratio = UNIMODAL_PSI_PRIOR_FLIP_RATIO;
 	if (bimodal_angular_priors)
 	{
@@ -2408,7 +2408,7 @@ void convertXimdispHelicalSegmentCoordsToMetaDataTable(
     MD_out.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM);
     MD_out.addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
 
-    half_box_size_pix = box_size_pix / 2.;
+    half_box_size_pix = box_size_pix * 0.5;
     psi_prior_flip_ratio = UNIMODAL_PSI_PRIOR_FLIP_RATIO;
     if (bimodal_angular_priors)
     {
@@ -2523,7 +2523,7 @@ void convertXimdispHelicalTubeCoordsToMetaDataTable(
 
 	x.resize(4);
 	y.resize(4);
-	half_box_size_pix = box_size_pix / 2.;
+	half_box_size_pix = box_size_pix * 0.5;
     psi_prior_flip_ratio = UNIMODAL_PSI_PRIOR_FLIP_RATIO;
     if (bimodal_angular_priors)
     {
@@ -2561,10 +2561,10 @@ void convertXimdispHelicalTubeCoordsToMetaDataTable(
 		getline(fin, line, '\n');
 
 		// Calculate starting and end points for this helical tube
-		x1 = (x[0] + x[1]) / 2.;
-		y1 = (y[0] + y[1]) / 2.;
-		x2 = (x[2] + x[3]) / 2.;
-		y2 = (y[2] + y[3]) / 2.;
+		x1 = (x[0] + x[1]) * 0.5;
+		y1 = (y[0] + y[1]) * 0.5;
+		x2 = (x[2] + x[3]) * 0.5;
+		y2 = (y[2] + y[3]) * 0.5;
 		psi_rad = atan2(y2 - y1, x2 - x1);
 		psi_deg = RAD2DEG(psi_rad);
 		dx = step_pix * cos(psi_rad);
@@ -2573,8 +2573,8 @@ void convertXimdispHelicalTubeCoordsToMetaDataTable(
 		if (!cut_into_segments)
 		{
 			MD_out.addObject();
-	    	MD_out.setValue(EMDL_IMAGE_COORD_X, ((x1 + x2) / 2.));
-	    	MD_out.setValue(EMDL_IMAGE_COORD_Y, ((y1 + y2) / 2.));
+	    	MD_out.setValue(EMDL_IMAGE_COORD_X, ((x1 + x2) * 0.5));
+	    	MD_out.setValue(EMDL_IMAGE_COORD_Y, ((y1 + y2) * 0.5));
 	    	MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, nr_tubes);
 	    	MD_out.setValue(EMDL_ORIENT_TILT_PRIOR, 90.);
 	    	MD_out.setValue(EMDL_ORIENT_PSI_PRIOR, -psi_deg);
@@ -2664,7 +2664,7 @@ void convertEmanHelicalSegmentCoordsToMetaDataTable(
     MD_out.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM);
     MD_out.addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
 
-    half_box_size_pix = box_size_pix / 2.;
+    half_box_size_pix = box_size_pix * 0.5;
     psi_prior_flip_ratio = UNIMODAL_PSI_PRIOR_FLIP_RATIO;
     if (bimodal_angular_priors)
 	{
@@ -2788,7 +2788,7 @@ void convertEmanHelicalTubeCoordsToMetaDataTable(
     MD_out.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM);
     MD_out.addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
 
-	half_box_size_pix = box_size_pix / 2.;
+	half_box_size_pix = box_size_pix * 0.5;
     psi_prior_flip_ratio = UNIMODAL_PSI_PRIOR_FLIP_RATIO;
     if (bimodal_angular_priors)
     {
@@ -2821,8 +2821,8 @@ void convertEmanHelicalTubeCoordsToMetaDataTable(
 		tag = textToInteger(words[4]);
 		if ( (tag != (-1)) || (fabs(width1 - width2) > 0.01) )
 			REPORT_ERROR("helix.cpp::convertEmanHelicalTubeCoordsToMetaDataTable(): Invalid input file " + fn_in);
-		x1 += width1 / 2.;
-		y1 += width1 / 2.;
+		x1 += width1 * 0.5;
+		y1 += width1 * 0.5;
 
 		// Get x2, y2
 		line.clear();
@@ -2838,8 +2838,8 @@ void convertEmanHelicalTubeCoordsToMetaDataTable(
 		tag = textToInteger(words[4]);
 		if ( (tag != (-2)) || (fabs(width3 - width4) > 0.01) || (fabs(width3 - width1) > 0.01) )
 			REPORT_ERROR("helix.cpp::convertEmanHelicalTubeCoordsToMetaDataTable(): Invalid input file " + fn_in);
-		x2 += width3 / 2.;
-		y2 += width3 / 2.;
+		x2 += width3 * 0.5;
+		y2 += width3 * 0.5;
 
 		nr_tubes++;
 
@@ -2850,16 +2850,16 @@ void convertEmanHelicalTubeCoordsToMetaDataTable(
 
 		// Truncate both ends of the helical tube
 		RFLOAT trans_offset = 0.;
-		x1 += ((width1 / 2.) - trans_offset) * cos(psi_rad);
-		y1 += ((width1 / 2.) - trans_offset) * sin(psi_rad);
-		x2 -= ((width1 / 2.) - trans_offset) * cos(psi_rad);
-		y2 -= ((width1 / 2.) - trans_offset) * sin(psi_rad);
+		x1 += ((width1 * 0.5) - trans_offset) * cos(psi_rad);
+		y1 += ((width1 * 0.5) - trans_offset) * sin(psi_rad);
+		x2 -= ((width1 * 0.5) - trans_offset) * cos(psi_rad);
+		y2 -= ((width1 * 0.5) - trans_offset) * sin(psi_rad);
 
 		if (!cut_into_segments)
 		{
 			MD_out.addObject();
-	    	MD_out.setValue(EMDL_IMAGE_COORD_X, ((x1 + x2) / 2.));
-	    	MD_out.setValue(EMDL_IMAGE_COORD_Y, ((y1 + y2) / 2.));
+	    	MD_out.setValue(EMDL_IMAGE_COORD_X, ((x1 + x2) * 0.5));
+	    	MD_out.setValue(EMDL_IMAGE_COORD_Y, ((y1 + y2) * 0.5));
 	    	MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, nr_tubes);
 	    	MD_out.setValue(EMDL_ORIENT_TILT_PRIOR, 90.);
 	    	MD_out.setValue(EMDL_ORIENT_PSI_PRIOR, -psi_deg);
@@ -3072,8 +3072,8 @@ void makeHelicalReference2D(
 	if ( (tube_diameter_pix < 1.) || (tube_diameter_pix > particle_diameter_pix) )
 		REPORT_ERROR("helix.cpp::makeHelicalReference2D(): Invalid tube diameter!");
 
-	r2 = (particle_diameter_pix / 2.) * (particle_diameter_pix / 2.);
-	t2 = (tube_diameter_pix / 2.) * (tube_diameter_pix / 2.);
+	r2 = (particle_diameter_pix * 0.5) * (particle_diameter_pix * 0.5);
+	t2 = (tube_diameter_pix * 0.5) * (tube_diameter_pix * 0.5);
 
 	out.clear();
 	out.resize(box_size, box_size);
@@ -3249,8 +3249,8 @@ void makeHelicalReference3DWithPolarity(
 	rise_pix = rise_A / pixel_size_A;
 	tube_diameter_pix = tube_diameter_A / pixel_size_A;
 	particle_diameter_pix = particle_diameter_A / pixel_size_A;
-	particle_radius_pix = particle_diameter_pix / 2.;
-	particle_radius_max_pix = (CEIL(particle_diameter_pix / 2.)) + 1;
+	particle_radius_pix = particle_diameter_pix * 0.5;
+	particle_radius_max_pix = (CEIL(particle_diameter_pix * 0.5)) + 1;
 	top_radius_pix = cyl_radius_pix = 0.5 * cyl_diameter_A / pixel_size_A;
 	bottom_radius_pix = top_radius_pix * topbottom_ratio;
 
@@ -3271,8 +3271,8 @@ void makeHelicalReference3DWithPolarity(
 	//y0 = 0.;
 	// NEW - To generate references with Dn symmetry. TODO: Am I doing what I want?
 	z0 = rise_pix * FLOOR((RFLOAT)(FIRST_XMIPP_INDEX(box_size)) / rise_pix);
-	x0 = (tube_diameter_pix / 2.) * cos( (PI * twist_deg * z0) / (rise_pix * 180.) );
-	y0 = (tube_diameter_pix / 2.) * sin( (PI * twist_deg * z0) / (rise_pix * 180.) );
+	x0 = (tube_diameter_pix * 0.5) * cos( (PI * twist_deg * z0) / (rise_pix * 180.) );
+	y0 = (tube_diameter_pix * 0.5) * sin( (PI * twist_deg * z0) / (rise_pix * 180.) );
 	vec0.clear();
 	vec0.resize(2);
 	XX(vec0) = x0;
@@ -3308,7 +3308,7 @@ void makeHelicalReference3DWithPolarity(
 
 			for (int dz = -particle_radius_max_pix; dz <= particle_radius_max_pix; dz++)
 			{
-				RFLOAT thres_xy = (top_radius_pix - bottom_radius_pix) * 0.5 * dz / particle_radius_pix + (top_radius_pix + bottom_radius_pix) / 2.;
+				RFLOAT thres_xy = (top_radius_pix - bottom_radius_pix) * 0.5 * dz / particle_radius_pix + (top_radius_pix + bottom_radius_pix) * 0.5;
 				for (int dy = -particle_radius_max_pix; dy <= particle_radius_max_pix; dy++)
 				{
 					for (int dx = -particle_radius_max_pix; dx <= particle_radius_max_pix; dx++)
@@ -3368,13 +3368,13 @@ void makeHelicalReference3DWithPolarity(
 			{
 				x1 *= (tube_diameter_pix + particle_diameter_pix) / tube_diameter_pix;
 				y1 *= (tube_diameter_pix + particle_diameter_pix) / tube_diameter_pix;
-				z1 += particle_diameter_pix / 2.;
+				z1 += particle_diameter_pix * 0.5;
 
-				for (int dz = -particle_radius_max_pix / 2.; dz <= particle_radius_max_pix / 2.; dz++)
+				for (int dz = -particle_radius_max_pix * 0.5; dz <= particle_radius_max_pix * 0.5; dz++)
 				{
-					for (int dy = -particle_radius_max_pix / 2.; dy <= particle_radius_max_pix / 2.; dy++)
+					for (int dy = -particle_radius_max_pix * 0.5; dy <= particle_radius_max_pix * 0.5; dy++)
 					{
-						for (int dx = -particle_radius_max_pix / 2.; dx <= particle_radius_max_pix / 2.; dx++)
+						for (int dx = -particle_radius_max_pix * 0.5; dx <= particle_radius_max_pix * 0.5; dx++)
 						{
 							RFLOAT _x, _y, _z, dist, val_old, val_new;
 							int x2, y2, z2;
@@ -3393,7 +3393,7 @@ void makeHelicalReference3DWithPolarity(
 							_z = (RFLOAT)(z2) - z1;
 
 							dist = sqrt(_x * _x + _y * _y + _z * _z);
-							if (dist > (particle_radius_pix / 2.))
+							if (dist > (particle_radius_pix * 0.5))
 								continue;
 
 							val_old = A3D_ELEM(out, z2, y2, x2);
@@ -3859,8 +3859,8 @@ void outputHelicalSymmetryStatus(
 
 	if (do_split_random_halves)
 	{
-		RFLOAT twist_avg_deg = (twist_deg_half1 + twist_deg_half2) / 2.;
-		RFLOAT rise_avg_A = (rise_A_half1 + rise_A_half2) / 2.;
+		RFLOAT twist_avg_deg = (twist_deg_half1 + twist_deg_half2) * 0.5;
+		RFLOAT rise_avg_A = (rise_A_half1 + rise_A_half2) * 0.5;
 
 		// TODO: raise a warning if two sets of helical parameters are >1% apart?
 		out << " (Half 1) Refined helical twist = " << twist_deg_half1 << " degrees, rise = " << rise_A_half1 << " Angstroms." << std::endl;
@@ -3979,7 +3979,7 @@ void cutOutPartOfHelix(
     for (long int zi = 0; zi < ZSIZE(vout); zi++)
     {
     	// Z subscript is out of range
-    	if ( ((RFLOAT)(ABS(zi + new_z0)) / (RFLOAT)(ZSIZE(vin))) > (z_percentage / 2.) )
+    	if ( ((RFLOAT)(ABS(zi + new_z0)) / (RFLOAT)(ZSIZE(vin))) > (z_percentage * 0.5) )
     		continue;
 
     	// Loop over X and Y
@@ -3990,7 +3990,7 @@ void cutOutPartOfHelix(
         		RFLOAT deg = (180.) * atan2((double)(yi), (double)(xi)) / PI;
 
         		// X or Y subscripts is out of range
-        		if ( (ang_deg < 90.) && ( (deg < ((45.) - (ang_deg / 2.))) || (deg > ((45.) + (ang_deg / 2.))) ) )
+        		if ( (ang_deg < 90.) && ( (deg < ((45.) - (ang_deg * 0.5))) || (deg > ((45.) + (ang_deg * 0.5))) ) )
         			continue;
         		if ( (yi >= old_ymax) || (xi >= old_xmax) )
         			continue;
@@ -4885,10 +4885,10 @@ RFLOAT HermiteInterpolate1D(
 
 	mu2 = mu * mu;
 	mu3 = mu2 * mu;
-	m0  = (y1 - y0) * (1. + bias) * (1. - tension) / 2.;
-	m0 += (y2 - y1) * (1. - bias) * (1. - tension) / 2.;
-	m1  = (y2 - y1) * (1. + bias) * (1. - tension) / 2.;
-	m1 += (y3 - y2) * (1. - bias) * (1. - tension) / 2.;
+	m0  = (y1 - y0) * (1. + bias) * (1. - tension) * 0.5;
+	m0 += (y2 - y1) * (1. - bias) * (1. - tension) * 0.5;
+	m1  = (y2 - y1) * (1. + bias) * (1. - tension) * 0.5;
+	m1 += (y3 - y2) * (1. - bias) * (1. - tension) * 0.5;
 	a0  = 2. * mu3 - 3. * mu2 + 1.;
 	a1  = mu3 - 2. * mu2 + mu;
 	a2  = mu3 - mu2;
@@ -4913,7 +4913,7 @@ void HermiteInterpolateOne3DHelicalFilament(
 {
 	RFLOAT x0, x1, x2, x3, xa, xb, y0, y1, y2, y3, ya, yb, z0, z1, z2, z3, za, zb, mu1, mu2;
 	RFLOAT step_pix, chord_pix, accu_len_pix, present_len_pix, len_pix, psi_prior_flip_ratio, tilt_deg, psi_deg;
-    RFLOAT half_box_size_pix = box_size_pix / 2.;
+    RFLOAT half_box_size_pix = box_size_pix * 0.5;
 	int nr_partitions, nr_segments;
 	std::vector<RFLOAT> xlist, ylist, zlist;
 	Matrix1D<RFLOAT> dr;
@@ -4975,7 +4975,7 @@ void HermiteInterpolateOne3DHelicalFilament(
         // Step size for interpolation is smaller than 1% of the inter-box distance
         // sqrt(0.57735 * 0.57735 * 0.57735 * 3) = 1.0, step size is larger than 1 pixel
     	// TODO: 1% ? Too expensive computationally? Try 10% ?
-        step_pix = (interbox_pix < 57.735) ? (0.57735) : (interbox_pix / 100.); // 1%
+        step_pix = (interbox_pix < 57.735) ? (0.57735) : (interbox_pix * 0.01); // 1%
         //step_pix = (interbox_pix < 5.7735) ? (0.57735) : (interbox_pix / 10.); // 10%
 
     	// Collect points 0, 1, 2, 3 for interpolations
@@ -5399,9 +5399,9 @@ void Interpolate3DCurves(
 			}
 			// Middle points of each short line segment
 			MD_in.addObject();
-			MD_in.setValue(EMDL_IMAGE_COORD_X, (xlist[id] + xlist[id - 1]) / 2.);
-	    	MD_in.setValue(EMDL_IMAGE_COORD_Y, (ylist[id] + ylist[id - 1]) / 2.);
-	    	MD_in.setValue(EMDL_IMAGE_COORD_Z, (zlist[id] + zlist[id - 1]) / 2.);
+			MD_in.setValue(EMDL_IMAGE_COORD_X, (xlist[id] + xlist[id - 1]) * 0.5);
+	    	MD_in.setValue(EMDL_IMAGE_COORD_Y, (ylist[id] + ylist[id - 1]) * 0.5);
+	    	MD_in.setValue(EMDL_IMAGE_COORD_Z, (zlist[id] + zlist[id - 1]) * 0.5);
 	    	if (id == (xlist.size() - 1)) // End point
 	    	{
 				MD_in.addObject();
