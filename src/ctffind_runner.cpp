@@ -460,6 +460,8 @@ void CtffindRunner::joinCtffindResults()
 
 		if (verb > 0 && imic % 60 == 0) progress_bar(imic);
 	}
+	if (MDctf.isEmpty())
+		REPORT_ERROR( (std::string) fn_ctffind_exe + " failed to estimate CTF parameters for any micrograph, exiting...");
 
     if (is_tomo)
     {
