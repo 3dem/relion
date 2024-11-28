@@ -293,6 +293,7 @@ void SubtomoProgram::writeParticleSet(
 
     RFLOAT real_subtomo_binning = 0.;
     int cropSize_tomogram;
+    bool is_first = true;
 	for (int t = 0; t < tc; t++)
 	{
 		const int pc = particles[t].size();
@@ -307,8 +308,15 @@ void SubtomoProgram::writeParticleSet(
         {
             RFLOAT tomogram_binning;
             tomogramSet.globalTable.getValue(EMDL_TOMO_TOMOGRAM_BINNING, tomogram_binning, t);
-            if (t == 0) real_subtomo_binning = tomogram_binning;
-            else if (real_subtomo_binning != tomogram_binning) REPORT_ERROR("ERROR: not all tomograms have the same binning; can't do real subtomos");
+            if (is_first)
+            {
+                real_subtomo_binning = tomogram_binning;
+                is_first = false;
+            }
+            else if (fabs(real_subtomo_binning - tomogram_binning) > 0.01)
+            {
+                REPORT_ERROR("ERROR: not all tomograms have the same binning; can't do real subtomos");
+            }
             cropSize_tomogram = ROUND(cropSize * binning / tomogram_binning);
             if (cropSize_tomogram%2 != 0)
             {
