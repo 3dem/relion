@@ -694,7 +694,7 @@ void CtffindRunner::executeCtffind4(long int imic)
 
 	// Write script to run ctffind
 	fh << "#!/usr/bin/env " << fn_shell << std::endl;
-	fh << fn_ctffind_exe << ctffind4_options << " > " << fn_log << " << EOF"<<std::endl;
+	fh << "env LC_ALL=C " << fn_ctffind_exe << ctffind4_options << " > " << fn_log << " << EOF"<<std::endl;
 	// line 1: input image
 	if (do_movie_thon_rings)
 	{
