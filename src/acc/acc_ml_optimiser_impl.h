@@ -2570,7 +2570,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	std::vector<MultidimArray<Complex > > dummy;
 	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
 	MultidimArray<RFLOAT> exp_local_STMulti;
-	bool do_subtomo_correction = NZYXSIZE(op.FstMulti) > 0;
+	bool do_subtomo_correction = YSIZE(op.FstMulti) > 1;
 
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, true, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimg, op.Fimg_nomask, op.Fctf, op.old_offset, dummy2, dummy2,
