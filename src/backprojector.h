@@ -91,8 +91,11 @@ public:
 		// Skip gridding
 		skip_gridding = _skip_gridding;
 
-		// Set the symmetry object
-		SL.read_sym_file(fn_sym);
+		// Set the symmetry object (somehow this is not thread-safe...)
+#pragma omp critical
+        {
+            SL.read_sym_file(fn_sym);
+        }
 
 		// Padding factor for the map
 		if (_padding_factor_3d < 1.0)
