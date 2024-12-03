@@ -6787,7 +6787,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
     exp_local_Fctf.resize(exp_nr_images);
     exp_local_sqrtXi2.resize(exp_nr_images);
 
-    bool do_subtomo_correction = NZYXSIZE(exp_STMulti) > 0;
+    bool do_subtomo_correction = YSIZE(exp_STMulti) > 1;
 
     int group_id = mydata.getGroupId(part_id);
     int optics_group = mydata.getOpticsGroup(part_id);
@@ -8279,7 +8279,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
     bool ctf_premultiplied = mydata.obsModel.getCtfPremultiplied(optics_group);
 
     MultidimArray<RFLOAT> exp_local_STMulti;
-    bool do_subtomo_correction = NZYXSIZE(exp_STMulti) > 0;
+    bool do_subtomo_correction = YSIZE(exp_STMulti) > 1;
 
     // Re-do below because now also want unmasked images AND if (stricht_highres_exp >0.) then may need to resize
     precalculateShiftedImagesCtfsAndInvSigma2s(true, true, part_id, exp_current_oversampling, metadata_offset,
