@@ -42,7 +42,7 @@ static inline
 __device__ int ceilfracf(T1 a, T2 b)
 {
 //	return __float2int_ru(__fdividef( (float)a, (float)b ) );
-	return (int)(a/b + 1);
+	return ceilf(float(a) / float(b));
 }
 
 static inline
