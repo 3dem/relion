@@ -6787,6 +6787,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
     exp_local_Fctf.resize(exp_nr_images);
     exp_local_sqrtXi2.resize(exp_nr_images);
 
+    // This used to be NZYXSIZE(exp_STMulti) > 0, but the GPU resizes this array to non-zero xsize, where ysize=zsize=1!
     bool do_subtomo_correction = YSIZE(exp_STMulti) > 1;
 
     int group_id = mydata.getGroupId(part_id);
