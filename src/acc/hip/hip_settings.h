@@ -15,7 +15,7 @@
 #include "src/macros.h"
 #include "src/error.h"
 
-#include <hiprand.h>
+#include <hiprand/hiprand.h>
 
 // Required compute capability
 #define HIP_CC_MAJOR 5

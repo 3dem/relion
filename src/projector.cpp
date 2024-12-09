@@ -24,7 +24,7 @@
 #ifdef _CUDA_ENABLED
 	#include <cufft.h>
 #elif _HIP_ENABLED
-	#include <hipfft.h>
+	#include <hipfft/hipfft.h>
 #endif
 #if defined _CUDA_ENABLED || defined _HIP_ENABLED
 	#include <sys/types.h>

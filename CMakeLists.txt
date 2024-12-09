@@ -210,7 +210,7 @@ if(CUDA)
 elseif(HIP)
     # ------------------------------------------------------------------------------HIP--
     if (DEFINED ENV{ROCM_PATH})
-        include($ENV{ROCM_PATH}/hip/cmake/FindHIP.cmake)
+        include($ENV{ROCM_PATH}/lib/cmake/hip/FindHIP.cmake)
     elseif(DEFINED ENV{HIP_PATH})
         include($ENV{HIP_PATH}/cmake/FindHIP.cmake)
     elseif(EXISTS "${CMAKE_SOURCE_DIR}/cmake/FindHIP.cmake")

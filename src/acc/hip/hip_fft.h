@@ -7,7 +7,7 @@
 #include "src/acc/hip/hip_settings.h"
 #include "src/acc/hip/hip_mem_utils.h"
 #include <hip/hip_runtime.h>
-#include <hipfft.h>
+#include <hipfft/hipfft.h>
 
 #ifdef DEBUG_HIP
 #define HANDLE_HIPFFT_ERROR( err ) (HipfftHandleError( err, __FILE__, __LINE__ ))
