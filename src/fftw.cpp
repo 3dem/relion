@@ -1306,7 +1306,7 @@ void LoGFilterMap(MultidimArray<RFLOAT > &img, RFLOAT sigma, RFLOAT angpix)
 		}
 		else
 		{
-			REPORT_ERROR("lowPassFilterMap: filtering of non-cube maps is not implemented...");
+			REPORT_ERROR("LoGFilterMap: filtering of non-cube maps is not implemented...");
 		}
 	}
 	transformer.FourierTransform(img, FT, false);
@@ -1322,7 +1322,7 @@ void LoGFilterMap(MultidimArray<RFLOAT > &img, RFLOAT sigma, RFLOAT angpix)
 		}
 		else
 		{
-			REPORT_ERROR("lowPassFilterMap: filtering of non-cube maps is not implemented...");
+			REPORT_ERROR("LoGFilterMap: filtering of non-cube maps is not implemented...");
 		}
 	}
 
@@ -1547,7 +1547,7 @@ void directionalFilterMap(MultidimArray<RFLOAT > &img, RFLOAT low_pass, RFLOAT a
 		}
 		else
 		{
-			REPORT_ERROR("lowPassFilterMap: filtering of non-cube maps is not implemented...");
+			REPORT_ERROR("directionalFilterMap: filtering of non-cube maps is not implemented...");
 		}
 	}
 	transformer.FourierTransform(img, FT, false);
@@ -1563,7 +1563,7 @@ void directionalFilterMap(MultidimArray<RFLOAT > &img, RFLOAT low_pass, RFLOAT a
 		}
 		else
 		{
-			REPORT_ERROR("lowPassFilterMap: filtering of non-cube maps is not implemented...");
+			REPORT_ERROR("directionalFilterMap: filtering of non-cube maps is not implemented...");
 		}
 	}
 
@@ -1702,21 +1702,22 @@ void amplitudeOrPhaseMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT >
 	maxr2 = (XYdim - 1) * (XYdim - 1) / 4;
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Faux)
 	{
+		long int r2 = ip * ip + jp * jp;
 		if ( (ip > STARTINGY(out)) && (ip < FINISHINGY(out))
 				&& (jp > STARTINGX(out)) && (jp < FINISHINGX(out))
-				&& ((ip * ip + jp * jp) < maxr2) )
+				&& (r2 < maxr2) )
 		{
 			if (output_map_type == AMPLITUDE_MAP)
-				val = FFTW2D_ELEM(Faux, ip, jp).abs();
+				// Down-weight the 10 pixels around origin for better visualization
+				val = (1.0-exp(-r2/100.0))*FFTW2D_ELEM(Faux, ip, jp).abs();
 			else if (output_map_type == PHASE_MAP)
 				val = (180.) * (FFTW2D_ELEM(Faux, ip, jp).arg()) / PI;
 			else
 				REPORT_ERROR("fftw.cpp::amplitudeOrPhaseMap(): ERROR Unknown type of output map.");
-
 			A2D_ELEM(out, -ip, -jp) = A2D_ELEM(out, ip, jp) = val;
 		}
 	}
-	A2D_ELEM(out, 0, 0) = 0.;
+	//A2D_ELEM(out, 0, 0) = 0.;
 	amp.clear();
 	amp = out;
 }
