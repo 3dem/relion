@@ -7,8 +7,8 @@
 #include "src/acc/hip/hip_kernels/helper.h"
 #include "src/acc/hip/hip_settings.h"
 
-#include <hiprand.h>
-#include <hiprand_kernel.h>
+#include <hiprand/hiprand.h>
+#include <hiprand/hiprand_kernel.h>
 
 /// Needed explicit template instantiations
 template __global__ void hip_kernel_make_eulers_2D<true>(XFLOAT *,
