@@ -87,9 +87,7 @@ public:
 		if (fn_dat != "")
 		{
             std::cout <<" Reading data ..." << std::endl;
-			MetaDataTable MDdata;
-			MDdata.read(fn_dat);
-			optimiser.mydata.MDimg = MDdata;
+            optimiser.mydata.read(fn_dat, "", "");
 		}
 
 
@@ -167,8 +165,7 @@ public:
 				FileName fn_mic2;
 				optimiser.mydata.MDimg.getValue(EMDL_MICROGRAPH_NAME, fn_mic2, part_id);
 				FileName fn_mic2_pre, fn_mic2_jobnr, fn_mic2_post;
-				decomposePipelineFileName(fn_mic2, fn_mic2_pre, fn_mic2_jobnr, fn_mic2_post);
-
+                decomposePipelineFileName(fn_mic2, fn_mic2_pre, fn_mic2_jobnr, fn_mic2_post);
 				if (fn_mic2_post == fn_mic_post)
 				{
 
