@@ -39,14 +39,14 @@ if (ptr.getAllocator() == NULL)
 	max_pair.deviceAlloc();
 	size_t temp_storage_size = 0;
 
-	DEBUG_HANDLE_ERROR(hipcub::DeviceReduce::ArgMax( NULL, temp_storage_size, ~ptr, ~max_pair, ptr.getSize()));
+	DEBUG_HANDLE_ERROR(hipcub::DeviceReduce::ArgMax( NULL, temp_storage_size, ~ptr, ~max_pair, static_cast<int>(ptr.getSize())));
 
 	if(temp_storage_size==0)
 		temp_storage_size=1;
 
 	HipCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
-	DEBUG_HANDLE_ERROR(hipcub::DeviceReduce::ArgMax( alloc->getPtr(), temp_storage_size, ~ptr, ~max_pair, ptr.getSize(), ptr.getStream()));
+	DEBUG_HANDLE_ERROR(hipcub::DeviceReduce::ArgMax( alloc->getPtr(), temp_storage_size, ~ptr, ~max_pair, static_cast<int>(ptr.getSize()), ptr.getStream()));
 
 	max_pair.cpToHost();
 	ptr.streamSync();
@@ -75,14 +75,14 @@ if (ptr.getAllocator() == NULL)
 	min_pair.deviceAlloc();
 	size_t temp_storage_size = 0;
 
-	DEBUG_HANDLE_ERROR(hipcub::DeviceReduce::ArgMin( NULL, temp_storage_size, ~ptr, ~min_pair, ptr.getSize()));
+	DEBUG_HANDLE_ERROR(hipcub::DeviceReduce::ArgMin( NULL, temp_storage_size, ~ptr, ~min_pair, static_cast<int>(ptr.getSize())));
 
 	if(temp_storage_size==0)
 		temp_storage_size=1;
 
 	HipCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
-	DEBUG_HANDLE_ERROR(hipcub::DeviceReduce::ArgMin( alloc->getPtr(), temp_storage_size, ~ptr, ~min_pair, ptr.getSize(), ptr.getStream()));
+	DEBUG_HANDLE_ERROR(hipcub::DeviceReduce::ArgMin( alloc->getPtr(), temp_storage_size, ~ptr, ~min_pair, static_cast<int>(ptr.getSize()), ptr.getStream()));
 
 	min_pair.cpToHost();
 	ptr.streamSync();
