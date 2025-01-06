@@ -11,8 +11,8 @@
 #include <iostream>
 #include "src/ml_optimiser.h"
 #include <hip/hip_runtime.h>
-#include <hiprand.h>
-#include <hiprand_kernel.h>
+#include <hiprand/hiprand.h>
+#include <hiprand/hiprand_kernel.h>
 
 #include "src/acc/acc_ptr.h"
 #include "src/acc/acc_projector.h"

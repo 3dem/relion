@@ -293,7 +293,7 @@ if (CUDA_FOUND)
 
 elseif (HIP_FOUND)
 	file(GLOB REL_HIP_SRC "${CMAKE_SOURCE_DIR}/src/acc/hip/*.cpp" "${CMAKE_SOURCE_DIR}/src/acc/hip/hip_kernels/*.cpp" )
-	hip_add_library(relion_gpu_util ${REL_HIP_SRC})
+	add_library(relion_gpu_util ${REL_HIP_SRC})
 
 	if (${CMAKE_BUILD_TYPE_LOWER} STREQUAL "profiling")
 		find_library(ROCM_TRACER_LIB NAMES roctx64 PATHS ${HIP_ROOT_DIR}/lib ${HIP_ROOT_DIR}/../lib REQUIRED)
