@@ -38,7 +38,7 @@ public:
     // Parallelized run function
     void run();
 
-    FileName getOutputFileNames(FileName fn_mic) override;
+    FileName getOutputFileNames(FileName fn_mic, bool continue_even_odd = false) override;
 
     FileName movie_path;
     FileName micrograph_path;

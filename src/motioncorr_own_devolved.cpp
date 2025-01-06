@@ -42,7 +42,7 @@ void MotioncorrOwnDevolved::run()
 	if (result) saveModel(mic);
 }
 
-FileName MotioncorrOwnDevolved::getOutputFileNames(FileName fn_mic)
+FileName MotioncorrOwnDevolved::getOutputFileNames(FileName fn_mic, bool continue_even_odd)
 {
 	return micrograph_path;
 }
