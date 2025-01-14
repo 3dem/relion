@@ -316,7 +316,8 @@ class star_handler_parameters
 		std::cout << " [ Average , stddev ] of the stddev  Image value = [ " << sum_stddev<< " , " << sum2_stddev << " ] "  << std::endl;
 
 		long int i = 0, nr_discard = 0;
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
+		MDout.setName(MDin.getName());
+        FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
 		{
 			if (avgs[i] > sum_avg - discard_sigma * sum2_avg &&
 			    avgs[i] < sum_avg + discard_sigma * sum2_avg &&
@@ -833,7 +834,8 @@ class star_handler_parameters
 		for (int isplit = 0; isplit < nr_split; isplit ++)
 		{
 			FileName fnt = fn_out.insertBeforeExtension("_split"+integerToString(isplit+1));
-			write_check_ignore_optics(MDouts[isplit], fnt, MD.getName());
+			MDouts[isplit].setName(MD.getName());
+            write_check_ignore_optics(MDouts[isplit], fnt, MD.getName());
 			std::cout << " Written: " <<fnt << " with " << MDouts[isplit].numberOfObjects() << " objects." << std::endl;
 
 			MDnodes.addObject();
