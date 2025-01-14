@@ -5,8 +5,8 @@
 #define HIP_HELPER_KERNELS_H_
 
 #include <hip/hip_runtime.h>
-#include <hiprand.h>
-#include <hiprand_kernel.h>
+#include <hiprand/hiprand.h>
+#include <hiprand/hiprand_kernel.h>
 #include <vector>
 #include <iostream>
 #include <fstream>
