@@ -1822,6 +1822,9 @@ void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 	MDboth.clear();
 	MDonly1.clear();
 	MDonly2.clear();
+    MDboth.setName(MD1.getName());
+    MDonly1.setName(MD1.getName());
+    MDonly2.setName(MD1.getName());
 
 	std::string mystr1, mystr2;
 	long int myint1, myint2;
