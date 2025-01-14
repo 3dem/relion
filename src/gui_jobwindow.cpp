@@ -2747,8 +2747,8 @@ void JobWindow::initialiseTomoReconstructTomogramsWindow()
 
     current_y += STEPY /2 ;
 
-    place ("tiltangle_offset");
-    place("tomo_name", TOGGLE_REACTIVATE);
+    place ("tiltangle_offset", TOGGLE_DEACTIVATE);
+    place("tomo_name");
 
     current_y += STEPY /2 ;
 
