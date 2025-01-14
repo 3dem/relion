@@ -7065,8 +7065,6 @@ void RelionJob::initialiseTomoSubtomoJob()
 	joboptions["do_stack2d"] = JobOption("Write output as 2D stacks?", true ,"If set to Yes, this program will write output subtomograms as 2D substacks. This is new as of relion-4.1, and the preferred way of generating subtomograms. If set to No, then relion-4.0 3D pseudo-subtomograms will be written out. Either can be used in subsequent refinements and classifications.");
 	joboptions["do_float16"] = JobOption("Write output in float16?", true ,"If set to Yes, this program will write output images in float16 MRC format. This will save a factor of two in disk space compared to the default of writing in float32. Note that RELION and CCPEM will read float16 images, but other programs may not (yet) do so.");
 
-    joboptions["do_real_subtomo"] = JobOption("Extract and re-project real subtomograms?", false, "If set to Yes, this program will box out real subtomograms from the input tomogram and then re-project these into 2D stacks that resemble the 2D stacks from windowed tilt series images. The size of the images is determined by the crop size; the pixel size is that of the tomogram. This will result in a particles.star file that is suitable for low-resolution subtomogram averaging and a particles_for_class2d.star file that can be used for fast 2D classification in order to select good particles. You can re-launch the GUI without the --tomo argument to get access to the Class2D job type. If set to No, the program will write out normal windowed tilt-series images that are suitable for high-resolution subtomogram averaging.");
-
 }
 
 bool RelionJob::getCommandsTomoSubtomoJob(std::string &outputname, std::vector<std::string> &commands,
@@ -7120,14 +7118,6 @@ bool RelionJob::getCommandsTomoSubtomoJob(std::string &outputname, std::vector<s
 	{
 		command += " --stack2d ";
 	}
-
-    if (joboptions["do_real_subtomo"].getBoolean())
-    {
-        command += " --real_subtomo ";
-        Node node2(outputname+"particles_for_class2d.star", LABEL_CLASS2D_PARTS);
-        outputNodes.push_back(node2);
-
-    }
 
 	if (is_continue)
 	{

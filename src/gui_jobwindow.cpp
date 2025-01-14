@@ -2884,10 +2884,6 @@ void JobWindow::initialiseTomoSubtomoWindow()
     place("do_stack2d", TOGGLE_DEACTIVATE);
     place("do_float16", TOGGLE_DEACTIVATE);
 
-    current_y += STEPY /2 ;
-
-    place("do_real_subtomo", TOGGLE_DEACTIVATE);
-
 	tab2->end();
 }
 
