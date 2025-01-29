@@ -25,7 +25,8 @@ dependencies:
       - fastcluster==1.2.6
       - seaborn==0.12.2
       - dill==0.3.7
-      - numpy<2
+      - numpy==1.26.1
+      - scipy==1.11.2
       - git+https://github.com/3dem/relion-classranker
       - git+https://github.com/3dem/relion-blush
       - git+https://github.com/3dem/DynaMight
