@@ -192,7 +192,7 @@ public:
 	void getShiftsMotioncor2(FileName fn_log, Micrograph &mic);
 
 	// Execute our own implementation for a single micrograph
-	bool executeOwnMotionCorrection(Micrograph &mic);
+	bool executeOwnMotionCorrection(Micrograph &mic, bool fromStarFile = false);
 
 	// Plot the shifts
 	void plotShifts(FileName fn_mic, Micrograph &mic);

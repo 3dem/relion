@@ -42,6 +42,7 @@ public:
 
     FileName movie_path;
     FileName micrograph_path;
+    FileName motion_correction_star_path;
 
 };
 

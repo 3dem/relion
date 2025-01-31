@@ -1109,7 +1109,7 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 	}
 }
 
-bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, bool fromStarFile = false) {
+bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, bool fromStarFile) {
 	FileName fn_mic = mic.getMovieFilename();
 	FileName fn_avg = getOutputFileNames(fn_mic);
 	FileName fn_avg_noDW = fn_avg.withoutExtension() + "_noDW.mrc";
