@@ -1261,20 +1261,18 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, bool fromStar
 	}
 	RCTOC(TIMING_APPLY_GAIN);
 
-	if (!fromStarFile) {
-
-		MultidimArray<float> Isum(ny, nx);
-		Isum.initZeros();
-		// First sum unaligned frames
-		RCTIC(TIMING_INITIAL_SUM);
-		for (int iframe = 0; iframe < n_frames; iframe++) {
-			#pragma omp parallel for num_threads(n_threads)
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum) {
-				DIRECT_MULTIDIM_ELEM(Isum, n) += DIRECT_MULTIDIM_ELEM(Iframes[iframe](), n);
-			}
+	MultidimArray<float> Isum(ny, nx);
+	Isum.initZeros();
+	// First sum unaligned frames
+	RCTIC(TIMING_INITIAL_SUM);
+	for (int iframe = 0; iframe < n_frames; iframe++) {
+		#pragma omp parallel for num_threads(n_threads)
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum) {
+			DIRECT_MULTIDIM_ELEM(Isum, n) += DIRECT_MULTIDIM_ELEM(Iframes[iframe](), n);
 		}
-		RCTOC(TIMING_INITIAL_SUM);
 	}
+	RCTOC(TIMING_INITIAL_SUM);
+	
 
 	// Hot pixel
 	if (!skip_defect)
@@ -1292,47 +1290,48 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, bool fromStar
 			std += d * d;
 		}
 		std = std::sqrt(std / YXSIZE(Isum));
-		if (!fromStarFile) {
-			const RFLOAT threshold = mean + hotpixel_sigma * std;
-			logfile << "In unaligned sum, Mean = " << mean << " Std = " << std << " Hotpixel threshold = " << threshold << std::endl;
+		const RFLOAT threshold = mean + hotpixel_sigma * std;
+		logfile << "In unaligned sum, Mean = " << mean << " Std = " << std << " Hotpixel threshold = " << threshold << std::endl;
 
-			MultidimArray<bool> bBad(ny, nx);
-			bBad.initZeros();
-			if (fn_defect != "")
-			{
-				fillDefectMask(bBad, fn_defect, n_threads);
+		MultidimArray<bool> bBad(ny, nx);
+		bBad.initZeros();
+		if (fn_defect != "")
+		{
+			fillDefectMask(bBad, fn_defect, n_threads);
 #ifdef DEBUG_HOTPIXELS
-				Image<RFLOAT> tmp(nx, ny);
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(tmp())
-					DIRECT_MULTIDIM_ELEM(tmp(), n) = DIRECT_MULTIDIM_ELEM(bBad, n);
-				tmp.write("defect.mrc");
+			Image<RFLOAT> tmp(nx, ny);
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(tmp())
+				DIRECT_MULTIDIM_ELEM(tmp(), n) = DIRECT_MULTIDIM_ELEM(bBad, n);
+			tmp.write("defect.mrc");
 #endif
-			}
+		}
 
-			if (fn_gain_reference != "")
+		if (fn_gain_reference != "")
+		{
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Igain())
 			{
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Igain())
+				if (DIRECT_MULTIDIM_ELEM(Igain(), n) == 0)
 				{
-					if (DIRECT_MULTIDIM_ELEM(Igain(), n) == 0)
-					{
-						DIRECT_MULTIDIM_ELEM(bBad, n) = true;
-					}
+					DIRECT_MULTIDIM_ELEM(bBad, n) = true;
 				}
 			}
+		}
 
-			int n_bad = 0;
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum) {
-				if (DIRECT_MULTIDIM_ELEM(Isum, n) > threshold && !DIRECT_MULTIDIM_ELEM(bBad, n)) {
-					DIRECT_MULTIDIM_ELEM(bBad, n) = true;
-					n_bad++;
+		int n_bad = 0;
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum) {
+			if (DIRECT_MULTIDIM_ELEM(Isum, n) > threshold && !DIRECT_MULTIDIM_ELEM(bBad, n)) {
+				DIRECT_MULTIDIM_ELEM(bBad, n) = true;
+				n_bad++;
+				if (!fromStarFile) {
 					mic.hotpixelX.push_back(n % nx);
 					mic.hotpixelY.push_back(n / nx);
 				}
 			}
-			logfile << "Detected " << n_bad << " hot pixels to be corrected." << std::endl;
-			Isum.clear();
 		}
-			RCTOC(TIMING_DETECT_HOT);
+		logfile << "Detected " << n_bad << " hot pixels to be corrected." << std::endl;
+		Isum.clear();
+	
+		RCTOC(TIMING_DETECT_HOT);
 
 		RCTIC(TIMING_FIX_DEFECT);
 		const RFLOAT frame_mean = mean / n_frames;
