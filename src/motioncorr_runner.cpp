@@ -1399,23 +1399,23 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, bool fromStar
 		logfile << "Image size after binning: X = " << nx << " Y = " << ny << std::endl;
 	}
 
-	if (!fromStarFile) {
-		// FFT
-		RCTIC(TIMING_GLOBAL_FFT);
-		#pragma omp parallel for num_threads(n_threads)
-		for (int iframe = 0; iframe < n_frames; iframe++) {
-			if (!early_binning) {
-				NewFFT::FourierTransform(Iframes[iframe](), Fframes[iframe]);
-			} else {
-				MultidimArray<fComplex> Fframe;
-				NewFFT::FourierTransform(Iframes[iframe](), Fframe);
-				Fframes[iframe].reshape(ny, nx / 2 + 1);
-				cropInFourierSpace(Fframe, Fframes[iframe]);
-			}
-			Iframes[iframe].clear(); // save some memory (global alignment use the most memory)
+	// FFT
+	RCTIC(TIMING_GLOBAL_FFT);
+	#pragma omp parallel for num_threads(n_threads)
+	for (int iframe = 0; iframe < n_frames; iframe++) {
+		if (!early_binning) {
+			NewFFT::FourierTransform(Iframes[iframe](), Fframes[iframe]);
+		} else {
+			MultidimArray<fComplex> Fframe;
+			NewFFT::FourierTransform(Iframes[iframe](), Fframe);
+			Fframes[iframe].reshape(ny, nx / 2 + 1);
+			cropInFourierSpace(Fframe, Fframes[iframe]);
 		}
-		RCTOC(TIMING_GLOBAL_FFT);
+		Iframes[iframe].clear(); // save some memory (global alignment use the most memory)
+	}
+	RCTOC(TIMING_GLOBAL_FFT);
 
+	if (!fromStarFile) {
 		RCTIC(TIMING_POWER_SPECTRUM);
 		// Write power spectrum for CTF estimation
 		if (grouping_for_ps > 0)
@@ -1531,18 +1531,16 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, bool fromStar
 		Iref_even().reshape(ny, nx);
 		Iref_odd().reshape(ny, nx);
 		Iref().initZeros();
-	}
-	
-	RCTIC(TIMING_GLOBAL_IFFT);
-	#pragma omp parallel for num_threads(n_threads)
-	for (int iframe = 0; iframe < n_frames; iframe++) {
-		Iframes[iframe]().reshape(ny, nx);
-		NewFFT::inverseFourierTransform(Fframes[iframe], Iframes[iframe]());
-		// Unfortunately, we cannot deallocate Fframes here because of dose-weighting
-	}
-	RCTOC(TIMING_GLOBAL_IFFT);
 
-	if (!fromStarFile) {
+		RCTIC(TIMING_GLOBAL_IFFT);
+		#pragma omp parallel for num_threads(n_threads)
+		for (int iframe = 0; iframe < n_frames; iframe++) {
+			Iframes[iframe]().reshape(ny, nx);
+			NewFFT::inverseFourierTransform(Fframes[iframe], Iframes[iframe]());
+			// Unfortunately, we cannot deallocate Fframes here because of dose-weighting
+		}
+		RCTOC(TIMING_GLOBAL_IFFT);
+
 		// Patch based alignment
 		logfile << std::endl << "Local alignments:" << std::endl;
 		logfile << "Patches: X = " << patch_x << " Y = " << patch_y << std::endl;

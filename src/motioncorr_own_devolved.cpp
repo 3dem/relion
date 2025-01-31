@@ -38,11 +38,10 @@ void MotioncorrOwnDevolved::run()
 	prepareGainReference(1);
 
 	bool fromStarFile = false;
-	if (motion_correction_star_path == "") {
-		Micrograph mic(movie_path, fn_gain_reference, bin_factor, eer_upsampling, eer_grouping);
-	}
-	else {
-		Micrograph mic(motion_correction_star_path, "", 0, 0);
+	Micrograph mic(movie_path, fn_gain_reference, bin_factor, eer_upsampling, eer_grouping);
+	if (motion_correction_star_path != "") {
+		Micrograph mic2(motion_correction_star_path, "", 0, 0);
+		mic = mic2;
 		fromStarFile = true;
 	}
 	bool result;
