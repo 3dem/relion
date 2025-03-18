@@ -60,8 +60,12 @@ public:
     // Pre-exposure for each micrograph (mainly used for tomography)
     std::vector<RFLOAT> pre_exposure_micrographs;
 
+	// Filenames of all the micrograph starfiles and power spectra from Motioncorr output starfile
+	std::vector<FileName> fn_micrographstars_all, fn_micrographps_all;
+
 	// Information about the optics groups
 	ObservationModel obsModel;
+	ObservationModel mcObsModel;
 
     // Is this a tomography experiment?
     bool is_tomo;
@@ -192,7 +196,7 @@ public:
 	void getShiftsMotioncor2(FileName fn_log, Micrograph &mic);
 
 	// Execute our own implementation for a single micrograph
-	bool executeOwnMotionCorrection(Micrograph &mic, bool fromStarFile = false);
+	bool executeOwnMotionCorrection(Micrograph &mic, bool fromStarfile = false);
 
 	// Plot the shifts
 	void plotShifts(FileName fn_mic, Micrograph &mic);
@@ -217,6 +221,8 @@ private:
 	void shiftNonSquareImageInFourierTransform(MultidimArray<fComplex> &frame, RFLOAT shiftx, RFLOAT shifty);
 
 	bool alignPatch(std::vector<MultidimArray<fComplex> > &Fframes, const int pnx, const int pny, const RFLOAT scaled_B, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, std::ostream &logfile);
+
+	bool alignPatch_knownShifts(std::vector<MultidimArray<fComplex> > &Fframes, const int pnx, const int pny, const RFLOAT scaled_B, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, std::ostream &logfile);
 
 	void binNonSquareImage(Image<float> &Iwork, RFLOAT bin_factor);
 

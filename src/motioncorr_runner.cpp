@@ -1318,16 +1318,27 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, bool fromStar
 		}
 
 		int n_bad = 0;
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum) {
-			if (DIRECT_MULTIDIM_ELEM(Isum, n) > threshold && !DIRECT_MULTIDIM_ELEM(bBad, n)) {
-				DIRECT_MULTIDIM_ELEM(bBad, n) = true;
-				n_bad++;
-				if (!fromStarFile) {
+		if (!fromStarFile) {
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum) {
+				if (DIRECT_MULTIDIM_ELEM(Isum, n) > threshold && !DIRECT_MULTIDIM_ELEM(bBad, n)) {
+					DIRECT_MULTIDIM_ELEM(bBad, n) = true;
+					n_bad++;
 					mic.hotpixelX.push_back(n % nx);
 					mic.hotpixelY.push_back(n / nx);
 				}
 			}
 		}
+		else{
+			if (mic.hotpixelX.size() != mic.hotpixelY.size())
+				REPORT_ERROR("Logic error: hotpixelX.size() != hotpixelY.size()");
+			for (int i = 0, ilim = mic.hotpixelX.size(); i < ilim; i++)
+			{
+				DIRECT_A2D_ELEM(bBad, mic.hotpixelY[i], mic.hotpixelX[i]) = true;
+			}
+			n_bad = mic.hotpixelX.size();
+		}
+
+
 		logfile << "Detected " << n_bad << " hot pixels to be corrected." << std::endl;
 		Isum.clear();
 	
@@ -1413,111 +1424,111 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, bool fromStar
 		Iframes[iframe].clear(); // save some memory (global alignment use the most memory)
 	}
 	RCTOC(TIMING_GLOBAL_FFT);
+	
+	RCTIC(TIMING_POWER_SPECTRUM);
+	// Write power spectrum for CTF estimation
+	if (grouping_for_ps > 0 && !fromStarFile)
+	{
+		const RFLOAT target_pixel_size = 1.4; // value from CTFFIND 4.1
 
-	if (!fromStarFile) {
-		RCTIC(TIMING_POWER_SPECTRUM);
-		// Write power spectrum for CTF estimation
-		if (grouping_for_ps > 0)
+		// NOTE: Image(X, Y) has MultidimArray(Y, X)!! X is the fast axis.
+		RCTIC(TIMING_POWER_SPECTRUM_SUM);
+		Image<float> PS_sum(nx, ny);
+		MultidimArray<fComplex> F_ps, F_ps_small;
+
+		// 0. Group and sum
+		PS_sum().initZeros();
+		PS_sum().setXmippOrigin();
+		for (int iframe = 0; iframe < n_frames; iframe += grouping_for_ps)
 		{
-			const RFLOAT target_pixel_size = 1.4; // value from CTFFIND 4.1
-
-			// NOTE: Image(X, Y) has MultidimArray(Y, X)!! X is the fast axis.
-			RCTIC(TIMING_POWER_SPECTRUM_SUM);
-			Image<float> PS_sum(nx, ny);
-			MultidimArray<fComplex> F_ps, F_ps_small;
-
-			// 0. Group and sum
-			PS_sum().initZeros();
-			PS_sum().setXmippOrigin();
-			for (int iframe = 0; iframe < n_frames; iframe += grouping_for_ps)
+			MultidimArray<fComplex> F_sum(Fframes[iframe]);
+			for (int j = 1; j < grouping_for_ps && j + iframe < n_frames; j++)
 			{
-				MultidimArray<fComplex> F_sum(Fframes[iframe]);
-				for (int j = 1; j < grouping_for_ps && j + iframe < n_frames; j++)
-				{
-					#pragma omp parallel for num_threads(n_threads)
-					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F_sum)
-						DIRECT_MULTIDIM_ELEM(F_sum, n) += DIRECT_MULTIDIM_ELEM(Fframes[j + iframe], n);
-				}
-
 				#pragma omp parallel for num_threads(n_threads)
-				FOR_ALL_ELEMENTS_IN_ARRAY2D(PS_sum()) // logical 2D access, i = logical_y, j = logical_x
-				{
-					// F(i, j) = conj(F(-i, -j))
-					if (j > 0)
-						A2D_ELEM(PS_sum(), i, j) += abs(FFTW2D_ELEM(F_sum, i, j)); // accessor is (Y, X)
-					else
-						A2D_ELEM(PS_sum(), i, j) += abs(FFTW2D_ELEM(F_sum, -i, -j));
-				}
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F_sum)
+					DIRECT_MULTIDIM_ELEM(F_sum, n) += DIRECT_MULTIDIM_ELEM(Fframes[j + iframe], n);
 			}
+
+			#pragma omp parallel for num_threads(n_threads)
+			FOR_ALL_ELEMENTS_IN_ARRAY2D(PS_sum()) // logical 2D access, i = logical_y, j = logical_x
+			{
+				// F(i, j) = conj(F(-i, -j))
+				if (j > 0)
+					A2D_ELEM(PS_sum(), i, j) += abs(FFTW2D_ELEM(F_sum, i, j)); // accessor is (Y, X)
+				else
+					A2D_ELEM(PS_sum(), i, j) += abs(FFTW2D_ELEM(F_sum, -i, -j));
+			}
+		}
 //#define DEBUG_PS
 #ifdef DEBUG_PS
-			std::cout << "size of Fframes: NX = " << XSIZE(Fframes[0]) << " NY = " << YSIZE(Fframes[0]) << std::endl;
-			std::cout << "size of PS_sum: NX = " << XSIZE(PS_sum()) << " NY = " << YSIZE(PS_sum()) << std::endl;
+		std::cout << "size of Fframes: NX = " << XSIZE(Fframes[0]) << " NY = " << YSIZE(Fframes[0]) << std::endl;
+		std::cout << "size of PS_sum: NX = " << XSIZE(PS_sum()) << " NY = " << YSIZE(PS_sum()) << std::endl;
 #endif
-			RCTOC(TIMING_POWER_SPECTRUM_SUM);
+		RCTOC(TIMING_POWER_SPECTRUM_SUM);
 
-			// 1. Make it square
-			RCTIC(TIMING_POWER_SPECTRUM_SQUARE);
-			int ps_size_square = XMIPP_MIN(nx, ny);
-			if (nx != ny)
-			{
-				F_ps_small.resize(ps_size_square, ps_size_square / 2 + 1);
-				NewFFT::FourierTransform(PS_sum(), F_ps);
-				cropInFourierSpace(F_ps, F_ps_small);
-				NewFFT::inverseFourierTransform(F_ps_small, PS_sum());
-#ifdef DEBUG_PS
-				std::cout << "size of F_ps: NX = " << XSIZE(F_ps) << " NY = " << YSIZE(F_ps) << std::endl;
-				std::cout << "size of F_ps_small: NX = " << XSIZE(F_ps_small) << " NY = " << YSIZE(F_ps_small) << std::endl;
-				std::cout << "size of PS_sum in square: NX = " << XSIZE(PS_sum()) << " NY = " << YSIZE(PS_sum()) << std::endl;
-				PS_sum.write("ps_test_square.mrc");
-#endif
-			}
-			RCTOC(TIMING_POWER_SPECTRUM_SQUARE);
-
-			// 2. Crop the center
-			RCTIC(TIMING_POWER_SPECTRUM_CROP);
-			RFLOAT ps_angpix = (!early_binning) ? angpix : angpix * bin_factor;
-			int nx_needed = XSIZE(PS_sum());
-			if (ps_angpix < target_pixel_size)
-			{
-				nx_needed = CEIL(ps_size_square * ps_angpix / target_pixel_size);
-				nx_needed += nx_needed % 2;
-				ps_angpix = XSIZE(PS_sum()) * ps_angpix / nx_needed;
-			}
-			Image<float> PS_sum_cropped(nx_needed, nx_needed);
-			PS_sum().setXmippOrigin();
-			PS_sum_cropped().setXmippOrigin();
-			FOR_ALL_ELEMENTS_IN_ARRAY2D(PS_sum_cropped())
-				A2D_ELEM(PS_sum_cropped(), i, j) = A2D_ELEM(PS_sum(), i, j);
-
-#ifdef DEBUG_PS
-			std::cout << "size of PS_sum_cropped: NX = " << XSIZE(PS_sum_cropped()) << " NY = " << YSIZE(PS_sum_cropped()) << std::endl;
-			std::cout << "nx_needed = " << nx_needed << std::endl;
-			std::cout << "ps_angpix after cropping = " << ps_angpix << std::endl;
-			PS_sum_cropped.write("ps_test_cropped.mrc");
-#endif
-			RCTOC(TIMING_POWER_SPECTRUM_CROP);
-
-			// 3. Downsample
-			RCTIC(TIMING_POWER_SPECTRUM_RESIZE);
-			F_ps_small.reshape(ps_size, ps_size / 2 + 1);
-			F_ps_small.initZeros();
-			NewFFT::FourierTransform(PS_sum_cropped(), F_ps);
+		// 1. Make it square
+		RCTIC(TIMING_POWER_SPECTRUM_SQUARE);
+		int ps_size_square = XMIPP_MIN(nx, ny);
+		if (nx != ny)
+		{
+			F_ps_small.resize(ps_size_square, ps_size_square / 2 + 1);
+			NewFFT::FourierTransform(PS_sum(), F_ps);
 			cropInFourierSpace(F_ps, F_ps_small);
 			NewFFT::inverseFourierTransform(F_ps_small, PS_sum());
-			RCTOC(TIMING_POWER_SPECTRUM_RESIZE);
-
-			// 4. Write
-			PS_sum.setSamplingRateInHeader(ps_angpix, ps_angpix);
-			PS_sum.write(fn_ps);
-			logfile << "Written the power spectrum for CTF estimation: " << fn_ps << std::endl;
-			logfile << "The pixel size for CTF estimation: " << ps_angpix << std::endl;
+#ifdef DEBUG_PS
+			std::cout << "size of F_ps: NX = " << XSIZE(F_ps) << " NY = " << YSIZE(F_ps) << std::endl;
+			std::cout << "size of F_ps_small: NX = " << XSIZE(F_ps_small) << " NY = " << YSIZE(F_ps_small) << std::endl;
+			std::cout << "size of PS_sum in square: NX = " << XSIZE(PS_sum()) << " NY = " << YSIZE(PS_sum()) << std::endl;
+			PS_sum.write("ps_test_square.mrc");
+#endif
 		}
-		RCTOC(TIMING_POWER_SPECTRUM);
+		RCTOC(TIMING_POWER_SPECTRUM_SQUARE);
 
-		// Global alignment
-		// TODO: Consider frame grouping in global alignment.
-		logfile << std::endl << "Global alignment:" << std::endl;
+		// 2. Crop the center
+		RCTIC(TIMING_POWER_SPECTRUM_CROP);
+		RFLOAT ps_angpix = (!early_binning) ? angpix : angpix * bin_factor;
+		int nx_needed = XSIZE(PS_sum());
+		if (ps_angpix < target_pixel_size)
+		{
+			nx_needed = CEIL(ps_size_square * ps_angpix / target_pixel_size);
+			nx_needed += nx_needed % 2;
+			ps_angpix = XSIZE(PS_sum()) * ps_angpix / nx_needed;
+		}
+		Image<float> PS_sum_cropped(nx_needed, nx_needed);
+		PS_sum().setXmippOrigin();
+		PS_sum_cropped().setXmippOrigin();
+		FOR_ALL_ELEMENTS_IN_ARRAY2D(PS_sum_cropped())
+			A2D_ELEM(PS_sum_cropped(), i, j) = A2D_ELEM(PS_sum(), i, j);
+
+#ifdef DEBUG_PS
+		std::cout << "size of PS_sum_cropped: NX = " << XSIZE(PS_sum_cropped()) << " NY = " << YSIZE(PS_sum_cropped()) << std::endl;
+		std::cout << "nx_needed = " << nx_needed << std::endl;
+		std::cout << "ps_angpix after cropping = " << ps_angpix << std::endl;
+		PS_sum_cropped.write("ps_test_cropped.mrc");
+#endif
+		RCTOC(TIMING_POWER_SPECTRUM_CROP);
+
+		// 3. Downsample
+		RCTIC(TIMING_POWER_SPECTRUM_RESIZE);
+		F_ps_small.reshape(ps_size, ps_size / 2 + 1);
+		F_ps_small.initZeros();
+		NewFFT::FourierTransform(PS_sum_cropped(), F_ps);
+		cropInFourierSpace(F_ps, F_ps_small);
+		NewFFT::inverseFourierTransform(F_ps_small, PS_sum());
+		RCTOC(TIMING_POWER_SPECTRUM_RESIZE);
+
+		// 4. Write
+		PS_sum.setSamplingRateInHeader(ps_angpix, ps_angpix);
+		PS_sum.write(fn_ps);
+		logfile << "Written the power spectrum for CTF estimation: " << fn_ps << std::endl;
+		logfile << "The pixel size for CTF estimation: " << ps_angpix << std::endl;
+	}
+	RCTOC(TIMING_POWER_SPECTRUM);
+
+	// Global alignment
+	// TODO: Consider frame grouping in global alignment.
+	logfile << std::endl << "Global alignment:" << std::endl;
+	if (!fromStarFile) {
 		RCTIC(TIMING_GLOBAL_ALIGNMENT);
 		alignPatch(Fframes, nx, ny, bfactor / (prescaling * prescaling), xshifts, yshifts, logfile);
 		RCTOC(TIMING_GLOBAL_ALIGNMENT);
@@ -1525,34 +1536,62 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, bool fromStar
 			// Should be in the original pixel size
 			mic.setGlobalShift(frames[i] + 1, xshifts[i] * prescaling, yshifts[i] * prescaling); // 1-indexed
 			}
-
-		Iref().reshape(ny, nx);
-		Iref_even().reshape(ny, nx);
-		Iref_odd().reshape(ny, nx);
-		Iref().initZeros();
-
-		RCTIC(TIMING_GLOBAL_IFFT);
-		#pragma omp parallel for num_threads(n_threads)
-		for (int iframe = 0; iframe < n_frames; iframe++) {
-			Iframes[iframe]().reshape(ny, nx);
-			NewFFT::inverseFourierTransform(Fframes[iframe], Iframes[iframe]());
-			// Unfortunately, we cannot deallocate Fframes here because of dose-weighting
+	}
+	else {
+		for (int i = 0, ilim = xshifts.size(); i < ilim; i++) {
+			xshifts[i] = mic.globalShiftX[i] / prescaling;
+			yshifts[i] = mic.globalShiftY[i] / prescaling;
 		}
-		RCTOC(TIMING_GLOBAL_IFFT);
+		alignPatch_knownShifts(Fframes, nx, ny, bfactor / (prescaling * prescaling), xshifts, yshifts, logfile);
+	}
 
-		// Patch based alignment
+	Iref().reshape(ny, nx);
+	Iref_even().reshape(ny, nx);
+	Iref_odd().reshape(ny, nx);
+	Iref().initZeros();
+
+	RCTIC(TIMING_GLOBAL_IFFT);
+	#pragma omp parallel for num_threads(n_threads)
+	for (int iframe = 0; iframe < n_frames; iframe++) {
+		Iframes[iframe]().reshape(ny, nx);
+		NewFFT::inverseFourierTransform(Fframes[iframe], Iframes[iframe]());
+		// Unfortunately, we cannot deallocate Fframes here because of dose-weighting
+	}
+	RCTOC(TIMING_GLOBAL_IFFT);
+
+	// Patch based alignment
+	if (!fromStarFile) {
 		logfile << std::endl << "Local alignments:" << std::endl;
 		logfile << "Patches: X = " << patch_x << " Y = " << patch_y << std::endl;
 		bool do_local = (patch_x > 2) && (patch_y > 2);
 		if (!do_local) {
 			logfile << "Too few patches to do local alignments. Local alignment is skipped." << std::endl;
 		}
-
 		if (do_local) {
-			const int patch_nx = nx / patch_x, patch_ny = ny / patch_y, n_patches = patch_x * patch_y;
 			std::vector<RFLOAT> patch_xshifts, patch_yshifts, patch_frames, patch_xs, patch_ys;
-			std::vector<MultidimArray<fComplex> > Fpatches(n_groups);
+			// if (fromStarFile) {
+			// 	MetaDataTable MDlocal;
+			// 	MotionModel *model =  mic.model;
+			// 	Matrix1D <RFLOAT> coeffX = model->coeffX;
+			// 	Matrix1D <RFLOAT> coeffY = model->coeffY;
+			// 	MDlocal.read(mic.fn_input,"local_shift");
+			// 	int all_frame_patches = MDlocal.numberOfObjects();
+			// 	if (all_frame_patches % n_frames != 0 ) {
+			// 		REPORT_ERROR("Error reading local shift metadata from input starfile");
+			// 	}
+			// 	int num_patches_xy = all_frame_patches / n_frames ;
+			// 	int frameNum = 0;
+			// 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDlocal) {
+			// 		MDlocal.getValue(EMDL_MICROGRAPH_FRAME_NUMBER, frameNum);
+			// 		// MD.setValue(EMDL_IMAGE_COORD_X, patchX[i]);
+			// 		// MD.setValue(EMDL_IMAGE_COORD_Y, patchY[i]);
+			// 		// MD.setValue(EMDL_MICROGRAPH_SHIFT_X, localShiftX[i]);
+			// 		// MD.setValue(EMDL_MICROGRAPH_SHIFT_Y, localShiftY[i]);
+			// 	}
 
+			// }
+			const int patch_nx = nx / patch_x, patch_ny = ny / patch_y, n_patches = patch_x * patch_y;
+			std::vector<MultidimArray<fComplex> > Fpatches(n_groups);
 			int ipatch = 1;
 			for (int iy = 0; iy < patch_y; iy++) {
 				for (int ix = 0; ix < patch_x; ix++) {
@@ -1741,11 +1780,11 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, bool fromStar
 				}
 			}
 			RCTOC(TIMING_FIT_POLYNOMIAL);
-		} else { // !do_local
+		}
+		else { // !do_local
 			mic.model = NULL;
 		}
 	}
-
 skip_fitting:
 	if (!do_dose_weighting || save_noDW) {
 		Iref().initZeros(Iframes[0]());
@@ -2249,6 +2288,19 @@ void MotioncorrRunner::realSpaceInterpolation_ThirdOrderPolynomial(Image <float>
 		}
 	}
 }
+bool MotioncorrRunner::alignPatch_knownShifts(std::vector<MultidimArray<fComplex> > &Fframes, const int pnx, const int pny, const RFLOAT scaled_B, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, std::ostream &logfile) {
+	const int n_frames = xshifts.size();
+	// Apply shifts
+	// Since the image is not necessarily square, we cannot use the method in fftw.cpp
+	RCTIC(TIMING_FOURIER_SHIFT);
+	#pragma omp parallel for num_threads(n_threads)
+	for (int iframe = 1; iframe < n_frames; iframe++) {
+		shiftNonSquareImageInFourierTransform(Fframes[iframe], -xshifts[iframe] / pnx, -yshifts[iframe] / pny);
+	}
+	RCTOC(TIMING_FOURIER_SHIFT);
+	return true; // convergence set to true
+}
+
 
 bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<fComplex> > &Fframes, const int pnx, const int pny, const RFLOAT scaled_B, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, std::ostream &logfile) {
 	std::vector<Image<float> > Iccs(n_threads);
