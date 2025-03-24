@@ -1569,27 +1569,6 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, bool fromStar
 		}
 		if (do_local) {
 			std::vector<RFLOAT> patch_xshifts, patch_yshifts, patch_frames, patch_xs, patch_ys;
-			// if (fromStarFile) {
-			// 	MetaDataTable MDlocal;
-			// 	MotionModel *model =  mic.model;
-			// 	Matrix1D <RFLOAT> coeffX = model->coeffX;
-			// 	Matrix1D <RFLOAT> coeffY = model->coeffY;
-			// 	MDlocal.read(mic.fn_input,"local_shift");
-			// 	int all_frame_patches = MDlocal.numberOfObjects();
-			// 	if (all_frame_patches % n_frames != 0 ) {
-			// 		REPORT_ERROR("Error reading local shift metadata from input starfile");
-			// 	}
-			// 	int num_patches_xy = all_frame_patches / n_frames ;
-			// 	int frameNum = 0;
-			// 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDlocal) {
-			// 		MDlocal.getValue(EMDL_MICROGRAPH_FRAME_NUMBER, frameNum);
-			// 		// MD.setValue(EMDL_IMAGE_COORD_X, patchX[i]);
-			// 		// MD.setValue(EMDL_IMAGE_COORD_Y, patchY[i]);
-			// 		// MD.setValue(EMDL_MICROGRAPH_SHIFT_X, localShiftX[i]);
-			// 		// MD.setValue(EMDL_MICROGRAPH_SHIFT_Y, localShiftY[i]);
-			// 	}
-
-			// }
 			const int patch_nx = nx / patch_x, patch_ny = ny / patch_y, n_patches = patch_x * patch_y;
 			std::vector<MultidimArray<fComplex> > Fpatches(n_groups);
 			int ipatch = 1;

@@ -50,8 +50,6 @@ public:
 	virtual int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const = 0;
 
 	virtual MotionModel* clone() const = 0;
-
-	Matrix1D <RFLOAT> coeffX, coeffY;
 };
 
 class ThirdOrderPolynomialModel: public MotionModel {
@@ -85,7 +83,6 @@ public:
 	static const RFLOAT NOT_OBSERVED;
 	RFLOAT angpix, voltage, dose_per_frame, pre_exposure;
 	FileName fnDefect;
-	FileName fn_input;
 	int first_frame; // First frame for local motion model. 1-indexed.
 	MotionModel *model;
 

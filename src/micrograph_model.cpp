@@ -422,7 +422,6 @@ void Micrograph::setGlobalShift(int frame, RFLOAT shiftx, RFLOAT shifty)
 
 void Micrograph::read(FileName fn_in, bool read_hotpixels)
 {
-	FileName fn_input = fn_in;
 	if (model != NULL)
 	{
 		delete model;
