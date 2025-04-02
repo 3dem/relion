@@ -1044,57 +1044,64 @@ void multiViewerCanvas::showAverage(bool selected, bool show_stddev)
 	MultidimArray<RFLOAT> sum2(ysize, xsize);
 
 	int nn = 0;
-
-	//I don't know how to properly retrive the pixel size here. Trying something that works in a simple case.
-	RFLOAT angpix = -1.0;
-	long int i,j;
-	int halfsizex,halfsizey;
+	long int i,j,r2;
+	int halfsizex = xsize/2;
+	int halfsizey = ysize/2;
 	RFLOAT x,y;
 	RFLOAT xs,ys;
 	CTF ctf;
 	MultidimArray<RFLOAT> sumN(ysize, xsize);
-	if(this->show_fourier_amplitudes || this->show_fourier_phase_angles)
+	//Initialized with ones to avoid division by zero later (produced by zones with no significat contribution |ctf| >0.3333).
+	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sum)
 	{
-		int optics_group = 0;
-		if (obsModel->opticsMdt.containsLabel(EMDL_IMAGE_PIXEL_SIZE))
-			obsModel->opticsMdt.getValue(EMDL_IMAGE_PIXEL_SIZE, angpix, optics_group);
-		halfsizex = xsize/2;
-		halfsizey = ysize/2;
-		xs = angpix*xsize;
-		ys = angpix*ysize;
-		//Initialized with ones to avoid division by zero later.
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sum)
-		{
-			DIRECT_MULTIDIM_ELEM(sumN, n) = 1.0;
-		}
+		DIRECT_MULTIDIM_ELEM(sumN, n) = 1.0;
 	}
+	RFLOAT angpix = 0.;
 	for (long int ipos = 0; ipos < boxes.size(); ipos++)
 	{
 		if (boxes[ipos]->selected == selected)
 		{
 			if(this->show_fourier_amplitudes || this->show_fourier_phase_angles) ctf.readByGroup(boxes[ipos]->MDimg,obsModel);
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sum)
+			if (boxes[ipos]->MDimg.containsLabel(EMDL_IMAGE_OPTICS_GROUP))
 			{
-				int ival = boxes[ipos]->img_data[n];
-				if (ival < 0) ival += 256;
-				if(this->show_fourier_amplitudes || this->show_fourier_phase_angles)
+				if (obsModel->opticsMdt.containsLabel(EMDL_IMAGE_PIXEL_SIZE))
 				{
-					i = n % xsize - halfsizex;
-					j = n / xsize - halfsizey;
-					x = (RFLOAT)i / xs;
-					y = (RFLOAT)j / ys;
-					if( fabs(ctf.getCTF(x, y, false, false, false, false)) > 0.3333)
+					int optics_group;
+					boxes[ipos]->MDimg.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group);
+					optics_group--;
+					obsModel->opticsMdt.getValue(EMDL_IMAGE_PIXEL_SIZE, angpix, optics_group);
+					xs = angpix*xsize;
+					ys = angpix*ysize;
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sum)
 					{
-						DIRECT_MULTIDIM_ELEM(sum, n) += ival;
-						DIRECT_MULTIDIM_ELEM(sum2, n) += ival * ival;
-						DIRECT_MULTIDIM_ELEM(sumN, n)++;
+						int ival = boxes[ipos]->img_data[n];
+						if (ival < 0) ival += 256;
+						if(this->show_fourier_amplitudes || this->show_fourier_phase_angles)
+						{
+							i = n % xsize - halfsizex;
+							j = n / xsize - halfsizey;
+							r2 = i*i+j*j;
+							ival *= (1.0-exp(-r2/100.0));
+							x = (RFLOAT)i / xs;
+							y = (RFLOAT)j / ys;
+							if( fabs(ctf.getCTF(x, y, false, false, false, false)) > 0.3333)
+							{
+								DIRECT_MULTIDIM_ELEM(sum, n) += ival;
+								DIRECT_MULTIDIM_ELEM(sum2, n) += ival * ival;
+								DIRECT_MULTIDIM_ELEM(sumN, n)++;
+							}
+						} else {
+							DIRECT_MULTIDIM_ELEM(sum, n) += ival;
+							DIRECT_MULTIDIM_ELEM(sum2, n) += ival * ival;
+						}
 					}
+					nn++;
 				} else {
-					DIRECT_MULTIDIM_ELEM(sum, n) += ival;
-					DIRECT_MULTIDIM_ELEM(sum2, n) += ival * ival;
+					std::cout << " Skipping image with no pixel size " << ipos << std::endl;
 				}
+			} else {
+				std::cout << " Skipping image with no optics group..." << std::endl;
 			}
-			nn++;
 		}
 	}
 	if(this->show_fourier_amplitudes || this->show_fourier_phase_angles)
