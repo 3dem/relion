@@ -19,7 +19,6 @@
  ***************************************************************************/
 
 #include "src/displayer.h"
-#include "src/ctf.h"
 //#define DEBUG
 //
 #ifdef HAVE_PNG
