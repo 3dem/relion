@@ -93,7 +93,7 @@ void FlexAnalyser::initialise()
 	// This creates a rotation matrix for (rot,tilt,psi) = (0,90,0)
 	// It will be used to make all Abody orientation matrices relative to (0,90,0) instead of the more logical (0,0,0)
 	// This is useful, as psi-priors are ill-defined around tilt=0, as rot becomes the same as -psi!!
-	rotation3DMatrix(-90., 'Y', A_rot90, false);
+	rotation3DMatrix(+90., 'Y', A_rot90, false);
 	A_rot90T = A_rot90.transpose();
 
 	if (do_PCA_orient)

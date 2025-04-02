@@ -7,6 +7,8 @@
 #include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/image/buffered_image.h>
 #include <src/jaz/tomography/optimisation_set.h>
+#include <src/projector.h>
+
 
 
 class ParticleSet;
@@ -67,7 +69,8 @@ class SubtomoProgram
                 apply_orientations,
 				write_float16,
 				run_from_GUI,
-				run_from_MPI;
+				run_from_MPI,
+                do_real_subtomo;
 
 		void readBasicParameters(IOParser& parser);
 		virtual void readParameters(int argc, char *argv[]);
@@ -81,6 +84,11 @@ class SubtomoProgram
 				const std::vector<std::vector<ParticleIndex>>& particles,
 				const TomogramSet& tomogramSet,
                 bool verbose = true);
+
+        BufferedImage<float> extractSubtomogramsAndReProject(
+                ParticleIndex part_id, MultidimArray<RFLOAT> &recTomo,
+                const Tomogram& tomogram, const ParticleSet &particleSet,
+                const std::vector<bool> &isVisible, RFLOAT tomogram_angpix);
 
 		void processTomograms(
 				const std::vector<int>& tomoIndices,

@@ -746,6 +746,34 @@ void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, Micrograph &mic)
 			}
 		}
 	}
+
+	// If no shifts were found with the version 1.5 method, attempt the version 1.6 method
+	if (!have_found_final)
+	{
+		// Reset and start parsing for version 1.6 style data
+		in.clear();
+		in.seekg(0);
+
+		while (getline(in, line))
+		{
+			if (line.find("Frame") != std::string::npos && line.find("x Shift") != std::string::npos)
+			{
+				while (getline(in, line) && !line.empty())
+				{
+					std::istringstream ss(line);
+					float x_shift, y_shift;
+					ss >> frame >> x_shift >> y_shift;
+					if (ss.fail())
+					{
+						std::cerr << " fn_log= " << fn_log << std::endl;
+						REPORT_ERROR("Error: Unexpected line format in 1.6 global shifts: " + line);
+					}
+					mic.setGlobalShift(frame, x_shift, y_shift);
+				}
+				break;
+			}
+		}
+	}
 	in.close();
 
 	mic.first_frame = first_frame_sum;

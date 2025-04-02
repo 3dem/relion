@@ -313,18 +313,6 @@ std::string trim2(const std::string& str);
  * finishing spaces are removed
  */
 std::string removeSpaces(const std::string& _str);
-
-/** Remove quotes.
- *
- * This function removes the first character if it is a RFLOAT or single quote,
- * as well as the last character. The char pointer might be moved.
- *
- * @code
- * char str[10] = "\"Hello\"";
- * (&str);
- * @endcode
- */
-void removeQuotes(char** _str);
 //@}
 
 /** @name Tokenization
@@ -358,10 +346,10 @@ void removeQuotes(char** _str);
  *
  * Returns a the number of tokens found. The tokens are in the variable results.
  */
-int splitString(const std::string& input,
-                const std::string& delimiter,
-                std::vector< std::string >& results,
-                bool includeEmpties = false);
+void splitString(const std::string& input,
+                 const std::string& delimiter,
+                 std::vector< std::string >& results,
+                 bool includeEmpties = false);
 
 /** Returns first token (char*).
  *

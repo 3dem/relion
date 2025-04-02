@@ -40,8 +40,8 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
 	long int _nDim;
 
 	// These are libtiff's types.
-	uint32 width, length; // apparent dimensions in the file
-	uint16 sampleFormat, bitsPerSample, resolutionUnit;
+	uint32_t width, length; // apparent dimensions in the file
+	uint16_t sampleFormat, bitsPerSample, resolutionUnit;
 	float xResolution;
 	
 	if (TIFFGetField(ftiff, TIFFTAG_IMAGEWIDTH, &width) != 1 ||
@@ -182,8 +182,8 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
 			TIFFSetDirectory(ftiff, img_select);
 
 			// Make sure image property is consistent for all frames
-			uint32 cur_width, cur_length;
-			uint16 cur_sampleFormat, cur_bitsPerSample;
+			uint32_t cur_width, cur_length;
+			uint16_t cur_sampleFormat, cur_bitsPerSample;
 
 			if (TIFFGetField(ftiff, TIFFTAG_IMAGEWIDTH, &cur_width) != 1 ||
 			    TIFFGetField(ftiff, TIFFTAG_IMAGELENGTH, &cur_length) != 1)

@@ -33,32 +33,37 @@ class NewStackHelper
 				const RawImage<T>& stack,
 				RawImage<tComplex<T>>& stackOut,
 				bool center = true,
-				int num_threads = 1);
+				int num_threads = 1,
+                FFT::Normalization normalization = FFT::Both);
 
 		static void FourierTransformStack_fast(
 				const RawImage<float>& stack,
 				RawImage<fComplex>& stackOut,
 				bool center = true,
-				int num_threads = 1);
+				int num_threads = 1,
+                FFT::Normalization normalization = FFT::Both);
 		
 		template <typename T>
 		static BufferedImage<tComplex<T>> FourierTransformStack(
 				const RawImage<T>& stack, 
 				bool center = true,
-				int num_threads = 1);
+				int num_threads = 1,
+                FFT::Normalization normalization = FFT::Both);
 		
 		template <typename T>
 		static void inverseFourierTransformStack(
 				const RawImage<tComplex<T>>& stack, 
 				RawImage<T>& stackOut, 
 				bool decenter = true,
-				int num_threads = 1);
+				int num_threads = 1,
+                FFT::Normalization normalization = FFT::Both);
 		
 		template <typename T>
 		static BufferedImage<T> inverseFourierTransformStack(
 				const RawImage<tComplex<T>>& stack,  
 				bool decenter = true,
-				int num_threads = 1);
+				int num_threads = 1,
+                FFT::Normalization normalization = FFT::Both);
 		
 		template <typename T>
 		static void shiftStack(
@@ -197,7 +202,8 @@ void NewStackHelper::FourierTransformStack(
 		const RawImage<T>& stack,
 		RawImage<tComplex<T>>& stackOut,
 		bool center,
-		int num_threads)
+		int num_threads,
+        FFT::Normalization normalization)
 {
 	const int w = stack.xdim;
 	const int h = stack.ydim;
@@ -225,7 +231,7 @@ void NewStackHelper::FourierTransformStack(
 			tempRS[t](x,y) = center? stack((x+w/2)%w, (y+h/2)%h, f) : stack(x,y,f);
 		}
 
-		FFT::FourierTransform(tempRS[t], tempFS[t], FFT::Both);
+		FFT::FourierTransform(tempRS[t], tempFS[t], normalization);
 
 		for (long int y = 0; y < h; y++)
 		for (long int x = 0; x < wh; x++)
@@ -239,10 +245,11 @@ template <typename T>
 BufferedImage<tComplex<T>> NewStackHelper::FourierTransformStack(
 		const RawImage<T>& stack, 
 		bool center,
-		int num_threads)
+		int num_threads,
+        FFT::Normalization normalization)
 {
 	BufferedImage<tComplex<T>> out(stack.xdim/2 + 1, stack.ydim, stack.zdim);
-	FourierTransformStack(stack, out, center, num_threads);
+	FourierTransformStack(stack, out, center, num_threads, normalization);
 	return out;
 }
 
@@ -251,7 +258,8 @@ void NewStackHelper::inverseFourierTransformStack(
 		const RawImage<tComplex<T>>& stack, 
 		RawImage<T>& stackOut, 
 		bool decenter,
-		int num_threads)
+		int num_threads,
+        FFT::Normalization normalization)
 {
 	const int wh = stack.xdim;
 	const int h = stack.ydim;
@@ -288,7 +296,7 @@ void NewStackHelper::inverseFourierTransformStack(
 			tempFS[t](x,y) = mod * stack(x,y,f);
 		}
 				
-		FFT::inverseFourierTransform(tempFS[t], tempRS[t], FFT::Both);
+		FFT::inverseFourierTransform(tempFS[t], tempRS[t], normalization);
 		
 		for (long int y = 0; y < h; y++)
 		for (long int x = 0; x < w; x++)
@@ -302,10 +310,11 @@ template <typename T>
 BufferedImage<T> NewStackHelper::inverseFourierTransformStack(
 		const RawImage<tComplex<T>>& stack, 
 		bool center,
-		int num_threads)
+		int num_threads,
+        FFT::Normalization normalization)
 {
 	BufferedImage<T> out(2*(stack.xdim - 1), stack.ydim, stack.zdim);
-	inverseFourierTransformStack(stack, out, center, num_threads);
+	inverseFourierTransformStack(stack, out, center, num_threads, normalization);
 	return out;
 }
 

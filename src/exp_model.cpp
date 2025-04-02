@@ -57,6 +57,14 @@ bool Experiment::hasCtfPremultiplied()
 	return false;
 }
 
+bool Experiment::hasCtfCorrected()
+{
+    for (int og = 0; og < numberOfOpticsGroups(); og++)
+        if (obsModel.getCtfCorrected(og)) return true;
+
+    return false;
+}
+
 RFLOAT Experiment::getOpticsPixelSize(int optics_group)
 {
 	return obsModel.getPixelSize(optics_group);

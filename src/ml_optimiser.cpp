@@ -388,7 +388,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
         mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
         mymodel.sigma2_psi = textToFloat(fnt) * textToFloat(fnt);
     }
-    fnt = parser.getOption("--sigma_off", "Stddev. on the translations", "OLD");
+    fnt = parser.getOption("--offset", "Stddev. on the translations", "OLD");
     if (fnt != "OLD")
     {
         mymodel.sigma2_offset = textToFloat(fnt) * textToFloat(fnt);
@@ -2035,7 +2035,7 @@ void MlOptimiser::initialiseGeneral(int rank)
     {
         blush_args += " --gpu ";
         for (auto &d : gpuDevices)
-            blush_args += gpu_ids + ",";
+            blush_args += integerToString(d) + ",";
         blush_args += " ";
     }
     else
@@ -2085,6 +2085,14 @@ void MlOptimiser::initialiseGeneral(int rank)
                 fn_ref, is_3d_model, mydata,
                 do_average_unaligned, do_generate_seeds,refs_are_ctf_corrected,
                 ref_angpix, gradient_refine, grad_pseudo_halfsets, do_trust_ref_size, (rank==0));
+
+    }
+
+    if (do_ctf_correction && mydata.hasCtfCorrected())
+    {
+        do_ctf_correction = false;
+        if (verb > 0)
+            std::cout << " + CTFs have already been corrected, switching off CTF correction ..." << std::endl;
 
     }
 
@@ -2188,7 +2196,7 @@ void MlOptimiser::initialiseGeneral(int rank)
             std::vector<std::string> resols;
             std::vector<RFLOAT> resols_end, resols_start;
 
-            int nresols = splitString(helical_fourier_mask_resols, ",", resols);
+            splitString(helical_fourier_mask_resols, ",", resols);
             if (resols.size()%2 == 1) REPORT_ERROR("Provide an even number of start-end resolutions for --fourier_exclude_resols");
             for (int nshell = 0; nshell < resols.size()/2; nshell++)
             {
@@ -4872,7 +4880,7 @@ bool MlOptimiser::setAverageCTF2(MultidimArray<RFLOAT> &avgctf2)
 {
     // When doing ctf_premultiplied, correct the tau2 estimates for the average CTF^2
     bool do_correct_tau2_by_avgctf2 = false;
-    if (mydata.hasCtfPremultiplied() && !fix_tau && !do_split_random_halves)
+    if (mydata.hasCtfPremultiplied() && !mydata.hasCtfCorrected() && !fix_tau && !do_split_random_halves)
     {
         do_correct_tau2_by_avgctf2 = true;
         MultidimArray<RFLOAT> sumw;

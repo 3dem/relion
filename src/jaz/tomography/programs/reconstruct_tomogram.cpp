@@ -124,6 +124,15 @@ void TomoBackprojectProgram::initialise(bool verbose)
 
     tomoIndexTodo.clear();
 
+    // If we do a tilt angle offset, apply to all tomograms to prevent trouble with MPI parallelisation
+    if (fabs(tiltAngleOffset) > 0.)
+    {
+        for (int idx = 0; idx < tomogramSet.size(); idx++)
+        {
+            tomogramSet.applyTiltAngleOffset(idx, tiltAngleOffset);
+        }
+    }
+
     if (tomoName == "*")
     {
         do_multiple = true;
@@ -133,6 +142,7 @@ void TomoBackprojectProgram::initialise(bool verbose)
             if (do_only_unfinished && exists(getOutputFileName(idx,false,false)))
                 continue;
             tomoIndexTodo.push_back(idx);
+
         }
 
         if (outFn[outFn.size()-1] != '/') outFn += '/';
@@ -186,11 +196,6 @@ void TomoBackprojectProgram::run(int rank, int size)
         // Abort through the pipeline_control system
         if (pipeline_control_check_abort_job())
             exit(RELION_EXIT_ABORTED);
-
-        if (fabs(tiltAngleOffset) > 0.)
-        {
-            tomogramSet.applyTiltAngleOffset(idx, tiltAngleOffset);
-        }
 
         if (fourierInversion)
         {

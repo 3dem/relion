@@ -486,48 +486,32 @@ std::string removeSpaces(const std::string& _str)
 	return retval;
 }
 
-// Remove quotes ===========================================================
-void removeQuotes(char **_str)
-{
-	std::string retval = *_str;
-	if (retval.length() == 0)
-		return;
-	char c = retval[0];
-	if (c == '\"' || c == '\'')
-		retval = retval.substr(1, retval.length() - 1);
-	c = retval[retval.length()-1];
-	if (c == '\"' || c == '\'')
-		retval = retval.substr(0, retval.length() - 1);
-	free(*_str);
-	*_str = strdup(retval.c_str());
-}
-
 // Split a string ==========================================================
-int splitString(const std::string& input,
-                const std::string& delimiter,
-                std::vector< std::string >& results,
-                bool includeEmpties)
+void splitString(const std::string& input,
+                 const std::string& delimiter,
+                 std::vector< std::string >& results,
+                 bool includeEmpties)
 {
 	results.clear();
-	int iPos = 0;
-	int newPos = -1;
-	int sizeS2 = static_cast< int >(delimiter.size());
-	int isize = static_cast< int >(input.size());
+	size_t iPos, newPos;
+	size_t sizeS2 = delimiter.size();
+	size_t isize = input.size();
 
 	if (isize == 0 || sizeS2 == 0)
-		return 0;
+		return;
 
-	std::vector< int > positions;
-	newPos = input.find(delimiter, 0);
+	std::vector<size_t> positions;
+	newPos = input.find(delimiter);
 
-	if (newPos < 0)
+	// No delimiter
+	if (newPos == std::string::npos)
 	{
 		results.push_back(input);
-		return 1;
+		return;
 	}
 
 	int numFound = 0;
-	while (newPos >= iPos)
+	while (newPos != std::string::npos)
 	{
 		numFound++;
 		positions.push_back(newPos);
@@ -535,27 +519,31 @@ int splitString(const std::string& input,
 		newPos = input.find(delimiter, iPos + sizeS2);
 	}
 
-	if (numFound == 0)
-		return 0;
-
-	for (int i = 0; i <= static_cast< int >(positions.size()); i++)
+	for (size_t i = 0; i <= numFound; i++)
 	{
-		std::string s("");
+		std::string s;
+
+		// First element; no delimiter at the beginning
 		if (i == 0)
-			s = input.substr(i, positions[i]);
-		int offset = positions[i-1] + sizeS2;
-		if (offset < isize)
 		{
-			if (i == positions.size())
-				s = input.substr(offset);
-			else if (i > 0)
-				s = input.substr(positions[i-1] + sizeS2,
-				                 positions[i] - positions[i-1] - sizeS2);
+			s = input.substr(i, positions[i]);
 		}
+		else
+		{
+			int offset = positions[i - 1] + sizeS2;
+//			std::cout << "i = " << i << " positions[i - 1] = " << positions[i - 1] << " offset = " << offset << std::endl;
+
+			// The last element
+			if (i == numFound)
+				s = input.substr(offset);
+			else
+				s = input.substr(offset, positions[i] - offset);
+		}
+
 		if (includeEmpties || s.size() > 0)
 			results.push_back(s);
 	}
-	return numFound;
+	return;
 }
 
 // To lower ================================================================
