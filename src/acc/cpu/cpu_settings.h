@@ -81,11 +81,23 @@
 									// memory usage by allocating
 									// ( 6*REF_GROUP_SIZE + 4 ) * BLOCK_SIZE XFLOATS. // DEPRECATED
 
-#ifdef __INTEL_COMPILER
-#  include <mathimf.h>
-#  define RESTRICT __restrict__
+#if defined(__INTEL_COMPILER) || defined(__INTEL_LLVM_COMPILER)
+ #ifndef USE_INTEL_COMPILER
+  #define USE_INTEL_COMPILER
+ #endif
+ #include <mathimf.h>
+#endif
+#define RESTRICT __restrict
+
+// This is for AVX512
+#ifdef ACC_DOUBLE_PRECISION
+ #define SIMD_LEN 8
 #else
-#  define RESTRICT
+ #define SIMD_LEN 16
+#endif
+
+#ifndef MEM_ALIGN
+ #define MEM_ALIGN 64
 #endif
 
 

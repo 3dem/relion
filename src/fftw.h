@@ -403,10 +403,6 @@ void CenterFFTbySign(MultidimArray <T> &v)
 }
 
 template <typename T>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-inline
-#endif
 void centerFFT_2D_CPU(
 			int     batch_size,
 			size_t  pixel_start,
@@ -441,10 +437,6 @@ void centerFFT_2D_CPU(
 }
 
 template <typename T>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-inline
-#endif
 void centerFFT_3D_CPU(
 			int     batch_size,
 			size_t  pixel_start,

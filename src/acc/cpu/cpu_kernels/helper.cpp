@@ -253,10 +253,6 @@ void cosineFilter(	int      block_dim,
 }
 
 template <typename T>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-inline
-#endif
 void cpu_translate2D(T *	g_image_in,
 					T *		g_image_out,
 					size_t	image_size,
@@ -268,10 +264,6 @@ void cpu_translate2D(T *	g_image_in,
 	int x,y,xp,yp;
 	size_t new_pixel;
 
-#ifdef DEBUG_CUDA
-	if (image_size > (size_t)std::numeric_limits<int>::max())
-		ACC_PTR_DEBUG_INFO("cpu_translate2D: image_size > std::numeric_limits<int>::max()");
-#endif
 	for(size_t pixel=0; pixel<image_size; pixel++)
 	{
 		x = pixel % xdim;
@@ -290,10 +282,6 @@ void cpu_translate2D(T *	g_image_in,
 }
 
 template <typename T>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-inline
-#endif
 void cpu_translate3D(T *	g_image_in,
 					T*		g_image_out,
 					size_t	image_size,
@@ -307,10 +295,6 @@ void cpu_translate3D(T *	g_image_in,
 	int x,y,z,xp,yp,zp,xy;
 	size_t new_voxel;
 
-#ifdef DEBUG_CUDA
-	if (image_size > (size_t)std::numeric_limits<int>::max())
-		ACC_PTR_DEBUG_INFO("cpu_translate3D: image_size > std::numeric_limits<int>::max()");
-#endif
 	for(size_t voxel=0; voxel<image_size; voxel++)
 	{
 		int xydim = xdim*ydim;
@@ -628,10 +612,6 @@ void cpu_kernel_multi( T *A,
 			T  S,
 			size_t     image_size)
 {
-#ifdef DEBUG_CUDA
-	if (image_size < 0)
-		ACC_PTR_DEBUG_INFO("cpu_kernel_multi:  image_size < 0");
-#endif
 	for (size_t i = 0; i < image_size; i ++)
 		OUT[i] = A[i]*S;
 }
@@ -641,10 +621,6 @@ void cpu_kernel_multi( T *A,
 			T  S,
 			size_t     image_size)
 {
-#ifdef DEBUG_CUDA
-	if (image_size < 0)
-		ACC_PTR_DEBUG_INFO("cpu_kernel_multi2:  image_size < 0");
-#endif
 	for (size_t i = 0; i < image_size; i ++)
 		A[i] *= S;
 }
@@ -656,10 +632,6 @@ void cpu_kernel_multi( T *A,
 			T  S,
 			size_t     image_size)
 {
-#ifdef DEBUG_CUDA
-	if (image_size < 0)
-		ACC_PTR_DEBUG_INFO("cpu_kernel_multi3:  image_size < 0");
-#endif
 	for (size_t i = 0; i < image_size; i ++)
 		OUT[i] = A[i]*B[i]*S;
 }
@@ -671,10 +643,6 @@ void cpu_kernel_add(
 	size_t size
 )
 {
-#ifdef DEBUG_CUDA
-	if (size < 0)
-		ACC_PTR_DEBUG_INFO("cpu_kernel_add:  image_size < 0");
-#endif
 	for (size_t i = 0; i < size; i ++)
 		A[i] += S;
 }
@@ -724,19 +692,11 @@ void square(int     blockIdx_x,
 }
 */
 template<bool invert>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-inline
-#endif
 void cpu_kernel_make_eulers_2D(int grid_size, int block_size,
 		XFLOAT *alphas,
 		XFLOAT *eulers,
 		unsigned long orientation_num)
 {
-#ifdef DEBUG_CUDA
-	if ((size_t)grid_size*(size_t)block_size > (size_t)std::numeric_limits<int>::max())
-		ACC_PTR_DEBUG_INFO("cpu_kernel_make_eulers_2D: grid_size*block_size > std::numeric_limits<int>::max()");
-#endif
 	for(int blockIdx_x=0; blockIdx_x<(int)(grid_size); blockIdx_x++) {
 		for(int threadIdx_x=0; threadIdx_x<block_size; threadIdx_x++)  {
 			unsigned long oid = (unsigned long)blockIdx_x * (unsigned long)block_size + threadIdx_x; //Orientation id
@@ -782,10 +742,6 @@ void cpu_kernel_make_eulers_2D(int grid_size, int block_size,
 }
 
 template<bool invert,bool doL, bool doR>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-inline
-#endif
 void cpu_kernel_make_eulers_3D(int grid_size, int block_size,
 		XFLOAT *alphas,
 		XFLOAT *betas,
@@ -795,10 +751,6 @@ void cpu_kernel_make_eulers_3D(int grid_size, int block_size,
 		XFLOAT *L,
 		XFLOAT *R)
 {
-#ifdef DEBUG_CUDA
-	if ((size_t)grid_size*(size_t)block_size > (size_t)std::numeric_limits<int>::max())
-		ACC_PTR_DEBUG_INFO("cpu_kernel_make_eulers_3D: grid_size*block_size > std::numeric_limits<int>::max()");
-#endif
 	for(int blockIdx_x=0; blockIdx_x<(int)(grid_size); blockIdx_x++) {
         for(int threadIdx_x=0; threadIdx_x<block_size; threadIdx_x++) {
 			XFLOAT a(0.f),b(0.f),g(0.f), A[9],B[9];

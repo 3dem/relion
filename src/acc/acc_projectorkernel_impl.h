@@ -77,9 +77,6 @@ public:
 #if defined _CUDA_ENABLED || defined _HIP_ENABLED
 	__device__ __forceinline__
 #else
-	#ifndef __INTEL_COMPILER
-	__attribute__((always_inline))
-	#endif
 	inline
 #endif
 	void project3Dmodel(
@@ -164,9 +161,6 @@ public:
 #if defined _CUDA_ENABLED || defined _HIP_ENABLED
 	__device__ __forceinline__
 #else
-	#ifndef __INTEL_COMPILER
-	__attribute__((always_inline))
-	#endif
 	inline
 #endif
 	void project3Dmodel(
@@ -245,9 +239,6 @@ public:
 #if defined _CUDA_ENABLED || defined _HIP_ENABLED
 __device__ __forceinline__
 #else
-	#ifndef __INTEL_COMPILER
-	__attribute__((always_inline))
-	#endif
 	inline
 #endif
 	void project2Dmodel(
