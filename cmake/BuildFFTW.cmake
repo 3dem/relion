@@ -42,7 +42,7 @@ else()
 		if (AMDFFTW)
 			set(ext_conf_flags_fft ${ext_conf_flags_fft} --enable-sse2 --enable-avx --enable-avx2 --enable-amd-opt)
 		else()
-			set(ext_conf_flags_fft ${ext_conf_flags_fft} --enable-avx)
+			set(ext_conf_flags_fft ${ext_conf_flags_fft} --enable-sse2 --enable-avx --enable-avx2 --enable-avx512 --enable-fma)
 		endif()
 	endif()
 	
