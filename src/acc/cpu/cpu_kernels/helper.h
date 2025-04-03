@@ -542,8 +542,8 @@ inline void translatePixel(
 		int y,
 		XFLOAT tx,
 		XFLOAT ty,
-		XFLOAT &real,
-		XFLOAT &imag,
+		XFLOAT real,
+		XFLOAT imag,
 		XFLOAT &tReal,
 		XFLOAT &tImag)
 {
@@ -565,8 +565,8 @@ inline void translatePixel(
 		XFLOAT tx,
 		XFLOAT ty,
 		XFLOAT tz,
-		XFLOAT &real,
-		XFLOAT &imag,
+		XFLOAT real,
+		XFLOAT imag,
 		XFLOAT &tReal,
 		XFLOAT &tImag)
 {
@@ -580,6 +580,38 @@ inline void translatePixel(
 	tReal = c * real - s * imag;
 	tImag = c * imag + s * real;
 }
+
+#ifdef ACC_DOUBLE_PRECISION
+ #define TRANSLATE_PIXEL_2D(x, y, tx, ty, real, imag, tReal, tImag) \
+{ \
+	XFLOAT s, c; \
+	sincos( (x) * (tx) + (y) * (ty),  &s, &c ); \
+	(tReal) = c * (real) - s * (imag); \
+	(tImag) = c * (imag) + s * (real); \
+}
+ #define TRANSLATE_PIXEL_3D(x, y, z, tx, ty, tz, real, imag, tReal, tImag) \
+{ \
+	XFLOAT s, c; \
+	sincos( (x) * (tx) + (y) * (ty) + (z) * (tz), &s, &c ); \
+	(tReal) = c * (real) - s * (imag); \
+	(tImag) = c * (imag) + s * (real); \
+}
+#else
+ #define TRANSLATE_PIXEL_2D(x, y, tx, ty, real, imag, tReal, tImag) \
+{ \
+	XFLOAT s, c; \
+	sincosf( (x) * (tx) + (y) * (ty),  &s, &c ); \
+	(tReal) = c * (real) - s * (imag); \
+	(tImag) = c * (imag) + s * (real); \
+}
+ #define TRANSLATE_PIXEL_3D(x, y, z, tx, ty, tz, real, imag, tReal, tImag) \
+{ \
+	XFLOAT s, c; \
+	sincosf( (x) * (tx) + (y) * (ty) + (z) * (tz), &s, &c ); \
+	(tReal) = c * (real) - s * (imag); \
+	(tImag) = c * (imag) + s * (real); \
+}
+#endif
 
 // sincos lookup table optimization. Function translatePixel calls 
 // sincos(x*tx + y*ty). We precompute 2D lookup tables for x and y directions. 
