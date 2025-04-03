@@ -115,7 +115,6 @@ size_t ceilfracf(size_t a, size_t b)
 #ifdef __INTEL_COMPILER
 #pragma omp declare simd uniform(mdlX,mdlInitY)
 #else
-__attribute__((always_inline))
 inline
 #endif
 static void complex2D(std::complex<XFLOAT> *mdlComplex, XFLOAT &real, XFLOAT &imag,
@@ -160,7 +159,6 @@ static void complex2D(std::complex<XFLOAT> *mdlComplex, XFLOAT &real, XFLOAT &im
 #ifdef __INTEL_COMPILER
 #pragma omp declare simd uniform(mdlX,mdlXY,mdlInitY,mdlInitZ)
 #else
-__attribute__((always_inline))
 inline
 #endif
 static void complex3D(

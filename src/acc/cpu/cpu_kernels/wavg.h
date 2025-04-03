@@ -20,10 +20,6 @@ namespace CpuKernels
 // cos(A+B) = cos(A) * cos(B) - sin(A) * sin(B), we can use lookup table to
 // compute sin(x*tx + y*ty) and cos(x*tx + y*ty).
 template<bool REFCTF, bool REF3D>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-inline
-#endif
 void wavg_ref3D(
 		XFLOAT * RESTRICT   g_eulers,
 		AccProjectorKernel &projector,
@@ -196,10 +192,6 @@ void wavg_ref3D(
 }
 
 template<bool REFCTF>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-inline
-#endif
 void wavg_3D(
 		XFLOAT * RESTRICT   g_eulers,
 		AccProjectorKernel &projector,

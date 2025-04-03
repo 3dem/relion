@@ -15,9 +15,6 @@ namespace CpuKernels
 {
 
 template<bool REF3D, bool DATA3D, int block_sz, int eulers_per_block, int prefetch_fraction>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-#endif
 inline void diff2_coarse(
 		unsigned long     grid_size,
 		XFLOAT *g_eulers,
@@ -285,9 +282,6 @@ inline void diff2_coarse(
 }
 
 template<bool REF3D>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-#endif
 inline void diff2_fine_2D(
 		unsigned long     grid_size,
 		XFLOAT *g_eulers,
@@ -426,9 +420,6 @@ inline void diff2_fine_2D(
 	}  // for bid
 }
 
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-#endif
 inline void diff2_fine_3D(
 		unsigned long  grid_size,
 		XFLOAT *g_eulers,
@@ -601,9 +592,6 @@ inline void diff2_fine_3D(
  *   	CROSS-CORRELATION-BASED KERNELS
  */
 template<bool REF3D>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-#endif
 inline void diff2_CC_coarse_2D(
 		unsigned long     grid_size,
 		XFLOAT *g_eulers,
@@ -731,9 +719,6 @@ inline void diff2_CC_coarse_2D(
 	} // for iorient
 }
 
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-#endif
 inline void diff2_CC_coarse_3D(
 		unsigned long     grid_size,
 		XFLOAT *g_eulers,
@@ -890,9 +875,6 @@ inline void diff2_CC_coarse_3D(
 
 
 template<bool REF3D>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-#endif
 inline void diff2_CC_fine_2D(
 		unsigned long     grid_size,
 		XFLOAT *g_eulers,
@@ -1036,9 +1018,6 @@ inline void diff2_CC_fine_2D(
 	} // for bid
 }
 
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-#endif
 inline void diff2_CC_fine_3D(
 		unsigned long     grid_size,
 		XFLOAT *g_eulers,

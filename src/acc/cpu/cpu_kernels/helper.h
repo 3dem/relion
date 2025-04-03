@@ -14,10 +14,6 @@ namespace CpuKernels
 {
 
 template<typename T>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-inline
-#endif
 void weights_exponent_coarse(
 		T *g_pdf_orientation,
 		bool *g_pdf_orientation_zeros,
@@ -44,10 +40,6 @@ void weights_exponent_coarse(
 
 
 template<typename T>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-inline
-#endif
 void exponentiate(
 		T *g_array,
 		T add,
@@ -71,10 +63,6 @@ void exponentiate(
 }
 
 template<bool DATA3D>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-inline
-#endif
 void collect2jobs(  int     grid_size,
 					int		block_size,
 					XFLOAT *g_oo_otrans_x,          // otrans-size -> make const
@@ -410,10 +398,6 @@ void cast(  int blockIdx_x,
 }
 */
 template<bool do_highpass>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-inline
-#endif
 void kernel_frequencyPass( int grid_size, int block_size,
 					ACCCOMPLEX *A,
 					long int     ori_size,
@@ -481,10 +465,6 @@ void kernel_frequencyPass( int grid_size, int block_size,
 }
 
 template<bool DATA3D>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-inline
-#endif
 void powerClass(int          gridSize,
 				ACCCOMPLEX   *g_image,
 				XFLOAT       *g_spectrum,
@@ -557,9 +537,6 @@ void powerClass(int          gridSize,
 	}
 }
 
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-#endif
 inline void translatePixel(
 		int x,
 		int y,
@@ -581,9 +558,6 @@ inline void translatePixel(
 	tImag = c * imag + s * real;
 }
 
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-#endif
 inline void translatePixel(
 		int x,
 		int y,
@@ -613,9 +587,6 @@ inline void translatePixel(
 // translation index. Since sin(a+B) = sin(A) * cos(B) + cos(A) * sin(B), and 
 // cos(A+B) = cos(A) * cos(B) - sin(A) * sin(B), we can use lookup table to 
 // compute sin(x*tx + y*ty) and cos(x*tx + y*ty). 
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-#endif
 inline void  computeSincosLookupTable2D(unsigned long  trans_num,
                                         XFLOAT  *trans_x,
 										XFLOAT  *trans_y,										
@@ -650,9 +621,6 @@ inline void  computeSincosLookupTable2D(unsigned long  trans_num,
 	}
 }	                                    
 				
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-#endif
 inline void  computeSincosLookupTable3D(unsigned long  trans_num,
                                         XFLOAT  *trans_x,
 										XFLOAT  *trans_y,
