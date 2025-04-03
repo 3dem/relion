@@ -109,6 +109,9 @@ void wavg_ref3D(
 #if _OPENMP >= 201307	// For OpenMP 4.0 and later
 			#pragma omp simd simdlen(SIMD_LEN)
 #endif
+#ifdef USE_INTEL_COMPILER
+			#pragma forceinline
+#endif
 			for(int x = xstart; x < xend; x++) {
 				if(REF3D)
 					projector.project3Dmodel(x, y, e0, e1, e3, e4, e6, e7,
@@ -272,6 +275,9 @@ void wavg_3D(
 
 #if _OPENMP >= 201307	// For OpenMP 4.0 and later
 				#pragma omp simd simdlen(SIMD_LEN)
+#endif
+#ifdef USE_INTEL_COMPILER
+				#pragma forceinline
 #endif
 				for(int x = xstart_y; x < xend_y; x++) {
 					projector.project3Dmodel(x, y, z, e0, e1, e2, e3, e4, e5, e6, e7, e8,

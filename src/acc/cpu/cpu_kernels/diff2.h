@@ -48,22 +48,25 @@ inline void diff2_coarse(
 	const int xSize = projector.imgX;
 	const int ySize = projector.imgY;
 	const int zSize = projector.imgZ;
+	const int xySize = xSize*ySize;
 	const int maxR = projector.maxR;
-	const unsigned pass_num(ceilfracf(image_size,block_sz));
+	const int pass_num_floor = image_size / block_sz;
+	const int pass_num = (image_size%block_sz == 0) ? pass_num_floor : pass_num_floor + 1;
 
-#ifndef __INTEL_COMPILER
+#ifdef USE_SINCOS_TABLE
 	// pre-compute sin and cos for x and y component
 	XFLOAT sin_x[translation_num][xSize], cos_x[translation_num][xSize];
 	XFLOAT sin_y[translation_num][ySize], cos_y[translation_num][ySize];
 	XFLOAT sin_z[translation_num][zSize], cos_z[translation_num][zSize];
 
-	if (DATA3D)  {
+	if (DATA3D) {
 		computeSincosLookupTable3D(translation_num, trans_x, trans_y, trans_z,
 								xSize, ySize, zSize,                               
 								&sin_x[0][0], &cos_x[0][0], 
 								&sin_y[0][0], &cos_y[0][0],
 								&sin_z[0][0], &cos_z[0][0]);
-	} else {
+	}
+	else {
 		computeSincosLookupTable2D(translation_num, trans_x, trans_y, 
 								xSize, ySize,
 								&sin_x[0][0], &cos_x[0][0], 
@@ -73,7 +76,7 @@ inline void diff2_coarse(
 	alignas(MEM_ALIGN) XFLOAT trans_cos_x[block_sz], trans_sin_x[block_sz];
 	alignas(MEM_ALIGN) XFLOAT trans_cos_y[block_sz], trans_sin_y[block_sz];
 	alignas(MEM_ALIGN) XFLOAT trans_cos_z[block_sz], trans_sin_z[block_sz];
-#endif  // not Intel Compiler
+#endif
 	
 	int x[pass_num][block_sz], y[pass_num][block_sz], z[pass_num][block_sz];
 	XFLOAT s_real[pass_num][block_sz];
@@ -81,222 +84,200 @@ inline void diff2_coarse(
 	XFLOAT s_corr[pass_num][block_sz];
 	
 	// Pre-calculate x/y/z
-	for (unsigned pass = 0; pass < pass_num; pass++) { // finish an entire ref image each block
-   		unsigned long start = pass * block_sz;
-		unsigned long elements = block_sz;
-		if (start + block_sz >= image_size)
-			elements = image_size - start;
-
+	for (int pass = 0; pass < pass_num; pass++) { // finish an entire ref image each block
+		const int start = pass * block_sz;
 		// Rotate the reference image per block_sz, saved in cache
 #if _OPENMP >= 201307	// For OpenMP 4.0 and later
 		#pragma omp simd simdlen(SIMD_LEN) safelen(block_sz)
 #endif
-		for (int tid=0; tid<elements; tid++){
-			unsigned long pixel = (unsigned long)start + (unsigned long)tid;
+		for (int tid=0; tid<block_sz; tid++) {
+			const int pixel = start + tid;
+			if (pixel < image_size) {
+				if (DATA3D) {
+					z[pass][tid] = pixel / xySize;
+					const int xy = pixel % xySize;
+					x[pass][tid] =    xy % xSize;
+					y[pass][tid] =    xy / xSize;
+					if (z[pass][tid] > maxR)
+						z[pass][tid] -= zSize;
+				}
+				else {
+					x[pass][tid] = pixel % xSize;
+					y[pass][tid] = pixel / xSize;
+					z[pass][tid] = (XFLOAT)0.0;
+				}
+				if (y[pass][tid] > maxR)
+					y[pass][tid] -= ySize;
 
-			if(DATA3D)
-			{
-				z[pass][tid] = floorfracf(pixel, xSize*ySize);
-				int xy = pixel % (xSize*ySize);
-				x[pass][tid] =             xy  % xSize;
-				y[pass][tid] = floorfracf( xy,   xSize);
-				if (z[pass][tid] > maxR)
-					z[pass][tid] -= zSize;
+				s_real[pass][tid] = g_real[pixel];
+				s_imag[pass][tid] = g_imag[pixel];
+				s_corr[pass][tid] = g_corr[pixel] * (XFLOAT)0.5;
 			}
-			else
-			{
-				x[pass][tid] =            pixel % xSize;
-				y[pass][tid] = floorfracf(pixel, xSize);
-				z[pass][tid] = (XFLOAT)0.0;
-			}
-			if (y[pass][tid] > maxR)
-				y[pass][tid] -= ySize;
-
-			s_real[pass][tid] = g_real[pixel];
-			s_imag[pass][tid] = g_imag[pixel];
-			s_corr[pass][tid] = g_corr[pixel] * (XFLOAT)0.5;
 		}
-
-		// Make sure un-used elements are zeroed - just in case
-		if (elements != block_sz)
-			for (int tid=elements; tid < block_sz; tid++)
-			{
-				x[pass][tid] = (XFLOAT)0.0;
-				y[pass][tid] = (XFLOAT)0.0;
-			}
 	}
 
 	XFLOAT diff2s[translation_num][eulers_per_block];
 	alignas(MEM_ALIGN) XFLOAT diffi[eulers_per_block];
+	XFLOAT s_ref_real[eulers_per_block][block_sz];
+	XFLOAT s_ref_imag[eulers_per_block][block_sz];
+	alignas(MEM_ALIGN) XFLOAT s_eulers[eulers_per_block * 16];
 
 	for (unsigned long block = 0; block < grid_size; block++) {
 		//Prefetch euler matrices with cacheline friendly index
-		alignas(MEM_ALIGN) XFLOAT s_eulers[eulers_per_block * 16];
 		for (int e = 0; e < eulers_per_block; e++)
 			for (int i = 0; i < 9; i++)
 				s_eulers[e*16+i] = g_eulers[(size_t)block * (size_t)eulers_per_block * (size_t)9 + e*9+i];
 
-		//Setup variables
-		XFLOAT s_ref_real[eulers_per_block][block_sz];
-		XFLOAT s_ref_imag[eulers_per_block][block_sz];
-
 		memset(&diff2s[0][0], 0, sizeof(XFLOAT) * translation_num * eulers_per_block);
 
 		//Step through data
-		for (unsigned pass = 0; pass < pass_num; pass++) { // finish an entire ref image each block
-			unsigned long start = pass * block_sz;
-			unsigned long elements = block_sz;
-			if (start + block_sz >= image_size)
-				elements = image_size - start;
-
+		for (int pass = 0; pass < pass_num; pass++) { // finish an entire ref image each block
+			const int start = pass * block_sz;
 			for (int i = 0; i < eulers_per_block; i ++) {
 #if _OPENMP >= 201307	// For OpenMP 4.0 and later
 				#pragma omp simd simdlen(SIMD_LEN) safelen(block_sz)
 #endif
-				for (int tid=0; tid<elements; tid++){
-
-					if(DATA3D) // if DATA3D, then REF3D as well.
-						projector.project3Dmodel(
-								x[pass][tid], y[pass][tid], z[pass][tid],
-								s_eulers[i*16  ],
-								s_eulers[i*16+1],
-								s_eulers[i*16+2],
-								s_eulers[i*16+3],
-								s_eulers[i*16+4],
-								s_eulers[i*16+5],
-								s_eulers[i*16+6],
-								s_eulers[i*16+7],
-								s_eulers[i*16+8],
-								s_ref_real[i][tid],
-								s_ref_imag[i][tid]);
-					else if(REF3D)
-						projector.project3Dmodel(
-								x[pass][tid], y[pass][tid], 
-								s_eulers[i*16  ],
-								s_eulers[i*16+1],
-								s_eulers[i*16+3],
-								s_eulers[i*16+4],
-								s_eulers[i*16+6],
-								s_eulers[i*16+7],
-								s_ref_real[i][tid],
-								s_ref_imag[i][tid]);                    
-					else
-						projector.project2Dmodel(
-								x[pass][tid], y[pass][tid], 
-								s_eulers[i*16  ],
-								s_eulers[i*16+1],
-								s_eulers[i*16+3],
-								s_eulers[i*16+4],
-								s_ref_real[i][tid],
-								s_ref_imag[i][tid]);
+#ifdef USE_INTEL_COMPILER
+				#pragma forceinline
+#endif
+				for (int tid=0; tid<block_sz; tid++) {
+					if (start + tid < image_size) {
+						if (DATA3D) // if DATA3D, then REF3D as well.
+							projector.project3Dmodel(
+									x[pass][tid], y[pass][tid], z[pass][tid],
+									s_eulers[i*16  ],
+									s_eulers[i*16+1],
+									s_eulers[i*16+2],
+									s_eulers[i*16+3],
+									s_eulers[i*16+4],
+									s_eulers[i*16+5],
+									s_eulers[i*16+6],
+									s_eulers[i*16+7],
+									s_eulers[i*16+8],
+									s_ref_real[i][tid],
+									s_ref_imag[i][tid]);
+						else if (REF3D)
+							projector.project3Dmodel(
+									x[pass][tid], y[pass][tid],
+									s_eulers[i*16  ],
+									s_eulers[i*16+1],
+									s_eulers[i*16+3],
+									s_eulers[i*16+4],
+									s_eulers[i*16+6],
+									s_eulers[i*16+7],
+									s_ref_real[i][tid],
+									s_ref_imag[i][tid]);
+						else
+							projector.project2Dmodel(
+									x[pass][tid], y[pass][tid],
+									s_eulers[i*16  ],
+									s_eulers[i*16+1],
+									s_eulers[i*16+3],
+									s_eulers[i*16+4],
+									s_ref_real[i][tid],
+									s_ref_imag[i][tid]);
+					}
 				}
 			}
 
-			for(unsigned long i=0; i<translation_num; i++) {
+			for (int i=0; i<translation_num; i++) {
 				XFLOAT tx = trans_x[i];
 				XFLOAT ty = trans_y[i];
 				XFLOAT tz = trans_z[i];                 
 
-#ifndef __INTEL_COMPILER
-				for (int tid=0; tid<elements; tid++) {
+#ifdef USE_SINCOS_TABLE
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+				#pragma omp simd simdlen(SIMD_LEN) safelen(block_sz)
+#endif
+				for (int tid=0; tid<block_sz; tid++) {
+					if (start + tid < image_size) {
+						int xidx = x[pass][tid];
+						int yidx = y[pass][tid];
+						int zidx;
 
-					int xidx = x[pass][tid];
-					int yidx = y[pass][tid];
-					int zidx;
+						if (DATA3D) {
+							zidx = z[pass][tid];
+							if ( zidx < 0) {
+								trans_cos_z[tid] =  cos_z[i][-zidx];
+								trans_sin_z[tid] = -sin_z[i][-zidx];
+							}
+							else {
+								trans_cos_z[tid] = cos_z[i][zidx];
+								trans_sin_z[tid] = sin_z[i][zidx];
+							}
+						}
 
-					if(DATA3D) {
-						zidx = z[pass][tid];
-						if ( zidx < 0) {
-							trans_cos_z[tid] =  cos_z[i][-zidx];
-							trans_sin_z[tid] = -sin_z[i][-zidx];            
+						if ( yidx < 0) {
+							trans_cos_y[tid] =  cos_y[i][-yidx];
+							trans_sin_y[tid] = -sin_y[i][-yidx];
 						}
 						else {
-							trans_cos_z[tid] = cos_z[i][zidx];
-							trans_sin_z[tid] = sin_z[i][zidx];
+							trans_cos_y[tid] = cos_y[i][yidx];
+							trans_sin_y[tid] = sin_y[i][yidx];
+						}
+
+						if ( xidx < 0) {
+							trans_cos_x[tid] =  cos_x[i][-xidx];
+							trans_sin_x[tid] = -sin_x[i][-xidx];
+						}
+						else {
+							trans_cos_x[tid] = cos_x[i][xidx];
+							trans_sin_x[tid] = sin_x[i][xidx];
 						}
 					}
-
-					if ( yidx < 0) {
-						trans_cos_y[tid] =  cos_y[i][-yidx];
-						trans_sin_y[tid] = -sin_y[i][-yidx];            
-					}
-					else {
-						trans_cos_y[tid] = cos_y[i][yidx];
-						trans_sin_y[tid] = sin_y[i][yidx];
-					}
-
-					if ( xidx < 0) {
-						trans_cos_x[tid] =  cos_x[i][-xidx];
-						trans_sin_x[tid] = -sin_x[i][-xidx];            
-					}
-					else {
-						trans_cos_x[tid] = cos_x[i][xidx];
-						trans_sin_x[tid] = sin_x[i][xidx];
-					}					
 				}  // tid  						
-#endif  // not Intel Compiler
+#endif
 
-				for (int j = 0; j < eulers_per_block; j ++)
-					diffi[j] = 0.0;
-
+				memset(diffi, 0, sizeof(XFLOAT) * eulers_per_block);
 #if _OPENMP > 201307	// For OpenMP 4.5 and later
 				#pragma omp simd reduction(+:diffi) simdlen(SIMD_LEN) safelen(block_sz)
 #endif
 				for (int tid=0; tid<block_sz; tid++) {
-// This will generate masked SVML routines for Intel compiler
-					unsigned long pixel = (unsigned long)start + (unsigned long)tid;
-					if(pixel >= image_size)
-						continue;                
+					if (start + tid < image_size) {
+						XFLOAT real, imag;
+#ifdef USE_SINCOS_TABLE
+						if (DATA3D) {
+							XFLOAT s  = trans_sin_x[tid] * trans_cos_y[tid] + trans_cos_x[tid] * trans_sin_y[tid];
+							XFLOAT c  = trans_cos_x[tid] * trans_cos_y[tid] - trans_sin_x[tid] * trans_sin_y[tid];
 
-					XFLOAT real, imag;
-#ifndef __INTEL_COMPILER
-					if(DATA3D) {
-//						translatePixel(x[tid], y[tid], z[tid], tx, ty, tz, s_real[tid], s_imag[tid], real, imag);
-						XFLOAT s  = trans_sin_x[tid] * trans_cos_y[tid] + trans_cos_x[tid] * trans_sin_y[tid];
-						XFLOAT c  = trans_cos_x[tid] * trans_cos_y[tid] - trans_sin_x[tid] * trans_sin_y[tid];
+							XFLOAT ss = s * trans_cos_z[tid] + c * trans_sin_z[tid];
+							XFLOAT cc = c * trans_cos_z[tid] - s * trans_sin_z[tid];
 
-						XFLOAT ss = s * trans_cos_z[tid] + c * trans_sin_z[tid];
-						XFLOAT cc = c * trans_cos_z[tid] - s * trans_sin_z[tid];				
+							real = cc * s_real[pass][tid] - ss * s_imag[pass][tid];
+							imag = cc * s_imag[pass][tid] + ss * s_real[pass][tid];
+						}
+						else  { // 2D data
+							XFLOAT ss = trans_sin_x[tid] * trans_cos_y[tid] + trans_cos_x[tid] * trans_sin_y[tid];
+							XFLOAT cc = trans_cos_x[tid] * trans_cos_y[tid] - trans_sin_x[tid] * trans_sin_y[tid];
 
-						real = cc * s_real[pass][tid] - ss * s_imag[pass][tid];
-						imag = cc * s_imag[pass][tid] + ss * s_real[pass][tid];
-					}
-					else  { // 2D data
-//						translatePixel(x[tid], y[tid],         tx, ty,     s_real[tid], s_imag[tid], real, imag);
-						XFLOAT ss = trans_sin_x[tid] * trans_cos_y[tid] + trans_cos_x[tid] * trans_sin_y[tid];
-						XFLOAT cc = trans_cos_x[tid] * trans_cos_y[tid] - trans_sin_x[tid] * trans_sin_y[tid];
-			
-						real = cc * s_real[pass][tid] - ss * s_imag[pass][tid];
-						imag = cc * s_imag[pass][tid] + ss * s_real[pass][tid];
-					}
-#else  // Intel Compiler - accept the (hopefully vectorized) sincos call every iteration rather than caching
-					if(DATA3D)
-						translatePixel(x[pass][tid], y[pass][tid], z[pass][tid], tx, ty, tz,
-										s_real[pass][tid], s_imag[pass][tid], real, imag);
-					else
-						translatePixel(x[pass][tid], y[pass][tid], tx, ty,
-										s_real[pass][tid], s_imag[pass][tid], real, imag);
-#endif  // not Intel Compiler
-
-#ifdef __INTEL_COMPILER
-					#pragma unroll(eulers_per_block)
+							real = cc * s_real[pass][tid] - ss * s_imag[pass][tid];
+							imag = cc * s_imag[pass][tid] + ss * s_real[pass][tid];
+						}
+#else
+						if (DATA3D)
+							TRANSLATE_PIXEL_3D(x[pass][tid], y[pass][tid], z[pass][tid], tx, ty, tz, s_real[pass][tid], s_imag[pass][tid], real, imag)
+						else
+							TRANSLATE_PIXEL_2D(x[pass][tid], y[pass][tid], tx, ty, s_real[pass][tid], s_imag[pass][tid], real, imag)
 #endif
-					for (int j = 0; j < eulers_per_block; j ++) {
-						XFLOAT diff_real =  s_ref_real[j][tid] - real;
-						XFLOAT diff_imag =  s_ref_imag[j][tid] - imag;
 
-						diffi[j] += (diff_real * diff_real + diff_imag * diff_imag) * s_corr[pass][tid];
+						#pragma unroll(eulers_per_block)
+						for (int j = 0; j < eulers_per_block; j ++) {
+							XFLOAT diff_real =  s_ref_real[j][tid] - real;
+							XFLOAT diff_imag =  s_ref_imag[j][tid] - imag;
+
+							diffi[j] += (diff_real * diff_real + diff_imag * diff_imag) * s_corr[pass][tid];
+						}
 					}
 				} // for tid
-				for (int j = 0; j < eulers_per_block; j ++)
+				for (int j = 0; j < eulers_per_block; j++)
 					diff2s[i][j] += diffi[j];
 			}  // for each translation
 		}  // for each pass
 
 		XFLOAT *pData = g_diff2s + (size_t)block * (size_t)eulers_per_block * (size_t)translation_num;
-		for(int i=0; i<eulers_per_block; i++)
-			for(unsigned long j=0; j<translation_num; j++)
-				pData[i*translation_num + j] += diff2s[j][i];
+		for(int j=0; j<eulers_per_block; j++)
+			for(int i=0; i<translation_num; i++)
+				pData[j*translation_num + i] += diff2s[i][j];
 	} // block
 }
 
@@ -334,8 +315,8 @@ inline void diff2_fine_2D(
 	alignas(MEM_ALIGN) XFLOAT ref_real[xSize],  ref_imag[xSize];
 	alignas(MEM_ALIGN) XFLOAT imgs_real[xSize], imgs_imag[xSize];
 	
-	alignas(MEM_ALIGN) XFLOAT s[translation_num];
-
+	alignas(MEM_ALIGN) XFLOAT s[translation_num];   
+	
 	// Now do calculations
 	for (unsigned long bid = 0; bid < grid_size; bid++) {
 		unsigned long trans_num        = (unsigned long)d_job_num[bid];     
@@ -375,6 +356,9 @@ inline void diff2_fine_2D(
 
 #if _OPENMP >= 201307	// For OpenMP 4.0 and later
 			#pragma omp simd simdlen(SIMD_LEN)
+#endif
+#ifdef USE_INTEL_COMPILER
+			#pragma forceinline
 #endif
 			for(int x = xstart; x < xend; x++) {
 				if(REF3D)
@@ -417,7 +401,7 @@ inline void diff2_fine_2D(
 
 				XFLOAT sum = (XFLOAT) 0.0;                   
 #if _OPENMP >= 201307	// For OpenMP 4.0 and later
-				#pragma omp simd  reduction(+:sum) simdlen(SIMD_LEN)
+				#pragma omp simd reduction(+:sum) simdlen(SIMD_LEN)
 #endif
 				for(int x = xstart; x < xend; x++) {
 					XFLOAT ss = trans_sin_x[x] * trans_cos_y + trans_cos_x[x] * trans_sin_y;
@@ -480,8 +464,8 @@ inline void diff2_fine_3D(
 	alignas(MEM_ALIGN) XFLOAT ref_real[xSize],  ref_imag[xSize];
 	alignas(MEM_ALIGN) XFLOAT imgs_real[xSize], imgs_imag[xSize];
 	
-	alignas(MEM_ALIGN) XFLOAT s[translation_num];
-
+	alignas(MEM_ALIGN) XFLOAT s[translation_num];   
+		
 	// Now do calculations
 	for (unsigned long bid = 0; bid < grid_size; bid++) {
 		unsigned long trans_num        = (unsigned long)d_job_num[bid];     
@@ -539,6 +523,9 @@ inline void diff2_fine_3D(
 #if _OPENMP >= 201307	// For OpenMP 4.0 and later
 				#pragma omp simd simdlen(SIMD_LEN)
 #endif
+#ifdef USE_INTEL_COMPILER
+				#pragma forceinline
+#endif
 				for(int x = xstart_y; x < xend_y; x++) {
 					projector.project3Dmodel(x, y, z, e1, e2, e3, e4, e5, e6, e7, e8, e9, 
 											 ref_real[x], ref_imag[x]);
@@ -558,7 +545,6 @@ inline void diff2_fine_3D(
 					imgs_real[x]  = g_imgs_real[pixel + x] * half_corr;
 					imgs_imag[x]  = g_imgs_imag[pixel + x] * half_corr;            
 				}
-
 
 				for (unsigned long itrans=0; itrans<trans_num; itrans++) {
 					XFLOAT trans_cos_z, trans_sin_z;
@@ -586,7 +572,7 @@ inline void diff2_fine_3D(
 
 					XFLOAT sum = (XFLOAT) 0.0;                   
 #if _OPENMP >= 201307	// For OpenMP 4.0 and later
-					#pragma omp simd  reduction(+:sum) simdlen(SIMD_LEN)
+					#pragma omp simd reduction(+:sum)
 #endif
 					for(int x = xstart_y; x < xend_y; x++) {
 						XFLOAT s1  = trans_sin_x[x] * trans_cos_y + trans_cos_x[x] * trans_sin_y;
@@ -684,6 +670,9 @@ inline void diff2_CC_coarse_2D(
 
 #if _OPENMP >= 201307	// For OpenMP 4.0 and later
 			#pragma omp simd simdlen(SIMD_LEN)
+#endif
+#ifdef USE_INTEL_COMPILER
+			#pragma forceinline
 #endif
 			for(int x = xstart; x < xend; x++) {
 				if(REF3D)
@@ -832,6 +821,9 @@ inline void diff2_CC_coarse_3D(
 
 #if _OPENMP >= 201307	// For OpenMP 4.0 and later
 				#pragma omp simd simdlen(SIMD_LEN)
+#endif
+#ifdef USE_INTEL_COMPILER
+				#pragma forceinline
 #endif
 				for(int x = xstart_y; x < xend_y; x++) {
 					projector.project3Dmodel(
@@ -989,6 +981,9 @@ inline void diff2_CC_fine_2D(
 
 #if _OPENMP >= 201307	// For OpenMP 4.0 and later
 			#pragma omp simd simdlen(SIMD_LEN)
+#endif
+#ifdef USE_INTEL_COMPILER
+			#pragma forceinline
 #endif
 			for(int x = xstart; x < xend; x++) {
 				if(REF3D)
@@ -1156,6 +1151,9 @@ inline void diff2_CC_fine_3D(
 
 #if _OPENMP >= 201307	// For OpenMP 4.0 and later
 				#pragma omp simd simdlen(SIMD_LEN)
+#endif
+#ifdef USE_INTEL_COMPILER
+				#pragma forceinline
 #endif
 				for(int x = xstart_y; x < xend_y; x++) {
 					projector.project3Dmodel(

@@ -52,7 +52,7 @@ void backproject2D(
 
 	// Set up some other variables
 	alignas(MEM_ALIGN) XFLOAT s_eulers[4];
-
+	
 	XFLOAT weight_norm_inverse = (XFLOAT) 1.0 / weight_norm;
 	
 	alignas(MEM_ALIGN) XFLOAT xp[img_x], yp[img_x];
@@ -369,9 +369,9 @@ void backproject3D(
                                                         Fweight[tid] += weight * ctf;
 
 							if(DATA3D)
-								CpuKernels::translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag);
+								TRANSLATE_PIXEL_3D(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag)
 							else
-								CpuKernels::translatePixel(x, y,    g_trans_x[itrans], g_trans_y[itrans],                    img_real, img_imag, temp_real, temp_imag);
+								TRANSLATE_PIXEL_2D(x, y,    g_trans_x[itrans], g_trans_y[itrans],                    img_real, img_imag, temp_real, temp_imag)
 
 							real[tid] += temp_real * weight;
 							imag[tid] += temp_imag * weight;
@@ -547,6 +547,7 @@ void backprojectRef3D(
 	alignas(MEM_ALIGN) XFLOAT xp[img_x], yp[img_x], zp[img_x];
 	alignas(MEM_ALIGN) XFLOAT real[img_x], imag[img_x], Fweight[img_x];
 
+		
 	for (unsigned long img=0; img<imageCount; img++) {
 
 		for(int i = 0; i < 9; i++)
@@ -925,9 +926,9 @@ void backproject3D_SGD(
                                                         Fweight[tid] += weight * ctf;
 
 							if(DATA3D)
-								CpuKernels::translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag);
+								TRANSLATE_PIXEL_3D(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag)
 							else
-								CpuKernels::translatePixel(x, y,    g_trans_x[itrans], g_trans_y[itrans],                    img_real, img_imag, temp_real, temp_imag);
+								TRANSLATE_PIXEL_2D(x, y,    g_trans_x[itrans], g_trans_y[itrans],                    img_real, img_imag, temp_real, temp_imag)
 
 							real[tid] += (temp_real-ref_real[tid]) * weight;
 							imag[tid] += (temp_imag-ref_imag[tid]) * weight;
