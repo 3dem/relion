@@ -105,8 +105,10 @@ void wavg_ref3D(
 			for(int x = xstart; x < xend; x++) {
 				wdiff2s_AA[x] = g_wdiff2s_AA[pixel + x];
 			}
-			
-			#pragma omp simd
+
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+			#pragma omp simd simdlen(SIMD_LEN)
+#endif
 			for(int x = xstart; x < xend; x++) {
 				if(REF3D)
 					projector.project3Dmodel(x, y, e0, e1, e3, e4, e6, e7,
@@ -144,7 +146,9 @@ void wavg_ref3D(
 				XFLOAT *trans_cos_x = &cos_x[itrans][0];
 				XFLOAT *trans_sin_x = &sin_x[itrans][0];
 
-#pragma omp simd
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+				#pragma omp simd simdlen(SIMD_LEN)
+#endif
 				for(int x = xstart; x < xend; x++) {
 
 					XFLOAT ss = trans_sin_x[x] * trans_cos_y + trans_cos_x[x] * trans_sin_y;
@@ -266,7 +270,9 @@ void wavg_3D(
 					}
 				}
 
-				#pragma omp simd
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+				#pragma omp simd simdlen(SIMD_LEN)
+#endif
 				for(int x = xstart_y; x < xend_y; x++) {
 					projector.project3Dmodel(x, y, z, e0, e1, e2, e3, e4, e5, e6, e7, e8,
 											 ref_real[x], ref_imag[x]);

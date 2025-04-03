@@ -88,7 +88,9 @@ inline void diff2_coarse(
 			elements = image_size - start;
 
 		// Rotate the reference image per block_sz, saved in cache
-		#pragma omp simd
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+		#pragma omp simd simdlen(SIMD_LEN) safelen(block_sz)
+#endif
 		for (int tid=0; tid<elements; tid++){
 			unsigned long pixel = (unsigned long)start + (unsigned long)tid;
 
@@ -148,7 +150,9 @@ inline void diff2_coarse(
 				elements = image_size - start;
 
 			for (int i = 0; i < eulers_per_block; i ++) {
-				#pragma omp simd
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+				#pragma omp simd simdlen(SIMD_LEN) safelen(block_sz)
+#endif
 				for (int tid=0; tid<elements; tid++){
 
 					if(DATA3D) // if DATA3D, then REF3D as well.
@@ -236,7 +240,7 @@ inline void diff2_coarse(
 					diffi[j] = 0.0;
 
 #if _OPENMP > 201307	// For OpenMP 4.5 and later
-				#pragma omp simd reduction(+:diffi)
+				#pragma omp simd reduction(+:diffi) simdlen(SIMD_LEN) safelen(block_sz)
 #endif
 				for (int tid=0; tid<block_sz; tid++) {
 // This will generate masked SVML routines for Intel compiler
@@ -369,7 +373,9 @@ inline void diff2_fine_2D(
 				}
 			}
 
-			#pragma omp simd
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+			#pragma omp simd simdlen(SIMD_LEN)
+#endif
 			for(int x = xstart; x < xend; x++) {
 				if(REF3D)
 					projector.project3Dmodel(x, y, e1, e2, e3, e4, e5, e6, 
@@ -379,7 +385,9 @@ inline void diff2_fine_2D(
 										 ref_real[x], ref_imag[x]);			                      
 			}
 
-			#pragma omp simd
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+			#pragma omp simd simdlen(SIMD_LEN)
+#endif
 			for(int x = xstart; x < xend; x++) {
 	#ifdef ACC_DOUBLE_PRECISION        
 				XFLOAT half_corr = sqrt (g_corr_img[pixel + x] * (XFLOAT)0.5);
@@ -408,7 +416,9 @@ inline void diff2_fine_2D(
 				XFLOAT *trans_sin_x = &sin_x[itrans][0];     
 
 				XFLOAT sum = (XFLOAT) 0.0;                   
-				#pragma omp simd  reduction(+:sum) 
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+				#pragma omp simd  reduction(+:sum) simdlen(SIMD_LEN)
+#endif
 				for(int x = xstart; x < xend; x++) {
 					XFLOAT ss = trans_sin_x[x] * trans_cos_y + trans_cos_x[x] * trans_sin_y;
 					XFLOAT cc = trans_cos_x[x] * trans_cos_y - trans_sin_x[x] * trans_sin_y;
@@ -526,13 +536,17 @@ inline void diff2_fine_3D(
 					}
 				}
 
-				#pragma omp simd
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+				#pragma omp simd simdlen(SIMD_LEN)
+#endif
 				for(int x = xstart_y; x < xend_y; x++) {
 					projector.project3Dmodel(x, y, z, e1, e2, e3, e4, e5, e6, e7, e8, e9, 
 											 ref_real[x], ref_imag[x]);
 				}
 
-				#pragma omp simd
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+				#pragma omp simd simdlen(SIMD_LEN)
+#endif
 				for(int x = xstart_y; x < xend_y; x++) {
 	#ifdef ACC_DOUBLE_PRECISION        
 					XFLOAT half_corr = sqrt (g_corr_img[pixel + x] * (XFLOAT)0.5);
@@ -571,7 +585,9 @@ inline void diff2_fine_3D(
 					XFLOAT *trans_sin_x = &sin_x[itrans][0];     
 
 					XFLOAT sum = (XFLOAT) 0.0;                   
-					#pragma omp simd  reduction(+:sum) 
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+					#pragma omp simd  reduction(+:sum) simdlen(SIMD_LEN)
+#endif
 					for(int x = xstart_y; x < xend_y; x++) {
 						XFLOAT s1  = trans_sin_x[x] * trans_cos_y + trans_cos_x[x] * trans_sin_y;
 						XFLOAT c1  = trans_cos_x[x] * trans_cos_y - trans_sin_x[x] * trans_sin_y;
@@ -666,7 +682,9 @@ inline void diff2_CC_coarse_2D(
 				}
 			}
 
-			#pragma omp simd
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+			#pragma omp simd simdlen(SIMD_LEN)
+#endif
 			for(int x = xstart; x < xend; x++) {
 				if(REF3D)
 					projector.project3Dmodel(
@@ -812,7 +830,9 @@ inline void diff2_CC_coarse_3D(
 					}
 				}
 
-				#pragma omp simd
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+				#pragma omp simd simdlen(SIMD_LEN)
+#endif
 				for(int x = xstart_y; x < xend_y; x++) {
 					projector.project3Dmodel(
 						x, y, z,
@@ -967,7 +987,9 @@ inline void diff2_CC_fine_2D(
 				}
 			}
 
-			#pragma omp simd
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+			#pragma omp simd simdlen(SIMD_LEN)
+#endif
 			for(int x = xstart; x < xend; x++) {
 				if(REF3D)
 					projector.project3Dmodel(
@@ -1132,7 +1154,9 @@ inline void diff2_CC_fine_3D(
 					}
 				}
 
-				#pragma omp simd
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+				#pragma omp simd simdlen(SIMD_LEN)
+#endif
 				for(int x = xstart_y; x < xend_y; x++) {
 					projector.project3Dmodel(
 						x, y, z, e0, e1, e2, e3, e4, e5, e6, e7, e8,

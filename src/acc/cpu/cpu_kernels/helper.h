@@ -601,6 +601,9 @@ inline void  computeSincosLookupTable2D(unsigned long  trans_num,
 		XFLOAT tx = trans_x[i];
 		XFLOAT ty = trans_y[i];
 
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+		#pragma omp simd simdlen(SIMD_LEN)
+#endif
 		for(int x=0; x<xSize; x++) {
 		   unsigned long index = i * xSize + x;
 #ifdef ACC_DOUBLE_PRECISION
@@ -609,7 +612,10 @@ inline void  computeSincosLookupTable2D(unsigned long  trans_num,
 			sincosf( x * tx, &sin_x[index], &cos_x[index] );
 #endif            
 		}
-		
+
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+		#pragma omp simd simdlen(SIMD_LEN)
+#endif
 		for(int y=0; y<ySize; y++) {
             unsigned long index = i * ySize + y;
 #ifdef ACC_DOUBLE_PRECISION
@@ -640,6 +646,9 @@ inline void  computeSincosLookupTable3D(unsigned long  trans_num,
 		XFLOAT ty = trans_y[i];
 		XFLOAT tz = trans_z[i];
 
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+		#pragma omp simd simdlen(SIMD_LEN)
+#endif
 		for(int x=0; x<xSize; x++) {
 		   unsigned long index = i * xSize + x;
 #ifdef ACC_DOUBLE_PRECISION
@@ -648,7 +657,10 @@ inline void  computeSincosLookupTable3D(unsigned long  trans_num,
 			sincosf( x * tx, &sin_x[index], &cos_x[index] );
 #endif            
 		}
-		
+
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+		#pragma omp simd simdlen(SIMD_LEN)
+#endif
 		for(int y=0; y<ySize; y++) {
             unsigned long index = i * ySize + y;
 #ifdef ACC_DOUBLE_PRECISION
@@ -657,7 +669,10 @@ inline void  computeSincosLookupTable3D(unsigned long  trans_num,
 			sincosf( y * ty, &sin_y[index], &cos_y[index] );
 #endif            
 		}           
-		
+
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+		#pragma omp simd simdlen(SIMD_LEN)
+#endif
 		for(int z=0; z<zSize; z++) {
 			unsigned long index = i * zSize + z;
 #ifdef ACC_DOUBLE_PRECISION

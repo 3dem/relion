@@ -279,7 +279,6 @@ void backproject3D(
 		for (unsigned pass = 0; pass < pixel_pass_num; pass++)
 		{
 			memset(Fweight,0,sizeof(XFLOAT)*block_size);
-			#pragma omp simd
 			for(int tid=0; tid<block_size; tid++)
 			{
 				int ok_for_next(1);  // This flag avoids continues, helping the vectorizer
@@ -588,7 +587,9 @@ void backprojectRef3D(
 				XFLOAT *trans_cos_x = &cos_x[itrans][0];
 				XFLOAT *trans_sin_x = &sin_x[itrans][0];
 
-				#pragma omp simd
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+				#pragma omp simd simdlen(SIMD_LEN)
+#endif
 				for(int x=0; x<xmax; x++) {
 					XFLOAT minvsigma2 = g_Minvsigma2s[pixel + x];
 					XFLOAT ctf        = g_ctfs       [pixel + x];
@@ -625,7 +626,9 @@ void backprojectRef3D(
 				}
 			}
 
-			#pragma omp simd
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+			#pragma omp simd simdlen(SIMD_LEN)
+#endif
 			for(int x=0; x<xmax; x++) {
 				// Get logical coordinates in the 3D map
 				xp[x] = (s_eulers[0] * x + s_eulers[1] * y ) * padding_factor;
@@ -815,7 +818,6 @@ void backproject3D_SGD(
 
 		for (unsigned pass = 0; pass < pixel_pass_num; pass++)   {
 			memset(Fweight,0,sizeof(XFLOAT)*block_size);
-//			#pragma omp simd
 			for(int tid=0; tid<block_size; tid++) {
 				int ok_for_next(1);  // This flag avoids continues, helping the vectorizer
 
