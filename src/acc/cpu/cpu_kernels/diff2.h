@@ -24,11 +24,7 @@ inline void diff2_coarse(
 		XFLOAT *trans_x,
 		XFLOAT *trans_y,
 		XFLOAT *trans_z,
-#ifdef DEBUG_CUDA		
-		XFLOAT *_g_real,
-#else
 		XFLOAT *g_real,	
-#endif
 		XFLOAT *g_imag,
 		AccProjectorKernel &projector,
 		XFLOAT *g_corr,
@@ -37,10 +33,6 @@ inline void diff2_coarse(
 		unsigned long image_size
 		)
 {
-#ifdef DEBUG_CUDA
-	checkedArray<XFLOAT> g_real;
-	g_real.initCheckedArray(_g_real);
-#endif
 	const int xSize = projector.imgX;
 	const int ySize = projector.imgY;
 	const int zSize = projector.imgZ;
@@ -299,11 +291,7 @@ __attribute__((always_inline))
 inline void diff2_fine_2D(
 		unsigned long     grid_size,
 		XFLOAT *g_eulers,
-#ifdef DEBUG_CUDA
-		XFLOAT *_g_imgs_real,
-#else
 		XFLOAT *g_imgs_real,		
-#endif
 		XFLOAT *g_imgs_imag,
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
@@ -322,10 +310,6 @@ inline void diff2_fine_2D(
 		unsigned long *d_job_num
 		)
 {
-#ifdef DEBUG_CUDA
-	checkedArray<XFLOAT> g_imgs_real;
-	g_imgs_real.initCheckedArray(_g_imgs_real);
-#endif
     // Set up arrays to hold largest possible values
 	int xSize = projector.imgX;
 	int ySize = projector.imgY;
@@ -448,11 +432,7 @@ __attribute__((always_inline))
 inline void diff2_fine_3D(
 		unsigned long  grid_size,
 		XFLOAT *g_eulers,
-#ifdef DEBUG_CUDA
-		XFLOAT *_g_imgs_real,
-#else
 		XFLOAT *g_imgs_real,
-#endif
 		XFLOAT *g_imgs_imag,
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
@@ -471,11 +451,6 @@ inline void diff2_fine_3D(
 		unsigned long *d_job_num
 		)
 {
-#ifdef DEBUG_CUDA
-	checkedArray<XFLOAT> g_imgs_real;
-	g_imgs_real.initCheckedArray(_g_imgs_real);
-#endif
-	
     // Set up arrays to hold largest possible values
 	int xSize = projector.imgX;
 	int ySize = projector.imgY;
@@ -632,11 +607,7 @@ __attribute__((always_inline))
 inline void diff2_CC_coarse_2D(
 		unsigned long     grid_size,
 		XFLOAT *g_eulers,
-#ifdef DEBUG_CUDA
-		XFLOAT *_g_imgs_real,
-#else
 		XFLOAT *g_imgs_real,
-#endif
 		XFLOAT *g_imgs_imag,
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
@@ -648,11 +619,6 @@ inline void diff2_CC_coarse_2D(
 		XFLOAT   exp_local_sqrtXi2
 		)
 {
-#ifdef DEBUG_CUDA
-	checkedArray<XFLOAT> g_imgs_real;
-	g_imgs_real.initCheckedArray(_g_imgs_real);
-#endif
-
 	// pre-compute sin and cos for x and y direction
 	int xSize = projector.imgX;
 	int ySize = projector.imgY;
@@ -771,11 +737,7 @@ __attribute__((always_inline))
 inline void diff2_CC_coarse_3D(
 		unsigned long     grid_size,
 		XFLOAT *g_eulers,
-#ifdef DEBUG_CUDA
-		XFLOAT *_g_imgs_real,
-#else
 		XFLOAT *g_imgs_real,
-#endif
 		XFLOAT *g_imgs_imag,
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
@@ -788,11 +750,6 @@ inline void diff2_CC_coarse_3D(
 		XFLOAT   exp_local_sqrtXi2
 		)
 {
-#ifdef DEBUG_CUDA
-	checkedArray<XFLOAT> g_imgs_real;
-	g_imgs_real.initCheckedArray(_g_imgs_real);
-#endif
-
 	// pre-compute sin and cos for x, y, and z direction
 	int xSize = projector.imgX;
 	int ySize = projector.imgY;
@@ -939,11 +896,7 @@ __attribute__((always_inline))
 inline void diff2_CC_fine_2D(
 		unsigned long     grid_size,
 		XFLOAT *g_eulers,
-#ifdef DEBUG_CUDA
-		XFLOAT *_g_imgs_real,
-#else
 		XFLOAT *g_imgs_real,
-#endif
 		XFLOAT *g_imgs_imag,
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
@@ -962,10 +915,6 @@ inline void diff2_CC_fine_2D(
 		unsigned long *d_job_num
 		)
 {
-#ifdef DEBUG_CUDA
-	checkedArray<XFLOAT> g_imgs_real;
-	g_imgs_real.initCheckedArray(_g_imgs_real);
-#endif
     // Set up arrays to hold largest possible values
 	int xSize = projector.imgX;
 	int ySize = projector.imgY;
@@ -1093,11 +1042,7 @@ __attribute__((always_inline))
 inline void diff2_CC_fine_3D(
 		unsigned long     grid_size,
 		XFLOAT *g_eulers,
-#ifdef DEBUG_CUDA
-		XFLOAT *_g_imgs_real,
-#else
 		XFLOAT *g_imgs_real,
-#endif
 		XFLOAT *g_imgs_imag,
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
@@ -1117,10 +1062,6 @@ inline void diff2_CC_fine_3D(
 		unsigned long *d_job_num
 		)
 {
-#ifdef DEBUG_CUDA
-	checkedArray<XFLOAT> g_imgs_real;
-	g_imgs_real.initCheckedArray(_g_imgs_real);
-#endif
     // Set up arrays to hold largest possible values
 	int xSize = projector.imgX;
 	int ySize = projector.imgY;

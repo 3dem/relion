@@ -29,11 +29,7 @@ void wavg_ref3D(
 		AccProjectorKernel &projector,
 		unsigned long       image_size,
 		unsigned long       orientation_num,
-#ifdef DEBUG_CUDA
-		XFLOAT * RESTRICT   _g_img_real,
-#else
 		XFLOAT * RESTRICT   g_img_real,
-#endif
 		XFLOAT * RESTRICT   g_img_imag,
 		XFLOAT * RESTRICT   g_trans_x,
 		XFLOAT * RESTRICT   g_trans_y,
@@ -48,10 +44,6 @@ void wavg_ref3D(
 		XFLOAT              significant_weight,
 		XFLOAT              part_scale)
 {
-#ifdef DEBUG_CUDA
-	checkedArray<XFLOAT> g_img_real;
-	g_img_real.initCheckedArray(_g_img_real);
-#endif
 	// pre-compute sin and cos for x and y direction
 	int xSize = projector.imgX;
 	int ySize = projector.imgY;
@@ -213,11 +205,7 @@ void wavg_3D(
 		AccProjectorKernel &projector,
 		unsigned long       image_size,
 		unsigned long       orientation_num,
-#ifdef DEBUG_CUDA
-		XFLOAT * RESTRICT   _g_img_real,
-#else
 		XFLOAT * RESTRICT   g_img_real,
-#endif
 		XFLOAT * RESTRICT   g_img_imag,
 		XFLOAT * RESTRICT   g_trans_x,
 		XFLOAT * RESTRICT   g_trans_y,
@@ -232,10 +220,6 @@ void wavg_3D(
 		XFLOAT              significant_weight,
 		XFLOAT              part_scale)
 {
-#ifdef DEBUG_CUDA
-	checkedArray<XFLOAT> g_img_real;
-	g_img_real.initCheckedArray(_g_img_real);
-#endif
 	// pre-compute sin and cos for x and y direction
 	int xSize = projector.imgX;
 	int ySize = projector.imgY;
