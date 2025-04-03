@@ -114,142 +114,79 @@ void RNDnormalDitributionComplexWithPowerModulation3D(ACCCOMPLEX* Image, size_t 
 		}
     }
 }
-void softMaskBackgroundValue(	int      block_dim,
-                                int      block_size,
-                                XFLOAT  *vol,
-								long int vol_size,
-								long int xdim,
-								long int ydim,
-								long int zdim,
-								long int xinit,
-								long int yinit,
-								long int zinit,
-								XFLOAT   radius,
-								XFLOAT   radius_p,
-								XFLOAT   cosine_width,
-								XFLOAT  *g_sum,
-								XFLOAT  *g_sum_bg)
-{
-	for(int bid=0; bid<block_dim; bid++)
-	{
-		for(int tid=0; tid<block_size; tid++)
-		{
-	//		vol.setXmippOrigin(); // sets xinit=xdim , also for y z
-			XFLOAT r, raisedcos;
-			int x,y,z;
-			XFLOAT     img_pixels;
 
-			size_t texel_pass_num = ceilfracf((size_t)vol_size,(size_t)block_size*(size_t)block_dim);
-			size_t texel = (size_t)bid*(size_t)block_size*(size_t)texel_pass_num + tid;
+void softMaskBackgroundValue(
+	int grid_dim, int block_dim,
+	XFLOAT *vol, long int vol_size,
+	long int xdim,  long int ydim,  long int zdim,
+	long int xinit, long int yinit, long int zinit,
+	XFLOAT radius, XFLOAT radius_p, XFLOAT cosine_width,
+	XFLOAT *g_sum, XFLOAT *g_sum_bg
+) {
+    const size_t stride = block_dim * grid_dim;
+    const size_t xydim = xdim * ydim;
 
-			for (size_t pass = 0; pass < texel_pass_num; pass++, texel+=block_size) // loop through all translations for this orientation
-			{
-				if(texel<vol_size)
-				{
-					img_pixels = vol[texel];
+    const auto weight = [radius, radius_p, cosine_width] (XFLOAT r) -> XFLOAT {
+        return r < radius   ? 0.0 :
+               r > radius_p ? 1.0 :
+        #if defined(ACC_DOUBLE_PRECISION)
+        0.5  + 0.5  * cos (M_PI * (radius_p - r) / cosine_width);
+        #else
+        0.5f + 0.5f * cosf(M_PI * (radius_p - r) / cosine_width);
+        #endif
+    };
 
-					z =   texel / (xdim*ydim) ;
-					y = ( texel % (xdim*ydim) ) / xdim ;
-					x = ( texel % (xdim*ydim) ) % xdim ;
+	for (int bid = 0; bid < grid_dim;  bid++)
+	for (int tid = 0; tid < block_dim; tid++) {
+		for (size_t i = bid * blockDim.x + tid; i < vol_size; i += stride) {
+			const int z = i / xydim        - zinit;
+			const int y = i % xydim / xdim - yinit;
+			const int x = i % xydim % xdim - xinit;
 
-					z-=zinit;
-					y-=yinit;
-					x-=xinit;
+			const XFLOAT r = sqrt(XFLOAT(x * x + y * y + z * z));
+			const XFLOAT w = weight(r);
 
-					r = sqrt(XFLOAT(x*x + y*y + z*z));
-
-					if (r < radius)
-						continue;
-					else if (r > radius_p)
-					{
-						g_sum[tid]    += (XFLOAT)1.0;
-						g_sum_bg[tid] += img_pixels;
-					}
-					else
-					{
-	#if defined(ACC_DOUBLE_PRECISION)
-						raisedcos = 0.5 + 0.5  * cos ( (radius_p - r) / cosine_width * M_PI);
-	#else
-						raisedcos = 0.5 + 0.5  * cosf( (radius_p - r) / cosine_width * M_PI);
-	#endif
-						g_sum[tid] += raisedcos;
-						g_sum_bg[tid] += raisedcos * img_pixels;
-					}
-				}
-			}
-		} // tid
-	} // bid
+			g_sum   [tid] += w;
+			g_sum_bg[tid] += w * vol[i];
+		}
+	}
 }
+void cosineFilter(
+	int block_dim, int block_size,
+	XFLOAT *vol, long int vol_size,
+	long int xdim,  long int ydim,  long int zdim,
+	long int xinit, long int yinit, long int zinit,
+	bool do_noise, XFLOAT *noise,
+	XFLOAT radius, XFLOAT radius_p, XFLOAT cosine_width,
+	XFLOAT bg_value
+) {
+	const size_t stride = block_dim * grid_dim;
+    const size_t xydim = xdim * ydim;
 
+    const auto weight = [radius, radius_p, cosine_width] (XFLOAT r) -> XFLOAT {
+        return r < radius   ? 0.0 :
+               r > radius_p ? 1.0 :
+        #if defined(ACC_DOUBLE_PRECISION)
+        0.5  + 0.5  * cos (M_PI * (radius_p - r) / cosine_width);
+        #else
+        0.5f + 0.5f * cosf(M_PI * (radius_p - r) / cosine_width);
+        #endif
+    };
 
-void cosineFilter(	int      block_dim,
-					int      block_size,
-					XFLOAT  *vol,
-					long int vol_size,
-					long int xdim,
-					long int ydim,
-					long int zdim,
-					long int xinit,
-					long int yinit,
-					long int zinit,
-					bool     do_noise,
-					XFLOAT *noise,
-					XFLOAT   radius,
-					XFLOAT   radius_p,
-					XFLOAT   cosine_width,
-					XFLOAT   bg_value)
-{
-	for(int bid=0; bid<block_dim; bid++)
-	{
-		for(int tid=0; tid<block_size; tid++)
-		{
-//		vol.setXmippOrigin(); // sets xinit=xdim , also for y z
-			XFLOAT r, raisedcos, defVal;
-			int x,y,z;
-			XFLOAT     img_pixels;
+	for (int bid = 0; bid < grid_dim;  bid++)
+	for (int tid = 0; tid < block_dim; tid++) {
+		for (size_t i = bid * blockDim.x + tid; i < vol_size; i += stride) {
+			const int z = i / xydim        - zinit;
+			const int y = i % xydim / xdim - yinit;
+			const int x = i % xydim % xdim - xinit;
 
-			size_t texel_pass_num = ceilfracf((size_t)vol_size,(size_t)block_size*(size_t)block_dim);
-			size_t texel = (size_t)bid*(size_t)block_size*(size_t)texel_pass_num + tid;
+			const XFLOAT r = sqrt(XFLOAT(x * x + y * y + z * z));
+			const XFLOAT w = weight(r);
+			const XFLOAT bg = do_noise ? noise[i] : bg_value;
 
-			defVal = bg_value;
-			for (size_t pass = 0; pass < texel_pass_num; pass++, texel+=block_size) // loop the available warps enough to complete all translations for this orientation
-			{
-				if(texel<vol_size)
-				{
-					img_pixels= vol[texel];
-
-					z =   texel / (xdim*ydim) ;
-					y = ( texel % (xdim*ydim) ) / xdim ;
-					x = ( texel % (xdim*ydim) ) % xdim ;
-
-					z-=zinit;
-					y-=yinit;
-					x-=xinit;
-
-					r = sqrt(XFLOAT(x*x + y*y + z*z));
-
-					if(do_noise)
-                                		defVal = noise[texel];
-
-					if (r < radius)
-						continue;
-					else if (r > radius_p)
-						img_pixels=defVal;
-					else
-					{
-		#if defined(ACC_DOUBLE_PRECISION)
-						raisedcos = 0.5 + 0.5  * cos ( (radius_p - r) / cosine_width * M_PI);
-		#else
-						raisedcos = 0.5 + 0.5  * cosf( (radius_p - r) / cosine_width * M_PI);
-		#endif
-						img_pixels= img_pixels*(1-raisedcos) + defVal*raisedcos;
-
-					}
-					vol[texel]=img_pixels;
-				}
-			}
-		} // tid
-	} // bid
+			vol[i] = vol[i] * (1 - w) + bg * w;
+		}
+	}
 }
 
 template <typename T>

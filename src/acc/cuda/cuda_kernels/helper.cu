@@ -230,264 +230,145 @@ __global__ void cuda_kernel_RNDnormalDitributionComplexWithPowerModulation3D( AC
 //	}
 //}
 
-__global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
-												long int vol_size,
-												long int xdim,
-												long int ydim,
-												long int zdim,
-												long int xinit,
-												long int yinit,
-												long int zinit,
-												bool do_Mnoise,
-												XFLOAT radius,
-												XFLOAT radius_p,
-												XFLOAT cosine_width	)
-{
+__global__ void cuda_kernel_softMaskOutsideMap(
+    XFLOAT *vol, long int vol_size,
+	long int xdim,  long int ydim,  long int zdim,
+	long int xinit, long int yinit, long int zinit,
+	bool do_Mnoise,
+	XFLOAT radius, XFLOAT radius_p, XFLOAT cosine_width
+) {
+    __shared__ XFLOAT partial_sum   [SOFTMASK_BLOCK_SIZE];
+    __shared__ XFLOAT partial_sum_bg[SOFTMASK_BLOCK_SIZE];
 
-		int tid = threadIdx.x;
+    const size_t tid = threadIdx.x, bid = blockIdx.x;
+    const size_t stride = blockDim.x * gridDim.x;
+    const size_t xydim = xdim * ydim;
 
-//		vol.setXmippOrigin(); // sets xinit=xdim , also for y z
-		XFLOAT r, raisedcos;
+    partial_sum   [tid] = 0.0;
+    partial_sum_bg[tid] = 0.0;
 
-		__shared__ XFLOAT     img_pixels[SOFTMASK_BLOCK_SIZE];
-		__shared__ XFLOAT    partial_sum[SOFTMASK_BLOCK_SIZE];
-		__shared__ XFLOAT partial_sum_bg[SOFTMASK_BLOCK_SIZE];
+    const auto weight = [radius, radius_p, cosine_width] (XFLOAT r) -> XFLOAT {
+        return r < radius   ? 0.0 :
+               r > radius_p ? 1.0 :
+        #if defined(ACC_DOUBLE_PRECISION)
+        0.5  + 0.5  * cospi ((radius_p - r) / cosine_width);
+        #else
+        0.5f + 0.5f * cospif((radius_p - r) / cosine_width);
+        #endif
+    };
 
-		XFLOAT sum_bg_total =  (XFLOAT)0.0;
+    XFLOAT bg = 0.0;
+    if (do_Mnoise) {
+        for (size_t i = bid * blockDim.x + tid; i < vol_size; i += stride) {
+            const int z = i / xydim        - zinit;
+            const int y = i % xydim / xdim - yinit;
+            const int x = i % xydim % xdim - xinit;
 
-		long int texel_pass_num = ceilfracf(vol_size,SOFTMASK_BLOCK_SIZE);
-		int texel = tid;
+            const XFLOAT r = sqrt(XFLOAT(x * x + y * y + z * z));
+            const XFLOAT w = weight(r);
+            partial_sum   [tid] += w;
+            partial_sum_bg[tid] += w * __ldg(&vol[i]);
+        }
 
-		partial_sum[tid]=(XFLOAT)0.0;
-		partial_sum_bg[tid]=(XFLOAT)0.0;
-		if (do_Mnoise)
-		{
-			for (int pass = 0; pass < texel_pass_num; pass++, texel+=SOFTMASK_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
-			{
-				XFLOAT x,y,z;
-				if(texel<vol_size)
-				{
-					img_pixels[tid]=__ldg(&vol[texel]);
+        __syncthreads();
+        for (int j = SOFTMASK_BLOCK_SIZE / 2; j > 0; j /= 2) {
+            if (tid < j) {
+                partial_sum   [tid] += partial_sum   [tid + j];
+                partial_sum_bg[tid] += partial_sum_bg[tid + j];
+            }
+            __syncthreads();
+        }
 
-					z = floor( (float) texel                   / (float)((xdim)*(ydim)));
-					y = floor( (XFLOAT)(texel-z*(xdim)*(ydim)) / (XFLOAT) xdim );
-					x = texel - z*(xdim)*(ydim) - y*xdim;
+        bg = partial_sum_bg[0] / partial_sum[0];
+    }
 
-					z-=zinit;
-					y-=yinit;
-					x-=xinit;
+    for (size_t i = bid * blockDim.x + tid; i < vol_size; i += stride) {
+        const int z = i / xydim        - zinit;
+        const int y = i % xydim / xdim - yinit;
+        const int x = i % xydim % xdim - xinit;
 
-					r = sqrt(x*x + y*y + z*z);
+        const XFLOAT r = sqrt(XFLOAT(x * x + y * y + z * z));
+        const XFLOAT w = weight(r);
 
-					if (r < radius)
-						continue;
-					else if (r > radius_p)
-					{
-						partial_sum[tid]    += (XFLOAT)1.0;
-						partial_sum_bg[tid] += img_pixels[tid];
-					}
-					else
-					{
-#if defined(ACC_DOUBLE_PRECISION)
-						raisedcos = 0.5 + 0.5  * cospi( (radius_p - r) / cosine_width );
-#else
-						raisedcos = 0.5f + 0.5f * cospif((radius_p - r) / cosine_width );
-#endif
-						partial_sum[tid] += raisedcos;
-						partial_sum_bg[tid] += raisedcos * img_pixels[tid];
-					}
-				}
-			}
-		}
-
-		__syncthreads();
-		for(int j=(SOFTMASK_BLOCK_SIZE/2); j>0; j/=2)
-		{
-			if(tid<j)
-			{
-				partial_sum[tid] += partial_sum[tid+j];
-				partial_sum_bg[tid] += partial_sum_bg[tid+j];
-			}
-			__syncthreads();
-		}
-
-		sum_bg_total  = partial_sum_bg[0] / partial_sum[0];
-
-
-		texel = tid;
-		for (int pass = 0; pass < texel_pass_num; pass++, texel+=SOFTMASK_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
-		{
-			XFLOAT x,y,z;
-			if(texel<vol_size)
-			{
-				img_pixels[tid]=__ldg(&vol[texel]);
-
-				z =  floor( (float) texel                  / (float)((xdim)*(ydim)));
-				y = floor( (XFLOAT)(texel-z*(xdim)*(ydim)) / (XFLOAT)  xdim         );
-				x = texel - z*(xdim)*(ydim) - y*xdim;
-
-				z-=zinit;
-				y-=yinit;
-				x-=xinit;
-
-				r = sqrt(x*x + y*y + z*z);
-
-				if (r < radius)
-					continue;
-				else if (r > radius_p)
-					img_pixels[tid]=sum_bg_total;
-				else
-				{
-#if defined(ACC_DOUBLE_PRECISION)
-					raisedcos = 0.5  + 0.5  * cospi( (radius_p - r) / cosine_width );
-#else
-					raisedcos = 0.5f + 0.5f * cospif((radius_p - r) / cosine_width );
-#endif
-					img_pixels[tid]= img_pixels[tid]*(1-raisedcos) + sum_bg_total*raisedcos;
-
-				}
-				vol[texel]=img_pixels[tid];
-			}
-
-		}
+        vol[i] = __ldg(&vol[i]) * (1 - w) + bg * w;
+    }
 }
 
-__global__ void cuda_kernel_softMaskBackgroundValue(	XFLOAT *vol,
-														long int vol_size,
-														long int xdim,
-														long int ydim,
-														long int zdim,
-														long int xinit,
-														long int yinit,
-														long int zinit,
-														XFLOAT radius,
-														XFLOAT radius_p,
-														XFLOAT cosine_width,
-														XFLOAT *g_sum,
-														XFLOAT *g_sum_bg)
-{
+__global__ void cuda_kernel_softMaskBackgroundValue(
+    XFLOAT *vol, long int vol_size,
+    long int xdim,  long int ydim,  long int zdim,
+    long int xinit, long int yinit, long int zinit,
+    XFLOAT radius, XFLOAT radius_p, XFLOAT cosine_width,
+    XFLOAT *g_sum, XFLOAT *g_sum_bg
+) {
+    __shared__ XFLOAT partial_sum   [SOFTMASK_BLOCK_SIZE];
+    __shared__ XFLOAT partial_sum_bg[SOFTMASK_BLOCK_SIZE];
 
-		int tid = threadIdx.x;
-		int bid = blockIdx.x;
+    const size_t tid = threadIdx.x, bid = blockIdx.x;
+    const size_t stride = blockDim.x * gridDim.x;
+    const size_t xydim = xdim * ydim;
 
-//		vol.setXmippOrigin(); // sets xinit=xdim , also for y z
-		XFLOAT r, raisedcos;
-		int x,y,z;
-		__shared__ XFLOAT     img_pixels[SOFTMASK_BLOCK_SIZE];
-		__shared__ XFLOAT    partial_sum[SOFTMASK_BLOCK_SIZE];
-		__shared__ XFLOAT partial_sum_bg[SOFTMASK_BLOCK_SIZE];
+    partial_sum   [tid] = 0.0;
+    partial_sum_bg[tid] = 0.0;
 
-		long int texel_pass_num = ceilfracf(vol_size,SOFTMASK_BLOCK_SIZE*gridDim.x);
-		int texel = bid*SOFTMASK_BLOCK_SIZE*texel_pass_num + tid;
+    const auto weight = [radius, radius_p, cosine_width] (XFLOAT r) -> XFLOAT {
+        return r < radius   ? 0.0 :
+               r > radius_p ? 1.0 :
+        #if defined(ACC_DOUBLE_PRECISION)
+        0.5  + 0.5  * cospi ((radius_p - r) / cosine_width);
+        #else
+        0.5f + 0.5f * cospif((radius_p - r) / cosine_width);
+        #endif
+    };
 
-		partial_sum[tid]=(XFLOAT)0.0;
-		partial_sum_bg[tid]=(XFLOAT)0.0;
+    for (size_t i = bid * blockDim.x + tid; i < vol_size; i += stride) {
+        const int z = i / xydim        - zinit;
+        const int y = i % xydim / xdim - yinit;
+        const int x = i % xydim % xdim - xinit;
 
-		for (int pass = 0; pass < texel_pass_num; pass++, texel+=SOFTMASK_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
-		{
-			if(texel<vol_size)
-			{
-				img_pixels[tid]=__ldg(&vol[texel]);
+        const XFLOAT r = sqrt(XFLOAT(x * x + y * y + z * z));
+        const XFLOAT w = weight(r);
 
-				z =   texel / (xdim*ydim) ;
-				y = ( texel % (xdim*ydim) ) / xdim ;
-				x = ( texel % (xdim*ydim) ) % xdim ;
+        partial_sum   [tid] += w;
+        partial_sum_bg[tid] += w * __ldg(&vol[i]);
+    }
 
-				z-=zinit;
-				y-=yinit;
-				x-=xinit;
-
-				r = sqrt(XFLOAT(x*x + y*y + z*z));
-
-				if (r < radius)
-					continue;
-				else if (r > radius_p)
-				{
-					partial_sum[tid]    += (XFLOAT)1.0;
-					partial_sum_bg[tid] += img_pixels[tid];
-				}
-				else
-				{
-#if defined(ACC_DOUBLE_PRECISION)
-					raisedcos = 0.5 + 0.5  * cospi( (radius_p - r) / cosine_width );
-#else
-					raisedcos = 0.5f + 0.5f * cospif((radius_p - r) / cosine_width );
-#endif
-					partial_sum[tid] += raisedcos;
-					partial_sum_bg[tid] += raisedcos * img_pixels[tid];
-				}
-			}
-		}
-
-		cuda_atomic_add(&g_sum[tid]   , partial_sum[tid]);
-		cuda_atomic_add(&g_sum_bg[tid], partial_sum_bg[tid]);
+    cuda_atomic_add(&g_sum   [tid], partial_sum   [tid]);
+    cuda_atomic_add(&g_sum_bg[tid], partial_sum_bg[tid]);
 }
 
+__global__ void cuda_kernel_cosineFilter(
+    XFLOAT *vol, long int vol_size,
+    long int xdim,  long int ydim,  long int zdim,
+    long int xinit, long int yinit, long int zinit,
+    bool do_noise, XFLOAT *noise,
+    XFLOAT radius, XFLOAT radius_p, XFLOAT cosine_width,
+    XFLOAT bg_value
+) {
+	const size_t tid = threadIdx.x, bid = blockIdx.x;
+    const size_t stride = blockDim.x * gridDim.x;
+    const size_t xydim = xdim * ydim;
 
-__global__ void cuda_kernel_cosineFilter(	XFLOAT *vol,
-											long int vol_size,
-											long int xdim,
-											long int ydim,
-											long int zdim,
-											long int xinit,
-											long int yinit,
-											long int zinit,
-											bool do_noise,
-											XFLOAT *noise,
-											XFLOAT radius,
-											XFLOAT radius_p,
-											XFLOAT cosine_width,
-											XFLOAT bg_value)
-{
+    const auto weight = [radius, radius_p, cosine_width] (XFLOAT r) -> XFLOAT {
+        return r < radius   ? 0.0 :
+               r > radius_p ? 1.0 :
+        #if defined(ACC_DOUBLE_PRECISION)
+        0.5  + 0.5  * cospi ((radius_p - r) / cosine_width);
+        #else
+        0.5f + 0.5f * cospif((radius_p - r) / cosine_width);
+        #endif
+    };
 
-	int tid = threadIdx.x;
-	int bid = blockIdx.x;
+	for (size_t i = bid * blockDim.x + tid; i < vol_size; i += stride) {
+        const int z = i / xydim        - zinit;
+        const int y = i % xydim / xdim - yinit;
+        const int x = i % xydim % xdim - xinit;
 
-//		vol.setXmippOrigin(); // sets xinit=xdim , also for y z
-	XFLOAT r, raisedcos, defVal;
-	int x,y,z;
-	__shared__ XFLOAT     img_pixels[SOFTMASK_BLOCK_SIZE];
+        const XFLOAT r = sqrt(XFLOAT(x * x + y * y + z * z));
+        const XFLOAT w = weight(r);
+        const XFLOAT bg = do_noise ? noise[i] : bg_value;
 
-	long int texel_pass_num = ceilfracf(vol_size,SOFTMASK_BLOCK_SIZE*gridDim.x);
-	int texel = bid*SOFTMASK_BLOCK_SIZE*texel_pass_num + tid;
-
-	defVal = bg_value;
-	for (int pass = 0; pass < texel_pass_num; pass++, texel+=SOFTMASK_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
-	{
-		if(texel<vol_size)
-		{
-			img_pixels[tid]=__ldg(&vol[texel]);
-
-			z =   texel / (xdim*ydim) ;
-			y = ( texel % (xdim*ydim) ) / xdim ;
-			x = ( texel % (xdim*ydim) ) % xdim ;
-
-			z-=zinit;
-			y-=yinit;
-			x-=xinit;
-
-			r = sqrt(XFLOAT(x*x + y*y + z*z));
-
-			if(do_noise)
-				defVal = noise[texel];
-
-			if (r < radius)
-				continue;
-			else if (r > radius_p)
-				img_pixels[tid]=defVal;
-			else
-			{
-#if defined(ACC_DOUBLE_PRECISION)
-				raisedcos = 0.5  + 0.5  * cospi( (radius_p - r) / cosine_width );
-#else
-				raisedcos = 0.5f + 0.5f * cospif((radius_p - r) / cosine_width );
-#endif
-				img_pixels[tid]= img_pixels[tid]*(1-raisedcos) + defVal*raisedcos;
-
-			}
-			vol[texel]=img_pixels[tid];
-		}
-
+        vol[i] = __ldg(&vol[i]) * (1 - w) + bg * w;
 	}
 }
 
