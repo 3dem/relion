@@ -110,34 +110,6 @@ size_t ceilfracf(size_t a, size_t b)
         return (size_t)(a/b + (size_t)1);
 }
 
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-#endif
-static inline
-XFLOAT no_tex2D(XFLOAT* mdl, XFLOAT xp, XFLOAT yp, int mdlX, int mdlInitY)
-{
-	int x0 = floorf(xp);
-	XFLOAT fx = xp - x0;
-	int x1 = x0 + 1;
-
-	int y0 = floorf(yp);
-	XFLOAT fy = yp - y0;
-	y0 -= mdlInitY;
-	int y1 = y0 + 1;
-
-	//-----------------------------
-	XFLOAT d00 = mdl[(size_t)y0*(size_t)mdlX+x0];
-	XFLOAT d01 = mdl[(size_t)y0*(size_t)mdlX+x1];
-	XFLOAT d10 = mdl[(size_t)y1*(size_t)mdlX+x0];
-	XFLOAT d11 = mdl[(size_t)y1*(size_t)mdlX+x1];
-	//-----------------------------
-	XFLOAT dx0 = d00 + (d01 - d00)*fx;
-	XFLOAT dx1 = d10 + (d11 - d10)*fx;
-	//-----------------------------
-
-	return dx0 + (dx1 - dx0)*fy;
-}
-
 // 2D linear interpolation for complex data that interleaves real and
 // imaginary data, rather than storing them in a separate array
 #ifdef __INTEL_COMPILER
@@ -181,57 +153,6 @@ static void complex2D(std::complex<XFLOAT> *mdlComplex, XFLOAT &real, XFLOAT &im
 	//-----------------------------	
 	real = dx0[0] + (dx1[0] - dx0[0])*fy;
 	imag = dx0[1] + (dx1[1] - dx0[1])*fy;
-}
-
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-#endif
-static inline
-XFLOAT no_tex3D(
-#ifdef DEBUG_CUDA
-				XFLOAT* _mdl, 
-#else
-				XFLOAT* mdl, 
-#endif
-				XFLOAT xp, XFLOAT yp, XFLOAT zp, 
-				int mdlX, int mdlXY, int mdlInitY, int mdlInitZ)
-{
-#ifdef DEBUG_CUDA
-	checkedArray<XFLOAT> mdl;
-	mdl.initCheckedArray(_mdl);
-#endif
-	int x0 = floorf(xp);
-	XFLOAT fx = xp - x0;
-	int x1 = x0 + 1;
-
-	int y0 = floorf(yp);
-	XFLOAT fy = yp - y0;
-	y0 -= mdlInitY;
-	int y1 = y0 + 1;
-
-	int z0 = floorf(zp);
-	XFLOAT fz = zp - z0;
-	z0 -= mdlInitZ;
-	int z1 = z0 + 1;
-
-	XFLOAT d000 = mdl[(size_t)z0*(size_t)mdlXY+(size_t)y0*(size_t)mdlX+x0];
-	XFLOAT d001 = mdl[(size_t)z0*(size_t)mdlXY+(size_t)y0*(size_t)mdlX+x1];
-	XFLOAT d010 = mdl[(size_t)z0*(size_t)mdlXY+(size_t)y1*(size_t)mdlX+x0];
-	XFLOAT d011 = mdl[(size_t)z0*(size_t)mdlXY+(size_t)y1*(size_t)mdlX+x1];
-	XFLOAT d100 = mdl[(size_t)z1*(size_t)mdlXY+(size_t)y0*(size_t)mdlX+x0];
-	XFLOAT d101 = mdl[(size_t)z1*(size_t)mdlXY+(size_t)y0*(size_t)mdlX+x1];
-	XFLOAT d110 = mdl[(size_t)z1*(size_t)mdlXY+(size_t)y1*(size_t)mdlX+x0];
-	XFLOAT d111 = mdl[(size_t)z1*(size_t)mdlXY+(size_t)y1*(size_t)mdlX+x1];
-	//-----------------------------
-	XFLOAT dx00 = d000 + (d001 - d000)*fx;
-	XFLOAT dx01 = d100 + (d101 - d100)*fx;
-	XFLOAT dx10 = d010 + (d011 - d010)*fx;
-	XFLOAT dx11 = d110 + (d111 - d110)*fx;
-	//-----------------------------
-	XFLOAT dxy0 = dx00 + (dx10 - dx00)*fy;
-	XFLOAT dxy1 = dx01 + (dx11 - dx01)*fy;
-	//-----------------------------
-	return dxy0 + (dxy1 - dxy0)*fz;
 }
 
 // 3D linear interpolation for complex data that interleaves real and
