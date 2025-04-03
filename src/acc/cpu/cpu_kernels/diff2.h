@@ -14,6 +14,21 @@
 namespace CpuKernels
 {
 
+/*
+ *     DIFFERENCE-BASED KERNELS
+ */
+
+// We are specializing 2D and 3D cases, since they benefit from different
+// optimizations.
+
+// Among the optimizations:
+// sincos lookup table optimization. Function translatePixel calls
+// sincos(x*tx + y*ty). We precompute 2D lookup tables for x and y directions.
+// The first dimension is x or y pixel index, and the second dimension is x or y
+// translation index. Since sin(a+B) = sin(A) * cos(B) + cos(A) * sin(B), and
+// cos(A+B) = cos(A) * cos(B) - sin(A) * sin(B), we can use lookup table to
+// compute sin(x*tx + y*ty) and cos(x*tx + y*ty).
+
 template<bool REF3D, bool DATA3D, int block_sz, int eulers_per_block, int prefetch_fraction>
 inline void diff2_coarse(
 		unsigned long     grid_size,
