@@ -70,9 +70,9 @@ inline void diff2_coarse(
 								&sin_y[0][0], &cos_y[0][0]);	
 	}
 	
-	XFLOAT trans_cos_x[block_sz], trans_sin_x[block_sz];
-	XFLOAT trans_cos_y[block_sz], trans_sin_y[block_sz];
-	XFLOAT trans_cos_z[block_sz], trans_sin_z[block_sz];
+	alignas(MEM_ALIGN) XFLOAT trans_cos_x[block_sz], trans_sin_x[block_sz];
+	alignas(MEM_ALIGN) XFLOAT trans_cos_y[block_sz], trans_sin_y[block_sz];
+	alignas(MEM_ALIGN) XFLOAT trans_cos_z[block_sz], trans_sin_z[block_sz];
 #endif  // not Intel Compiler
 	
 	int x[pass_num][block_sz], y[pass_num][block_sz], z[pass_num][block_sz];
@@ -127,11 +127,11 @@ inline void diff2_coarse(
 	}
 
 	XFLOAT diff2s[translation_num][eulers_per_block];
-	XFLOAT diffi[eulers_per_block];
+	alignas(MEM_ALIGN) XFLOAT diffi[eulers_per_block];
 
 	for (unsigned long block = 0; block < grid_size; block++) {
 		//Prefetch euler matrices with cacheline friendly index
-		XFLOAT s_eulers[eulers_per_block * 16];
+		alignas(MEM_ALIGN) XFLOAT s_eulers[eulers_per_block * 16];
 		for (int e = 0; e < eulers_per_block; e++)
 			for (int i = 0; i < 9; i++)
 				s_eulers[e*16+i] = g_eulers[(size_t)block * (size_t)eulers_per_block * (size_t)9 + e*9+i];
@@ -329,13 +329,13 @@ inline void diff2_fine_2D(
 	XFLOAT sin_x[translation_num][xSize], cos_x[translation_num][xSize];
 	XFLOAT sin_y[translation_num][ySize], cos_y[translation_num][ySize];
 
-	XFLOAT trans_x[translation_num], trans_y[translation_num];
+	alignas(MEM_ALIGN) XFLOAT trans_x[translation_num], trans_y[translation_num];
 	
-	XFLOAT ref_real[xSize],  ref_imag[xSize];
-	XFLOAT imgs_real[xSize], imgs_imag[xSize];
+	alignas(MEM_ALIGN) XFLOAT ref_real[xSize],  ref_imag[xSize];
+	alignas(MEM_ALIGN) XFLOAT imgs_real[xSize], imgs_imag[xSize];
 	
-	XFLOAT s[translation_num];   
-	
+	alignas(MEM_ALIGN) XFLOAT s[translation_num];
+
 	// Now do calculations
 	for (unsigned long bid = 0; bid < grid_size; bid++) {
 		unsigned long trans_num        = (unsigned long)d_job_num[bid];     
@@ -475,13 +475,13 @@ inline void diff2_fine_3D(
 	XFLOAT sin_y[translation_num][ySize], cos_y[translation_num][ySize];
 	XFLOAT sin_z[translation_num][zSize], cos_z[translation_num][zSize];	
 
-	XFLOAT trans_x[translation_num], trans_y[translation_num], trans_z[translation_num];
+	alignas(MEM_ALIGN) XFLOAT trans_x[translation_num], trans_y[translation_num], trans_z[translation_num];
 	
-	XFLOAT ref_real[xSize],  ref_imag[xSize];
-	XFLOAT imgs_real[xSize], imgs_imag[xSize];
+	alignas(MEM_ALIGN) XFLOAT ref_real[xSize],  ref_imag[xSize];
+	alignas(MEM_ALIGN) XFLOAT imgs_real[xSize], imgs_imag[xSize];
 	
-	XFLOAT s[translation_num];   
-		
+	alignas(MEM_ALIGN) XFLOAT s[translation_num];
+
 	// Now do calculations
 	for (unsigned long bid = 0; bid < grid_size; bid++) {
 		unsigned long trans_num        = (unsigned long)d_job_num[bid];     
@@ -652,8 +652,8 @@ inline void diff2_CC_coarse_2D(
 	XFLOAT s_weight[trans_num][xSize];	
 	XFLOAT s_norm[trans_num][xSize];
 
-	XFLOAT ref_real[xSize], ref_imag[xSize];
-	XFLOAT img_real[xSize], img_imag[xSize], corr_imag[xSize];
+	alignas(MEM_ALIGN) XFLOAT ref_real[xSize], ref_imag[xSize];
+	alignas(MEM_ALIGN) XFLOAT img_real[xSize], img_imag[xSize], corr_imag[xSize];
 			
 	for (unsigned long iorient = 0; iorient < grid_size; iorient++) {
 	
@@ -786,8 +786,8 @@ inline void diff2_CC_coarse_3D(
 	XFLOAT s_weight[trans_num][xSize];
 	XFLOAT s_norm[trans_num][xSize];
 
-	XFLOAT ref_real[xSize], ref_imag[xSize];
-	XFLOAT img_real[xSize], img_imag[xSize], corr_imag[xSize];
+	alignas(MEM_ALIGN) XFLOAT ref_real[xSize], ref_imag[xSize];
+	alignas(MEM_ALIGN) XFLOAT img_real[xSize], img_imag[xSize], corr_imag[xSize];
 	
 	for (unsigned long iorient = 0; iorient < grid_size; iorient++) {
 		XFLOAT e0, e1, e2, e3, e4, e5, e6, e7, e8;
@@ -938,13 +938,13 @@ inline void diff2_CC_fine_2D(
 	XFLOAT sin_x[translation_num][xSize], cos_x[translation_num][xSize];
 	XFLOAT sin_y[translation_num][ySize], cos_y[translation_num][ySize];
 
-	XFLOAT trans_x[translation_num], trans_y[translation_num];
+	alignas(MEM_ALIGN) XFLOAT trans_x[translation_num], trans_y[translation_num];
 
 	XFLOAT  s   [translation_num][xSize]; 
 	XFLOAT  s_cc[translation_num][xSize];
 	
-	XFLOAT ref_real[xSize], ref_imag[xSize];
-	XFLOAT img_real[xSize], img_imag[xSize], corr_imag[xSize];
+	alignas(MEM_ALIGN) XFLOAT ref_real[xSize], ref_imag[xSize];
+	alignas(MEM_ALIGN) XFLOAT img_real[xSize], img_imag[xSize], corr_imag[xSize];
 	
 	// Now do calculations
 	for (unsigned long bid = 0; bid < grid_size; bid++) {
@@ -1086,13 +1086,13 @@ inline void diff2_CC_fine_3D(
 	XFLOAT sin_y[translation_num][ySize], cos_y[translation_num][ySize];
 	XFLOAT sin_z[translation_num][zSize], cos_z[translation_num][zSize];	
 
-	XFLOAT trans_x[translation_num], trans_y[translation_num], trans_z[translation_num];
+	alignas(MEM_ALIGN) XFLOAT trans_x[translation_num], trans_y[translation_num], trans_z[translation_num];
 
 	XFLOAT  s   [translation_num][xSize]; 
 	XFLOAT  s_cc[translation_num][xSize];
 
-	XFLOAT ref_real[xSize], ref_imag[xSize];
-	XFLOAT img_real[xSize], img_imag[xSize], corr_imag[xSize];
+	alignas(MEM_ALIGN) XFLOAT ref_real[xSize], ref_imag[xSize];
+	alignas(MEM_ALIGN) XFLOAT img_real[xSize], img_imag[xSize], corr_imag[xSize];
 	
 	// Now do calculations
 	for (unsigned long bid = 0; bid < grid_size; bid++) {

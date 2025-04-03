@@ -91,11 +91,11 @@ void collect2jobs(  int     grid_size,
 	// block id
 	for (int bid=0; bid < grid_size; bid++) {
 
-		XFLOAT s_o_weights[block_size];
-		XFLOAT s_thr_wsum_sigma2_offset[block_size];;
-		XFLOAT s_thr_wsum_prior_offsetx_class[block_size];
-		XFLOAT s_thr_wsum_prior_offsety_class[block_size];
-		XFLOAT s_thr_wsum_prior_offsetz_class[block_size];
+		alignas(MEM_ALIGN) XFLOAT s_o_weights[block_size];
+		alignas(MEM_ALIGN) XFLOAT s_thr_wsum_sigma2_offset[block_size];;
+		alignas(MEM_ALIGN) XFLOAT s_thr_wsum_prior_offsetx_class[block_size];
+		alignas(MEM_ALIGN) XFLOAT s_thr_wsum_prior_offsety_class[block_size];
+		alignas(MEM_ALIGN) XFLOAT s_thr_wsum_prior_offsetz_class[block_size];
 
 		unsigned long pos = d_job_idx[bid];
 		unsigned long job_size = d_job_num[bid];

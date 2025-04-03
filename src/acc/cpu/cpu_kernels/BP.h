@@ -51,12 +51,12 @@ void backproject2D(
 								&sin_y[0][0], &cos_y[0][0]);
 
 	// Set up some other variables
-	XFLOAT s_eulers[4];
-	
+	alignas(MEM_ALIGN) XFLOAT s_eulers[4];
+
 	XFLOAT weight_norm_inverse = (XFLOAT) 1.0 / weight_norm;
 	
-	XFLOAT xp[img_x], yp[img_x];
-	XFLOAT real[img_x], imag[img_x], Fweight[img_x];
+	alignas(MEM_ALIGN) XFLOAT xp[img_x], yp[img_x];
+	alignas(MEM_ALIGN) XFLOAT real[img_x], imag[img_x], Fweight[img_x];
 	
 	for (unsigned long img=0; img<imageCount; img++) {
 
@@ -256,12 +256,12 @@ void backproject3D(
 	int max_r2_vol = max_r2 * padding_factor * padding_factor;
 	
 	// Set up some variables
-	XFLOAT s_eulers[9];
+	alignas(MEM_ALIGN) XFLOAT s_eulers[9];
 	
 	//   We collect block_size number of values before storing the results to
 	//   help vectorization and control memory accesses
-	XFLOAT real[block_size], imag[block_size], Fweight[block_size];
-	XFLOAT xp[block_size], yp[block_size], zp[block_size];
+	alignas(MEM_ALIGN) XFLOAT real[block_size], imag[block_size], Fweight[block_size];
+	alignas(MEM_ALIGN) XFLOAT xp[block_size], yp[block_size], zp[block_size];
 
 	for (unsigned long img=0; img<imageCount; img++) {
 
@@ -540,14 +540,13 @@ void backprojectRef3D(
 							   &sin_y[0][0], &cos_y[0][0]);
 	
 	// Set up some other variables
-	XFLOAT s_eulers[9];
+	alignas(MEM_ALIGN) XFLOAT s_eulers[9];
 	
 	XFLOAT weight_norm_inverse = (XFLOAT) 1.0 / weight_norm;
 
-	XFLOAT xp[img_x], yp[img_x], zp[img_x];
-	XFLOAT real[img_x], imag[img_x], Fweight[img_x];
+	alignas(MEM_ALIGN) XFLOAT xp[img_x], yp[img_x], zp[img_x];
+	alignas(MEM_ALIGN) XFLOAT real[img_x], imag[img_x], Fweight[img_x];
 
-		
 	for (unsigned long img=0; img<imageCount; img++) {
 
 		for(int i = 0; i < 9; i++)
@@ -792,7 +791,7 @@ void backproject3D_SGD(
 	int max_r2_vol = max_r2 * padding_factor * padding_factor;
 	
 	// Set up some variables
-	XFLOAT s_eulers[9];
+	alignas(MEM_ALIGN) XFLOAT s_eulers[9];
 
 	XFLOAT weight_norm_inverse = (XFLOAT) 1.0 / weight_norm;
 
@@ -800,9 +799,9 @@ void backproject3D_SGD(
 	//
 	//   We collect block_size number of values before storing the results to
 	//   help vectorization and control memory accesses
-	XFLOAT real[block_size], imag[block_size], Fweight[block_size];
-	XFLOAT ref_real[block_size], ref_imag[block_size];
-	XFLOAT xp[block_size], yp[block_size], zp[block_size];
+	alignas(MEM_ALIGN) XFLOAT real[block_size], imag[block_size], Fweight[block_size];
+	alignas(MEM_ALIGN) XFLOAT ref_real[block_size], ref_imag[block_size];
+	alignas(MEM_ALIGN) XFLOAT xp[block_size], yp[block_size], zp[block_size];
 		
 	for (unsigned long img=0; img<imageCount; img++) {
 
@@ -1088,12 +1087,12 @@ void backproject2D_SGD(
 	                           &sin_y[0][0], &cos_y[0][0]);
 
 	// Set up some other variables
-	XFLOAT s_eulers[4];
+	alignas(MEM_ALIGN) XFLOAT s_eulers[4];
 
 	XFLOAT weight_norm_inverse = (XFLOAT) 1.0 / weight_norm;
 
-	XFLOAT xp[img_x], yp[img_x];
-	XFLOAT real[img_x], imag[img_x], Fweight[img_x];
+	alignas(MEM_ALIGN) XFLOAT xp[img_x], yp[img_x];
+	alignas(MEM_ALIGN) XFLOAT real[img_x], imag[img_x], Fweight[img_x];
 
 	for (unsigned long img=0; img<imageCount; img++) {
 

@@ -51,12 +51,12 @@ void wavg_ref3D(
 							  &sin_y[0][0], &cos_y[0][0]);
 	
 	// Set up other arrays
-	XFLOAT ref_real[xSize], ref_imag[xSize];
-	XFLOAT img_real[xSize], img_imag[xSize];
-	XFLOAT ctfs[xSize];
-	XFLOAT wdiff2s_parts[xSize];
-	XFLOAT wdiff2s_XA   [xSize];
-	XFLOAT wdiff2s_AA   [xSize];
+	alignas(MEM_ALIGN) XFLOAT ref_real[xSize], ref_imag[xSize];
+	alignas(MEM_ALIGN) XFLOAT img_real[xSize], img_imag[xSize];
+	alignas(MEM_ALIGN) XFLOAT ctfs[xSize];
+	alignas(MEM_ALIGN) XFLOAT wdiff2s_parts[xSize];
+	alignas(MEM_ALIGN) XFLOAT wdiff2s_XA   [xSize];
+	alignas(MEM_ALIGN) XFLOAT wdiff2s_AA   [xSize];
 	
 	for(unsigned long bid=0; bid<orientation_num; bid++) {
 
@@ -231,8 +231,8 @@ void wavg_3D(
 							  &sin_z[0][0], &cos_z[0][0]);
 	
 	// Set up other arrays
-	XFLOAT ref_real[xSize], ref_imag[xSize];
-	XFLOAT img_real[xSize], img_imag[xSize];
+	alignas(MEM_ALIGN) XFLOAT ref_real[xSize], ref_imag[xSize];
+	alignas(MEM_ALIGN) XFLOAT img_real[xSize], img_imag[xSize];
 		
 	for(unsigned long bid=0; bid<orientation_num; bid++) {
 		// Copy the rotation matrix to local variables
