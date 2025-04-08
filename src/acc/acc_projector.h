@@ -41,11 +41,11 @@ class AccProjector
 	#endif
 	size_t pitch2D;
 #else
-#ifndef ALTCPU
-	XFLOAT *mdlReal, *mdlImag;
-#else
+#ifdef ALTCPU
 	std::complex<XFLOAT> *mdlComplex;
 	int externalFree;
+#else
+	XFLOAT *mdlComplex;
 #endif
 #endif  // PROJECTOR_NO_TEXTURES
 
@@ -70,11 +70,8 @@ public:
 		mdlImag = 0;
 		pitch2D = 0;
 #else
-#ifndef ALTCPU
-		mdlReal = 0;
-		mdlImag = 0;
-#else
 		mdlComplex = 0;
+#ifdef ALTCPU
 		externalFree = 0;
 #endif
 #endif
@@ -88,10 +85,13 @@ public:
 			int inity, int initz,
 			int maxr, XFLOAT paddingFactor);
 
+#if defined(_CUDA_ENABLED) || defined(_HIP_ENABLED)
 	void initMdl(XFLOAT *real, XFLOAT *imag);
-	void initMdl(Complex *data);
+#endif
 #ifdef ALTCPU
 	void initMdl(std::complex<XFLOAT> *data);
+#else
+	void initMdl(Complex *data);
 #endif
 
 	void clear();
