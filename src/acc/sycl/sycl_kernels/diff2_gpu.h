@@ -34,6 +34,7 @@ void sycl_kernel_diff2_coarse(
 
 	const int xSize = projector.imgX;
 	const int ySize = projector.imgY;
+	const int xySize = xSize * ySize;
 	const int zSize = projector.imgZ;
 	const int maxR = projector.maxR;
 
@@ -41,7 +42,6 @@ void sycl_kernel_diff2_coarse(
 	for (int i = tid; i < max_block_pass_euler; i += block_sz)
 		if (i < eulers_per_block * 9)
 			s_eulers[i] = g_eulers[blockid*eulers_per_block*9 + i];
-
 
 	XFLOAT diff2s[eulers_per_block] {0.0f};
 
@@ -51,9 +51,9 @@ void sycl_kernel_diff2_coarse(
 
 	//Step through data
 	const int max_block_pass_pixel {(image_size/block_sz + 1) * block_sz};
+	__group_barrier(nit);
 	for (int init_pixel = 0; init_pixel < max_block_pass_pixel; init_pixel += block_sz/prefetch_fraction)
 	{
-		__group_barrier(nit);
 
 		//Prefetch block-fraction-wise
 		if (init_pixel + tid/prefetch_fraction < image_size)
@@ -61,8 +61,8 @@ void sycl_kernel_diff2_coarse(
 			int x, y, z, xy;
 			if (DATA3D)
 			{
-				z  = (init_pixel + tid/prefetch_fraction) / (xSize*ySize);
-				xy = (init_pixel + tid/prefetch_fraction) % (xSize*ySize);
+				z  = (init_pixel + tid/prefetch_fraction) / xySize;
+				xy = (init_pixel + tid/prefetch_fraction) % xySize;
 				x  = xy % xSize;
 				y  = xy / xSize;
 				if (z > maxR)
@@ -126,8 +126,8 @@ void sycl_kernel_diff2_coarse(
 				int x, y, z, xy;
 				if (DATA3D)
 				{
-					z  = (init_pixel + pix) / (xSize*ySize);
-					xy = (init_pixel + pix) % (xSize*ySize);
+					z  = (init_pixel + pix) / xySize;
+					xy = (init_pixel + pix) % xySize;
 					x  = xy % xSize;
 					y  = xy / ySize;
 					if (z > maxR)
