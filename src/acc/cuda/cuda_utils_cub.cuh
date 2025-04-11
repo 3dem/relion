@@ -18,10 +18,10 @@
     #include <cub/cub.cuh>
 #else
     // #define CUB_NS_QUALIFIER ::cub // for compatibility with CUDA 11.5
-    #include "src/acc/cuda/cub/device/device_radix_sort.cuh"
-    #include "src/acc/cuda/cub/device/device_reduce.cuh"
-    #include "src/acc/cuda/cub/device/device_scan.cuh"
-    #include "src/acc/cuda/cub/device/device_select.cuh"
+    #include <cub/device/device_radix_sort.cuh>
+    #include <cub/device/device_reduce.cuh>
+    #include <cub/device/device_scan.cuh>
+    #include <cub/device/device_select.cuh>
 #endif
 
 namespace CudaKernels
