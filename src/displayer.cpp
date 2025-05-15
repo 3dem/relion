@@ -301,7 +301,7 @@ int DisplayBox::unSelect()
 int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, ObservationModel *obsModel, EMDLabel display_label, EMDLabel text_label, bool _do_read_whole_stacks, bool _do_apply_orient,
                                   RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale, RFLOAT _ori_scale, int _ncol, long int max_nr_images, RFLOAT lowpass, RFLOAT highpass, bool _do_class,
                                   MetaDataTable *_MDdata, int _nr_regroup, bool _do_recenter,  bool _is_data, MetaDataTable *_MDgroups,
-                                  bool do_allow_save, FileName fn_selected_imgs, FileName fn_selected_parts, int max_nr_parts_per_class, bool _show_fourier_amplitudes, bool _show_fourier_phase_angles)
+                                  bool do_allow_save, FileName fn_selected_imgs, FileName fn_selected_parts, int max_nr_parts_per_class)
 {
 	// Scroll bars
 	Fl_Scroll scroll(0, 0, w(), h());
@@ -332,8 +332,6 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, Observat
 		canvas.fn_selected_imgs= fn_selected_imgs;
 		canvas.fn_selected_parts = fn_selected_parts;
 		canvas.max_nr_parts_per_class = max_nr_parts_per_class;
-		canvas.show_fourier_amplitudes = _show_fourier_amplitudes;
-		canvas.show_fourier_phase_angles = _show_fourier_phase_angles;
 		canvas.fill(MDin, obsModel, display_label, text_label, _do_apply_orient, _minval, _maxval, _sigma_contrast, _scale, _ncol, _do_recenter, max_nr_images, lowpass, highpass);
 		canvas.nr_regroups = _nr_regroup;
 		canvas.do_recenter = _do_recenter;
@@ -581,12 +579,6 @@ void basisViewerCanvas::fill(MetaDataTable &MDin, ObservationModel *obsModel, EM
 				if (highpass > 0. && have_optics_group)
 					highPassFilterMap(img(), highpass, angpix);
 
-				if(this->show_fourier_amplitudes)
-				{
-				       amplitudeOrPhaseMap(img(), img(), AMPLITUDE_MAP);
-				} else {
-					if(this->show_fourier_phase_angles) amplitudeOrPhaseMap(img(), img(), PHASE_MAP);
-				}
 				// Dont change the user-provided _minval and _maxval in the getImageContrast routine!
 				RFLOAT myminval = _minval;
 				RFLOAT mymaxval = _maxval;
@@ -612,11 +604,6 @@ void basisViewerCanvas::fill(MetaDataTable &MDin, ObservationModel *obsModel, EM
 				int xcoor = icol * xsize_box;
 
 				DisplayBox* my_box = new DisplayBox(xcoor, ycoor, xsize_box, ysize_box, "");
-				if(this->show_fourier_phase_angles)
-				{
-					myminval = -180.0;
-					mymaxval =  180.0;
-				}
 				my_box->setData(img(), MDin.getObject(my_ipos), my_ipos, myminval, mymaxval, _scale, false);
 				if (MDin.containsLabel(text_label))
 				{
@@ -730,17 +717,15 @@ int multiViewerCanvas::handle(int ev)
 						{ "Show Fourier phase angles (2x)" },
 						{ "Show helical layer line profile" },
 						{ "Show particles from selected classes" },
-						{ "Show Fourier amplitudes (2x) from selected classes" },
-						{ "Show Fourier phase angles (2x) from selected classes" },
 						{ "Set selection type" },
-						{ "Save selected classes" }, // idx = 16; change below when re-ordered!!
+						{ "Save selected classes" }, // idx = 14; change below when re-ordered!!
 						{ "Quit" },
 						{ 0 }
 					};
 
 					if (!do_allow_save)
 					{
-						rclick_menu[16].deactivate();
+						rclick_menu[14].deactivate();
 					}
 
 				    const Fl_Menu_Item *m = rclick_menu->popup(Fl::event_x(), Fl::event_y(), 0, 0, 0);
@@ -774,10 +759,6 @@ int multiViewerCanvas::handle(int ev)
 						setSelectionType();
 					else if ( strcmp(m->label(), "Show particles from selected classes") == 0 )
 						showSelectedParticles(current_selection_type);
-					else if ( strcmp(m->label(), "Show Fourier amplitudes (2x) from selected classes") == 0 )
-						showSelectedFourierAmplitudes(current_selection_type);
-					else if ( strcmp(m->label(), "Show Fourier phase angles (2x) from selected classes") == 0 )
-						showSelectedFourierPhaseAngles(current_selection_type);
 					else if ( strcmp(m->label(), "Save selected classes") == 0 )
 					{
 						saveBackupSelection();
@@ -1446,38 +1427,6 @@ void multiViewerCanvas::showSelectedParticles(int save_selected)
 	{
 		basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, "Particles in the selected classes");
 		win.fillCanvas(MULTIVIEWER, MDpart, obsModel, EMDL_IMAGE_NAME, text_label, do_read_whole_stacks, do_apply_orient, 0., 0., 0., boxes[0]->scale, ori_scale, ncol, multi_max_nr_images);
-	}
-	else
-		std::cout <<" No classes selected. First select one or more classes..." << std::endl;
-}
-
-void multiViewerCanvas::showSelectedFourierAmplitudes(int save_selected)
-{
-	MetaDataTable MDpart;
-	makeStarFileSelectedParticles(save_selected, MDpart);
-	int nparts = MDpart.numberOfObjects();
-	if (nparts > 0)
-	{
-		basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, "Amplitudes in the selected classes");
-		win.fillCanvas(MULTIVIEWER, MDpart, obsModel, EMDL_IMAGE_NAME, text_label, do_read_whole_stacks, do_apply_orient, 0., 0., 0., boxes[0]->scale, ori_scale, ncol,
-				multi_max_nr_images,  0, 0, false, MDdata, nr_regroups, do_recenter, false, MDgroups,
-				do_allow_save, fn_selected_imgs, fn_selected_parts, max_nr_parts_per_class, true);
-	}
-	else
-		std::cout <<" No classes selected. First select one or more classes..." << std::endl;
-}
-
-void multiViewerCanvas::showSelectedFourierPhaseAngles(int save_selected)
-{
-	MetaDataTable MDpart;
-	makeStarFileSelectedParticles(save_selected, MDpart);
-	int nparts = MDpart.numberOfObjects();
-	if (nparts > 0)
-	{
-		basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, "Phase angles in the selected classes");
-		win.fillCanvas(MULTIVIEWER, MDpart, obsModel, EMDL_IMAGE_NAME, text_label, do_read_whole_stacks, do_apply_orient, 0., 0., 0., boxes[0]->scale, ori_scale, ncol,
-				multi_max_nr_images,  0, 0, false, MDdata, nr_regroups, do_recenter, false, MDgroups,
-				do_allow_save, fn_selected_imgs, fn_selected_parts, max_nr_parts_per_class, false, true);
 	}
 	else
 		std::cout <<" No classes selected. First select one or more classes..." << std::endl;
@@ -2829,6 +2778,7 @@ void Displayer::initialise()
 		if ( (ZSIZE(img()) > 1) || (NSIZE(img()) > 1) )
 			REPORT_ERROR("Displayer::initialise ERROR: cannot display Fourier maps for 3D images or stacks!");
 	}
+
 }
 
 int Displayer::runGui()
@@ -3044,7 +2994,7 @@ void Displayer::run()
 		basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
 		win.fillCanvas(MULTIVIEWER, MDin, &obsModel, display_label, text_label, do_read_whole_stacks, do_apply_orient, minval, maxval, sigma_contrast, scale, ori_scale, ncol,
 				max_nr_images,  lowpass, highpass, do_class, &MDdata, nr_regroups, do_recenter, fn_in.contains("_data.star"), &MDgroups,
-				do_allow_save, fn_selected_imgs, fn_selected_parts, max_nr_parts_per_class, show_fourier_amplitudes, show_fourier_phase_angles);
+				do_allow_save, fn_selected_imgs, fn_selected_parts, max_nr_parts_per_class);
 	}
 	else
 	{
