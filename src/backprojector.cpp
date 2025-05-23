@@ -2307,14 +2307,9 @@ void BackProjector::applyHelicalSymmetry(int nr_helical_asu, RFLOAT helical_twis
 						A3D_ELEM(sum_weight,k,i,j) += A2D_ELEM(slice_weight,i,j);
 						// coords_output(x,y) = A * coords_input (xp,yp)
 						RFLOAT xp = x * R(0, 0) + y * R(0, 1);
-						RFLOAT yp = x * R(1, 0) + y * R(1, 1);
-						RFLOAT zp = z;  // Z remains unchanged
 						bool is_neg_x = xp < 0;
 						if (is_neg_x)
 						{
-							xp = -xp;
-							yp = -yp;
-							zp = -zp;
 							A3D_ELEM(sum_data,-k,i,j) += A2D_ELEM(slice_data,i,j);
 							A3D_ELEM(sum_weight,-k,i,j) += A2D_ELEM(slice_weight,i,j);
 						} else {
@@ -2322,7 +2317,7 @@ void BackProjector::applyHelicalSymmetry(int nr_helical_asu, RFLOAT helical_twis
 //Specially considering we are only going through z=0..FINISHINGZ(sum_weight).
 //But for the special case of xp == 0 and zp != 0, it is still necessary to have the values stored
 //at both +z and -z slices. So the lines below.
-							if(xp == 0 && zp != 0)
+							if(xp == 0 && z != 0)
 							{
 								A3D_ELEM(sum_data,-k,-i,j) += A2D_ELEM(slice_data,i,j);
 								A3D_ELEM(sum_weight,-k,-i,j) += A2D_ELEM(slice_weight,i,j);
