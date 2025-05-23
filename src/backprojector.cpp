@@ -2191,7 +2191,7 @@ void BackProjector::applyHelicalSymmetry(int nr_helical_asu, RFLOAT helical_twis
 		//Only the positive half of the z-range has to be calculated.
 		//The other half is calculated by the x<0 part of the x-loop.
 		#pragma omp parallel for schedule(dynamic) num_threads(threads) default(none) shared(data,weight,sum_data,sum_weight,rmax2,helical_twist,helical_rise,ori_size,padding_factor) firstprivate(hh,R)
-		for (long int k=0; k<=FINISHINGZ(sum_weight); k++)
+		for (long int k=STARTINGZ(sum_weight); k<=FINISHINGZ(sum_weight); k++)
 		{
 			// Allocate minimal 2D slices per thread instead of full 3D arrays
 			MultidimArray<RFLOAT> slice_weight(YSIZE(data), XSIZE(data));
@@ -2305,24 +2305,6 @@ void BackProjector::applyHelicalSymmetry(int nr_helical_asu, RFLOAT helical_twis
 					{
 						A3D_ELEM(sum_data,k,i,j) += A2D_ELEM(slice_data,i,j);
 						A3D_ELEM(sum_weight,k,i,j) += A2D_ELEM(slice_weight,i,j);
-						// coords_output(x,y) = A * coords_input (xp,yp)
-						RFLOAT xp = x * R(0, 0) + y * R(0, 1);
-						bool is_neg_x = xp < 0;
-						if (is_neg_x)
-						{
-							A3D_ELEM(sum_data,-k,i,j) += A2D_ELEM(slice_data,i,j);
-							A3D_ELEM(sum_weight,-k,i,j) += A2D_ELEM(slice_weight,i,j);
-						} else {
-//In the x,y loop, for xp<0 the interpolations for -z were stored at +z and that's OK (perhaps a z-flip?).
-//Specially considering we are only going through z=0..FINISHINGZ(sum_weight).
-//But for the special case of xp == 0 and zp != 0, it is still necessary to have the values stored
-//at both +z and -z slices. So the lines below.
-							if(xp == 0 && z != 0)
-							{
-								A3D_ELEM(sum_data,-k,-i,j) += A2D_ELEM(slice_data,i,j);
-								A3D_ELEM(sum_weight,-k,-i,j) += A2D_ELEM(slice_weight,i,j);
-							}
-						}
 					}
 				}
 			}
