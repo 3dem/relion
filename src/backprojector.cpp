@@ -2166,7 +2166,7 @@ void BackProjector::enforceHermitianSymmetry()
 
 void BackProjector::applyHelicalSymmetry(int nr_helical_asu, RFLOAT helical_twist, RFLOAT helical_rise, int threads)
 {
-	if ( (nr_helical_asu < 2) || (ref_dim != 3) || data.getDim() != 3)
+	if ( (nr_helical_asu < 2) || (ref_dim != 3) )
 		return;
 
 	int rmax2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
