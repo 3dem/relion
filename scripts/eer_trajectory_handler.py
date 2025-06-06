@@ -97,8 +97,8 @@ def interpolate_trajectory(traj_star, eer_grouping, old_grouping):
     traj_star['general']['rlnMicrographDoseRate'] = str(float(traj_star['general']['rlnMicrographDoseRate']) * scale)
     traj_star['general']['rlnEERGrouping'] = eer_grouping
  
-    xs = np.array(traj_star['global_shift']['rlnMicrographShiftX'], dtype=np.float)
-    ys = np.array(traj_star['global_shift']['rlnMicrographShiftY'], dtype=np.float)
+    xs = np.array(traj_star['global_shift']['rlnMicrographShiftX'], dtype=np.float64)
+    ys = np.array(traj_star['global_shift']['rlnMicrographShiftY'], dtype=np.float64)
 
     new_xs = np.zeros(new_nz)
     new_ys = np.zeros(new_nz)
@@ -121,13 +121,13 @@ def interpolate_trajectory(traj_star, eer_grouping, old_grouping):
             new_xs[i] = xs[src1] * (1 - frac) + xs[src2] * frac
             new_ys[i] = ys[src1] * (1 - frac) + ys[src2] * frac
 
-    traj_star['global_shift']['rlnMicrographFrameNumber'] = list(np.linspace(1, new_nz, num=new_nz).astype(np.int).astype(np.str0))
+    traj_star['global_shift']['rlnMicrographFrameNumber'] = list(np.linspace(1, new_nz, num=new_nz).astype(np.int64).astype(np.str0))
     traj_star['global_shift']['rlnMicrographShiftX'] = list(new_xs.astype(np.str0))
     traj_star['global_shift']['rlnMicrographShiftY'] = list(new_ys.astype(np.str0))
  
     # z is not normalized, so have to be patched.
     if "local_motion_model" in traj_star:
-        coeffs = np.array(traj_star['local_motion_model']['rlnMotionModelCoeff'], dtype=np.float)
+        coeffs = np.array(traj_star['local_motion_model']['rlnMotionModelCoeff'], dtype=np.float64)
         coeffs *= scale       # 1st-order in time(z)
         coeffs[1::3] *= scale # 2nd-order
         coeffs[2::3] *= scale # 3rd-order
@@ -153,20 +153,20 @@ def resample_image(traj_star, eer_upsampling):
 
     traj_star['general']['rlnMicrographOriginalPixelSize'] = str(float(traj_star['general']['rlnMicrographOriginalPixelSize']) / scale)
 
-    xs = np.array(traj_star['global_shift']['rlnMicrographShiftX'], dtype=np.float) * scale
-    ys = np.array(traj_star['global_shift']['rlnMicrographShiftY'], dtype=np.float) * scale
+    xs = np.array(traj_star['global_shift']['rlnMicrographShiftX'], dtype=np.float64) * scale
+    ys = np.array(traj_star['global_shift']['rlnMicrographShiftY'], dtype=np.float64) * scale
     traj_star['global_shift']['rlnMicrographShiftX'] = list(xs.astype(np.str0))
     traj_star['global_shift']['rlnMicrographShiftY'] = list(ys.astype(np.str0))
 
     # Hot pixels
     if 'hot_pixels' in traj_star:
-        hot_xs = np.array(traj_star['hot_pixels']['rlnCoordinateX'], dtype=np.float)
-        hot_ys = np.array(traj_star['hot_pixels']['rlnCoordinateY'], dtype=np.float)
+        hot_xs = np.array(traj_star['hot_pixels']['rlnCoordinateX'], dtype=np.float64)
+        hot_ys = np.array(traj_star['hot_pixels']['rlnCoordinateY'], dtype=np.float64)
         if scale == 2:
             hot_xs = np.hstack([2 * hot_xs, 2 * hot_xs, 2 * hot_xs + 1, 2 * hot_xs + 1])
             hot_ys = np.hstack([2 * hot_ys, 2 * hot_ys + 1, 2 * hot_ys, 2 * hot_ys + 1])
         elif scale == 0.5:
-            tmp = np.floor(np.vstack([hot_xs, hot_ys]) / 2.0).astype(np.int)
+            tmp = np.floor(np.vstack([hot_xs, hot_ys]) / 2.0).astype(np.int64)
             tmp = np.unique(tmp, axis = 1)
             hot_xs = tmp[0, :]
             hot_ys = tmp[1, :]
