@@ -709,6 +709,7 @@ void acc_make_eulers_2D(int grid_size, int block_size,
 #endif
 }
 
+
 template<bool invert,bool doL,bool doR>
 void acc_make_eulers_3D(int grid_size, int block_size,
 		deviceStream_t stream,

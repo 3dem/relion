@@ -7,7 +7,7 @@ target_link_libraries(tests relion_lib)
 target_link_libraries(tests ${FFTW_LIBRARIES})
 target_link_libraries(tests ${TIFF_LIBRARIES})
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
 
 include_directories(tests PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/tests)
 include_directories(tests PRIVATE ${FFTW_INCLUDES})

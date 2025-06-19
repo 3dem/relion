@@ -19,7 +19,7 @@
 #define	GTOC(timer,timing) (timer.cuda_gpu_toc(timing))
 #define	GATHERGPUTIMINGS(timer) (timer.cuda_gpu_printtictoc())
 #elif defined CUDA_PROFILING
-	#include <nvToolsExt.h>
+	#include <nvtx3/nvToolsExt.h>
 	#define	CTIC(timer,timing) (nvtxRangePush(timing))
 	#define	CTOC(timer,timing) (nvtxRangePop())
 	#define	GTIC(timer,timing)

@@ -388,7 +388,7 @@ else()
 	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 
 	set(CMAKE_C_FLAGS "-std=c99 ${CMAKE_C_FLAGS}")
-	set(CMAKE_CXX_FLAGS "-fPIC -std=c++14 ${CMAKE_CXX_FLAGS}")
+	set(CMAKE_CXX_FLAGS "-fPIC -std=c++17 ${CMAKE_CXX_FLAGS}")
 endif()
 
 # ----------------------------------------------------------Intel Compiler support --
