@@ -45,8 +45,10 @@
 #include "src/ml_optimiser.h"
 #ifdef _CUDA_ENABLED
 #include "src/acc/cuda/cuda_ml_optimiser.h"
+#ifdef CUDA_PROFILING
 #include <nvToolsExt.h>
 #include <cuda_profiler_api.h>
+#endif
 #elif _HIP_ENABLED
 #include "src/acc/hip/hip_ml_optimiser.h"
 #include <roctracer/roctx.h>
