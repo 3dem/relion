@@ -47,7 +47,8 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt, bool do_die_
 	lambda(_opticsMdt.numberOfObjects()),
 	Cs(_opticsMdt.numberOfObjects()),
 	boxSizes(_opticsMdt.numberOfObjects(), 0.0),
-	CtfPremultiplied(_opticsMdt.numberOfObjects(), false)
+    CtfPremultiplied(_opticsMdt.numberOfObjects(), false),
+    CtfCorrected(_opticsMdt.numberOfObjects(), false)
 {
 	if (!(opticsMdt.containsLabel(EMDL_IMAGE_PIXEL_SIZE) ||
 	      opticsMdt.containsLabel(EMDL_MICROGRAPH_PIXEL_SIZE) ||
@@ -141,6 +142,12 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt, bool do_die_
 			opticsMdt.getValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, val, i);
 			CtfPremultiplied[i] = val;
 		}
+        if (opticsMdt.containsLabel(EMDL_OPTIMISER_DATA_ARE_CTF_CORRECTED))
+        {
+            bool val;
+            opticsMdt.getValue(EMDL_OPTIMISER_DATA_ARE_CTF_CORRECTED, val, i);
+            CtfCorrected[i] = val;
+        }
 
 		opticsMdt.getValue(EMDL_IMAGE_SIZE, boxSizes[i], i);
 
@@ -384,7 +391,7 @@ void ObservationModel::predictObservation(
 		shiftImageInFourierTransform(dest, dest, s_out, s_out/2 - xoff, s_out/2 - yoff);
 	}
 
-	if (applyCtf)
+	if (applyCtf && !getCtfCorrected(opticsGroup))
 	{
 		CTF ctf;
 		ctf.readByGroup(partMdt, this, particle);
@@ -792,9 +799,26 @@ bool ObservationModel::getCtfPremultiplied(int og) const
 	}
 }
 
+bool ObservationModel::getCtfCorrected(int og) const
+{
+	if (og < CtfCorrected.size())
+	{
+		return CtfCorrected[og];
+	}
+	else
+	{
+		return false;
+	}
+}
+
 void ObservationModel::setCtfPremultiplied(int og, bool val)
 {
 	CtfPremultiplied[og] = val;
+}
+
+void ObservationModel::setCtfCorrected(int og, bool val)
+{
+	CtfCorrected[og] = val;
 }
 
 std::string ObservationModel::getGroupName(int og)

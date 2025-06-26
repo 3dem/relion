@@ -409,10 +409,10 @@ def reorder_class_average_star_by_clustered(model_star_file: str, clustered: sns
         write_models_star(reordered_classes_df, all_model_data, filename = f"{output_path}", overwrite = overwrite)
         opt = starfile.read(optimiser_star)
         opt["rlnModelStarFile"] = output_path+"_model.star"
-        data_star = opt["rlnExperimentalDataStarFile"][0]
+        data_star = opt["rlnExperimentalDataStarFile"]
         shutil.copy(data_star, output_path+"_data.star")
         opt["rlnExperimentalDataStarFile"] = output_path+"_data.star"
-        starfile.write(opt, output_path+"_optimiser.star")
+        starfile.write({'optimiser_general' : opt}, output_path+"_optimiser.star")
         print("Saved optimiser.star with reordered classes as: ",output_path,"_optimiser.star")        
         
     return reordered_classes_df
@@ -594,8 +594,8 @@ def get_starfiles_from_optimiser(filename: str) -> (str, str, str):
     else:
         try:
             opt = starfile.read(filename)
-            particle_star = opt['rlnExperimentalDataStarFile'][0]
-            model_star = opt['rlnModelStarFile'][0]
+            particle_star = opt['rlnExperimentalDataStarFile']
+            model_star = opt['rlnModelStarFile']
             model = starfile.read(model_star)
             class_mrcs=model["model_classes"]["rlnReferenceImage"][0].split("@",1)[1]
         except:

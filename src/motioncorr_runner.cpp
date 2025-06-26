@@ -317,6 +317,10 @@ void MotioncorrRunner::initialise()
 		}
 	}
 
+	// Make sure fn_out ends with a slash
+	if (fn_out[fn_out.length() - 1] != '/')
+		fn_out += "/";
+
 	// First backup the given list of all micrographs
 	std::vector<int> optics_group_given_all = optics_group_micrographs;
 	std::vector<FileName> fn_mic_given_all = fn_micrographs;
@@ -382,10 +386,6 @@ void MotioncorrRunner::initialise()
 			optics_group_ori_micrographs.push_back(optics_group_given_all[imic]);
 		}
 	}
-
-	// Make sure fn_out ends with a slash
-	if (fn_out[fn_out.length()-1] != '/')
-		fn_out += "/";
 
 	// Make all output directories if necessary
 	FileName prevdir="";
@@ -742,6 +742,34 @@ void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, Micrograph &mic)
 			else
 			{
 				// Stop now
+				break;
+			}
+		}
+	}
+
+	// If no shifts were found with the version 1.5 method, attempt the version 1.6 method
+	if (!have_found_final)
+	{
+		// Reset and start parsing for version 1.6 style data
+		in.clear();
+		in.seekg(0);
+
+		while (getline(in, line))
+		{
+			if (line.find("Frame") != std::string::npos && line.find("x Shift") != std::string::npos)
+			{
+				while (getline(in, line) && !line.empty())
+				{
+					std::istringstream ss(line);
+					float x_shift, y_shift;
+					ss >> frame >> x_shift >> y_shift;
+					if (ss.fail())
+					{
+						std::cerr << " fn_log= " << fn_log << std::endl;
+						REPORT_ERROR("Error: Unexpected line format in 1.6 global shifts: " + line);
+					}
+					mic.setGlobalShift(frame, x_shift, y_shift);
+				}
 				break;
 			}
 		}

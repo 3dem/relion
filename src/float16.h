@@ -74,6 +74,26 @@ typedef unsigned short float16;
   At the moment subnormal numbers are not implemented; they are truncated to signed zeros.
 */
 
+inline void print_float32bits(float32 f)
+{
+	for (int i = 0; i < 32; i++)
+	{
+		printf("%d", (f.i >> (31 - i)) & 1);
+		if (i % 8 == 7) printf("|");
+		if (i % 8 == 3) printf(" ");
+	}
+}
+
+inline void print_float16bits(float16 f)
+{
+	for (int i = 0; i < 16; i++)
+	{
+		printf("%d", (f >> (15 - i)) & 1);
+		if (i % 8 == 7) printf("|");
+		if (i % 8 == 3) printf(" ");
+	}
+}
+
 inline float16 float2half(float f32)
 {
 	float32 f;
@@ -97,9 +117,12 @@ inline float16 float2half(float f32)
 		return ret;
 	}
 
-	fractional += 1 << 12; // add 1 to 13th bit to round.
+	fractional += 1 << 12; // add 1 to the 13th bit to round.
 	if (fractional & (1 << 23)) // carry up
+	{
+		fractional &= 0x007fffffu;
 		exponent++;
+	}
 
 	if (exponent > 127 + 15) // Overflow: don't create INF but truncate to MAX.
 	{

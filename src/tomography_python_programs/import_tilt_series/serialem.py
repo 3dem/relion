@@ -96,6 +96,26 @@ def import_tilt_series_from_serial_em(
         _utils.mdoc.construct_tomogram_id(mdoc_file, prefix)
         for mdoc_file in mdoc_files
     ]
+
+    # Following code validates the presence of tomogram_ids in
+    # tilt_image_files. If there's a mismatch the tomogram_ids list is updated
+    tilt_image_ids = [_utils.mdoc.construct_tomogram_id(tilt_image_file, prefix = '')
+        for tilt_image_file in tilt_image_files
+    ]
+
+    base_names_tilt_image_ids = [Path(file).stem for file in tilt_image_ids]
+
+    matches = []
+    for item in tomogram_ids:
+        base_name = Path(item).stem
+        for name in base_names_tilt_image_ids:
+            if base_name in name:
+                matches.append(item)
+                break
+
+    tomogram_ids = matches
+    #
+
     tilt_series_star_files = [
         tilt_series_directory / f"{tomogram_id}.star"
         for tomogram_id in tomogram_ids

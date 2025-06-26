@@ -20,20 +20,12 @@ namespace CpuKernels
 // cos(A+B) = cos(A) * cos(B) - sin(A) * sin(B), we can use lookup table to
 // compute sin(x*tx + y*ty) and cos(x*tx + y*ty).
 template<bool REFCTF, bool REF3D>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-inline
-#endif
 void wavg_ref3D(
 		XFLOAT * RESTRICT   g_eulers,
 		AccProjectorKernel &projector,
 		unsigned long       image_size,
 		unsigned long       orientation_num,
-#ifdef DEBUG_CUDA
-		XFLOAT * RESTRICT   _g_img_real,
-#else
 		XFLOAT * RESTRICT   g_img_real,
-#endif
 		XFLOAT * RESTRICT   g_img_imag,
 		XFLOAT * RESTRICT   g_trans_x,
 		XFLOAT * RESTRICT   g_trans_y,
@@ -48,10 +40,6 @@ void wavg_ref3D(
 		XFLOAT              significant_weight,
 		XFLOAT              part_scale)
 {
-#ifdef DEBUG_CUDA
-	checkedArray<XFLOAT> g_img_real;
-	g_img_real.initCheckedArray(_g_img_real);
-#endif
 	// pre-compute sin and cos for x and y direction
 	int xSize = projector.imgX;
 	int ySize = projector.imgY;
@@ -63,12 +51,12 @@ void wavg_ref3D(
 							  &sin_y[0][0], &cos_y[0][0]);
 	
 	// Set up other arrays
-	XFLOAT ref_real[xSize], ref_imag[xSize];
-	XFLOAT img_real[xSize], img_imag[xSize];
-	XFLOAT ctfs[xSize];
-	XFLOAT wdiff2s_parts[xSize];
-	XFLOAT wdiff2s_XA   [xSize];
-	XFLOAT wdiff2s_AA   [xSize];
+	alignas(MEM_ALIGN) XFLOAT ref_real[xSize], ref_imag[xSize];
+	alignas(MEM_ALIGN) XFLOAT img_real[xSize], img_imag[xSize];
+	alignas(MEM_ALIGN) XFLOAT ctfs[xSize];
+	alignas(MEM_ALIGN) XFLOAT wdiff2s_parts[xSize];
+	alignas(MEM_ALIGN) XFLOAT wdiff2s_XA   [xSize];
+	alignas(MEM_ALIGN) XFLOAT wdiff2s_AA   [xSize];
 	
 	for(unsigned long bid=0; bid<orientation_num; bid++) {
 
@@ -117,8 +105,13 @@ void wavg_ref3D(
 			for(int x = xstart; x < xend; x++) {
 				wdiff2s_AA[x] = g_wdiff2s_AA[pixel + x];
 			}
-			
-			#pragma omp simd
+
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+			#pragma omp simd simdlen(SIMD_LEN)
+#endif
+#ifdef USE_INTEL_COMPILER
+			#pragma forceinline
+#endif
 			for(int x = xstart; x < xend; x++) {
 				if(REF3D)
 					projector.project3Dmodel(x, y, e0, e1, e3, e4, e6, e7,
@@ -156,7 +149,9 @@ void wavg_ref3D(
 				XFLOAT *trans_cos_x = &cos_x[itrans][0];
 				XFLOAT *trans_sin_x = &sin_x[itrans][0];
 
-#pragma omp simd
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+				#pragma omp simd simdlen(SIMD_LEN)
+#endif
 				for(int x = xstart; x < xend; x++) {
 
 					XFLOAT ss = trans_sin_x[x] * trans_cos_y + trans_cos_x[x] * trans_sin_y;
@@ -204,20 +199,12 @@ void wavg_ref3D(
 }
 
 template<bool REFCTF>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-inline
-#endif
 void wavg_3D(
 		XFLOAT * RESTRICT   g_eulers,
 		AccProjectorKernel &projector,
 		unsigned long       image_size,
 		unsigned long       orientation_num,
-#ifdef DEBUG_CUDA
-		XFLOAT * RESTRICT   _g_img_real,
-#else
 		XFLOAT * RESTRICT   g_img_real,
-#endif
 		XFLOAT * RESTRICT   g_img_imag,
 		XFLOAT * RESTRICT   g_trans_x,
 		XFLOAT * RESTRICT   g_trans_y,
@@ -232,10 +219,6 @@ void wavg_3D(
 		XFLOAT              significant_weight,
 		XFLOAT              part_scale)
 {
-#ifdef DEBUG_CUDA
-	checkedArray<XFLOAT> g_img_real;
-	g_img_real.initCheckedArray(_g_img_real);
-#endif
 	// pre-compute sin and cos for x and y direction
 	int xSize = projector.imgX;
 	int ySize = projector.imgY;
@@ -251,8 +234,8 @@ void wavg_3D(
 							  &sin_z[0][0], &cos_z[0][0]);
 	
 	// Set up other arrays
-	XFLOAT ref_real[xSize], ref_imag[xSize];
-	XFLOAT img_real[xSize], img_imag[xSize];
+	alignas(MEM_ALIGN) XFLOAT ref_real[xSize], ref_imag[xSize];
+	alignas(MEM_ALIGN) XFLOAT img_real[xSize], img_imag[xSize];
 		
 	for(unsigned long bid=0; bid<orientation_num; bid++) {
 		// Copy the rotation matrix to local variables
@@ -290,7 +273,12 @@ void wavg_3D(
 					}
 				}
 
-				#pragma omp simd
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+				#pragma omp simd simdlen(SIMD_LEN)
+#endif
+#ifdef USE_INTEL_COMPILER
+				#pragma forceinline
+#endif
 				for(int x = xstart_y; x < xend_y; x++) {
 					projector.project3Dmodel(x, y, z, e0, e1, e2, e3, e4, e5, e6, e7, e8,
 											 ref_real[x], ref_imag[x]);

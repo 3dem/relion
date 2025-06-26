@@ -130,7 +130,7 @@ endif(NOT GUI)
 
 #--Remove apps for testing--
 
-set(TEST_TARGETS movie_reconstruct double_reconstruct_openmp cs_fit ctf_nyquist_test free_aberration_plot split_stack defocus_stats double_bfac_fit interpolation_test motion_diff paper_data_synth Zernike_test vis_delocalisation vis_Ewald_weight mpi_tester)
+set(TEST_TARGETS double_reconstruct_openmp cs_fit ctf_nyquist_test free_aberration_plot split_stack defocus_stats double_bfac_fit interpolation_test motion_diff paper_data_synth Zernike_test vis_delocalisation vis_Ewald_weight mpi_tester)
 if(NOT RELION_TEST)
 	foreach(TARGET ${TEST_TARGETS})
 		list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/${TARGET}.cpp")
@@ -293,7 +293,7 @@ if (CUDA_FOUND)
 
 elseif (HIP_FOUND)
 	file(GLOB REL_HIP_SRC "${CMAKE_SOURCE_DIR}/src/acc/hip/*.cpp" "${CMAKE_SOURCE_DIR}/src/acc/hip/hip_kernels/*.cpp" )
-	hip_add_library(relion_gpu_util ${REL_HIP_SRC})
+	add_library(relion_gpu_util ${REL_HIP_SRC})
 
 	if (${CMAKE_BUILD_TYPE_LOWER} STREQUAL "profiling")
 		find_library(ROCM_TRACER_LIB NAMES roctx64 PATHS ${HIP_ROOT_DIR}/lib ${HIP_ROOT_DIR}/../lib REQUIRED)

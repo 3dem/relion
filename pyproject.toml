@@ -25,7 +25,7 @@ dynamic = ["version"]
 dependencies = [
     "numpy",
     "pandas",
-    "starfile",
+    "starfile>=0.5.6",
     "mrcfile",
     "mdocfile",
     "typer",

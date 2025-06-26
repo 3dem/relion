@@ -22,34 +22,16 @@ public:
 		maxR, maxR2, maxR2_padded;
 	XFLOAT 	padding_factor;
 
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 	PROJECTOR_PTR_TYPE mdlReal;
 	PROJECTOR_PTR_TYPE mdlImag;
-#ifndef ALTCPU
+#elif _SYCL_ENABLED
 	PROJECTOR_PTR_TYPE mdlComplex;
 #else
 	std::complex<XFLOAT> *mdlComplex;
 #endif
 
-	AccProjectorKernel(
-			int mdlX, int mdlY, int mdlZ,
-			int imgX, int imgY, int imgZ,
-			int mdlInitY, int mdlInitZ,
-			XFLOAT padding_factor,
-			int maxR,
-#ifndef ALTCPU
-			PROJECTOR_PTR_TYPE mdlComplex
-#else
-			std::complex<XFLOAT> *mdlComplex
-#endif
-			):
-			mdlX(mdlX), mdlXY(mdlX*mdlY), mdlZ(mdlZ),
-			imgX(imgX), imgY(imgY), imgZ(imgZ),
-			mdlInitY(mdlInitY), mdlInitZ(mdlInitZ),
-			padding_factor(padding_factor),
-			maxR(maxR), maxR2(maxR*maxR), maxR2_padded(maxR*maxR*padding_factor*padding_factor),
-			mdlComplex(mdlComplex)
-		{};
-
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 	AccProjectorKernel(
 			int mdlX, int mdlY, int mdlZ,
 			int imgX, int imgY, int imgZ,
@@ -64,22 +46,32 @@ public:
 				padding_factor(padding_factor),
 				maxR(maxR), maxR2(maxR*maxR), maxR2_padded(maxR*maxR*padding_factor*padding_factor),
 				mdlReal(mdlReal), mdlImag(mdlImag)
-			{
-#ifdef ALTCPU
-				std::complex<XFLOAT> *pData = mdlComplex;
-				for(size_t i=0; i<(size_t)mdlX * (size_t)mdlY * (size_t)mdlZ; i++) {
-					std::complex<XFLOAT> arrayval(*mdlReal ++, *mdlImag ++);
-					pData[i] = arrayval;
-				}
+		{};
+#else
+	AccProjectorKernel(
+			int mdlX, int mdlY, int mdlZ,
+			int imgX, int imgY, int imgZ,
+			int mdlInitY, int mdlInitZ,
+			XFLOAT padding_factor,
+			int maxR,
+#if _SYCL_ENABLED
+			PROJECTOR_PTR_TYPE mdlComplex
+#else
+			std::complex<XFLOAT> *mdlComplex
 #endif
-			};
+			):
+			mdlX(mdlX), mdlXY(mdlX*mdlY), mdlZ(mdlZ),
+			imgX(imgX), imgY(imgY), imgZ(imgZ),
+			mdlInitY(mdlInitY), mdlInitZ(mdlInitZ),
+			padding_factor(padding_factor),
+			maxR(maxR), maxR2(maxR*maxR), maxR2_padded(maxR*maxR*padding_factor*padding_factor),
+			mdlComplex(mdlComplex)
+		{};
+#endif
 
 #if defined _CUDA_ENABLED || defined _HIP_ENABLED
 	__device__ __forceinline__
 #else
-	#ifndef __INTEL_COMPILER
-	__attribute__((always_inline))
-	#endif
 	inline
 #endif
 	void project3Dmodel(
@@ -120,8 +112,8 @@ public:
 			real =   no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 			imag = - no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 #elif _SYCL_ENABLED
-			real =   syclKernels::no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
-			imag = - syclKernels::no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+			syclKernels::no_tex3D(mdlComplex, real, imag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+			imag = -imag;
 #else
 			CpuKernels::complex3D(mdlComplex, real, imag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 #endif
@@ -164,9 +156,6 @@ public:
 #if defined _CUDA_ENABLED || defined _HIP_ENABLED
 	__device__ __forceinline__
 #else
-	#ifndef __INTEL_COMPILER
-	__attribute__((always_inline))
-	#endif
 	inline
 #endif
 	void project3Dmodel(
@@ -203,8 +192,7 @@ public:
 			real = no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 			imag = no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 	#elif _SYCL_ENABLED
-			real = syclKernels::no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
-			imag = syclKernels::no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+			syclKernels::no_tex3D(mdlComplex, real, imag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 	#else
 			CpuKernels::complex3D(mdlComplex, real, imag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 	#endif
@@ -245,9 +233,6 @@ public:
 #if defined _CUDA_ENABLED || defined _HIP_ENABLED
 __device__ __forceinline__
 #else
-	#ifndef __INTEL_COMPILER
-	__attribute__((always_inline))
-	#endif
 	inline
 #endif
 	void project2Dmodel(
@@ -279,8 +264,7 @@ __device__ __forceinline__
 			real = no_tex2D(mdlReal, xp, yp, mdlX, mdlInitY);
 			imag = no_tex2D(mdlImag, xp, yp, mdlX, mdlInitY);
 	#elif _SYCL_ENABLED
-			real = syclKernels::no_tex2D(mdlReal, xp, yp, mdlX, mdlInitY);
-			imag = syclKernels::no_tex2D(mdlImag, xp, yp, mdlX, mdlInitY);
+			syclKernels::no_tex2D(mdlComplex, real, imag, xp, yp, mdlX, mdlInitY);
 	#else
 			CpuKernels::complex2D(mdlComplex, real, imag, xp, yp, mdlX, mdlInitY);
 	#endif
@@ -328,12 +312,7 @@ __device__ __forceinline__
 					*p.mdlReal,
 					*p.mdlImag
 #else
-#ifndef ALTCPU
-					p.mdlReal,
-					p.mdlImag
-#else
 					p.mdlComplex
-#endif
 #endif
 				);
 		return k;

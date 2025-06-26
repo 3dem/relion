@@ -149,12 +149,9 @@ class Tensor2x2
     {
         Tensor2x2<T> out;
 
-        out.xx = v0.x0 * v1.x1;
-        out.xy = v0.x0 * v1.y1;
-        out.xz = v0.x0 * v1.z1;
-        out.yy = v0.y0 * v1.y1;
-        out.yz = v0.y0 * v1.z1;
-        out.zz = v0.z0 * v1.z1;
+        out.xx = v0.x * v1.x;
+        out.xy = v0.x * v1.y;
+        out.yy = v0.y * v1.y;
 
         return out;
     }

@@ -87,7 +87,7 @@ def cryoCARE_predict(
     else:
         predict_executable = "cryoCARE_predict.py"
 
-    global_star = starfile.read(tomogram_star_file, always_dict=True)['global']
+    global_star = starfile.read(tomogram_star_file, always_dict=True, parse_as_string=['rlnTomoName'])['global']
 
     if not model_file.exists():
         e = f'Could not find denoise model'

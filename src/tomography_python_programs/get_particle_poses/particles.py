@@ -27,12 +27,12 @@ def combine_particle_annotations(
 ):
     console.log("Running get_particle_poses particles.")
 
-    global_df = starfile.read(tilt_series_star_file)
+    global_df = starfile.read(tilt_series_star_file, parse_as_string=['rlnTomoName'])
     global_df = global_df.set_index('rlnTomoName')
     annotation_files = annotations_directory.glob('*_particles.star')
     dfs = []
     for file in annotation_files:
-        df = starfile.read(file)
+        df = starfile.read(file, parse_as_string=['rlnTomoName'])
         tilt_series_id = '_'.join(file.name.split('_')[:-1])
         pixel_size = float(
             global_df.loc[tilt_series_id, 'rlnTomoTiltSeriesPixelSize'])
@@ -56,7 +56,8 @@ def combine_particle_annotations(
             'rlnCoordinateZ': 'rlnCenteredCoordinateZAngst'
         }, inplace=True)
 
-        df.insert(loc=0, column='rlnTomoName', value=tilt_series_id)
+        if 'rlnTomoName' not in df.columns:
+            df.insert(loc=0, column='rlnTomoName', value=tilt_series_id)
 
         dfs.append(df)
     df = pd.concat(dfs)
@@ -88,8 +89,8 @@ def create_annotations_from_previous_star_file(
 
     annotations_directory.mkdir(parents=True, exist_ok=True)
 
-    star_data = starfile.read(in_star_file)
-    tomo_data = starfile.read(tomograms_file)
+    star_data = starfile.read(in_star_file, parse_as_string=['rlnTomoName'])
+    tomo_data = starfile.read(tomograms_file, parse_as_string=['rlnTomoName'])
     tomo_data = tomo_data.set_index('rlnTomoName')
 
     if isinstance(star_data, pd.DataFrame):

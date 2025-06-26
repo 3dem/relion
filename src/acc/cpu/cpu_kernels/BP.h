@@ -9,9 +9,6 @@
 namespace CpuKernels
 {
 template < bool CTF_PREMULTIPLIED >
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-#endif
 inline
 void backproject2D(
 		unsigned long imageCount,
@@ -54,12 +51,12 @@ void backproject2D(
 								&sin_y[0][0], &cos_y[0][0]);
 
 	// Set up some other variables
-	XFLOAT s_eulers[4];
+	alignas(MEM_ALIGN) XFLOAT s_eulers[4];
 	
 	XFLOAT weight_norm_inverse = (XFLOAT) 1.0 / weight_norm;
 	
-	XFLOAT xp[img_x], yp[img_x];
-	XFLOAT real[img_x], imag[img_x], Fweight[img_x];
+	alignas(MEM_ALIGN) XFLOAT xp[img_x], yp[img_x];
+	alignas(MEM_ALIGN) XFLOAT real[img_x], imag[img_x], Fweight[img_x];
 	
 	for (unsigned long img=0; img<imageCount; img++) {
 
@@ -221,9 +218,6 @@ void backproject2D(
 }
 
 template < bool DATA3D, bool CTF_PREMULTIPLIED >
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-#endif
 inline
 void backproject3D(
 		unsigned long imageCount,
@@ -262,12 +256,12 @@ void backproject3D(
 	int max_r2_vol = max_r2 * padding_factor * padding_factor;
 	
 	// Set up some variables
-	XFLOAT s_eulers[9];
+	alignas(MEM_ALIGN) XFLOAT s_eulers[9];
 	
 	//   We collect block_size number of values before storing the results to
 	//   help vectorization and control memory accesses
-	XFLOAT real[block_size], imag[block_size], Fweight[block_size];
-	XFLOAT xp[block_size], yp[block_size], zp[block_size];
+	alignas(MEM_ALIGN) XFLOAT real[block_size], imag[block_size], Fweight[block_size];
+	alignas(MEM_ALIGN) XFLOAT xp[block_size], yp[block_size], zp[block_size];
 
 	for (unsigned long img=0; img<imageCount; img++) {
 
@@ -285,7 +279,6 @@ void backproject3D(
 		for (unsigned pass = 0; pass < pixel_pass_num; pass++)
 		{
 			memset(Fweight,0,sizeof(XFLOAT)*block_size);
-			#pragma omp simd
 			for(int tid=0; tid<block_size; tid++)
 			{
 				int ok_for_next(1);  // This flag avoids continues, helping the vectorizer
@@ -376,9 +369,9 @@ void backproject3D(
                                                         Fweight[tid] += weight * ctf;
 
 							if(DATA3D)
-								CpuKernels::translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag);
+								TRANSLATE_PIXEL_3D(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag)
 							else
-								CpuKernels::translatePixel(x, y,    g_trans_x[itrans], g_trans_y[itrans],                    img_real, img_imag, temp_real, temp_imag);
+								TRANSLATE_PIXEL_2D(x, y,    g_trans_x[itrans], g_trans_y[itrans],                    img_real, img_imag, temp_real, temp_imag)
 
 							real[tid] += temp_real * weight;
 							imag[tid] += temp_imag * weight;
@@ -502,9 +495,6 @@ void backproject3D(
 // cos(A+B) = cos(A) * cos(B) - sin(A) * sin(B), we can use lookup table to
 // compute sin(x*tx + y*ty) and cos(x*tx + y*ty).
 template < bool CTF_PREMULTIPLIED >
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-#endif
 inline
 void backprojectRef3D(
 		unsigned long imageCount,
@@ -550,12 +540,12 @@ void backprojectRef3D(
 							   &sin_y[0][0], &cos_y[0][0]);
 	
 	// Set up some other variables
-	XFLOAT s_eulers[9];
+	alignas(MEM_ALIGN) XFLOAT s_eulers[9];
 	
 	XFLOAT weight_norm_inverse = (XFLOAT) 1.0 / weight_norm;
 
-	XFLOAT xp[img_x], yp[img_x], zp[img_x];
-	XFLOAT real[img_x], imag[img_x], Fweight[img_x];
+	alignas(MEM_ALIGN) XFLOAT xp[img_x], yp[img_x], zp[img_x];
+	alignas(MEM_ALIGN) XFLOAT real[img_x], imag[img_x], Fweight[img_x];
 
 		
 	for (unsigned long img=0; img<imageCount; img++) {
@@ -597,7 +587,9 @@ void backprojectRef3D(
 				XFLOAT *trans_cos_x = &cos_x[itrans][0];
 				XFLOAT *trans_sin_x = &sin_x[itrans][0];
 
-				#pragma omp simd
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+				#pragma omp simd simdlen(SIMD_LEN)
+#endif
 				for(int x=0; x<xmax; x++) {
 					XFLOAT minvsigma2 = g_Minvsigma2s[pixel + x];
 					XFLOAT ctf        = g_ctfs       [pixel + x];
@@ -634,7 +626,9 @@ void backprojectRef3D(
 				}
 			}
 
-			#pragma omp simd
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+			#pragma omp simd simdlen(SIMD_LEN)
+#endif
 			for(int x=0; x<xmax; x++) {
 				// Get logical coordinates in the 3D map
 				xp[x] = (s_eulers[0] * x + s_eulers[1] * y ) * padding_factor;
@@ -759,9 +753,6 @@ void backprojectRef3D(
 }
 
 template < bool DATA3D, bool CTF_PREMULTIPLIED >
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-#endif
 inline
 void backproject3D_SGD(
 		unsigned long imageCount,
@@ -801,7 +792,7 @@ void backproject3D_SGD(
 	int max_r2_vol = max_r2 * padding_factor * padding_factor;
 	
 	// Set up some variables
-	XFLOAT s_eulers[9];
+	alignas(MEM_ALIGN) XFLOAT s_eulers[9];
 
 	XFLOAT weight_norm_inverse = (XFLOAT) 1.0 / weight_norm;
 
@@ -809,9 +800,9 @@ void backproject3D_SGD(
 	//
 	//   We collect block_size number of values before storing the results to
 	//   help vectorization and control memory accesses
-	XFLOAT real[block_size], imag[block_size], Fweight[block_size];
-	XFLOAT ref_real[block_size], ref_imag[block_size];
-	XFLOAT xp[block_size], yp[block_size], zp[block_size];
+	alignas(MEM_ALIGN) XFLOAT real[block_size], imag[block_size], Fweight[block_size];
+	alignas(MEM_ALIGN) XFLOAT ref_real[block_size], ref_imag[block_size];
+	alignas(MEM_ALIGN) XFLOAT xp[block_size], yp[block_size], zp[block_size];
 		
 	for (unsigned long img=0; img<imageCount; img++) {
 
@@ -827,7 +818,6 @@ void backproject3D_SGD(
 
 		for (unsigned pass = 0; pass < pixel_pass_num; pass++)   {
 			memset(Fweight,0,sizeof(XFLOAT)*block_size);
-//			#pragma omp simd
 			for(int tid=0; tid<block_size; tid++) {
 				int ok_for_next(1);  // This flag avoids continues, helping the vectorizer
 
@@ -936,9 +926,9 @@ void backproject3D_SGD(
                                                         Fweight[tid] += weight * ctf;
 
 							if(DATA3D)
-								CpuKernels::translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag);
+								TRANSLATE_PIXEL_3D(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag)
 							else
-								CpuKernels::translatePixel(x, y,    g_trans_x[itrans], g_trans_y[itrans],                    img_real, img_imag, temp_real, temp_imag);
+								TRANSLATE_PIXEL_2D(x, y,    g_trans_x[itrans], g_trans_y[itrans],                    img_real, img_imag, temp_real, temp_imag)
 
 							real[tid] += (temp_real-ref_real[tid]) * weight;
 							imag[tid] += (temp_imag-ref_imag[tid]) * weight;
@@ -1055,9 +1045,6 @@ void backproject3D_SGD(
 }
 
 template < bool CTF_PREMULTIPLIED >
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-#endif
 inline
 void backproject2D_SGD(
 		unsigned long imageCount,
@@ -1101,12 +1088,12 @@ void backproject2D_SGD(
 	                           &sin_y[0][0], &cos_y[0][0]);
 
 	// Set up some other variables
-	XFLOAT s_eulers[4];
+	alignas(MEM_ALIGN) XFLOAT s_eulers[4];
 
 	XFLOAT weight_norm_inverse = (XFLOAT) 1.0 / weight_norm;
 
-	XFLOAT xp[img_x], yp[img_x];
-	XFLOAT real[img_x], imag[img_x], Fweight[img_x];
+	alignas(MEM_ALIGN) XFLOAT xp[img_x], yp[img_x];
+	alignas(MEM_ALIGN) XFLOAT real[img_x], imag[img_x], Fweight[img_x];
 
 	for (unsigned long img=0; img<imageCount; img++) {
 

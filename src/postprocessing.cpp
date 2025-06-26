@@ -801,18 +801,20 @@ void Postprocessing::writeOutput()
 
 	// Write a plot with the FSC curves
 	std::string title= "Final resolution = " + floatToString(global_resol, 5, 2) + " Angstroms";
-	CPlot2D *plot2D = new CPlot2D(title);
-	plot2D->SetXAxisSize(600);
-	plot2D->SetYAxisSize(400);
-	MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_TRUE, 0., 0., 0., 2.);
-	MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_UNMASKED, 0., 1., 0.);
-	MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_MASKED, 0., 0., 1.);
-	MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_RANDOM_MASKED, 1., 0., 0.);
-	plot2D->SetXAxisTitle("resolution (1/A)");
-	plot2D->SetYAxisTitle("Fourier Shell Correlation");
-	plot2D->OutputPostScriptPlot(fn_out + "_fsc.eps");
-	delete plot2D;
-
+	if (do_mask)
+    {
+        CPlot2D *plot2D = new CPlot2D(title);
+        plot2D->SetXAxisSize(600);
+        plot2D->SetYAxisSize(400);
+        MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_TRUE, 0., 0., 0., 2.);
+        MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_UNMASKED, 0., 1., 0.);
+        MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_MASKED, 0., 0., 1.);
+        MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_RANDOM_MASKED, 1., 0., 0.);
+        plot2D->SetXAxisTitle("resolution (1/A)");
+        plot2D->SetYAxisTitle("Fourier Shell Correlation");
+        plot2D->OutputPostScriptPlot(fn_out + "_fsc.eps");
+        delete plot2D;
+    }
 //#define CISTEMFSC
 #ifdef CISTEMFSC
 	// Write a plot with the FSC curves

@@ -217,7 +217,7 @@ void Assembly::readPDB(std::string filename, bool use_segid_instead_of_chainid, 
 	fh.seekg(0);
 
 	// Loop over all lines
-	while (fh.getline (line, 600))
+	while (fh.getline (line, 100))
 	{
 		// Only look at lines with an ATOM label
 		std::string record(line,0,6);

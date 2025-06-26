@@ -388,7 +388,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
         mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
         mymodel.sigma2_psi = textToFloat(fnt) * textToFloat(fnt);
     }
-    fnt = parser.getOption("--sigma_off", "Stddev. on the translations", "OLD");
+    fnt = parser.getOption("--offset", "Stddev. on the translations", "OLD");
     if (fnt != "OLD")
     {
         mymodel.sigma2_offset = textToFloat(fnt) * textToFloat(fnt);
@@ -2024,9 +2024,32 @@ void MlOptimiser::initialiseGeneral(int rank)
     if (!exists(fn_dir))
         REPORT_ERROR("ERROR: output directory does not exist!");
 
-    // Just die if trying to use accelerators and skipping alignments
-    if ((do_skip_align || do_skip_rotate) && (do_gpu || do_sycl || do_cpu))
-        REPORT_ERROR("ERROR: you cannot use accelerators when skipping alignments.");
+    char *env_blush_args = getenv("RELION_BLUSH_ARGS");
+    if (env_blush_args != nullptr)
+        blush_args += std::string(env_blush_args);
+
+    if (skip_spectral_trailing)
+        blush_args += " --skip-spectral-trailing ";
+
+    if (do_gpu)
+    {
+        blush_args += " --gpu ";
+        for (auto &d : gpuDevices)
+            blush_args += integerToString(d) + ",";
+        blush_args += " ";
+    }
+    else
+        blush_args = blush_args + " --gpu -1 ";
+
+    if (do_skip_align || do_skip_rotate)
+    {
+        do_gpu = false;
+        do_sycl = false;
+        do_cpu = false;
+
+        std::cerr << "WARNING: you cannot use accelerators (like the GPU) when skipping alignments." << std::endl
+                  << "Will continue without accelerators and maintain setting for external tasks (like Blush regularization)." << std::endl;
+    }
 
     if (do_always_cc)
         do_calculate_initial_sigma_noise = false;
@@ -2062,6 +2085,14 @@ void MlOptimiser::initialiseGeneral(int rank)
                 fn_ref, is_3d_model, mydata,
                 do_average_unaligned, do_generate_seeds,refs_are_ctf_corrected,
                 ref_angpix, gradient_refine, grad_pseudo_halfsets, do_trust_ref_size, (rank==0));
+
+    }
+
+    if (do_ctf_correction && mydata.hasCtfCorrected())
+    {
+        do_ctf_correction = false;
+        if (verb > 0)
+            std::cout << " + CTFs have already been corrected, switching off CTF correction ..." << std::endl;
 
     }
 
@@ -2165,7 +2196,7 @@ void MlOptimiser::initialiseGeneral(int rank)
             std::vector<std::string> resols;
             std::vector<RFLOAT> resols_end, resols_start;
 
-            int nresols = splitString(helical_fourier_mask_resols, ",", resols);
+            splitString(helical_fourier_mask_resols, ",", resols);
             if (resols.size()%2 == 1) REPORT_ERROR("Provide an even number of start-end resolutions for --fourier_exclude_resols");
             for (int nshell = 0; nshell < resols.size()/2; nshell++)
             {
@@ -2531,23 +2562,6 @@ void MlOptimiser::initialiseGeneral(int rank)
         subset_size = -1;
         mu = 0.;
     }
-
-	char *env_blush_args = getenv("RELION_BLUSH_ARGS");
-	if (env_blush_args != nullptr)
-		blush_args += std::string(env_blush_args);
-
-    if (skip_spectral_trailing)
-        blush_args += " --skip-spectral-trailing ";
-
-	if (do_gpu)
-	{
-		blush_args += " --gpu ";
-		for (auto &d: gpuDevices)
-			blush_args += gpu_ids + ",";
-		blush_args += " ";
-	}
-	else
-		blush_args = blush_args + " --gpu -1 ";
 
     if (minimum_nr_particles_sigma2_noise < 0)
     {
@@ -4866,7 +4880,7 @@ bool MlOptimiser::setAverageCTF2(MultidimArray<RFLOAT> &avgctf2)
 {
     // When doing ctf_premultiplied, correct the tau2 estimates for the average CTF^2
     bool do_correct_tau2_by_avgctf2 = false;
-    if (mydata.hasCtfPremultiplied() && !fix_tau && !do_split_random_halves)
+    if (mydata.hasCtfPremultiplied() && !mydata.hasCtfCorrected() && !fix_tau && !do_split_random_halves)
     {
         do_correct_tau2_by_avgctf2 = true;
         MultidimArray<RFLOAT> sumw;

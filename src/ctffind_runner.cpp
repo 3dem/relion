@@ -303,7 +303,7 @@ void CtffindRunner::initialise(bool is_leader)
 		}
 	}
 
-	if (is_leader)
+	if (is_leader && do_at_most >= 0)
 	{
 		std::cout << fn_mic_given_all.size() << " micrographs were given but we process only ";
 		std::cout  << do_at_most << " micrographs as specified in --do_at_most." << std::endl;
@@ -463,11 +463,28 @@ void CtffindRunner::joinCtffindResults()
 
 		if (verb > 0 && imic % 60 == 0) progress_bar(imic);
 	}
+	if (MDctf.isEmpty())
+		REPORT_ERROR( (std::string) fn_ctffind_exe + " failed to estimate CTF parameters for any micrograph, exiting...");
 
     if (is_tomo)
     {
         tomogramSet.convertBackFromSingleMetaDataTable(MDctf);
         tomogramSet.write(fn_out+"tilt_series_ctf.star");
+
+        // Also save all Thon-ring diagnosis images in one star file
+        if (verb > 0) std::cout << " Saving a file called " << fn_out << "power_spectra_fits.star for visualisation of Thon ring fits..." << std::endl;
+        MetaDataTable MDpower;
+        for (long int t = 0; t < tomogramSet.tomogramTables.size(); t++)
+        {
+            FOR_ALL_OBJECTS_IN_METADATA_TABLE(tomogramSet.tomogramTables[t])
+            {
+                MDpower.addObject(tomogramSet.tomogramTables[t].getObject(current_object));
+            }
+        }
+        MDpower.deactivateLabel(EMDL_MICROGRAPH_NAME);
+        MDpower.deactivateLabel(EMDL_MICROGRAPH_MOVIE_NAME);
+        MDpower.write(fn_out+"power_spectra_fits.star");
+
     }
     else
     {
@@ -546,6 +563,8 @@ void CtffindRunner::getMySearchParameters(long int imic, RFLOAT &my_def_min, RFL
         // Simple model that increases maxres by an exponential on the dose
         RFLOAT mydose = pre_exposure_micrographs[imic];
         my_maxres = resol_max * exp(mydose/bfactor_dose);
+        //SHWS 3may2024: don't let maxres become smaller than minres!
+        my_maxres = XMIPP_MIN(my_maxres, resol_min * 0.9);
     }
 
     if (localsearch_nominal_defocus_range > 0.)
@@ -696,7 +715,7 @@ void CtffindRunner::executeCtffind4(long int imic)
 
 	// Write script to run ctffind
 	fh << "#!/usr/bin/env " << fn_shell << std::endl;
-	fh << fn_ctffind_exe << ctffind4_options << " > " << fn_log << " << EOF"<<std::endl;
+	fh << "env LC_ALL=C " << fn_ctffind_exe << ctffind4_options << " > " << fn_log << " << EOF"<<std::endl;
 	// line 1: input image
 	if (do_movie_thon_rings)
 	{

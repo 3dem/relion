@@ -14,10 +14,6 @@ namespace CpuKernels
 {
 
 template<typename T>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-inline
-#endif
 void weights_exponent_coarse(
 		T *g_pdf_orientation,
 		bool *g_pdf_orientation_zeros,
@@ -44,10 +40,6 @@ void weights_exponent_coarse(
 
 
 template<typename T>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-inline
-#endif
 void exponentiate(
 		T *g_array,
 		T add,
@@ -71,10 +63,6 @@ void exponentiate(
 }
 
 template<bool DATA3D>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-inline
-#endif
 void collect2jobs(  int     grid_size,
 					int		block_size,
 					XFLOAT *g_oo_otrans_x,          // otrans-size -> make const
@@ -103,11 +91,11 @@ void collect2jobs(  int     grid_size,
 	// block id
 	for (int bid=0; bid < grid_size; bid++) {
 
-		XFLOAT s_o_weights[block_size];
-		XFLOAT s_thr_wsum_sigma2_offset[block_size];;
-		XFLOAT s_thr_wsum_prior_offsetx_class[block_size];
-		XFLOAT s_thr_wsum_prior_offsety_class[block_size];
-		XFLOAT s_thr_wsum_prior_offsetz_class[block_size];
+		alignas(MEM_ALIGN) XFLOAT s_o_weights[block_size];
+		alignas(MEM_ALIGN) XFLOAT s_thr_wsum_sigma2_offset[block_size];;
+		alignas(MEM_ALIGN) XFLOAT s_thr_wsum_prior_offsetx_class[block_size];
+		alignas(MEM_ALIGN) XFLOAT s_thr_wsum_prior_offsety_class[block_size];
+		alignas(MEM_ALIGN) XFLOAT s_thr_wsum_prior_offsetz_class[block_size];
 
 		unsigned long pos = d_job_idx[bid];
 		unsigned long job_size = d_job_num[bid];
@@ -410,10 +398,6 @@ void cast(  int blockIdx_x,
 }
 */
 template<bool do_highpass>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-inline
-#endif
 void kernel_frequencyPass( int grid_size, int block_size,
 					ACCCOMPLEX *A,
 					long int     ori_size,
@@ -426,12 +410,6 @@ void kernel_frequencyPass( int grid_size, int block_size,
 					XFLOAT       angpix,
 					size_t       image_size)
 {
-#ifdef DEBUG_CUDA
-	if((size_t)grid_size*(size_t)block_size > (size_t)std::numeric_limits<int>::max())
-		CHECK_INDEX_DEBUG_FATAL("kernel_frequencyPass:  grid_size*(size_t)block_size > (size_t)std::numeric_limits<int>::max()");
-	if (image_size < 0)
-		CHECK_INDEX_DEBUG_FATAL("kernel_frequencyPass:  image_size < 0");
-#endif
 	// TODO - why not a single loop over image_size pixels?
 	for(int blk=0; blk<grid_size; blk++) {
 		for(int tid=0; tid<block_size; tid++) {
@@ -487,10 +465,6 @@ void kernel_frequencyPass( int grid_size, int block_size,
 }
 
 template<bool DATA3D>
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-inline
-#endif
 void powerClass(int          gridSize,
 				ACCCOMPLEX   *g_image,
 				XFLOAT       *g_spectrum,
@@ -502,12 +476,6 @@ void powerClass(int          gridSize,
 				int          res_limit,
 				XFLOAT      *g_highres_Xi2)
 {
-#ifdef DEBUG_CUDA
-	if((size_t)gridSize*(size_t)POWERCLASS_BLOCK_SIZE > (size_t)std::numeric_limits<int>::max())
-		CHECK_INDEX_DEBUG_FATAL("kernel_frequencyPass:  gridSize*(size_t)POWERCLASS_BLOCK_SIZE > (size_t)std::numeric_limits<int>::max()");
-	if (image_size < 0)
-		CHECK_INDEX_DEBUG_FATAL("kernel_frequencyPass:  image_size < 0");
-#endif
 	for(int bid=0; bid<gridSize; bid++)
 	{
 		XFLOAT normFaux;
@@ -569,16 +537,13 @@ void powerClass(int          gridSize,
 	}
 }
 
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-#endif
 inline void translatePixel(
 		int x,
 		int y,
 		XFLOAT tx,
 		XFLOAT ty,
-		XFLOAT &real,
-		XFLOAT &imag,
+		XFLOAT real,
+		XFLOAT imag,
 		XFLOAT &tReal,
 		XFLOAT &tImag)
 {
@@ -593,9 +558,6 @@ inline void translatePixel(
 	tImag = c * imag + s * real;
 }
 
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-#endif
 inline void translatePixel(
 		int x,
 		int y,
@@ -603,8 +565,8 @@ inline void translatePixel(
 		XFLOAT tx,
 		XFLOAT ty,
 		XFLOAT tz,
-		XFLOAT &real,
-		XFLOAT &imag,
+		XFLOAT real,
+		XFLOAT imag,
 		XFLOAT &tReal,
 		XFLOAT &tImag)
 {
@@ -619,15 +581,44 @@ inline void translatePixel(
 	tImag = c * imag + s * real;
 }
 
+#ifdef ACC_DOUBLE_PRECISION
+ #define TRANSLATE_PIXEL_2D(x, y, tx, ty, real, imag, tReal, tImag) \
+{ \
+	XFLOAT s, c; \
+	sincos( (x) * (tx) + (y) * (ty),  &s, &c ); \
+	(tReal) = c * (real) - s * (imag); \
+	(tImag) = c * (imag) + s * (real); \
+}
+ #define TRANSLATE_PIXEL_3D(x, y, z, tx, ty, tz, real, imag, tReal, tImag) \
+{ \
+	XFLOAT s, c; \
+	sincos( (x) * (tx) + (y) * (ty) + (z) * (tz), &s, &c ); \
+	(tReal) = c * (real) - s * (imag); \
+	(tImag) = c * (imag) + s * (real); \
+}
+#else
+ #define TRANSLATE_PIXEL_2D(x, y, tx, ty, real, imag, tReal, tImag) \
+{ \
+	XFLOAT s, c; \
+	sincosf( (x) * (tx) + (y) * (ty),  &s, &c ); \
+	(tReal) = c * (real) - s * (imag); \
+	(tImag) = c * (imag) + s * (real); \
+}
+ #define TRANSLATE_PIXEL_3D(x, y, z, tx, ty, tz, real, imag, tReal, tImag) \
+{ \
+	XFLOAT s, c; \
+	sincosf( (x) * (tx) + (y) * (ty) + (z) * (tz), &s, &c ); \
+	(tReal) = c * (real) - s * (imag); \
+	(tImag) = c * (imag) + s * (real); \
+}
+#endif
+
 // sincos lookup table optimization. Function translatePixel calls 
 // sincos(x*tx + y*ty). We precompute 2D lookup tables for x and y directions. 
 // The first dimension is x or y pixel index, and the second dimension is x or y
 // translation index. Since sin(a+B) = sin(A) * cos(B) + cos(A) * sin(B), and 
 // cos(A+B) = cos(A) * cos(B) - sin(A) * sin(B), we can use lookup table to 
 // compute sin(x*tx + y*ty) and cos(x*tx + y*ty). 
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-#endif
 inline void  computeSincosLookupTable2D(unsigned long  trans_num,
                                         XFLOAT  *trans_x,
 										XFLOAT  *trans_y,										
@@ -642,6 +633,9 @@ inline void  computeSincosLookupTable2D(unsigned long  trans_num,
 		XFLOAT tx = trans_x[i];
 		XFLOAT ty = trans_y[i];
 
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+		#pragma omp simd simdlen(SIMD_LEN)
+#endif
 		for(int x=0; x<xSize; x++) {
 		   unsigned long index = i * xSize + x;
 #ifdef ACC_DOUBLE_PRECISION
@@ -650,7 +644,10 @@ inline void  computeSincosLookupTable2D(unsigned long  trans_num,
 			sincosf( x * tx, &sin_x[index], &cos_x[index] );
 #endif            
 		}
-		
+
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+		#pragma omp simd simdlen(SIMD_LEN)
+#endif
 		for(int y=0; y<ySize; y++) {
             unsigned long index = i * ySize + y;
 #ifdef ACC_DOUBLE_PRECISION
@@ -662,9 +659,6 @@ inline void  computeSincosLookupTable2D(unsigned long  trans_num,
 	}
 }	                                    
 				
-#ifndef __INTEL_COMPILER
-__attribute__((always_inline))
-#endif
 inline void  computeSincosLookupTable3D(unsigned long  trans_num,
                                         XFLOAT  *trans_x,
 										XFLOAT  *trans_y,
@@ -684,6 +678,9 @@ inline void  computeSincosLookupTable3D(unsigned long  trans_num,
 		XFLOAT ty = trans_y[i];
 		XFLOAT tz = trans_z[i];
 
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+		#pragma omp simd simdlen(SIMD_LEN)
+#endif
 		for(int x=0; x<xSize; x++) {
 		   unsigned long index = i * xSize + x;
 #ifdef ACC_DOUBLE_PRECISION
@@ -692,7 +689,10 @@ inline void  computeSincosLookupTable3D(unsigned long  trans_num,
 			sincosf( x * tx, &sin_x[index], &cos_x[index] );
 #endif            
 		}
-		
+
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+		#pragma omp simd simdlen(SIMD_LEN)
+#endif
 		for(int y=0; y<ySize; y++) {
             unsigned long index = i * ySize + y;
 #ifdef ACC_DOUBLE_PRECISION
@@ -701,7 +701,10 @@ inline void  computeSincosLookupTable3D(unsigned long  trans_num,
 			sincosf( y * ty, &sin_y[index], &cos_y[index] );
 #endif            
 		}           
-		
+
+#if _OPENMP >= 201307	// For OpenMP 4.0 and later
+		#pragma omp simd simdlen(SIMD_LEN)
+#endif
 		for(int z=0; z<zSize; z++) {
 			unsigned long index = i * zSize + z;
 #ifdef ACC_DOUBLE_PRECISION

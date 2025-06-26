@@ -64,7 +64,7 @@
 #include "src/error.h"
 #include "src/strings.h"
 
-#define FILENAMENUMBERLENGTH 6
+#define FILENAMENUMBERLENGTH 8
 
 //@{
 /** Filenames.

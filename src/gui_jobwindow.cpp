@@ -18,6 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/gui_jobwindow.h"
+#include "src/gui_entries.h"
 JobWindow::JobWindow(int _x, int _y, int _w, int _h, const char* title ) : Fl_Box(_x,_y,_w,_h,title)
 {
 	clear();
@@ -788,10 +789,35 @@ void JobWindow::initialiseAutopickWindow()
 	tab3->label("Topaz");
 	resetHeight();
 
+    place("fn_topaz_exe", TOGGLE_DEACTIVATE);
 	place("topaz_particle_diameter", TOGGLE_DEACTIVATE);
 
-	// Add a little spacer
-	current_y += STEPY/2;
+    // Add a little spacer
+    current_y += STEPY/4;
+
+    group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group5->end();
+    place("do_topaz_train", TOGGLE_DEACTIVATE, group5);
+    group5->begin();
+
+    place("topaz_nr_particles", TOGGLE_DEACTIVATE);
+    place("topaz_train_picks", TOGGLE_DEACTIVATE);
+
+    group6 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group6->end();
+
+    place("do_topaz_train_parts", TOGGLE_DEACTIVATE, group6);
+
+    group6->begin();
+    place("topaz_train_parts", TOGGLE_DEACTIVATE);
+    group6->end();
+    guientries["do_topaz_train_parts"].cb_menu_i();
+
+    group5->end();
+    guientries["do_topaz_train"].cb_menu_i();
+
+    // Add a little spacer
+    current_y += STEPY/4;
 
 	group7 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group7->end();
@@ -801,38 +827,24 @@ void JobWindow::initialiseAutopickWindow()
 
 	group7->begin();
 	place("topaz_model", TOGGLE_DEACTIVATE);
-	group7->end();
-	guientries["do_topaz_pick"].cb_menu_i();
 
-	// Add a little spacer
-	current_y += STEPY/2;
+    group8 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group8->end();
 
-	group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group5->end();
-	place("do_topaz_train", TOGGLE_DEACTIVATE, group5);
-	group5->begin();
+    place("do_topaz_filaments", TOGGLE_DEACTIVATE, group8);
 
-	place("topaz_nr_particles", TOGGLE_DEACTIVATE);
-	place("topaz_train_picks", TOGGLE_DEACTIVATE);
+    group8->begin();
+    place2("topaz_filament_threshold", "topaz_hough_length", "Threshold, Hough length (A)", TOGGLE_DEACTIVATE);
+    group8->end();
+    guientries["do_topaz_filaments"].cb_menu_i();
 
-	group6 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group6->end();
+    group7->end();
+    guientries["do_topaz_pick"].cb_menu_i();
 
-	place("do_topaz_train_parts", TOGGLE_DEACTIVATE, group6);
+    // Add a little spacer
+    current_y += STEPY/4;
 
-	group6->begin();
-	place("topaz_train_parts", TOGGLE_DEACTIVATE);
-	group6->end();
-	guientries["do_topaz_train_parts"].cb_menu_i();
-
-	group5->end();
-	guientries["do_topaz_train"].cb_menu_i();
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	place("fn_topaz_exe", TOGGLE_DEACTIVATE);
-	place("topaz_other_args", TOGGLE_DEACTIVATE);
+    place("topaz_other_args", TOGGLE_DEACTIVATE);
 
 	tab3->end();
 	tab4->begin();
@@ -2611,10 +2623,22 @@ void JobWindow::initialiseTomoAlignTiltseriesWindow()
     // Add a little spacer
     current_y += STEPY/2;
 
+    place("tomogram_thickness", TOGGLE_DEACTIVATE);
+
+    // Add a little spacer
+    current_y += STEPY/2;
+
+    place("fn_batchtomo_exe", TOGGLE_DEACTIVATE);
+    place("fn_aretomo_exe", TOGGLE_DEACTIVATE);
+
     tab1->end();
     tab2->begin();
     tab2->label("IMOD");
     resetHeight();
+
+
+    // Add a little spacer
+	current_y += STEPY/2;
 
     group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
     group1->end();
@@ -2639,22 +2663,42 @@ void JobWindow::initialiseTomoAlignTiltseriesWindow()
     guientries["do_imod_patchtrack"].cb_menu_i(); // make default active
 
     tab2->end();
+
     tab3->begin();
-    tab3->label("AreTomo");
+    tab3->label("AreTomo2");
     resetHeight();
 
     group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
     group3->end();
-    place("do_aretomo", TOGGLE_DEACTIVATE, group3, false);
+    place("do_aretomo2", TOGGLE_DEACTIVATE, group3, false);
     group3->begin();
 
-//    place("aretomo_resolution", TOGGLE_DEACTIVATE);
-    place("aretomo_thickness", TOGGLE_DEACTIVATE);
-    place("aretomo_tiltcorrect", TOGGLE_DEACTIVATE);
+    // Add a little spacer
+    current_y += STEPY/2;
+    group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group4->end();
+    place("do_aretomo_tiltcorrect", TOGGLE_DEACTIVATE, group4, false);
+    group4->begin();
+    place("aretomo_tiltcorrect_angle", TOGGLE_DEACTIVATE);
+    group4->end();
+    guientries["do_aretomo_tiltcorrect"].cb_menu_i(); // make default active
 
+    // Add a little spacer
+    current_y += STEPY/2;
+    group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group5->end();
+    place("do_aretomo_ctf", TOGGLE_DEACTIVATE, group5, false);
+    group5->begin();
+    place("do_aretomo_phaseshift", TOGGLE_DEACTIVATE);
+    group5->end();
+    guientries["do_aretomo_ctf"].cb_menu_i(); // make default active
+
+    // Add a little spacer
+    current_y += STEPY/2;
+    place("other_aretomo_args", TOGGLE_DEACTIVATE);
     place("gpu_ids");
-    group2->end();
-    guientries["do_aretomo"].cb_menu_i(); // make default active
+    group3->end();
+    guientries["do_aretomo2"].cb_menu_i(); // make default active
 
     tab3->end();
 
@@ -2671,24 +2715,9 @@ void JobWindow::initialiseTomoReconstructTomogramsWindow()
     
     place("in_tiltseries", TOGGLE_DEACTIVATE);
 
-	tab2->begin();
-	tab2->label("Reconstruct");
-	resetHeight();
-
-
-    place("xdim", TOGGLE_DEACTIVATE);
-    place("ydim", TOGGLE_DEACTIVATE);
-    place("zdim", TOGGLE_DEACTIVATE);
-    place("binned_angpix", TOGGLE_DEACTIVATE);
-    
     current_y += STEPY /2 ;
 
     place("generate_split_tomograms", TOGGLE_DEACTIVATE);
-
-    current_y += STEPY /2 ;
-
-    place ("tiltangle_offset");
-    place("tomo_name");
 
     current_y += STEPY /2 ;
 
@@ -2702,6 +2731,35 @@ void JobWindow::initialiseTomoReconstructTomogramsWindow()
     group1->end();
     guientries["do_proj"].cb_menu_i();
 
+    tab1-> end();
+
+
+    tab2->begin();
+	tab2->label("Reconstruct");
+	resetHeight();
+
+
+    place("xdim", TOGGLE_DEACTIVATE);
+    place("ydim", TOGGLE_DEACTIVATE);
+    place("zdim", TOGGLE_DEACTIVATE);
+    place("binned_angpix", TOGGLE_DEACTIVATE);
+    
+
+    current_y += STEPY /2 ;
+
+    place ("tiltangle_offset", TOGGLE_DEACTIVATE);
+    place("tomo_name");
+
+    current_y += STEPY /2 ;
+
+    group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group2->end();
+    place("do_fourier", TOGGLE_DEACTIVATE, group2, false);
+
+    group2->begin();
+    place("ctf_intact_first_peak", TOGGLE_DEACTIVATE);
+    group2->end();
+    guientries["do_fourier"].cb_menu_i();
 
     tab2->end();
 

@@ -14,9 +14,9 @@ class RlnTiltSeries(BaseModel):
 
     @classmethod
     def from_star_file(cls, filename: os.PathLike):
-        star = starfile.read(filename, always_dict=True)
+        star = starfile.read(filename, always_dict=True, parse_as_string=['rlnTomoName'])
         tilt_series_id = list(star.keys())[0]
-        return cls(name=tilt_series_id, data=starfile.read(filename))
+        return cls(name=tilt_series_id, data=starfile.read(filename, parse_as_string=['rlnTomoName']))
 
     def write_star_file(self, filename: os.PathLike):
         starfile.write({self.name: self.data}, filename, overwrite=True)

@@ -1918,7 +1918,7 @@ int pickerViewerCanvas::handle(int ev)
 			// No autopicking, but still always fill in the parameters for autopicking with dummy values (to prevent problems in joining autopicked and manually picked coordinates)
 			MDcoords.setValue(EMDL_PARTICLE_SELECTION_TYPE, iaux);
 			MDcoords.setValue(EMDL_ORIENT_PSI, aux);
-			MDcoords.setValue(EMDL_PARTICLE_AUTOPICK_FOM, aux);
+			MDcoords.setValue(EMDL_PARTICLE_AUTOPICK_FOM, zero);
 
 			redraw();
 			return 1;

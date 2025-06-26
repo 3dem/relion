@@ -158,7 +158,7 @@ void cb_viewmic(Fl_Widget* w, void* data)
 		}
 
 		command += " &";
-		std::cerr << " command= " << command << std::endl;
+		//std::cerr << " command= " << command << std::endl;
 		int res = system(command.c_str());
 	}
 
