@@ -139,32 +139,17 @@ void progress_bar(long rlen)
 		t1 = currt - startt; // Elapsed time
 		t2 = (long)(t1 * (float)totlen / rlen); // Total time
 
-		hour = 0;
-		min = 0;
-		if (t2 > 60)
-		{
-			m1 = (float)t1 / 60.0;
-			m2 = (float)t2 / 60.0;
-			min = 1;
-			if (m2 > 60)
-			{
-				h1 = (float)m1 / 60.0;
-				h2 = (float)m2 / 60.0;
-				hour = 1;
-				min = 0;
-			}
-			else
-				hour = 0;
-		}
-		else
-			min = 0;
+    int et = (int)t1;
+    int tt = (int)t2;
+    int eh = et / 3600, em = (et % 3600) / 60, es = et % 60; // Elapsed hours, mins, secs
+    int th = tt / 3600, tm = (tt % 3600) / 60, ts = tt % 60; // Total hours, mins, secs
 
-		if (hour)
-			fprintf(stdout, "\r%3.2f/%3.2f %s ", h1, h2, "hrs");
-		else if (min)
-			fprintf(stdout, "\r%3.2f/%3.2f %s ", m1, m2, "min");
-		else
-			fprintf(stdout, "\r%4u/%4u %s ", (int)t1, (int)t2, "sec");
+    if ((eh == 0) && (th == 0)) // Display time in either MM:SS or HH:MM:SS
+    {
+      fprintf(stdout, "\r%02d:%02d/%02d:%02d", em, es, tm, ts);
+    }
+    else
+      fprintf(stdout, "\r%02d:%02d:%02d/%02d:%02d:%02d", eh, em, es, th, tm, ts);
 
 		i = (int)(60 * (1 - (float)(totlen - rlen) / totlen));
 		while (i--)
