@@ -277,6 +277,7 @@ private:
 	void makeStarFileSelectedParticles(int save_selected, MetaDataTable &MDpart);
 	void saveSelectedParticles(int save_selected);
 	void showSelectedParticles(int save_selected);
+	void showSelectedFourierAmplitudesOrPhases(int save_selected, bool ampl=true);
 	void saveTrainingSet();
 	void saveSelected(int save_selected);
 	void saveBackupSelection();

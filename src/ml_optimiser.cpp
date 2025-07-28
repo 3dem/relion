@@ -4743,7 +4743,7 @@ void MlOptimiser::symmetriseReconstructions()
                     wsum_model.BPref[ith_recons].applyHelicalSymmetry(
                             mymodel.helical_nr_asu,
                             mymodel.helical_twist[ith_recons],
-                            mymodel.helical_rise[ith_recons] / mymodel.pixel_size);
+                            mymodel.helical_rise[ith_recons] / mymodel.pixel_size, nr_threads);
 
                 if (fn_multi_sym.size() > ith_recons) // Always false if size=0
                 {
@@ -4767,7 +4767,7 @@ void MlOptimiser::symmetriseReconstructions()
                         wsum_model.BPref[iclass_half].applyHelicalSymmetry(
                                 mymodel.helical_nr_asu,
                                 mymodel.helical_twist[ith_recons],
-                                mymodel.helical_rise[ith_recons] / mymodel.pixel_size);
+                                mymodel.helical_rise[ith_recons] / mymodel.pixel_size, nr_threads);
 
                     if (fn_multi_sym.size() > ith_recons) // Always false if size=0
                     {

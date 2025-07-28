@@ -717,15 +717,17 @@ int multiViewerCanvas::handle(int ev)
 						{ "Show Fourier phase angles (2x)" },
 						{ "Show helical layer line profile" },
 						{ "Show particles from selected classes" },
+						{ "Show Fourier amplitudes (2x) from selected classes" },
+						{ "Show Fourier phase angles (2x) from selected classes" },
 						{ "Set selection type" },
-						{ "Save selected classes" }, // idx = 14; change below when re-ordered!!
+						{ "Save selected classes" }, // idx = 16; change below when re-ordered!!
 						{ "Quit" },
 						{ 0 }
 					};
 
 					if (!do_allow_save)
 					{
-						rclick_menu[14].deactivate();
+						rclick_menu[16].deactivate();
 					}
 
 				    const Fl_Menu_Item *m = rclick_menu->popup(Fl::event_x(), Fl::event_y(), 0, 0, 0);
@@ -759,6 +761,10 @@ int multiViewerCanvas::handle(int ev)
 						setSelectionType();
 					else if ( strcmp(m->label(), "Show particles from selected classes") == 0 )
 						showSelectedParticles(current_selection_type);
+					else if ( strcmp(m->label(), "Show Fourier amplitudes (2x) from selected classes") == 0 )
+						showSelectedFourierAmplitudesOrPhases(current_selection_type,true);
+					else if ( strcmp(m->label(), "Show Fourier phase angles (2x) from selected classes") == 0 )
+						showSelectedFourierAmplitudesOrPhases(current_selection_type,false);
 					else if ( strcmp(m->label(), "Save selected classes") == 0 )
 					{
 						saveBackupSelection();
@@ -1427,6 +1433,49 @@ void multiViewerCanvas::showSelectedParticles(int save_selected)
 	{
 		basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, "Particles in the selected classes");
 		win.fillCanvas(MULTIVIEWER, MDpart, obsModel, EMDL_IMAGE_NAME, text_label, do_read_whole_stacks, do_apply_orient, 0., 0., 0., boxes[0]->scale, ori_scale, ncol, multi_max_nr_images);
+	}
+	else
+		std::cout <<" No classes selected. First select one or more classes..." << std::endl;
+}
+
+void multiViewerCanvas::showSelectedFourierAmplitudesOrPhases(int save_selected, bool ampl)
+{
+	MetaDataTable MDpart;
+	makeStarFileSelectedParticles(save_selected, MDpart);
+	int nparts = MDpart.numberOfObjects();
+	if (nparts > 0)
+	{
+		std::string command;
+		int res = 0;
+		if (exists("./PS_tmp.star"))
+		{
+			command = "rm -f ./PS_tmp.star";
+			res = system(command.c_str());
+		}
+		FileName fn = "./PS_tmp.star";
+		MDpart.write(fn);
+		if(ampl)
+			command = "relion_image_handler --i ./PS_tmp.star --o PS_tmp.mrcs --avg_ampl2_ali";
+		else
+			command = "relion_image_handler --i ./PS_tmp.star --o PS_tmp.mrcs --avg_phase_ali";
+		res = system(command.c_str());
+		command = "relion_display  --i PS_tmp.mrcs --scale " + floatToString(ori_scale);
+		command += " --sigma_contrast " + floatToString(sigma_contrast);
+		command += " --black " + floatToString(minval);
+		command += " --white " + floatToString(maxval);
+		switch (colour_scheme)
+		{
+			case (BLACKGREYREDSCALE): { command += " --colour_fire"; break; }
+			case (BLUEGREYWHITESCALE): { command += " --colour_ice"; break; }
+			case (BLUEGREYREDSCALE): { command += " --colour_fire-n-ice"; break; }
+			case (RAINBOWSCALE): { command += " --colour_rainbow"; break; }
+			case (CYANBLACKYELLOWSCALE): { command += " --colour_difference"; break; }
+		}
+		// send job in the background
+		command += " &";
+		res = system(command.c_str());
+		command = "rm -f ./PS_tmp.star";
+		res = system(command.c_str());
 	}
 	else
 		std::cout <<" No classes selected. First select one or more classes..." << std::endl;
