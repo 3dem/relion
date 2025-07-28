@@ -827,6 +827,8 @@ class image_handler_parameters
    		if (verb > 0)
    			init_progress_bar(MD.numberOfObjects());
 
+		RFLOAT PS_angpix = -1.0;
+
 		bool do_md_out = false;
    		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 		{
@@ -852,6 +854,8 @@ class image_handler_parameters
 				Image<RFLOAT> Ihead;
 				Ihead.read(fn_img, false);
 				Ihead.getDimensions(xdim, ydim, zdim, ndim);
+				if(do_avg_ampl2_ali || do_avg_phase_ali)
+					PS_angpix = Ihead.samplingRateX();
 
 				if (zdim > 1 && (do_add_edge || do_flipXY || do_flipmXY))
 					REPORT_ERROR("ERROR: you cannot perform 2D operations like --add_edge, --flipXY or --flipmXY on 3D maps. If you intended to operate on a movie, use .mrcs extensions for stacks!");
@@ -1166,6 +1170,7 @@ class image_handler_parameters
 			} else {
 				Iout() = avg_ampl;
 			}
+			Iout.setSamplingRateInHeader(PS_angpix);
 			Iout.write(fn_out, -1, false, WRITE_OVERWRITE, write_float16 ? Float16: Float);
 		}
 
