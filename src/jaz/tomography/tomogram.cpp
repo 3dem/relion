@@ -41,7 +41,7 @@ void Tomogram::setProjectionMatrix(int f, RFLOAT xtilt, RFLOAT ytilt, RFLOAT zro
     d4Matrix s0, s1, s2, r0, r1, r2;
 
     // Get specimen center
-    t3Vector<double> specimen_center((double)int(w0/2), (double)int(h0/2), (double)int(d0/2) );
+    t3Vector<double> specimen_center((w0/2.0), (h0/2.0), (d0/2.0) );
     s0 = s0.translation(-specimen_center);
 
     // Get specimen shifts (in pixels)
