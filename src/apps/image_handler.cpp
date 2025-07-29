@@ -957,32 +957,38 @@ class image_handler_parameters
 				Iin.read(fn_img);
 
 				MultidimArray<Complex> FT;
+				MultidimArray<RFLOAT > out;
 				if (do_avg_ampl2_ali || do_avg_phase_ali)
 				{
 					RFLOAT xoff = 0.;
 					RFLOAT yoff = 0.;
 					RFLOAT psi = 0.;
-					MD.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
-					MD.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+					MD.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff);
+					MD.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff);
 					MD.getValue(EMDL_ORIENT_PSI, psi);
 					// Apply the actual transformation
 					Matrix2D<RFLOAT> A;
 					rotation2DMatrix(psi, A);
-					MAT_ELEM(A,0, 2) = xoff;
-					MAT_ELEM(A,1, 2) = yoff;
+					MAT_ELEM(A, 0, 2) = COSD(psi) * xoff - SIND(psi) * yoff;
+					MAT_ELEM(A, 1, 2) = COSD(psi) * yoff + SIND(psi) * xoff;
 					selfApplyGeometry(Iin(), A, IS_NOT_INV, DONT_WRAP);
-
-					MultidimArray<RFLOAT > out;
+					transformer.clear();
+					FT.clear();
 					out.clear();
 					CenterFFTbySign(Iin());
 					padAndFloat2DMap(Iin(), out, PS_padding_factor);
+					if ( (XSIZE(out) != YSIZE(out)) || (ZSIZE(out) > 1) || (NSIZE(out) > 1) )
+						REPORT_ERROR("fftw.cpp::amplitudeOrPhaseMap(): ERROR MultidimArray should be 2D square.");
 					long int XYdim = XSIZE(out);
 					transformer.FourierTransform(out, FT, false);
+					CenterFFTbySign(FT);
 					out.setXmippOrigin();
 					out.initZeros(XYdim, XYdim);
 				}
 				else
 				{
+					transformer.clear();
+					FT.clear();
 					transformer.FourierTransform(Iin(), FT);
 				}
 
@@ -1113,7 +1119,7 @@ class image_handler_parameters
 		{
 			if(do_avg_phase_ali)
 			{
-				avg_phase /= 180. * (RFLOAT)i_img / PI;
+				avg_phase /= (PI*(RFLOAT)i_img)/180.;
 			}
 			else
 			{
@@ -1122,28 +1128,28 @@ class image_handler_parameters
 			if(do_avg_ampl2_ali || do_avg_phase_ali)
 			{
 				//set the output to squared dimensions N*padding_factor x N*padding_factor instead of the half-size FFTW N*padding_factor x ((N*padding_factor)/2+1) and copy/complete the missing half coefficients
-				Iout().resize(PS_padding_factor*ydim,PS_padding_factor*xdim);
+				Iout().resize(PS_padding_factor*ydim, PS_padding_factor*xdim);
 			}
 			if(do_avg_phase_ali)
 			{
-				avg_phase.resize(PS_padding_factor*ydim,PS_padding_factor*xdim);
+				avg_phase.resize(zdim, PS_padding_factor*ydim, PS_padding_factor*xdim);
 				for (int i = 0; i < YSIZE(avg_phase); i++)
 				{
 					for (int j = 0; j < XSIZE(avg_phase)/2; j++)
 					{
-						DIRECT_A2D_ELEM(avg_phase, YSIZE(avg_phase)-1-i, XSIZE(avg_phase)-1-j) =  DIRECT_A2D_ELEM(avg_phase, i, j);
+						DIRECT_A2D_ELEM(avg_phase, YSIZE(avg_phase)-i, XSIZE(avg_phase)-j) =  DIRECT_A2D_ELEM(avg_phase, i, j);
 					}
 				}
 				Iout() = avg_phase;
 			}
 			else if(do_avg_ampl2_ali)
 			{
-				avg_ampl.resize(PS_padding_factor*ydim,PS_padding_factor*xdim);
+				avg_ampl.resize(zdim, PS_padding_factor*ydim, PS_padding_factor*xdim);
 				for (int i = 0; i < YSIZE(avg_ampl); i++)
 				{
 					for (int j = 0; j < XSIZE(avg_ampl)/2; j++)
 					{
-						DIRECT_A2D_ELEM(avg_ampl, YSIZE(avg_ampl)-1-i, XSIZE(avg_ampl)-1-j) =  DIRECT_A2D_ELEM(avg_ampl, i, j);
+						DIRECT_A2D_ELEM(avg_ampl, YSIZE(avg_ampl)-i, XSIZE(avg_ampl)-j) =  DIRECT_A2D_ELEM(avg_ampl, i, j);
 					}
 				}
 				//Get maximum value for PS log-normalization

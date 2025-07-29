@@ -145,7 +145,7 @@ public:
 	               RFLOAT _scale, RFLOAT _ori_scale, int _ncol, long int max_nr_images = -1, RFLOAT lowpass = -1.0 , RFLOAT highpass = -1.0,
 	               bool do_class = false, MetaDataTable *MDdata = NULL,
 	               int _nr_regroup = -1, bool do_recenter = false, bool _is_data = false, MetaDataTable *MDgroups = NULL,
-	               bool do_allow_save = false, FileName fn_selected_imgs="", FileName fn_selected_parts="", int max_nr_parts_per_class = -1);
+	               bool do_allow_save = false, FileName fn_selected_imgs="", FileName fn_selected_parts="", int max_nr_parts_per_class = -1, RFLOAT angpix = -1.);
 	int fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale);
 	int fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale, RFLOAT _coord_scale,
 	                           int _particle_radius, bool do_startend = false, FileName _fn_coords = "",
@@ -237,6 +237,9 @@ public:
 
 	// Sjors 12mar18: read/write information-containing backup_selection for Liyi's project
 	MetaDataTable MDbackup;
+
+	// Pixel size to calculate lowpass filter in Angstroms and translations in apply_orient
+	RFLOAT angpix;
 
 	// Scale for showing the original image
 	RFLOAT ori_scale;

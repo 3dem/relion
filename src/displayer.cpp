@@ -301,7 +301,7 @@ int DisplayBox::unSelect()
 int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, ObservationModel *obsModel, EMDLabel display_label, EMDLabel text_label, bool _do_read_whole_stacks, bool _do_apply_orient,
                                   RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale, RFLOAT _ori_scale, int _ncol, long int max_nr_images, RFLOAT lowpass, RFLOAT highpass, bool _do_class,
                                   MetaDataTable *_MDdata, int _nr_regroup, bool _do_recenter,  bool _is_data, MetaDataTable *_MDgroups,
-                                  bool do_allow_save, FileName fn_selected_imgs, FileName fn_selected_parts, int max_nr_parts_per_class)
+                                  bool do_allow_save, FileName fn_selected_imgs, FileName fn_selected_parts, int max_nr_parts_per_class, RFLOAT angpix)
 {
 	// Scroll bars
 	Fl_Scroll scroll(0, 0, w(), h());
@@ -339,6 +339,7 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, Observat
 		canvas.obsModel = obsModel;
 		canvas.text_label = text_label;
 		canvas.metadata_table_name = MDin.getName();
+		canvas.angpix = angpix;
 		if (canvas.nr_regroups > 0)
 			canvas.MDgroups = _MDgroups;
 		if (_do_class)
@@ -1455,11 +1456,13 @@ void multiViewerCanvas::showSelectedFourierAmplitudesOrPhases(int save_selected,
 		FileName fn = "./PS_tmp.star";
 		MDpart.write(fn);
 		if(ampl)
-			command = "relion_image_handler --i ./PS_tmp.star --o PS_tmp.mrcs --avg_ampl2_ali";
+			command = "relion_image_handler --i ./PS_tmp.star --o ./PS_tmp_Apix_" + floatToString(angpix) + ".mrc --avg_ampl2_ali";
 		else
-			command = "relion_image_handler --i ./PS_tmp.star --o PS_tmp.mrcs --avg_phase_ali";
+			command = "relion_image_handler --i ./PS_tmp.star --o ./PS_tmp_Apix_" + floatToString(angpix) + ".mrc --avg_phase_ali";
 		res = system(command.c_str());
-		command = "relion_display  --i PS_tmp.mrcs --scale " + floatToString(ori_scale);
+		command = "relion_image_handler --i ./PS_tmp_Apix_" + floatToString(angpix) + ".mrc --o ./PS_tmp_Apix_" + floatToString(angpix) + ".png";
+		res = system(command.c_str());
+		command = "relion_display  --i PS_tmp_Apix_" + floatToString(angpix) + ".mrc --scale " + floatToString(ori_scale);
 		command += " --sigma_contrast " + floatToString(sigma_contrast);
 		command += " --black " + floatToString(minval);
 		command += " --white " + floatToString(maxval);
@@ -2782,6 +2785,17 @@ void Displayer::initialise()
 			std::cout <<" Warning: cannot find model.star file for " << fn_in << " needed for regrouping..." << std::endl;
 
 	}
+	if (fn_in.isStarFile() && angpix <= 0.)
+	{
+		if (MDdata.containsLabel(EMDL_IMAGE_OPTICS_GROUP))
+		{
+			std::cout <<" Warning: setting angpix from 1st optics group..." << std::endl;
+			int optics_group;
+			MDdata.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group, 0);
+			optics_group--;
+			obsModel.opticsMdt.getValue(EMDL_IMAGE_PIXEL_SIZE, angpix, optics_group);
+		}
+	}
 
 	// Check if input STAR file contains pixel-size information
 	if (!do_class && (do_apply_orient || lowpass > 0 || highpass > 0))
@@ -2813,7 +2827,6 @@ void Displayer::initialise()
 		}
 	}
 
-
 	if (show_fourier_amplitudes && show_fourier_phase_angles)
 		REPORT_ERROR("Displayer::initialise ERROR: cannot display Fourier amplitudes and phase angles at the same time!");
 	if (show_fourier_amplitudes || show_fourier_phase_angles)
@@ -2827,7 +2840,6 @@ void Displayer::initialise()
 		if ( (ZSIZE(img()) > 1) || (NSIZE(img()) > 1) )
 			REPORT_ERROR("Displayer::initialise ERROR: cannot display Fourier maps for 3D images or stacks!");
 	}
-
 }
 
 int Displayer::runGui()
@@ -3043,7 +3055,7 @@ void Displayer::run()
 		basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
 		win.fillCanvas(MULTIVIEWER, MDin, &obsModel, display_label, text_label, do_read_whole_stacks, do_apply_orient, minval, maxval, sigma_contrast, scale, ori_scale, ncol,
 				max_nr_images,  lowpass, highpass, do_class, &MDdata, nr_regroups, do_recenter, fn_in.contains("_data.star"), &MDgroups,
-				do_allow_save, fn_selected_imgs, fn_selected_parts, max_nr_parts_per_class);
+				do_allow_save, fn_selected_imgs, fn_selected_parts, max_nr_parts_per_class, angpix);
 	}
 	else
 	{
