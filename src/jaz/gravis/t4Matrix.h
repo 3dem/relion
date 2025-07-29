@@ -133,7 +133,7 @@ namespace gravis
         return scale(t3Vector<T>(s,s,s));
       }
       static t4Matrix rotation(const t3Vector<T>& u, const t3Vector<T>& v);
-      static t4Matrix rotation(const t3Vector<T>& axis, float angle);
+      static t4Matrix rotation(const t3Vector<T>& axis, T angle);
       static t4Matrix rotationX(T angle);
       static t4Matrix rotationY(T angle);
       static t4Matrix rotationZ(T angle);
@@ -563,7 +563,7 @@ namespace gravis
 
   /*! \brief Return a matrix that rotates by specified angle (in degrees) around specified axis. */
   template <class T> inline
-  t4Matrix<T> t4Matrix<T>::rotation(const t3Vector<T>& axis, float angle)
+  t4Matrix<T> t4Matrix<T>::rotation(const t3Vector<T>& axis, T angle)
   {
     t4Matrix<T> out;
     out.copy(t3Matrix<T>::rotation(axis, angle));

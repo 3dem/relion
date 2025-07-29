@@ -11,6 +11,7 @@
 
 #include <iostream>
 #include <iomanip>
+#include "src/macros.h"
 #include "t3Vector.h"
 #include "tRGB.h"
 #include "private/tDeterminants.h"
@@ -132,7 +133,7 @@ namespace gravis
         return scale(t3Vector<T>(s,s,s));
       }
       static t3Matrix rotation(const t3Vector<T>& u, const t3Vector<T>& v);
-      static t3Matrix rotation(const t3Vector<T>& axis, float angle);
+      static t3Matrix rotation(const t3Vector<T>& axis, T angle);
       static t3Matrix rotationX(T angle);
       static t3Matrix rotationY(T angle);
       static t3Matrix rotationZ(T angle);
@@ -474,14 +475,14 @@ namespace gravis
 
   /*! \brief Return a matrix that rotates by specified angle (in degrees) around specified axis. */
   template <class T> inline
-  t3Matrix<T> t3Matrix<T>::rotation(const t3Vector<T>& axis, float angle)
+  t3Matrix<T> t3Matrix<T>::rotation(const t3Vector<T>& axis, T angle)
   {
     // formula copied form GL specification
 
     t3Vector<T> n(axis);
     n.normalize();
     // convert to radians
-    angle *= (float)(3.1415927/180.);
+    angle *= (PI / 180.0);
 
     t3Matrix<T> s(0, -n.z, n.y,
                   n.z, 0, -n.x,
