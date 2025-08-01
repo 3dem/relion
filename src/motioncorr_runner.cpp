@@ -519,6 +519,7 @@ void MotioncorrRunner::run()
 
 		Micrograph mic(fn_micrographs[imic], fn_gain_reference, bin_factor, eer_upsampling, eer_grouping);
 
+
         // Set per-micrograph pre_exposure
         mic.pre_exposure = pre_exposure + pre_exposure_micrographs[imic];
 

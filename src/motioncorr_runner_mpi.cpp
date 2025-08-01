@@ -68,7 +68,13 @@ void MotioncorrRunnerMpi::run()
 			MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
 
 		Micrograph mic(fn_micrographs[imic], fn_gain_reference, bin_factor, eer_upsampling, eer_grouping);
-        mic.pre_exposure = pre_exposure + pre_exposure_micrographs[imic];
+        
+		// if (pre_exposure_micrographs.size() == imic)
+    		// mic.pre_exposure = pre_exposure + pre_exposure_micrographs[imic];
+		// else
+    		// mic.pre_exposure = pre_exposure;
+		
+		mic.pre_exposure = pre_exposure + pre_exposure_micrographs[imic];
 
         // Get angpix and voltage from the optics groups:
 		obsModel.opticsMdt.getValue(EMDL_CTF_VOLTAGE, voltage, optics_group_micrographs[imic]-1);

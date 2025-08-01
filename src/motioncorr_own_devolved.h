@@ -32,7 +32,7 @@ public:
      */
     void read(int argc, char **argv);
 
-    void initialise() {return;};
+    // void initialise() {return;};
     void addClArgs() override;
 
     // Parallelized run function
