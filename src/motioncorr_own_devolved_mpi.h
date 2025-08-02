@@ -22,27 +22,25 @@
 #define MOTIONCORR_OWN_DEVOLVED_MPI_H_
 
 #include "src/motioncorr_runner_mpi.h"
-#include "src/motioncorr_own_devolved.h"
+// #include "src/motioncorr_own_devolved.h"
 #include "src/parallel.h"
 #include "src/mpi.h"
 
-class MotioncorrOwnDevolvedMpi: public MotioncorrOwnDevolved
+class MotioncorrOwnDevolvedMpi: public MotioncorrRunnerMpi
 {
-private:
-	MpiNode *node;
+// private:
+// 	MpiNode *node;
 
 public:
     /** Read
      * This could take care of mpi-parallelisation-dependent variables
      */
-    void read(int argc, char **argv);
+    // void read(int argc, char **argv);
 
     void addClArgs() override;
 
     // Parallelized run function
     void run();
-
-    FileName getOutputFileNames(FileName fn_mic, bool continue_even_odd = false) override;
 
     FileName movie_path;
     FileName micrograph_path;

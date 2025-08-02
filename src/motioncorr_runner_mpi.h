@@ -27,7 +27,7 @@
 
 class MotioncorrRunnerMpi: public MotioncorrRunner
 {
-private:
+protected:
 	MpiNode *node;
 
 public:
