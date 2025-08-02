@@ -19,21 +19,6 @@
  ***************************************************************************/
 #include "src/motioncorr_own_devolved_mpi.h"
 
-// void MotioncorrOwnDevolvedMpi::read(int argc, char **argv)
-// {
-//     // Define a new MpiNode
-// 	node = new MpiNode(argc, argv);
-
-// 	// First read in non-parallelisation-dependent variables
-// 	MotioncorrRunner::read(argc, argv);
-
-// 	// Don't put any output to screen for mpi followers
-// 	verb = (node->isLeader()) ? 1 : 0;
-
-// 	// Print out MPI info
-// 	printMpiNodesMachineNames(*node);
-// }
-
 void MotioncorrOwnDevolvedMpi::addClArgs()
 {
 	int path_section =  parser.addSection("In/out paths options");
@@ -85,7 +70,10 @@ void MotioncorrOwnDevolvedMpi::run()
 	    	fromStarFile = true;
 	    }
         
-        mic.pre_exposure = pre_exposure + pre_exposure_micrographs[imic];
+        if (pre_exposure_micrographs.size() == imic)
+    		mic.pre_exposure = pre_exposure + pre_exposure_micrographs[imic];
+		else
+    		mic.pre_exposure = pre_exposure;
 
         // Get angpix and voltage from the optics groups:
 		obsModel.opticsMdt.getValue(EMDL_CTF_VOLTAGE, voltage, optics_group_micrographs[imic]-1);
@@ -104,27 +92,3 @@ void MotioncorrOwnDevolvedMpi::run()
     if (node->isLeader() && !fromStarFile)
         generateLogFilePDFAndWriteStarFiles();
 }
-
-
-// FileName MotioncorrOwnDevolvedMpi::getOutputFileNames(FileName fn_mic, bool continue_even_odd)
-// {
-// 	// If there are any dots in the filename, replace them by underscores
-// 	FileName fn_root = fn_mic.withoutExtension();
-
-// 	size_t pos = 0;
-// 	while (true)
-// 	{
-// 		pos = fn_root.find(".");
-// 		if (pos == std::string::npos)
-// 			break;
-// 		fn_root.replace(pos, 1, "_");
-// 	}
-// 	if (continue_even_odd)
-// 	{
-// 		return fn_out + fn_root + "_EVN.mrc";
-// 	}
-// 	else
-// 	{
-// 	return fn_out + fn_root + ".mrc";
-// 	}
-// }

@@ -296,6 +296,7 @@ void MotioncorrRunner::initialise()
 		optics_group_micrographs.resize(fn_in.size(), 1);
 		obsModel.opticsMdt.clear();
 		obsModel.opticsMdt.addObject();
+		pre_exposure_micrographs.assign(fn_micrographs.size(), 0.0);
 	}
 
 	// Make sure obsModel.opticsMdt has all the necessary information
