@@ -48,6 +48,8 @@ public:
     FileName micrograph_path;
     FileName motion_correction_star_path;
 
+    // Filenames of the STAR files containing pre-calculated shifts
+    std::vector<FileName> fn_stars_all;
 };
 
 #endif /* MOTIONCORR_RUNNER_MPI_H_ */

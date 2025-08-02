@@ -34,16 +34,11 @@ void MotioncorrOwnDevolvedMpi::read(int argc, char **argv)
 
 	// Print out MPI info
 	printMpiNodesMachineNames(*node);
-
-    // for (int i = 1; i < argc; ++i) {
-        // std::cout << "Arg " << i << ": " << argv[i] << '\n';
-    // }
 }
 
 void MotioncorrOwnDevolvedMpi::addClArgs()
 {
 	int path_section =  parser.addSection("In/out paths options");
-	// movie_path = parser.getOption("--in_movie", "Path to star file containing input movie(s)");
     micrograph_path = parser.getOption("--out_mic", "Output micrograph(s) path");
 	motion_correction_star_path = parser.getOption("--mc_star", "Path to star file containing motion correction model information from a previous run", "");
 	MotioncorrRunner::addClArgs();
@@ -53,16 +48,22 @@ void MotioncorrOwnDevolvedMpi::run()
 {
     prepareGainReference(node->isLeader());
 
-    // DL: Initialise MDTable:
-    MetaDataTable MDout;
+    bool fromStarFile = false;
 
-    // DL: Set the table's name (data_particles)
-    MDout.setName("particles");
-    // DL: Specify the table's label (Column)
-    EMDLabel mylabel = EMDL_BODY_STAR_FILE;
+    if (motion_correction_star_path != "") 
+    {
+        MetaDataTable MDin;
+        MDin.read(motion_correction_star_path, "micrographs");
+        
+        FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
+        {
+            FileName fn_stars;
+            MDin.getValue(EMDL_MICROGRAPH_METADATA_NAME, fn_stars);
 
-    // DL: Initialise a filehandler to stream data to
-    std::ofstream  fh;
+            fn_stars_all.push_back(fn_stars);
+        }
+    }
+    
     
 	MPI_Barrier(MPI_COMM_WORLD); // wait for the leader to write the gain reference
 
@@ -71,16 +72,22 @@ void MotioncorrOwnDevolvedMpi::run()
 	divide_equally(fn_micrographs.size(), node->size, node->rank, my_first_micrograph, my_last_micrograph);
 	my_nr_micrographs = my_last_micrograph - my_first_micrograph + 1;
 
-    std::cout << "fn_micrographs" << std::endl;
     for (long int imic = my_first_micrograph; imic <= my_last_micrograph; imic++)
 	{
-        std::cout << "Working On: " << fn_micrographs[imic] << std::endl;
-
-		// Abort through the pipeline_control system
+        // Abort through the pipeline_control system
 		if (pipeline_control_check_abort_job())
 			MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
 
         Micrograph mic(fn_micrographs[imic], fn_gain_reference, bin_factor, eer_upsampling, eer_grouping);
+        if (motion_correction_star_path != "") 
+        {
+            FileName shifts_star_path = fn_stars_all[imic];
+    		Micrograph mic2(shifts_star_path, "", 1);
+
+            mic = mic2;
+	    	fromStarFile = true;
+	    }
+        
         mic.pre_exposure = pre_exposure + pre_exposure_micrographs[imic];
 
         // Get angpix and voltage from the optics groups:
@@ -88,45 +95,17 @@ void MotioncorrOwnDevolvedMpi::run()
 		obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix, optics_group_micrographs[imic]-1);
 
         bool result;
-        result = executeOwnMotionCorrection(mic);
+        result = executeOwnMotionCorrection(mic, fromStarFile);
 
-        std::cout << "Finished Working On " << fn_micrographs[imic] << std::endl;
-        std::cout << mic.getMovieFilename() << " " << getOutputFileNames(mic.getMovieFilename()) << std::endl;
-
-        if (result)  {
+        if (result && !fromStarFile)
 			saveModel(mic);
-
-            // DL: Get the fn_avg starfile's name
-            FileName fn_avg = getOutputFileNames(mic.getMovieFilename());
-            fn_avg = fn_avg.withoutExtension() + ".star";
-
-            std::cout << "fn_avg: " << fn_avg << std::endl;
-
-            // DL: Add the starfile name to the MDTable
-            MDout.addObject();
-            MDout.setValue(mylabel, fn_avg);
-        }
-
-        std::cout << "Saved" << std::endl;
-
 	}
 
     MPI_Barrier(MPI_COMM_WORLD);
 
     // Only the leader writes the joined result file
-    if (node->isLeader())
-    {
-        // DL: Write out the MDTable as .star file
-        FileName outstar = "frames.star";
-        //DL: micrograph_path+outstar
-        fh.open(outstar.c_str(), std::ios::out);
-
-        // DL: Debug, check what outpath for the master starfile is
-        std::cout << micrograph_path << " out " << outstar << std::endl;
-
-        MDout.write(fh);
-        fh.close();
-    }
+    if (node->isLeader() && !fromStarFile)
+        generateLogFilePDFAndWriteStarFiles();
 }
 
 
