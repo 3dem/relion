@@ -22,8 +22,6 @@
 #define MOTIONCORR_OWN_DEVOLVED_MPI_H_
 
 #include "src/motioncorr_runner_mpi.h"
-#include "src/parallel.h"
-#include "src/mpi.h"
 
 class MotioncorrOwnDevolvedMpi: public MotioncorrRunnerMpi
 {
