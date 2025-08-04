@@ -22,20 +22,16 @@
 #define MOTIONCORR_OWN_DEVOLVED_MPI_H_
 
 #include "src/motioncorr_runner_mpi.h"
-// #include "src/motioncorr_own_devolved.h"
 #include "src/parallel.h"
 #include "src/mpi.h"
 
 class MotioncorrOwnDevolvedMpi: public MotioncorrRunnerMpi
 {
-// private:
-// 	MpiNode *node;
 
 public:
     /** Read
      * This could take care of mpi-parallelisation-dependent variables
      */
-    // void read(int argc, char **argv);
 
     void addClArgs() override;
 
