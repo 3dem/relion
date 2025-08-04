@@ -2747,8 +2747,8 @@ void JobWindow::initialiseTomoReconstructTomogramsWindow()
 
     current_y += STEPY /2 ;
 
-    place ("tiltangle_offset");
-    place("tomo_name", TOGGLE_REACTIVATE);
+    place ("tiltangle_offset", TOGGLE_DEACTIVATE);
+    place("tomo_name");
 
     current_y += STEPY /2 ;
 
@@ -2883,10 +2883,6 @@ void JobWindow::initialiseTomoSubtomoWindow()
 
     place("do_stack2d", TOGGLE_DEACTIVATE);
     place("do_float16", TOGGLE_DEACTIVATE);
-
-    current_y += STEPY /2 ;
-
-    place("do_real_subtomo", TOGGLE_DEACTIVATE);
 
 	tab2->end();
 }

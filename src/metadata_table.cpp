@@ -1822,6 +1822,9 @@ void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 	MDboth.clear();
 	MDonly1.clear();
 	MDonly2.clear();
+    MDboth.setName(MD1.getName());
+    MDonly1.setName(MD1.getName());
+    MDonly2.setName(MD1.getName());
 
 	std::string mystr1, mystr2;
 	long int myint1, myint2;
@@ -2036,6 +2039,7 @@ MetaDataTable subsetMetaDataTable(MetaDataTable &MDin, EMDLabel label, RFLOAT mi
 		REPORT_ERROR("subsetMetadataTable ERROR: input MetaDataTable does not contain label: " +  EMDL::label2Str(label));
 
 	MetaDataTable MDout;
+    MDout.setName(MDin.getName());
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
 	{
 		bool do_include = false;
@@ -2186,7 +2190,9 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
 
 
 	MetaDataTable MDout, MDremoved;
-	long n_removed = 0;
+    MDout.setName(MDin.getName());
+    MDremoved.setName(MDin.getName());
+    long n_removed = 0;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
 	{
 		if (valid[current_object])

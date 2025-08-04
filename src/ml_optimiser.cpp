@@ -2035,7 +2035,7 @@ void MlOptimiser::initialiseGeneral(int rank)
     {
         blush_args += " --gpu ";
         for (auto &d : gpuDevices)
-            blush_args += gpu_ids + ",";
+            blush_args += integerToString(d) + ",";
         blush_args += " ";
     }
     else
