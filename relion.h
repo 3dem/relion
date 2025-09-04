@@ -3,7 +3,6 @@
 
 //This is a main header - it includes everything else.
 
-
 #include <external/Healpix_2.15a/arr.h>
 #include <external/Healpix_2.15a/cxxutils.h>
 #include <external/Healpix_2.15a/datatypes.h>
