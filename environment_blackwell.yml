@@ -1,0 +1,35 @@
+name: relion-5.0
+channels:
+  - conda-forge
+dependencies:
+  - pip
+  - python=3.10
+  - setuptools=59.5.0
+  - pip:
+      - --extra-index-url https://download.pytorch.org/whl/cu128
+      - torch==2.7.1+cu128
+      - torchvision==0.22.1+cu128
+      - tqdm==4.65.0
+      - mrcfile==1.4.3
+      - starfile>=0.5.6
+      - loguru==0.7.0
+      - scikit-learn==1.3.0
+      - umap-learn==0.5.3
+      - matplotlib==3.7.2
+      - morphosamplers==0.0.13
+      - pydantic==1.10.18
+      - napari[all]==0.4.18
+      - tsnecuda==3.0.1
+      - PyQt5==5.15.9
+      - typer==0.9.0
+      - biopython==1.81
+      - fastcluster==1.2.6
+      - seaborn==0.12.2
+      - dill==0.3.7
+      - numpy==1.26.1
+      - scipy==1.11.2
+      - git+https://github.com/3dem/relion-classranker
+      - git+https://github.com/3dem/relion-blush
+      - git+https://github.com/3dem/DynaMight
+      - git+https://github.com/3dem/topaz
+      - git+https://github.com/3dem/model-angelo
