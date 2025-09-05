@@ -3,6 +3,7 @@
 # Because gcc is compliant with a float128 type, fftw has become as well. nvcc is NOT.
 # So -D__INTEL_COMPILER just manages to avoid compiling float128-targets (see fftw3.h, for instance).
 # Add -G to allow cuda-gdb to break inside kernels.
+
 if(CUDA)
     set(EXTRA_NVCC_FLAGS "-D__INTEL_COMPILER --default-stream per-thread --std=c++17")
     set(RELION_NVCC_FLAGS "${CUDARCH} ${WARN_DBL} ${EXTRA_NVCC_FLAGS}" CACHE STRING "" FORCE)
@@ -14,6 +15,7 @@ elseif (HIP)
     endif()
     set(RELION_HIPCC_FLAGS "${EXTRA_HIPCC_FLAGS}" CACHE STRING "Compiler flags for HIP" FORCE)
 endif()
+
 # message(STATUS "RELION_NVCC_FLAGS: ${RELION_NVCC_FLAGS}")
 # message(STATUS "RELION_HIPCC_FLAGS: ${RELION_HIPCC_FLAGS}")
 # --------------------------
@@ -43,7 +45,7 @@ set(CMAKE_C_FLAGS_DEBUG          "${CMAKE_C_FLAGS_DEBUG} ${RELION_FLAGS_DEBUG}")
 set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} ${RELION_LINKER_FLAGS_DEBUG}")
 
 if(CUDA)
-    set(CUDA_NVCC_FLAGS_DEBUG    "${RELION_NVCC_FLAGS_DEBUG}" CACHE STRING "")
+    set(CUDA_NVCC_FLAGS_DEBUG    "${RELION_NVCC_FLAGS_DEBUG}" CACHE STRING "" FORCE)
 elseif(HIP)
     set(CMAKE_CXX_FLAGS_DEBUG    "${CMAKE_CXX_FLAGS_DEBUG} ${RELION_HIPCC_FLAGS_DEBUG}")
 endif()
@@ -62,9 +64,6 @@ endif()
 # message(STATUS "CUDA_NVCC_FLAGS_DEBUG : ${CUDA_NVCC_FLAGS_DEBUG}")
 # message(STATUS "CMAKE_CXX_FLAGS_DEBUG : ${CMAKE_CXX_FLAGS_DEBUG}")
 #--------------------------------------------------------------------
-
-
-
 
 # --------------------------
 #        RELWITHDEBINFO BUILD
@@ -85,7 +84,7 @@ set(CMAKE_CXX_FLAGS_RELWITHDEBINFO        "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} ${R
 set(CMAKE_C_FLAGS_RELWITHDEBINFO          "${CMAKE_C_FLAGS_RELWITHDEBINFO} ${RELION_FLAGS_RELWITHDEBINFO}")
 set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO "${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO} ${RELION_LINKER_FLAGS_RELWITHDEBINFO}")
 if(CUDA)
-    set(CUDA_NVCC_FLAGS_RELWITHDEBINFO        "${RELION_NVCC_FLAGS_RELWITHDEBINFO}" CACHE STRING "")
+    set(CUDA_NVCC_FLAGS_RELWITHDEBINFO        "${RELION_NVCC_FLAGS_RELWITHDEBINFO}" CACHE STRING "" FORCE)
     # -- Add preprocessor defintions ------------------------------------
     set(RELION_DEFINITIONS_RELWITHDEBINFO "-DDEBUG_CUDA")
     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} ${RELION_DEFINITIONS_RELWITHDEBINFO}")
@@ -96,15 +95,11 @@ elseif(HIP)
     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} ${RELION_DEFINITIONS_RELWITHDEBINFO}")
 endif()
 
-
 # message(STATUS "Set the extra flags for RELWITHDEBINFO build type")
 # message(STATUS "RELION_NVCC_FLAGS_RELWITHDEBINFO : ${RELION_NVCC_FLAGS_RELWITHDEBINFO}")
 # message(STATUS "CUDA_NVCC_FLAGS_RELWITHDEBINFO : ${CUDA_NVCC_FLAGS_RELWITHDEBINFO}")
 # message(STATUS "CMAKE_CXX_FLAGS_RELWITHDEBINFO : ${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
 #--------------------------------------------------------------------
-
-
-
 
 # --------------------------
 #       Release BUILD
@@ -137,7 +132,7 @@ set(CMAKE_CXX_FLAGS_RELEASE        "${CMAKE_CXX_FLAGS_RELEASE} ${RELION_FLAGS_RE
 set(CMAKE_C_FLAGS_RELEASE          "${CMAKE_C_FLAGS_RELEASE} ${RELION_FLAGS_RELEASE}")
 set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} ${RELION_LINKER_FLAGS_RELEASE}")
 if(CUDA)
-    set(CUDA_NVCC_FLAGS_RELEASE    "${RELION_NVCC_FLAGS_RELEASE}" CACHE STRING "")
+    set(CUDA_NVCC_FLAGS_RELEASE    "${RELION_NVCC_FLAGS_RELEASE}" CACHE STRING "" FORCE)
 elseif(HIP)
     set(CMAKE_CXX_FLAGS_RELEASE    "${CMAKE_CXX_FLAGS_RELEASE} ${RELION_HIPCC_FLAGS_RELEASE}")
 endif()
@@ -148,7 +143,6 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${RELION_DEFINITIONS_REL
 # message(STATUS "RELION_FLAGS_PROFILING : ${RELION_FLAGS_PROFILING}")
 # message(STATUS "CMAKE_CXX_FLAGS_RELEASE : ${CMAKE_CXX_FLAGS_RELEASE}")
 #--------------------------------------------------------------------
-
 
 if(CUDA)
     # ----------------------------------
@@ -174,7 +168,7 @@ if(CUDA)
     set(CMAKE_CXX_FLAGS_PROFILING        "${CMAKE_CXX_FLAGS_RELEASE} ${RELION_FLAGS_PROFILING}"               CACHE STRING "")
     set(CMAKE_C_FLAGS_PROFILING          "${CMAKE_C_FLAGS_RELEASE} ${RELION_FALAGS_PROFILING}"                 CACHE STRING "")
     set(CMAKE_EXE_LINKER_FLAGS_PROFILING "${CMAKE_EXE_LINKER_FLAGS_RELEASE} ${RELION_LINKER_FLAGS_PROFILING}" CACHE STRING "")
-    set(CUDA_NVCC_FLAGS_PROFILING        "${RELION_NVCC_FLAGS_PROFILING}"                                     CACHE STRING "")
+    set(CUDA_NVCC_FLAGS_PROFILING        "${RELION_NVCC_FLAGS_PROFILING}"                                     CACHE STRING "" FORCE)
 
     # -- Add preprocessor defintions ------------------------------------
     set(RELION_DEFINITIONS_PROFILING "-DCUDA_PROFILING")
@@ -211,8 +205,6 @@ elseif(HIP)
     # message(STATUS "CMAKE_CXX_FLAGS_PROFILING : ${CMAKE_CXX_FLAGS_PROFILING}")
     #--------------------------------------------------------------------
 endif()
-
-
 
 # ----------------------------------
 #       Benchmarking BUILD
