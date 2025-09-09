@@ -1700,6 +1700,19 @@ void amplitudeOrPhaseMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT >
 	out.setXmippOrigin();
 	out.initZeros(XYdim, XYdim);
 	maxr2 = (XYdim - 1) * (XYdim - 1) / 4;
+	//Get maximum value for PS log-normalization. The normalisation of the transform is undone.
+	RFLOAT val_max = -99999;
+	unsigned long int size = MULTIDIM_SIZE(out);
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Faux)
+	{
+		if ( (ip > STARTINGY(out)) && (ip < FINISHINGY(out))
+				&& (jp > STARTINGX(out)) && (jp < FINISHINGX(out))
+				&& ((ip * ip + jp * jp) < maxr2) )
+		{
+			if(FFTW2D_ELEM(Faux, ip, jp).abs()*size > val_max) val_max = FFTW2D_ELEM(Faux, ip, jp).abs()*size;
+		}
+	}
+	RFLOAT logOfMax = log10f(val_max+1.0f);
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Faux)
 	{
 		if ( (ip > STARTINGY(out)) && (ip < FINISHINGY(out))
@@ -1707,7 +1720,7 @@ void amplitudeOrPhaseMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT >
 				&& ((ip * ip + jp * jp) < maxr2) )
 		{
 			if (output_map_type == AMPLITUDE_MAP)
-				val = FFTW2D_ELEM(Faux, ip, jp).abs();
+				val = log10f(FFTW2D_ELEM(Faux, ip, jp).abs()*size+1.0f)/logOfMax;
 			else if (output_map_type == PHASE_MAP)
 				val = (180.) * (FFTW2D_ELEM(Faux, ip, jp).arg()) / PI;
 			else
