@@ -451,9 +451,9 @@ BufferedImage<T> Resampling::FourierCrop_fftwHalfStack(const BufferedImage<T>& i
 	const int w0 = (wh0 - 1) * 2;
 	const int h0 = img.ydim;
 	
-	const int w1 = w0 / factor;
+	const int w1 = (int)(w0 / factor + 0.5);
 	const int wh1 = w1/2 + 1;
-	const int h1 = h0 / factor;
+	const int h1 = (int)(h0 / factor + 0.5);
 	
 	const int fc = img.zdim;
 		
