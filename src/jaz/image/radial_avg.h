@@ -126,7 +126,7 @@ std::vector<T> RadialAvg::fftwHalf_3D_lin(const RawImage<T>& img)
 		const int r0 = (int) r;
 		const int r1 = r0 + 1;
 
-		const T val = img(x,y);
+		const T val = img(x,y,z);
 
 		const double w1 = r - r0;
 		const double w0 = 1.0 - w1;
