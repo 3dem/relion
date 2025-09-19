@@ -393,12 +393,10 @@ void ReconstructParticleProgram::processTomograms(
 						}
 					}
 				}
-
-                // If we're not doing CTF premultiplication, we may still want to invert the contrast
-                if (!do_ctf) particleStack[th] *= sign;
-
 			}
 
+			// If we're not doing CTF premultiplication, we may still want to invert the contrast
+			if (!do_ctf) particleStack[th] *= sign;
 
 			if (aberrationsCache.hasAntisymmetrical)
 			{
