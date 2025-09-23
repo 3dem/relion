@@ -21,6 +21,7 @@ dependencies:
       - tsnecuda==3.0.1
       - PyQt5==5.15.9
       - typer==0.9.0
+      - click<8.2.0
       - biopython==1.81
       - fastcluster==1.2.6
       - seaborn==0.12.2
