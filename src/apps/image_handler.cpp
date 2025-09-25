@@ -36,8 +36,8 @@ class image_handler_parameters
 {
 	public:
    	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_mask, fn_fsc, fn_adjust_power, fn_correct_ampl, fn_fourfilter, fn_cosDPhi;
-	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr, my_new_box_size;
-	bool do_add_edge, do_invert_hand, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan, do_average_all_frames, do_power, do_guinier, do_ignore_optics, do_optimise_scale_subtract, write_float16;
+	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr, my_new_box_size, PS_padding_factor;
+	bool do_add_edge, do_invert_hand, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_avg_phase_ali, do_average, do_remove_nan, do_average_all_frames, do_power, do_guinier, do_ignore_optics, do_optimise_scale_subtract, write_float16;
 	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, requested_angpix, real_angpix, force_header_angpix, lowpass, highpass, logfilter, bfactor, shift_x, shift_y, shift_z, replace_nan, randomize_at, optimise_bfactor_subtract;
 	// PNG options
 	RFLOAT minval, maxval, sigma_contrast, guinier_fit_minres, guinier_fit_maxres;
@@ -53,6 +53,7 @@ class image_handler_parameters
 	Image<RFLOAT> Iop;
 	Image<RFLOAT> Imask;
 	MultidimArray<RFLOAT> avg_ampl;
+	MultidimArray<RFLOAT> avg_phase;
 	MetaDataTable MD;
 	FourierTransformer transformer;
 	std::map<FileName, long int> n_images;
@@ -127,6 +128,8 @@ class image_handler_parameters
 		do_avg_ampl = parser.checkOption("--avg_ampl", "Calculate average amplitude spectrum for all images?");
 		do_avg_ampl2 = parser.checkOption("--avg_ampl2", "Calculate average amplitude spectrum for all images?");
 		do_avg_ampl2_ali = parser.checkOption("--avg_ampl2_ali", "Calculate average amplitude spectrum for all aligned images?");
+		do_avg_phase_ali = parser.checkOption("--avg_phase_ali", "Calculate average phases for all aligned images?");
+		PS_padding_factor = textToInteger(parser.getOption("--PS_padding_factor", "Pad images into a this factor times bigger box before the FFT", "2"));
 		do_average = parser.checkOption("--average", "Calculate average of all images (without alignment)");
 		fn_correct_ampl = parser.getOption("--correct_avg_ampl", "Correct all images with this average amplitude spectrum", "");
 		minr_ampl_corr = textToInteger(parser.getOption("--minr_ampl_corr", "Minimum radius (in Fourier pixels) to apply average amplitudes", "0"));
@@ -825,6 +828,8 @@ class image_handler_parameters
    		if (verb > 0)
    			init_progress_bar(MD.numberOfObjects());
 
+		RFLOAT PS_angpix = -1.0;
+
 		bool do_md_out = false;
    		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 		{
@@ -850,6 +855,8 @@ class image_handler_parameters
 				Image<RFLOAT> Ihead;
 				Ihead.read(fn_img, false);
 				Ihead.getDimensions(xdim, ydim, zdim, ndim);
+				if(do_avg_ampl2_ali || do_avg_phase_ali)
+					PS_angpix = Ihead.samplingRateX();
 
 				if (zdim > 1 && (do_add_edge || do_flipXY || do_flipmXY))
 					REPORT_ERROR("ERROR: you cannot perform 2D operations like --add_edge, --flipXY or --flipmXY on 3D maps. If you intended to operate on a movie, use .mrcs extensions for stacks!");
@@ -911,9 +918,13 @@ class image_handler_parameters
 					if (XSIZE(Iop()) != xdim || YSIZE(Iop()) != ydim || ZSIZE(Iop()) != zdim)
 						REPORT_ERROR("Error: operate-image is not of the correct size");
 
-				if (do_avg_ampl || do_avg_ampl2 || do_avg_ampl2_ali)
+				if (do_avg_phase_ali)
 				{
-					avg_ampl.initZeros(zdim, ydim, xdim/2+1);
+					avg_phase.initZeros(zdim, PS_padding_factor*ydim, (PS_padding_factor*xdim/2)+1);
+				}
+				else if (do_avg_ampl || do_avg_ampl2 || do_avg_ampl2_ali)
+				{
+					avg_ampl.initZeros(zdim, PS_padding_factor*ydim, (PS_padding_factor*xdim/2)+1);
 				}
 				else if (do_average || do_average_all_frames)
 				{
@@ -941,34 +952,58 @@ class image_handler_parameters
 				if (VEC_XSIZE(com) > 2) std::cout << " z " << ZZ(com);
 				std::cout << std::endl;
 			}
-			else if (do_avg_ampl || do_avg_ampl2 || do_avg_ampl2_ali)
+			else if (do_avg_ampl || do_avg_ampl2 || do_avg_ampl2_ali || do_avg_phase_ali)
 			{
 				Iin.read(fn_img);
 
-				if (do_avg_ampl2_ali)
+				MultidimArray<Complex> FT;
+				MultidimArray<RFLOAT > out;
+				if (do_avg_ampl2_ali || do_avg_phase_ali)
 				{
 					RFLOAT xoff = 0.;
 					RFLOAT yoff = 0.;
 					RFLOAT psi = 0.;
-					MD.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
-					MD.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+					MD.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff);
+					MD.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff);
 					MD.getValue(EMDL_ORIENT_PSI, psi);
 					// Apply the actual transformation
 					Matrix2D<RFLOAT> A;
 					rotation2DMatrix(psi, A);
-					MAT_ELEM(A,0, 2) = xoff;
-					MAT_ELEM(A,1, 2) = yoff;
+					MAT_ELEM(A, 0, 2) = COSD(psi) * xoff - SIND(psi) * yoff;
+					MAT_ELEM(A, 1, 2) = COSD(psi) * yoff + SIND(psi) * xoff;
 					selfApplyGeometry(Iin(), A, IS_NOT_INV, DONT_WRAP);
+					transformer.clear();
+					FT.clear();
+					out.clear();
+					CenterFFTbySign(Iin());
+					padAndFloat2DMap(Iin(), out, PS_padding_factor);
+					if ( (XSIZE(out) != YSIZE(out)) || (ZSIZE(out) > 1) || (NSIZE(out) > 1) )
+						REPORT_ERROR("fftw.cpp::amplitudeOrPhaseMap(): ERROR MultidimArray should be 2D square.");
+					long int XYdim = XSIZE(out);
+					transformer.FourierTransform(out, FT, false);
+					CenterFFTbySign(FT);
+					out.setXmippOrigin();
+					out.initZeros(XYdim, XYdim);
 				}
-
-				MultidimArray<Complex> FT;
-				transformer.FourierTransform(Iin(), FT);
+				else
+				{
+					transformer.clear();
+					FT.clear();
+					transformer.FourierTransform(Iin(), FT);
+				}
 
 				if (do_avg_ampl)
 				{
 					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(FT)
 					{
 						DIRECT_MULTIDIM_ELEM(avg_ampl, n) +=  abs(DIRECT_MULTIDIM_ELEM(FT, n));
+					}
+				}
+				else if (do_avg_phase_ali)
+				{
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(FT)
+					{
+						DIRECT_MULTIDIM_ELEM(avg_phase, n) +=  arg(DIRECT_MULTIDIM_ELEM(FT, n));
 					}
 				}
 				else if (do_avg_ampl2 || do_avg_ampl2_ali)
@@ -1080,10 +1115,67 @@ class image_handler_parameters
 		}
 
 
-		if (do_avg_ampl || do_avg_ampl2 || do_avg_ampl2_ali || do_average || do_average_all_frames)
+		if (do_avg_ampl || do_avg_ampl2 || do_avg_ampl2_ali || do_avg_phase_ali || do_average || do_average_all_frames)
 		{
-			avg_ampl /= (RFLOAT)i_img;
-			Iout() = avg_ampl;
+			if(do_avg_phase_ali)
+			{
+				avg_phase /= (PI*(RFLOAT)i_img)/180.;
+			}
+			else
+			{
+				avg_ampl /= (RFLOAT)i_img;
+			}
+			if(do_avg_ampl2_ali || do_avg_phase_ali)
+			{
+				//set the output to squared dimensions N*padding_factor x N*padding_factor instead of the half-size FFTW N*padding_factor x ((N*padding_factor)/2+1) and copy/complete the missing half coefficients
+				Iout().resize(PS_padding_factor*ydim, PS_padding_factor*xdim);
+			}
+			if(do_avg_phase_ali)
+			{
+				avg_phase.resize(zdim, PS_padding_factor*ydim, PS_padding_factor*xdim);
+				for (int i = 0; i < YSIZE(avg_phase); i++)
+				{
+					for (int j = 0; j < XSIZE(avg_phase)/2; j++)
+					{
+						DIRECT_A2D_ELEM(avg_phase, YSIZE(avg_phase)-i, XSIZE(avg_phase)-j) =  DIRECT_A2D_ELEM(avg_phase, i, j);
+					}
+				}
+				Iout() = avg_phase;
+			}
+			else if(do_avg_ampl2_ali)
+			{
+				avg_ampl.resize(zdim, PS_padding_factor*ydim, PS_padding_factor*xdim);
+				for (int i = 0; i < YSIZE(avg_ampl); i++)
+				{
+					for (int j = 0; j < XSIZE(avg_ampl)/2; j++)
+					{
+						DIRECT_A2D_ELEM(avg_ampl, YSIZE(avg_ampl)-i, XSIZE(avg_ampl)-j) =  DIRECT_A2D_ELEM(avg_ampl, i, j);
+					}
+				}
+				//Get maximum value for PS log-normalization
+				RFLOAT val_max = -99999;
+				for (int i = 0; i < YSIZE(avg_ampl); i++)
+				{
+					for (int j = 0; j < XSIZE(avg_ampl)/2; j++)
+					{
+						if(DIRECT_A2D_ELEM(avg_ampl, i, j) > val_max) val_max = DIRECT_A2D_ELEM(avg_ampl, i, j);
+					}
+				}
+				//The normalization of the FFT transform by fftw.cpp is undone here (multiplication by fftsize).
+				unsigned long int fftsize = ydim * PS_padding_factor * MULTIDIM_SIZE(avg_ampl);
+				RFLOAT logOfMax = log10f(val_max*fftsize+1.0f);
+				for (int i = 0; i < YSIZE(avg_ampl); i++)
+				{
+					for (int j = 0; j < XSIZE(avg_ampl); j++)
+					{
+						 DIRECT_A2D_ELEM(avg_ampl, i, j) = log10f(DIRECT_A2D_ELEM(avg_ampl, i, j)*fftsize+1.0f)/logOfMax;
+					}
+				}
+				Iout() = avg_ampl;
+			} else {
+				Iout() = avg_ampl;
+			}
+			Iout.setSamplingRateInHeader(PS_angpix);
 			Iout.write(fn_out, -1, false, WRITE_OVERWRITE, write_float16 ? Float16: Float);
 		}
 
