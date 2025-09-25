@@ -451,6 +451,10 @@ void MlOptimiser::parseContinue(int argc, char **argv)
     if (parser.checkOption("--no_norm", "Switch off normalisation-error correction","OLD"))
         do_norm_correction = false;
 
+    //Check for relax_symmetry option
+    std::string sym_relax_ =  parser.getOption("--relax_sym", "Symmetry to be relaxed", "");
+    sampling.fn_sym_relax = sym_relax_;
+
     int subtomogram_section = parser.addSection("Subtomogram averaging");
     normalised_subtomos = parser.checkOption("--normalised_subtomo", "Have subtomograms been multiplicity normalised? (Default=False)");
     do_skip_subtomo_correction = parser.checkOption("--skip_subtomo_multi", "Skip subtomo multiplicity correction");
