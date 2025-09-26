@@ -110,6 +110,9 @@ void CtffindRunner::initialise(bool is_leader)
 	if (use_given_ps && do_movie_thon_rings)
 		REPORT_ERROR("ERROR: You cannot enable --use_given_ps and --do_movie_thon_rings simultaneously");
 
+	if (use_given_ps && ctf_win != -1)
+		REPORT_ERROR("ERROR* You cannot enable --use_given_ps and --ctfWin simultaneously.");
+
 	if (use_given_ps)
 		do_use_without_doseweighting = false;
 
@@ -119,7 +122,7 @@ void CtffindRunner::initialise(bool is_leader)
 
 	// Set up which micrographs to estimate CTFs from
 	is_tomo = false;
-    if (fn_in.isStarFile())
+	if (fn_in.isStarFile())
 	{
 		MetaDataTable MDin;
 
