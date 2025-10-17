@@ -1,8 +1,5 @@
-cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 
-#if(POLICY CMP0048)
-#  cmake_policy(SET CMP0048 NEW)
-#endif()
 project(Relion)
 
 # Use new policy for OS X @rpath
@@ -176,15 +173,15 @@ endif()
 
 if(CUDA)
     # -----------------------------------------------------------------------------CUDA--
-    # DOC: http://www.cmake.org/cmake/help/v3.0/module/FindCUDA.html
-    FIND_PACKAGE(CUDA)
+    FIND_PACKAGE(CUDAToolkit)
+    enable_language(CUDA)
 
     # "-arch=sm_XX" alone is equal to "-arch=compute_XX -code=compute_XX,sm_XX"
     # compute_XX generates PTX; thus GPUs newer than XX can also use the binary.
     # See https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/#gpu-architecture-arch.
     set(CUDA_ARCH "" CACHE STRING "CUDA architecture to use")
     if (CUDA_ARCH STREQUAL "")
-        if (${CUDA_VERSION} VERSION_LESS "13.0") # Pascal (e.g. 1080)
+	    if (${CUDAToolkit_VERSION} VERSION_LESS "13.0") # Pascal (e.g. 1080)
             message(STATUS "Setting fallback CUDA_ARCH=50 (Pascal)")
             set(CUDARCH "-arch=sm_50")
         else() # CUDA >= 13.0 no longer supports Pascal. 75 = Turing (e.g. 2080) 
@@ -196,7 +193,7 @@ if(CUDA)
         set(CUDARCH "-arch=sm_${CUDA_ARCH}")
     endif ()
 
-    if(CUDA_FOUND)
+    if(CUDAToolkit_FOUND)
       message(STATUS "Using cuda wrapper to compile....")
       if( (NOT ${CUDA_VERSION} VERSION_LESS "7.5") AND (NOT DoublePrec_ACC) )
           message(STATUS "Cuda version is >= 7.5 and single-precision build, enable double usage warning.")
@@ -209,9 +206,9 @@ if(CUDA)
       if(CUDA)
           add_definitions(-D_CUDA_ENABLED)
       endif()
-    else(CUDA_FOUND)
+    else(CUDAToolkit_FOUND)
         message(FATAL_ERROR "CUDA enabled but unlable to locate packages...")
-    endif(CUDA_FOUND)
+    endif(CUDAToolkit_FOUND)
 elseif(HIP)
     # ------------------------------------------------------------------------------HIP--
     if (DEFINED ENV{ROCM_PATH})
@@ -675,6 +672,11 @@ message(STATUS "CMAKE_CXX_FLAGS : ${CMAKE_CXX_FLAGS}")
 #message(STATUS "MPI_C_COMPILER : ${MPI_C_COMPILER}")
 #message(STATUS "MPI_CXX_COMPILER : ${MPI_CXX_COMPILER}")
 #message(STATUS "CMAKE_EXE_LINKER_FLAGS : ${CMAKE_EXE_LINKER_FLAGS}")
+#message(STATUS "CUDAToolkit_FOUND: ${CUDAToolkit_FOUND}")
+#get_target_property(CUDART_LIB CUDA::cudart IMPORTED_LOCATION)
+#message(STATUS "CUDA::cudart location: ${CUDART_LIB}")
+#get_target_property(CUDART_INC CUDA::cudart INTERFACE_INCLUDE_DIRECTORIES)
+#message(STATUS "CUDA::cudart includes: ${CUDART_INC}")
 
 # -----------------------------------------------------------------------------TESTS--
 # Include testing flag(s) as precomiler
