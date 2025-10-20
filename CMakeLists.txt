@@ -69,12 +69,11 @@ endif()
 
 # ----------------------------------------------------------------SET CXX STANDARD--
 set(CXX_STANDARD_REQUIRED ON)
-if(SYCL)
-	set(CMAKE_CXX_STANDARD 17)
-else()
-	set(CMAKE_CXX_STANDARD 14)
-endif()
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+set(C_STANDARD_REQUIRED ON)
+set(CMAKE_C_STANDARD 99)
 
 # ------------------OPTIONS WHICH ARE NEEDED TO SET BUILD-TYPES (COMPILATION FLAGS)--
 # -------------------------------------------------------------------FURTHER OPTIONS--
@@ -174,41 +173,40 @@ endif()
 if(CUDA)
     # -----------------------------------------------------------------------------CUDA--
     FIND_PACKAGE(CUDAToolkit)
-    enable_language(CUDA)
 
-    # "-arch=sm_XX" alone is equal to "-arch=compute_XX -code=compute_XX,sm_XX"
-    # compute_XX generates PTX; thus GPUs newer than XX can also use the binary.
-    # See https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/#gpu-architecture-arch.
-    set(CUDA_ARCH "" CACHE STRING "CUDA architecture to use")
-    if (CUDA_ARCH STREQUAL "")
-	    if (${CUDAToolkit_VERSION} VERSION_LESS "13.0") # Pascal (e.g. 1080)
-            message(STATUS "Setting fallback CUDA_ARCH=50 (Pascal)")
-            set(CUDARCH "-arch=sm_50")
-        else() # CUDA >= 13.0 no longer supports Pascal. 75 = Turing (e.g. 2080) 
-            message(STATUS "Setting fallback CUDA_ARCH=75 (Turing)")
-            set(CUDARCH "-arch=sm_75")
-        endif()
-    else ()
-        message(STATUS "Using provided CUDA_ARCH=${CUDA_ARCH}")
-        set(CUDARCH "-arch=sm_${CUDA_ARCH}")
-    endif ()
+    if((CUDAToolkit_FOUND) AND ("${CUDAToolkit_VERSION}" VERSION_GREATER_EQUAL "10.0"))
+        message("-- CUDAToolkit discovered CUDA " ${CUDAToolkit_VERSION} " at " ${CUDAToolkit_BIN_DIR})
+        set(CMAKE_CUDA_STANDARD 17)
 
-    if(CUDAToolkit_FOUND)
-      message(STATUS "Using cuda wrapper to compile....")
-      if( (NOT ${CUDA_VERSION} VERSION_LESS "7.5") AND (NOT DoublePrec_ACC) )
-          message(STATUS "Cuda version is >= 7.5 and single-precision build, enable double usage warning.")
-		      set(WARN_DBL "--ptxas-options=-warn-double-usage") # cuda>=7.5
-	    elseif( ${CUDA_VERSION} VERSION_LESS "7.0")
-		      message(WARNING "Cuda version is less than 7.0, so relion will be compiled without GPU support.")
-          message(STATUS "Using non-cuda compilation....")
-		      set(CUDA OFF)
-      endif()
-      if(CUDA)
-          add_definitions(-D_CUDA_ENABLED)
-      endif()
-    else(CUDAToolkit_FOUND)
-        message(FATAL_ERROR "CUDA enabled but unlable to locate packages...")
-    endif(CUDAToolkit_FOUND)
+        # Very puzzling but `CUDAToolkit` package and `enable_language(CUDA)` use
+        # different methods to find `nvcc`. The latter does NOT respect `PATH` (`which nvcc`) and
+        # can pick up /usr/bin/nvcc. We can override this by setting `CMAKE_CUDA_COMPILER`.
+        # Another useful variable is `CMAKE_CUDA_HOST_COMPILER`.
+        set(CMAKE_CUDA_COMPILER "${CUDAToolkit_BIN_DIR}/nvcc" CACHE FILEPATH "Path to the CUDA compiler (nvcc)")
+        enable_language(CUDA)
+
+        # "-arch=sm_XX" alone is equal to "-arch=compute_XX -code=compute_XX,sm_XX"
+        # compute_XX generates PTX; thus GPUs newer than XX can also use the binary.
+        # See https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/#gpu-architecture-arch.
+        set(CUDA_ARCH "" CACHE STRING "CUDA architecture to use")
+        if (CUDA_ARCH STREQUAL "")
+            if (${CUDAToolkit_VERSION} VERSION_LESS "13.0") # Pascal (e.g. 1080)
+                message(STATUS "Setting fallback CUDA_ARCH=50 (Pascal)")
+                set(CMAKE_CUDA_ARCHITECTURES 50)
+            else() # CUDA >= 13.0 no longer supports Pascal. 75 = Turing (e.g. 2080)
+                message(STATUS "Setting fallback CUDA_ARCH=75 (Turing)")
+                set(CMAKE_CUDA_ARCHITECTURES 75)
+            endif()
+        else ()
+            message(STATUS "Using provided CUDA_ARCH=${CUDA_ARCH}")
+            set(CMAKE_CUDA_ARCHITECTURES ${CUDA_ARCH})
+        endif ()
+
+        add_definitions(-D_CUDA_ENABLED)
+    else()
+        message("!! CUDA was enabled but CUDA >= 10.0 cannot be located. CUDA is set to OFF.")
+        set(CUDA OFF)
+    endif()
 elseif(HIP)
     # ------------------------------------------------------------------------------HIP--
     if (DEFINED ENV{ROCM_PATH})
@@ -380,16 +378,14 @@ if(SYCL)    # Intel DPC++ specific
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fiopenmp")
 	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fiopenmp")
 
-	set(CMAKE_C_FLAGS "-std=c99 ${CMAKE_C_FLAGS}")
-	set(CMAKE_CXX_FLAGS "-fPIC -std=c++17 ${CMAKE_CXX_FLAGS}")
+	set(CMAKE_CXX_FLAGS "-fPIC ${CMAKE_CXX_FLAGS}")
 else()
 	FIND_PACKAGE(OpenMP REQUIRED)
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 
-	set(CMAKE_C_FLAGS "-std=c99 ${CMAKE_C_FLAGS}")
-	set(CMAKE_CXX_FLAGS "-fPIC -std=c++17 ${CMAKE_CXX_FLAGS}")
+	set(CMAKE_CXX_FLAGS "-fPIC ${CMAKE_CXX_FLAGS}")
 endif()
 
 # ----------------------------------------------------------Intel Compiler support --

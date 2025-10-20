@@ -5,8 +5,8 @@
 # Add -G to allow cuda-gdb to break inside kernels.
 
 if(CUDA)
-    set(EXTRA_NVCC_FLAGS "-D__INTEL_COMPILER --default-stream per-thread --std=c++17")
-    set(RELION_NVCC_FLAGS "${CUDARCH} ${WARN_DBL} ${EXTRA_NVCC_FLAGS}" CACHE STRING "" FORCE)
+    set(EXTRA_NVCC_FLAGS "-D__INTEL_COMPILER --default-stream per-thread")
+    set(RELION_NVCC_FLAGS "${WARN_DBL} ${EXTRA_NVCC_FLAGS}" CACHE STRING "" FORCE)
 elseif (HIP)
     if (${HIP_VERSION} VERSION_LESS "5.3" )
         set(EXTRA_HIPCC_FLAGS "-fgpu-default-stream=legacy -fno-gpu-rdc -munsafe-fp-atomics")
