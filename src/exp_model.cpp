@@ -17,6 +17,8 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
+
+#include <random>
 #include "src/exp_model.h"
 #include <sys/statvfs.h>
 using namespace gravis;
@@ -408,7 +410,7 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 	const bool doing_subset = 0 < subsets_size && subsets_size < numberOfParticles() ;
 	if (!randomised || doing_subset)
 	{
-		srand(seed);
+		std::mt19937 rng(seed);
 
 		if (do_split_random_halves)
 		{
@@ -433,8 +435,8 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 				REPORT_ERROR("ERROR Experiment::randomiseParticlesOrder: invalid half2 size:" + integerToString(nr_half2) + " != " + integerToString(nr_particles_subset2));
 
 			// Randomise the two particle lists
-			std::random_shuffle(sorted_idx.begin(), sorted_idx.begin() + nr_half1);
-			std::random_shuffle(sorted_idx.begin() + nr_half1, sorted_idx.end());
+			std::shuffle(sorted_idx.begin(), sorted_idx.begin() + nr_half1, rng);
+			std::shuffle(sorted_idx.begin() + nr_half1, sorted_idx.end(), rng);
 
 			// Make sure the particles are sorted on their optics_group.
 			// Otherwise CudaFFT re-calculation of plans every time image size changes slows down things a lot!
@@ -446,7 +448,7 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 		else
 		{
 			// Just randomise the entire vector
-			std::random_shuffle(sorted_idx.begin(), sorted_idx.end());
+			std::shuffle(sorted_idx.begin(), sorted_idx.end(), rng);
 
 			// Make sure the particles are sorted on their optics_group.
 			// Otherwise CudaFFT re-calculation of plans every time image size changes slows down things a lot!

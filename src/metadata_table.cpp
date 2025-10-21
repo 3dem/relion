@@ -42,6 +42,7 @@
  *	e-mail address 'xmipp@cnb.csic.es'
  ***************************************************************************/
 
+#include <random>
 #include "src/metadata_table.h"
 #include "src/metadata_label.h"
 
@@ -1773,7 +1774,9 @@ void MetaDataTable::printLabels(std::ostream &ost)
 
 void MetaDataTable::randomiseOrder()
 {
-	std::random_shuffle(objects.begin(), objects.end());
+	std::random_device rd;
+	std::mt19937 rng(rd());
+	std::shuffle(objects.begin(), objects.end(), rng);
 }
 
 void MetaDataTable::checkObjectID(long id, std::string caller) const
