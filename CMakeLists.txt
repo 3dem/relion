@@ -166,7 +166,7 @@ else(DoublePrec_ACC)
 endif(DoublePrec_ACC)
 
 if(MDT_TYPE_CHECK)
-    message("-- MetaDataTable type check is enabled.")
+	message(STATUS "MetaDataTable type check is enabled.")
     add_definitions(-DMETADATA_TABLE_TYPE_CHECK)
 endif()
 
@@ -175,7 +175,7 @@ if(CUDA)
     FIND_PACKAGE(CUDAToolkit)
 
     if((CUDAToolkit_FOUND) AND ("${CUDAToolkit_VERSION}" VERSION_GREATER_EQUAL "10.0"))
-        message("-- CUDAToolkit discovered CUDA " ${CUDAToolkit_VERSION} " at " ${CUDAToolkit_BIN_DIR})
+	    message(STATUS "CUDAToolkit discovered CUDA " ${CUDAToolkit_VERSION} " at " ${CUDAToolkit_BIN_DIR})
         set(CMAKE_CUDA_STANDARD 17)
 
         # Very puzzling but `CUDAToolkit` package and `enable_language(CUDA)` use
@@ -252,6 +252,24 @@ elseif(ALTCPU)
 	endif()
 endif()
  
+# ----------------------------------------------------------------- OpenMP ----------
+# This must come before including BuildTypes.cmake to properly set OpenMP flags to NVCC.
+# CUDA support by the OpenMP package came at CMake 3.31 (too new).
+
+if(SYCL) # Intel DPC++ specific; I don't know when the OpenMP package supports SYCL
+	set(OpenMP_C_FLAGS "-fiopenmp")
+	set(OpenMP_CXX_FLAGS "-fiopenmp")
+	set(OpenMP_EXE_LINKER_FLAGS "-fiopenmp")
+else()
+	FIND_PACKAGE(OpenMP REQUIRED)
+endif()
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+set(CMAKE_CXX_FLAGS "-fPIC ${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+
+#message(STATUS "OpenMP_CXX_FLAGS: ${OpenMP_CXX_FLAGS}")
+
 # ----------------------------------------------------------INCLUDE ALL BUILD TYPES---
 # This has to be AFTER project() and find_package(HIP).
 # Up to RELION 5.0.0, this must come BEFORE find_package(CUDA) as discussed in issue #1032.
@@ -367,27 +385,6 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-# ----------------------------------------------------------------- OpenMP ----------
-# This MUST be set before all cuda_add_executable/library calls.
-# Otherwise the -Xcompiler argument to NVCC does not contain -fopenmp
-# and #pragma omp critical is SILENTLY ignored, giving a wrong binary!!!
-# https://github.com/3dem/relion/issues/1016
-
-if(SYCL)    # Intel DPC++ specific
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fiopenmp")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fiopenmp")
-	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fiopenmp")
-
-	set(CMAKE_CXX_FLAGS "-fPIC ${CMAKE_CXX_FLAGS}")
-else()
-	FIND_PACKAGE(OpenMP REQUIRED)
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
-
-	set(CMAKE_CXX_FLAGS "-fPIC ${CMAKE_CXX_FLAGS}")
-endif()
-
 # ----------------------------------------------------------Intel Compiler support --
 # ----------------------------------  and build flags including MKL and IPP ---------
 
@@ -479,9 +476,9 @@ if(GUI)
 	endif(NOT FLTK_FOUND)
 
     else(X11_FOUND)
-        message( STATUS "\n-- ------------------ YOU HAVE NO X11-LIBS ------------------")
-        message( STATUS "CCmake found no X11-libs on your system, which are required for the GUI.")
-        message( STATUS " You CAN add the flag -DGUI=OFF to avoid using X11" )
+        message(STATUS "\n-- ------------------ YOU HAVE NO X11-LIBS ------------------")
+        message(STATUS "CCmake found no X11-libs on your system, which are required for the GUI.")
+        message(STATUS " You CAN add the flag -DGUI=OFF to avoid using X11" )
         message(FATAL_ERROR "X11 is required for GUI.")
     endif(X11_FOUND)
 
