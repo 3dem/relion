@@ -87,12 +87,12 @@ bool concatenatePDFfiles(FileName fn_pdf_out, FileName pdf1, FileName pdf2)
 bool concatenatePDFfiles(FileName fn_pdf_out, std::vector<FileName> fn_pdfs)
 {
 
-	FileName fn_comb=fn_pdf_out;
+	FileName fn_comb = fn_pdf_out;
 	// check if fn_pdf_out occurs in fn_pdfs
 	if (std::find(fn_pdfs.begin(), fn_pdfs.end(), fn_pdf_out) != fn_pdfs.end())
 	{
-	  // Element in vector.
-		fn_comb.withoutExtension() + "_tmp_combine.pdf";
+		// Element in vector.
+		fn_comb = fn_comb.withoutExtension() + "_tmp_combine.pdf";
 	}
 
 	std::string command="gs -dNOPAUSE -sDEVICE=pdfwrite -sOUTPUTFILE=";
