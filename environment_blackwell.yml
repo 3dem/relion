@@ -34,3 +34,4 @@ dependencies:
       - git+https://github.com/3dem/DynaMight
       - git+https://github.com/3dem/topaz
       - git+https://github.com/3dem/model-angelo
+      - ".[vis]"
