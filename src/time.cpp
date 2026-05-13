@@ -112,6 +112,9 @@ void init_progress_bar(long total)
 // routine must be in ascending order, ie, 0, 1, 2, ... No. elements
 void progress_bar(long rlen)
 {
+	if (!isatty(fileno(stdout)))
+		return;
+
 	static time_t startt, prevt;
 	time_t currt;
 	static long totlen;
