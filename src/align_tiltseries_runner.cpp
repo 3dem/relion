@@ -658,8 +658,8 @@ bool AlignTiltseriesRunner::readIMODResults(long idx_tomo, std::string &error_me
     std::string line;
     std::vector<std::string> words;
 
-    // 1. Get tiltangle_offset from the align.log file
-    RFLOAT tiltangle_offset = 0., mean_error = 0., stddev_error = 0., leaveout_error = 0.;
+    // 1. Get alignment diagnostics from the align.log file
+    RFLOAT mean_error = 0., stddev_error = 0., leaveout_error = 0.;
     std::ifstream in0(fn_align.data(), std::ios_base::in);
     if (in0.fail())
     {
@@ -670,13 +670,7 @@ bool AlignTiltseriesRunner::readIMODResults(long idx_tomo, std::string &error_me
     in0.seekg(0);
     while (getline(in0, line, '\n'))
     {
-        if (line.find("AngleOffset = ") != std::string::npos)
-        {
-            tokenize(line, words);
-            if (words.size() < 3) REPORT_ERROR("ERROR: fewer than 3 columns on this line from align.log file: " + line);
-            tiltangle_offset = textToFloat(words[2]);
-        }
-        else if (line.find("Residual error mean and sd:") != std::string::npos)
+        if (line.find("Residual error mean and sd:") != std::string::npos)
         {
             tokenize(line, words);
             if (words.size() < 7) REPORT_ERROR("ERROR: fewer than 7 columns on this line from align.log file: " + line);
@@ -737,7 +731,7 @@ bool AlignTiltseriesRunner::readIMODResults(long idx_tomo, std::string &error_me
     if (f != fc) REPORT_ERROR("ERROR: found " + integerToString(f) + " entries in xf file " + fn_xf + ", but expected " +
                                                  integerToString(fc) + " entries...");
 
-    // 3. Get ytilt angles straight from the .tlt file (and apply tiltangle_offset)
+    // 3. Get ytilt angles straight from IMOD's final .tlt file.
     std::ifstream in2(fn_tlt.data(), std::ios_base::in);
     if (in2.fail())
     {
@@ -752,8 +746,9 @@ bool AlignTiltseriesRunner::readIMODResults(long idx_tomo, std::string &error_me
         tokenize(line, words);
         if (words.size() != 1) REPORT_ERROR("ERROR: did not find 1 column in tlt file: " + fn_tlt);
         tomogramSet.tomogramTables[idx_tomo].setValue(EMDL_TOMO_XTILT, 0., f);
-        // Subtract tilt_angle_offset
-        tomogramSet.tomogramTables[idx_tomo].setValue(EMDL_TOMO_YTILT, textToFloat(words[0]) - tiltangle_offset, f);
+        // The .tlt file is IMOD's final OutputTiltFile. If tiltalign estimated
+        // an AngleOffset, those final angles already include it.
+        tomogramSet.tomogramTables[idx_tomo].setValue(EMDL_TOMO_YTILT, textToFloat(words[0]), f);
 
         f++;
     }
