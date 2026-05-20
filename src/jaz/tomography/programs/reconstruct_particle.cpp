@@ -198,6 +198,8 @@ void ReconstructParticleProgram::processTomograms(
 	const int s = dataImgFS[0].ydim;
 	const int sh = s/2 + 1;
 	const int tc = tomoIndices.size();
+	const bool has_explicit_visible_frames =
+		particleSet.partTable.containsLabel(EMDL_TOMO_VISIBLE_FRAMES);
 
     if (verbosity > 0 && !per_tomogram_progress)
 	{
@@ -343,7 +345,38 @@ void ReconstructParticleProgram::processTomograms(
 						part_id, fc, tomogram.centre, tomogram.optics.pixelSize);
 			std::vector<d4Matrix> projCut(fc), projPart(fc);
 
-			const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
+			std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
+
+			// Intersect geometric visibility with the explicit per-particle
+			// _rlnTomoVisibleFrames mask that subtomo writes when --max_dose
+			// (or any frame filter) was used at extraction. Without this,
+			// reconstruction silently includes frames that were excluded
+			// from the 2D stacks and from Refine3D alignment, so the
+			// per-particle CTF + dose-weight math uses a different frame
+			// set than the data on disk. exp_model.cpp's "Add only the
+			// visible images for this particle" loop is the authoritative
+			// pattern that this matches.
+			if (has_explicit_visible_frames)
+			{
+				const std::vector<int> explicitVisible =
+					particleSet.getVisibleFrames(part_id);
+
+				if ((int)explicitVisible.size() != fc)
+				{
+					REPORT_ERROR_STR(
+						"reconstruct_particle: bad "
+						<< EMDL::label2Str(EMDL_TOMO_VISIBLE_FRAMES)
+						<< " length for particle "
+						<< particleSet.getName(part_id)
+						<< "; expected " << fc
+						<< " frames, found " << explicitVisible.size());
+				}
+
+				for (int f = 0; f < fc; f++)
+				{
+					isVisible[f] = isVisible[f] && (explicitVisible[f] != 0);
+				}
+			}
 
 			const bool circle_crop = do_circle_crop;
 
