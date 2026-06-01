@@ -112,23 +112,48 @@ class ctf_toolbox_parameters
 			std::cout << " + " << std::endl;
 			ctf.setValues(defU, defV, defAng, kV, Cs, Q0, 0., 1., phase_shift);
 
-			Ictf().setXmippOrigin();
-			RFLOAT xs = (RFLOAT)sim_box_large * sim_angpix;
-			RFLOAT ys = (RFLOAT)sim_box_large * sim_angpix;
-			FOR_ALL_ELEMENTS_IN_ARRAY2D(Ictf())
-			{
-				RFLOAT x = (RFLOAT)j / xs;
-				RFLOAT y = (RFLOAT)i / ys;
 
-				A2D_ELEM(Ictf(), i, j) = ctf.getCTF(x, y, false, false, do_intact_ctf_until_first_peak, true, 0.0, do_intact_ctf_after_first_peak);
-			}
+            if (fn_sim.getExtension() == "star")
+            {
+                MetaDataTable MDout;
+                MDout.setName("ctf");
 
-			resizeMap(Ictf(), sim_box);
+                if (fabs(defU - defV) > 0.) REPORT_ERROR("Star file output is only for non-astigmatic CTFs, i.e. where defU = defV!");
+                RFLOAT xs = (RFLOAT)sim_box_large * sim_angpix;
+                std::cout << " resolution (1/A) vs (non-astigmatic) CTF " << std::endl;
+                for (int i = 0; i < FINISHINGX(Ictf())/2; i++)
+                {
+                    RFLOAT x = (RFLOAT)i / xs;
+                    RFLOAT ctfval = ctf.getCTF(x, 0., false, false, do_intact_ctf_until_first_peak, true, 0.0, do_intact_ctf_after_first_peak);
+                    MDout.addObject();
+                    MDout.setValue(EMDL_RESOLUTION_ANGSTROM, x);
+                    MDout.setValue(EMDL_CTF_VALUE, ctfval);
+                    std::cout << x << " " << ctfval << std::endl;
+                }
+                MDout.write(fn_sim);
 
-			Ictf.write(fn_sim);
-			std::cout << " + Done! written: " << fn_sim << std::endl;
+            }
+            else
+            {
+                Ictf().setXmippOrigin();
+                RFLOAT xs = (RFLOAT)sim_box_large * sim_angpix;
+                RFLOAT ys = (RFLOAT)sim_box_large * sim_angpix;
+                FOR_ALL_ELEMENTS_IN_ARRAY2D(Ictf())
+                    {
+                        RFLOAT x = (RFLOAT)j / xs;
+                        RFLOAT y = (RFLOAT)i / ys;
 
-		}
+                        A2D_ELEM(Ictf(), i, j) = ctf.getCTF(x, y, false, false, do_intact_ctf_until_first_peak, true, 0.0, do_intact_ctf_after_first_peak);
+                    }
+
+                resizeMap(Ictf(), sim_box);
+
+                Ictf.write(fn_sim);
+            }
+
+            std::cout << " + Done! written: " << fn_sim << std::endl;
+
+        }
 
 		else
 		{
