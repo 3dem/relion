@@ -241,7 +241,7 @@ void MlOptimiserMpi::initialise()
 				fullAutomaticMapping = true;
 				semiAutomaticMapping = true; // possible to set fully manual for specific ranks
 
-				if ((allThreadIDs.size()<rank) || allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
+				if ((allThreadIDs.size()<rank) || allThreadIDs[0].size()==0 || (!hasExplicitDeviceIDs(gpu_ids)) )
 				{
 					std::cout << "GPU-ids not specified for this rank, threads will automatically be mapped to available devices."<< std::endl;
 				}
@@ -485,7 +485,7 @@ will still yield good performance and possibly a more stable execution. \n" << s
 	{
 		if (node->isLeader())
 		{
-			if (! std::isdigit(*gpu_ids.begin()))
+			if (!hasExplicitDeviceIDs(gpu_ids))
 			{
 				std::cout << std::string(80, '*') << std::endl;
 				std::cout << "GPU-ids not specified and MPI/threads will automatically be mapped to available devices."<< std::endl;
@@ -626,7 +626,7 @@ will still yield good performance and possibly a more stable execution. \n" << s
 
 			bool fullAutomaticMapping;
 			bool semiAutomaticMapping;
-			if (allThreadIDs[node->rank-1].size()==0 || ! std::isdigit(*gpu_ids.begin()) )
+			if (allThreadIDs[node->rank-1].size()==0 || !hasExplicitDeviceIDs(gpu_ids) )
 			{
 				fullAutomaticMapping = true;
 				semiAutomaticMapping = true;

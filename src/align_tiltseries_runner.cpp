@@ -563,13 +563,11 @@ void AlignTiltseriesRunner::executeAreTomo(long idx_tomo, int rank)
 
     if (gpu_ids.length() > 0)
     {
-        if (rank >= allThreadIDs.size())
-            REPORT_ERROR("ERROR: not enough MPI nodes specified for the GPU IDs.");
-
         command += " -Gpu " ;
-        for (int igpu = 0; igpu < allThreadIDs[rank].size(); igpu++)
+        const std::vector<std::string> &rankThreadIDs = getDeviceIDsForRank(allThreadIDs, rank);
+        for (int igpu = 0; igpu < rankThreadIDs.size(); igpu++)
         {
-            command += allThreadIDs[rank][igpu] + " ";
+            command += rankThreadIDs[igpu] + " ";
         }
     }
 
