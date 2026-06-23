@@ -1684,6 +1684,37 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 
 		ThirdOrderPolynomialModel *model = new ThirdOrderPolynomialModel();
 		model->coeffX = coeffX; model->coeffY = coeffY;
+
+		// Validation of the model:
+		// Neighbouring target pixels must refer to more-or-less neighbouring
+		// source pixels.
+		// Because our local model is 2nd order in the X/Y plane,
+		// the difference between neighbouring pixels is linear.
+		// So we need to check only four corners.
+		const RFLOAT corners[4][2] = {{0, 0}, {1, 0}, {0, 1}, {1, 1}};
+		const RFLOAT dx = 1.0 / nx, dy = 1.0 / ny;
+		const RFLOAT MAXIMUM_TOLERANCE = 3; // px
+		RFLOAT largest_delta = 0;
+		for (int z = 0; z < n_frames; z++) {
+			RFLOAT x1, x2, x3, y1, y2, y3;
+			for (int ic = 0; ic < 4; ic++) {
+				model->getShiftAt(z, corners[ic][0], corners[ic][1], x1, y1);
+				model->getShiftAt(z, corners[ic][0] + dx, corners[ic][1], x2, y2);
+				model->getShiftAt(z, corners[ic][0], corners[ic][1] + dy, x3, y3);
+
+				if (largest_delta < fabs(x2 - x1)) largest_delta = fabs(x2 - x1);
+				if (largest_delta < fabs(x3 - x1)) largest_delta = fabs(x3 - x1);
+				if (largest_delta < fabs(y2 - y1)) largest_delta = fabs(y2 - y1);
+				if (largest_delta < fabs(y3 - y1)) largest_delta = fabs(y3 - y1);
+			}
+//			std::cout << fn_mic << " " << z << " largest delta: " << largest_delta << std::endl;
+			if (largest_delta > MAXIMUM_TOLERANCE) break;
+		}
+		if (largest_delta > MAXIMUM_TOLERANCE) {
+			std::cerr << fn_mic << ": could not fit a reasonable local motion model (delta > " << largest_delta << "). Global trajectory alone is used." << std::endl;
+			delete model;
+			goto skip_fitting; // TODO: Refactor!
+		}
 		mic.model = model;
 
 #ifdef DEBUG_OWN

@@ -11,7 +11,6 @@
 #include <src/jaz/image/normalization.h>
 #include <src/jaz/single_particle/vtk_helper.h>
 #include <src/jaz/single_particle/volume_converter.h>
-#include <src/spherical-harmonics/SphericalHarmonics.h>
 
 #include <omp.h>
 
