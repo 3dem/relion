@@ -390,6 +390,9 @@ MetaDataTable subsetMetaDataTable(MetaDataTable &MDin, EMDLabel label, std::stri
 // OriginX/Y are multiplied by origin_scale before added to CoordinateX/Y to compensate for down-sampling
 MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label, RFLOAT threshold, RFLOAT origin_scale=1.0, FileName fn_removed="", bool verb=true);
 
+// Write multiple tables into a star file, with writing to .tmp file for file completion checking in pipeliner
+void writeMultipleTablesToStar(std::vector<MetaDataTable> &MDins, FileName fn_out);
+
 // This flag should be enabled via "cmake -DMDT_TYPE_CHECK=ON"
 #ifdef METADATA_TABLE_TYPE_CHECK
 //#pragma message("typecheck enabled")

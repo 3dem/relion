@@ -2217,4 +2217,28 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
 	return MDout;
 }
 
+void writeMultipleTablesToStar(std::vector<MetaDataTable> &MDins, FileName fn_out)
+{
+
+    // Write to temporary file first
+    FileName fn_tmp = fn_out + ".tmp";
+
+    std::ofstream  fh;
+    fh.open((fn_tmp).c_str(), std::ios::out);
+    if (!fh)
+        REPORT_ERROR( (std::string)"MetaDataTable::write: cannot write to file: " + fn_tmp);
+
+    // Write all the tables
+    for (int i = 0; i < MDins.size(); i++)
+    {
+        MDins[i].write(fh);
+    }
+
+    fh.close();
+
+    // Rename to prevent errors with programs in pipeliner reading in incomplete STAR files
+    std::rename(fn_tmp.c_str(), fn_out.c_str());
+
+
+}
 

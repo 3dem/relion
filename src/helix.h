@@ -210,7 +210,8 @@ void extractHelicalSegmentsFromTubes_Multiple(
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
 		bool bimodal_angular_priors = true,
-		bool cut_into_segments = true);
+		bool cut_into_segments = true,
+        RFLOAT tilt_prior = 90.);
 
 void convertHelicalTubeCoordsToMetaDataTable(
 		FileName& fn_in,
@@ -251,6 +252,8 @@ void removeBadPsiHelicalSegmentsFromDataStar(
 		FileName& fn_in,
 		FileName& fn_out,
 		RFLOAT max_dev_deg = 15.);
+
+RFLOAT calculateTiltPriorFromPsi(RFLOAT psi, RFLOAT tilt_angle, RFLOAT tilt_axis);
 
 void convertHelicalSegmentCoordsToStarFile_Multiple(
 		FileName& suffix_coords,
@@ -428,7 +431,7 @@ public:
 
 	~HelicalSegmentPriorInfoEntry() { clear(); };
 
-	void checkPsiPolarity();
+        void checkPsiPolarity();
 
 	bool operator<(const HelicalSegmentPriorInfoEntry &rhs) const;
 };
@@ -440,6 +443,11 @@ void flipPsiTiltForHelicalSegment(
 		RFLOAT& new_psi,
 		RFLOAT& new_tilt);
 
+void getNstartHelicalTwistAndRise(RFLOAT &twist,
+                                  RFLOAT &rise,
+                                  int helical_nstart);
+
+
 void updatePriorsForOneHelicalTube(
 		std::vector<HelicalSegmentPriorInfoEntry>& list,
 		int sid,
@@ -449,6 +457,7 @@ void updatePriorsForOneHelicalTube(
 		RFLOAT sigma_segment_dist,
 		std::vector<RFLOAT> helical_rise,
 		std::vector<RFLOAT> helical_twist,
+        int nfold_ambiguity,
 		bool is_3D_data,
 		bool do_auto_refine,
 		RFLOAT sigma2_rot,       // KThurber

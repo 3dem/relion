@@ -217,9 +217,9 @@ class star_handler_parameters
 
 		compareMetaDataTable(MD1, MD2, MDboth, MDonly1, MDonly2, label1, eps, label2, label3);
 
-		std::cout << MDboth.numberOfObjects()  << " entries occur in both input STAR files." << std::endl;
-		std::cout << MDonly1.numberOfObjects() << " entries occur only in the 1st input STAR file." << std::endl;
-		std::cout << MDonly2.numberOfObjects() << " entries occur only in the 2nd input STAR file." << std::endl;
+		std::cout << MDboth.numberOfObjects()  << " entries from the 1st input STAR file also have an entry in the 2nd STAR file." << std::endl;
+		std::cout << MDonly1.numberOfObjects() << " entries from the 1st input STAR file do NOT have an entry in the 2nd STAR file." << std::endl;
+		std::cout << MDonly2.numberOfObjects() << " entries from the 2nd Sinput STAR file do NOT have an entry in the 1st STAR file." << std::endl;
 
 		write_check_ignore_optics(MDboth, fn_out.insertBeforeExtension("_both"), MD1.getName());
 		std::cout << " Written: " << fn_out.insertBeforeExtension("_both") << std::endl;
@@ -833,7 +833,8 @@ class star_handler_parameters
 		fnt0 = integerToString(nr_split);
 		for (int isplit = 0; isplit < nr_split; isplit ++)
 		{
-			FileName fnt = fn_out.insertBeforeExtension("_split"+integerToString(isplit+1));
+			FileName fnt;
+            fnt.compose(fn_out.withoutExtension() + "_split",isplit+1, "star", 5);
 			MDouts[isplit].setName(MD.getName());
             write_check_ignore_optics(MDouts[isplit], fnt, MD.getName());
 			std::cout << " Written: " <<fnt << " with " << MDouts[isplit].numberOfObjects() << " objects." << std::endl;
@@ -1012,13 +1013,22 @@ class star_handler_parameters
 			MD.getValue(EMDL_ORIENT_TILT, tilt);
 			MD.getValue(EMDL_ORIENT_PSI, psi);
 
-			xoff /= angpix;
-			yoff /= angpix;
+            Euler_angles2matrix(rot, tilt, psi, A3D, false);
+            if (MD.containsLabel(EMDL_TOMO_SUBTOMOGRAM_ROT))
+            {
+                const double phi = MD.getAngleInRad(EMDL_TOMO_SUBTOMOGRAM_ROT);
+                const double theta = MD.getAngleInRad(EMDL_TOMO_SUBTOMOGRAM_TILT);
+                const double psi = MD.getAngleInRad(EMDL_TOMO_SUBTOMOGRAM_PSI);
+                Matrix2D<RFLOAT> Asubtomo;
+                Euler_angles2matrix( phi, theta, psi, Asubtomo, false);
+                A3D = Asubtomo * A3D;
+            }
 
-			// Project the center-coordinates
-			Euler_angles2matrix(rot, tilt, psi, A3D, false);
+			// Project the recenter-coordinates
 			my_projected_center = A3D * my_center;
 
+            xoff /= angpix;
+            yoff /= angpix;
 			xoff -= XX(my_projected_center);
 			yoff -= YY(my_projected_center);
 

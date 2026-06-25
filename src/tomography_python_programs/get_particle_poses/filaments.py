@@ -28,8 +28,8 @@ def get_poses_along_filament_backbones(
         ..., help="spacing between particles along filaments in angstroms."
     ),
     filament_polarity_known: bool = typer.Option(
-        True, help="Whether filament polarity from annotations should be fixed "
-                   "during refinement."
+        False, help="Whether filament polarity from annotations should be fixed "
+                   "during refinement (i.e. filaments have been picked front->end)."
     )
 ):
     global_df = starfile.read(tilt_series_star_file,

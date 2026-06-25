@@ -991,7 +991,7 @@ bool Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
 
                 if (tomo_name != prev_tomo_name)
                 {
-                    tomogram = tomogramSet.loadTomogram(tomo_id, false);
+                    tomogram = tomogramSet.loadTomogram(tomo_id, false, false, false, -999, -999, -999, true);  // Ignore tomo size
                     prev_tomo_name = tomo_name;
 
                     // Tomogram sanity checks

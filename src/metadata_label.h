@@ -156,7 +156,9 @@ enum EMDLabel
 	EMDL_CTF_ENERGY_LOSS, ///< Energy loss
 	EMDL_CTF_FOM, ///< ctffind FOM (CC) for quality of CTF-fit
 	EMDL_CTF_IMAGE, ///< name of an image describing the CTF model
-	EMDL_CTF_ICERINGDENSITY, ///< sum of image power in ice ring
+    EMDL_CTF_ICERINGDENSITY, ///< sum of image power in ice ring
+    EMDL_CTF_ICERINGPOWERFRACTION, ///< fraction of power in ice ring, relative to above and below bands
+    EMDL_CTF_ICERINGKURTOSIS, ///< kurtosis of power values in ice ring
 	EMDL_CTF_LENS_STABILITY, ///< Lens stability
 	EMDL_CTF_MAGNIFICATION, ///< Magnification used for CTF-determination (deprecated)
 	EMDL_CTF_PHASESHIFT, ///< Phase-shift from a phase plate
@@ -230,6 +232,8 @@ enum EMDLabel
 	EMDL_JOBOPTION_DIRECTORY,
 	EMDL_JOBOPTION_MENUOPTIONS,
 
+    EMDL_LOCSYM_WEIGHT,
+
 	EMDL_MATRIX_1_1,
 	EMDL_MATRIX_1_2,
 	EMDL_MATRIX_1_3,
@@ -266,6 +270,11 @@ enum EMDLabel
 	EMDL_MICROGRAPH_END_FRAME,
 	EMDL_MICROGRAPH_SHIFT_X,
 	EMDL_MICROGRAPH_SHIFT_Y,
+    EMDL_MICROGRAPH_AUTOPICK_FOM,
+    EMDL_MICROGRAPH_AUTOPICK_PSI,
+    EMDL_MICROGRAPH_PICKTYPE,
+    EMDL_MICROGRAPH_SCORE_KURTOSIS,
+    EMDL_MICROGRAPH_SCORE_SKEWNESS,
 	EMDL_MICROGRAPH_MOTION_COEFFS_IDX,
 	EMDL_MICROGRAPH_MOTION_COEFF,
 	EMDL_MICROGRAPH_EER_UPSAMPLING,
@@ -884,7 +893,9 @@ private:
 		EMDL::addLabel(EMDL_CTF_ENERGY_LOSS, EMDL_DOUBLE, "rlnEnergyLoss", "Energy loss (in eV)");
 		EMDL::addLabel(EMDL_CTF_FOM, EMDL_DOUBLE, "rlnCtfFigureOfMerit", "Figure of merit for the fit of the CTF (not used inside relion_refine)");
 		EMDL::addLabel(EMDL_CTF_IMAGE, EMDL_STRING, "rlnCtfImage", "Name of an image with all CTF values");
-		EMDL::addLabel(EMDL_CTF_ICERINGDENSITY, EMDL_DOUBLE, "rlnCtfIceRingDensity", "Power of the image in the ice ring frequency range (0.25-0.28 A-1)");
+        EMDL::addLabel(EMDL_CTF_ICERINGDENSITY, EMDL_DOUBLE, "rlnCtfIceRingDensity", "Power of the image in the ice ring frequency range (0.25-0.28 A-1)");
+        EMDL::addLabel(EMDL_CTF_ICERINGPOWERFRACTION, EMDL_DOUBLE, "rlnCtfIceRingPowerFraction", "Fraction of power in ice ring, relative to above and below resolution bands");
+        EMDL::addLabel(EMDL_CTF_ICERINGKURTOSIS, EMDL_DOUBLE, "rlnCtfIceRingKurtosis", "Kurtosis of power values within the ice ring");
         EMDL::addLabel(EMDL_CTF_LENS_STABILITY, EMDL_DOUBLE, "rlnLensStability", "Lens stability (in ppm)");
 		EMDL::addLabel(EMDL_CTF_MAGNIFICATION, EMDL_DOUBLE, "rlnMagnification", "Magnification at the detector (in times)");
 		EMDL::addLabel(EMDL_CTF_PHASESHIFT, EMDL_DOUBLE, "rlnPhaseShift", "Phase-shift from a phase-plate (in degrees)");
@@ -960,8 +971,10 @@ private:
 		EMDL::addLabel(EMDL_JOBOPTION_DIRECTORY, EMDL_STRING, "rlnJobOptionDirectoryDefault", "Default directory for file browser of a joboption");
 		EMDL::addLabel(EMDL_JOBOPTION_MENUOPTIONS, EMDL_STRING, "rlnJobOptionMenuOptions", "Options for pull-down menu");
 
-		EMDL::addLabel(EMDL_MATRIX_1_1, EMDL_DOUBLE, "rlnMatrix_1_1", "Matrix element (1,1) of a 3x3 matrix");
-		EMDL::addLabel(EMDL_MATRIX_1_2, EMDL_DOUBLE, "rlnMatrix_1_2", "Matrix element (1,2) of a 3x3 matrix");
+        EMDL::addLabel(EMDL_LOCSYM_WEIGHT, EMDL_DOUBLE, "rlnLocalSymmetryWeight", "Relative weight for local symmetry operator (main one is 1)");
+
+        EMDL::addLabel(EMDL_MATRIX_1_1, EMDL_DOUBLE, "rlnMatrix_1_1", "Matrix element (1,1) of a 3x3 matrix");
+        EMDL::addLabel(EMDL_MATRIX_1_2, EMDL_DOUBLE, "rlnMatrix_1_2", "Matrix element (1,2) of a 3x3 matrix");
 		EMDL::addLabel(EMDL_MATRIX_1_3, EMDL_DOUBLE, "rlnMatrix_1_3", "Matrix element (1,3) of a 3x3 matrix");
 		EMDL::addLabel(EMDL_MATRIX_2_1, EMDL_DOUBLE, "rlnMatrix_2_1", "Matrix element (2,1) of a 3x3 matrix");
 		EMDL::addLabel(EMDL_MATRIX_2_2, EMDL_DOUBLE, "rlnMatrix_2_2", "Matrix element (2,1) of a 3x3 matrix");
@@ -996,7 +1009,12 @@ private:
 		EMDL::addLabel(EMDL_MICROGRAPH_END_FRAME, EMDL_INT, "rlnMicrographEndFrame", "End frame of a motion model");
 		EMDL::addLabel(EMDL_MICROGRAPH_SHIFT_X, EMDL_DOUBLE, "rlnMicrographShiftX", "X shift of a (patch of) micrograph");
 		EMDL::addLabel(EMDL_MICROGRAPH_SHIFT_Y, EMDL_DOUBLE, "rlnMicrographShiftY", "Y shift of a (patch of) micrograph");
-		EMDL::addLabel(EMDL_MICROGRAPH_MOTION_COEFFS_IDX, EMDL_INT, "rlnMotionModelCoeffsIdx", "Index of a coefficient of a motion model");
+        EMDL::addLabel(EMDL_MICROGRAPH_AUTOPICK_FOM, EMDL_STRING, "rlnMicrographFomImage", "Filename of the FOM image of micrograph autopicking ");
+        EMDL::addLabel(EMDL_MICROGRAPH_AUTOPICK_PSI, EMDL_STRING, "rlnMicrographPsiImage", "Filename of the PSI image of micrograph autopicking");
+        EMDL::addLabel(EMDL_MICROGRAPH_PICKTYPE, EMDL_STRING, "rlnMicrographPickType", "Type of micrograph coordinates (particles, startend or lines)");
+        EMDL::addLabel(EMDL_MICROGRAPH_SCORE_KURTOSIS, EMDL_DOUBLE, "rlnMicrographScoreKurtosis", "(Excess) kurtosis in micrograph autopick FOM scores");
+        EMDL::addLabel(EMDL_MICROGRAPH_SCORE_SKEWNESS, EMDL_DOUBLE, "rlnMicrographScoreSkewness", "Skewness in micrograph autopick FOM scores");
+        EMDL::addLabel(EMDL_MICROGRAPH_MOTION_COEFFS_IDX, EMDL_INT, "rlnMotionModelCoeffsIdx", "Index of a coefficient of a motion model");
 		EMDL::addLabel(EMDL_MICROGRAPH_MOTION_COEFF, EMDL_DOUBLE, "rlnMotionModelCoeff", "A coefficient of a motion model");
 		EMDL::addLabel(EMDL_MICROGRAPH_EER_UPSAMPLING, EMDL_INT, "rlnEERUpsampling", "EER upsampling ratio (1 = physical, 2 = 2x super-resolution)");
 		EMDL::addLabel(EMDL_MICROGRAPH_EER_GROUPING, EMDL_INT, "rlnEERGrouping", "The number of hardware frames to group");

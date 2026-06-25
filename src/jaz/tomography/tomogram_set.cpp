@@ -151,7 +151,7 @@ void TomogramSet::removeTomogram(std::string tomogramName)
 }
 
 Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenFramesOnly, bool loadOddFramesOnly,
-                                   int _w0, int _h0, int _d0) const //Set loadEven/OddFramesOnly to True to loadImageData from rlnTomoMicrographNameEven/Odd rather than rlnMicrographName
+                                   int _w0, int _h0, int _d0, bool ignore_tomo_size) const //Set loadEven/OddFramesOnly to True to loadImageData from rlnTomoMicrographNameEven/Odd rather than rlnMicrographName
 {
 	Tomogram out;
 
@@ -175,11 +175,9 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
         globalTable.getValueSafely(EMDL_TOMO_SIZE_Y, out.h0, index);
         globalTable.getValueSafely(EMDL_TOMO_SIZE_Z, out.d0, index);
     }
-    else
+    else if (!ignore_tomo_size)
     {
-        out.w0 = -999;
-        out.h0 = -999;
-        out.d0 = -999;
+        REPORT_ERROR("ERROR loadTomogram: tomogram sizes have not been set for tomogram " + tomoName);
     }
 
     // Select only a subset of the tilt series images with the lowest dose
@@ -690,18 +688,18 @@ int TomogramSet::getImageIndexWithSmallestVisibleTiltAngle(int index, std::vecto
     RFLOAT mindiff = 999.;
 
     int nr_idx = tomogramTables[index].numberOfObjects();
-    if (nr_idx != isVisible.size()) REPORT_ERROR("BUG: incofrrect number of elements in isVisible vector...");
+    if ( isVisible.size() > 0 && nr_idx != isVisible.size()) REPORT_ERROR("BUG: incofrrect number of elements in isVisible vector...");
 
     int nr_invisible = 0;
     for (int idx = 0; idx < nr_idx; idx++)
     {
-        if (!isVisible[idx])
+        if (isVisible.size() > 0 && !isVisible[idx])
         {
             nr_invisible++;
             continue;
         }
         RFLOAT tilt;
-        tomogramTables[index].getValue(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE, tilt, idx);
+        tomogramTables[index].getValue(EMDL_TOMO_YTILT, tilt, idx);
         if (fabs(tilt) < mindiff)
         {
             mindiff = fabs(tilt);
@@ -769,6 +767,10 @@ void TomogramSet::generateSingleMetaDataTable(MetaDataTable &MDout, ObservationM
     MDout.clear();
     for (long int t = 0; t < tomogramTables.size(); t++)
     {
+
+        //Make sure we order tilt series on pre-exposure, as we'll also do this when combining everything at the end
+        tomogramTables[t].newSort(EMDL_MICROGRAPH_PRE_EXPOSURE);
+
         // Store all the necessary optics stuff in an opticsGroup per tomogram
         RFLOAT moviePixelSize, voltage, Cs, Q0;
         std::string tomo_name = getTomogramName(t);

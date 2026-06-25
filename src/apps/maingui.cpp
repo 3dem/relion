@@ -35,27 +35,14 @@ int main(int argc, char *argv[])
 #define _MAX_PATH 200
 
 	char my_dir[_MAX_PATH];
-	char short_dir[49];
+	char short_dir[39];
 	char* res = getcwd(my_dir, _MAX_PATH);
 
-	// Get last 45 characters of my_dir to fit in titlebar of window
-	if (strlen(my_dir) > 45)
-	{
-		short_dir[0]=short_dir[1]=short_dir[2]='.';
-		int j = 3;
-		for (int i = strlen(my_dir)-45; i < strlen(my_dir); i++, j++)
-		{
-			short_dir[j] = my_dir[i];
-		}
-		short_dir[j] = '\0';
-	}
-	else
-	{
-		int i;
-		for (i = 0; i < strlen(my_dir); i++)
-			short_dir[i] = my_dir[i];
-		short_dir[i] = '\0';
-	}
+    std::string s(res);
+    unsigned long pos = s.find_last_of('/');
+    std::string basename = (pos == std::string::npos) ? s : s.substr(pos + 1);
+    if (basename.size() > 35)
+    basename = basename.substr(basename.size() - 35);
 
 	char titletext[256];
 	snprintf(titletext, 256, "RELION-%s", g_RELION_VERSION);
@@ -64,7 +51,7 @@ int main(int argc, char *argv[])
 #endif
 	strcat(titletext,": ");
 
-	strcat (titletext, short_dir);
+	strcat (titletext, basename.c_str());
 
 	try
 	{

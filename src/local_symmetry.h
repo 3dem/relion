@@ -136,6 +136,7 @@ void readRelionFormatMasksAndOperators(
 		FileName fn_info,
 		std::vector<FileName>& fn_mask_list,
 		std::vector<std::vector<Matrix1D<RFLOAT> > >& ops,
+        std::vector<std::vector<RFLOAT> >& weights,
 		RFLOAT angpix = 1.,
 		bool verb = false);
 
@@ -183,6 +184,7 @@ void applyLocalSymmetry(
 		const MultidimArray<RFLOAT>& ori_map,
 		const std::vector<FileName> fn_masks,
 		const std::vector<std::vector<Matrix1D<RFLOAT> > > ops,
+        const std::vector<std::vector<RFLOAT> > weights,
 		RFLOAT radius = -1.,
 		RFLOAT cosine_width_pix = 5.);
 
@@ -190,6 +192,7 @@ void applyLocalSymmetry(
 		MultidimArray<RFLOAT>& map,
 		const std::vector<FileName> fn_masks,
 		const std::vector<std::vector<Matrix1D<RFLOAT> > > ops,
+        const std::vector<std::vector<RFLOAT> > weights,
 		RFLOAT radius = -1.,
 		RFLOAT cosine_width_pix = 5.);
 

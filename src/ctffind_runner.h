@@ -88,6 +88,9 @@ public:
 	// Use pre-calculated power spectra
 	bool use_given_ps;
 
+    // Calculate extra ice statistics when using pre-calculated power spectra
+	bool do_extra_ice;
+
 	// Calculate Thon rings from movies?
 	bool do_movie_thon_rings;
 
@@ -136,6 +139,9 @@ public:
 
 	RFLOAT angpix;
 
+    // Resolution band for Rafa's ice ring statistics
+    RFLOAT ice_min, ice_max;
+
 	// Flag to only join results into a star file
 	bool do_only_join_results;
 
@@ -147,6 +153,9 @@ public:
 
 	// Disable "Slower, more exhaustive search?" in CTFFIND 4.1.5-
 	bool do_fast_search;
+
+    // As of CTFFINF-4.1.15 one can search for the tilt angle and axis too. This will be written to the logfile, but for now relion doesn't do anything with it.
+    bool do_tilt_search;
 
 	// Which GPU devices to use?
 	std::string gpu_ids;
@@ -180,13 +189,13 @@ public:
 	// Get micrograph metadata
 	bool getCtffindResults(FileName fn_mic, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
 			RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
-			RFLOAT &maxres, RFLOAT &valscore, RFLOAT &phaseshift, RFLOAT &icering, bool do_warn = true);
+			RFLOAT &maxres, RFLOAT &valscore, RFLOAT &phaseshift, RFLOAT &icering, RFLOAT &icepowerfrac, RFLOAT &icekurtosis, bool do_warn = true);
 	bool getCtffind3Results(FileName fn_mic, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
 			RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
 			RFLOAT &maxres, RFLOAT &phaseshift, RFLOAT &valscore, bool do_warn = true);
 	bool getCtffind4Results(FileName fn_mic, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
 			RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
-			RFLOAT &maxres, RFLOAT &phaseshift, RFLOAT &icering, bool do_warn = true);
+			RFLOAT &maxres, RFLOAT &phaseshift, RFLOAT &icering, RFLOAT &icepowerfrac, RFLOAT &icekurtosis, bool do_warn = true);
 };
 
 

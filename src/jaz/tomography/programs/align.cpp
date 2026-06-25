@@ -72,6 +72,7 @@ void AlignProgram::parseInput()
 	do_anisotropy = parser.checkOption("--aniso", "Assume an anisotropic projection model");
 	per_tilt_anisotropy = parser.checkOption("--per_tilt_aniso", "Fit independent view anisotropy for each tilt image");
 	num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "10000"));
+    only_do_unfinished =parser.checkOption("--only_do_unfinished", "Skip tomograms for which intermediate projections.star files exist");
 
 	int motion_section = parser.addSection("Motion estimation options");
 

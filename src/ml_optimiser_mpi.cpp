@@ -2506,7 +2506,7 @@ void MlOptimiserMpi::maximization()
 
 					// Apply local symmetry according to a list of masks and their operators
 					if ( (fn_local_symmetry_masks.size() != 0) && (fn_local_symmetry_operators.size() != 0) && (!has_converged) )
-						applyLocalSymmetry(mymodel.Iref[ith_recons], fn_local_symmetry_masks, fn_local_symmetry_operators);
+						applyLocalSymmetry(mymodel.Iref[ith_recons], fn_local_symmetry_masks, fn_local_symmetry_operators, local_symmetry_weights);
 
 					// Shaoda Jul26,2015 - Helical symmetry local refinement
 					if ( (iter > 1) && (do_helical_refine) && (!ignore_helical_symmetry) && (do_helical_symmetry_local_refinement) && mymodel.ref_dim != 2)
@@ -2640,7 +2640,7 @@ void MlOptimiserMpi::maximization()
 
 							// Apply local symmetry according to a list of masks and their operators
 							if ( (fn_local_symmetry_masks.size() != 0) && (fn_local_symmetry_operators.size() != 0) && (!has_converged) )
-								applyLocalSymmetry(mymodel.Iref[ith_recons], fn_local_symmetry_masks, fn_local_symmetry_operators);
+								applyLocalSymmetry(mymodel.Iref[ith_recons], fn_local_symmetry_masks, fn_local_symmetry_operators, local_symmetry_weights);
 
 							// Shaoda Jul26,2015 - Helical symmetry local refinement
 							if ( (iter > 1) && (do_helical_refine) && (!ignore_helical_symmetry) && (do_helical_symmetry_local_refinement) && mymodel.ref_dim != 2 )
@@ -4125,7 +4125,8 @@ void MlOptimiserMpi::iterate()
 		{
 			if ( (do_helical_refine) && (!do_skip_align) && (!do_skip_rotate) && mymodel.ref_dim == 3)
 			{
-					updatePriorsForHelicalReconstruction(
+                // Only update rot priors in local averaging for 1-start filaments, otherwise centre around rot from previous iteration
+                updatePriorsForHelicalReconstruction(
 							mydata.MDimg,
 							helical_sigma_distance * ((RFLOAT)(mymodel.ori_size)),
 							mymodel.helical_rise,

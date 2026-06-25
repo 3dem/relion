@@ -44,19 +44,19 @@
 #include "src/error.h"
 #include "src/ml_optimiser.h"
 #ifdef _CUDA_ENABLED
-#include "src/acc/cuda/cuda_ml_optimiser.h"
-#ifdef CUDA_PROFILING
-#include <nvtx3/nvToolsExt.h>
-#include <cuda_profiler_api.h>
-#endif
+    #include "src/acc/cuda/cuda_ml_optimiser.h"
+    #ifdef CUDA_PROFILING
+        #include <nvtx3/nvToolsExt.h>
+        #include <cuda_profiler_api.h>
+    #endif
 #elif _HIP_ENABLED
-#include "src/acc/hip/hip_ml_optimiser.h"
-#include <roctracer/roctx.h>
+    #include "src/acc/hip/hip_ml_optimiser.h"
+    #include <roctracer/roctx.h>
 #elif _SYCL_ENABLED
-	#include <cstdlib>
-	#include <cstring>
-	#include <tuple>
-	#include <algorithm>
+    #include <cstdlib>
+    #include <cstring>
+    #include <tuple>
+    #include <algorithm>
     #include "src/acc/sycl/sycl_ml_optimiser.h"
 #elif ALTCPU
     #include <atomic>
@@ -431,6 +431,11 @@ void MlOptimiser::parseContinue(int argc, char **argv)
     else
         do_center_classes = false;
 
+    if (parser.checkOption("--keep_priors_fixed", "Keep priors fixed, even for local angular searches?"))
+        keep_angular_priors_fixed = true;
+    else
+        keep_angular_priors_fixed = false;
+
     do_skip_maximization = parser.checkOption("--skip_maximize", "Skip maximization step (only write out data.star file)?");
 
     int corrections_section = parser.addSection("Corrections");
@@ -589,6 +594,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
     skip_realspace_helical_sym = parser.checkOption("--skip_realspace_helical_sym", "", "false", true);
 
     do_blush = parser.checkOption("--blush", "Perform the reconstruction with the Blush algorithm.");
+    blush_model = parser.getOption("--blush_model", "File location of a non-standard blush model", "");
     skip_spectral_trailing = parser.checkOption("--blush_skip_spectral_trailing", "Skip spectral trailing during Blush reconstruction (WARNING: This may inflate resolution estimates)");
 
 	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
@@ -770,6 +776,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     do_skip_rotate = parser.checkOption("--skip_rotate", "Skip rotational assignment (only translate and classify)?");
     do_bimodal_psi = parser.checkOption("--bimodal_psi", "Do bimodal searches of psi angle?"); // Oct07,2015 - Shaoda, bimodal psi
     do_skip_maximization = false;
+    keep_angular_priors_fixed = parser.checkOption("--keep_priors_fixed", "Keep priors fixed, even for local angular searches?");
 
     // Helical reconstruction
     int helical_section = parser.addSection("Helical reconstruction (in development...)");
@@ -1010,6 +1017,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be handled by fail-safe mode, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
 
     do_blush = parser.checkOption("--blush", "Perform the reconstruction with the Blush algorithm.");
+    blush_model = parser.getOption("--blush_model", "File location of a non-standard blush model", "");
     skip_spectral_trailing = parser.checkOption("--blush_skip_spectral_trailing", "Skip spectral trailing during Blush reconstruction (WARNING: This may inflate resolution estimates)");
 
     do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
@@ -2032,10 +2040,22 @@ void MlOptimiser::initialiseGeneral(int rank)
 
     char *env_blush_args = getenv("RELION_BLUSH_ARGS");
     if (env_blush_args != nullptr)
+    {
         blush_args += std::string(env_blush_args);
+    }
+
+    if (blush_model != "")
+        blush_args += std::string(" -m " + blush_model);
 
     if (skip_spectral_trailing)
         blush_args += " --skip-spectral-trailing ";
+
+    if (verb > 0 && blush_args != "")
+    {
+        std::cout << " +  Passing the below additional arguments to blush: " << std::endl;
+        std::cout << " +  " << blush_args << std::endl;
+    }
+
 
     if (do_gpu)
     {
@@ -2116,7 +2136,7 @@ void MlOptimiser::initialiseGeneral(int rank)
     fn_local_symmetry_masks.clear();
     fn_local_symmetry_operators.clear();
     if (fn_local_symmetry != "None")
-        readRelionFormatMasksAndOperators(fn_local_symmetry, fn_local_symmetry_masks, fn_local_symmetry_operators, mymodel.pixel_size, false);
+        readRelionFormatMasksAndOperators(fn_local_symmetry, fn_local_symmetry_masks, fn_local_symmetry_operators, local_symmetry_weights, mymodel.pixel_size, false);
 
     // For multi-body refinement: Read in the masks in the input STAR file, add a soft-edge to them, and write them to disc with the standard name
     if (do_initialise_bodies)
@@ -4749,7 +4769,7 @@ void MlOptimiser::symmetriseReconstructions()
                     wsum_model.BPref[ith_recons].applyHelicalSymmetry(
                             mymodel.helical_nr_asu,
                             mymodel.helical_twist[ith_recons],
-                            mymodel.helical_rise[ith_recons] / mymodel.pixel_size);
+                            mymodel.helical_rise[ith_recons] / mymodel.pixel_size, nr_threads);
 
                 if (fn_multi_sym.size() > ith_recons) // Always false if size=0
                 {
@@ -4773,7 +4793,7 @@ void MlOptimiser::symmetriseReconstructions()
                         wsum_model.BPref[iclass_half].applyHelicalSymmetry(
                                 mymodel.helical_nr_asu,
                                 mymodel.helical_twist[ith_recons],
-                                mymodel.helical_rise[ith_recons] / mymodel.pixel_size);
+                                mymodel.helical_rise[ith_recons] / mymodel.pixel_size, nr_threads);
 
                     if (fn_multi_sym.size() > ith_recons) // Always false if size=0
                     {
@@ -4810,7 +4830,7 @@ void MlOptimiser::applyLocalSymmetryForEachRef()
         {
             // either ibody or iclass can be larger than 0, never 2 at the same time!
             int ith_recons = (mymodel.nr_bodies > 1) ? ibody : iclass;
-            applyLocalSymmetry(mymodel.Iref[ith_recons], fn_local_symmetry_masks, fn_local_symmetry_operators);
+            applyLocalSymmetry(mymodel.Iref[ith_recons], fn_local_symmetry_masks, fn_local_symmetry_operators, local_symmetry_weights);
         }
     }
 }
@@ -5985,11 +6005,11 @@ void MlOptimiser::getFourierTransformsAndCtfs(
         // If there were no defined priors (i.e. their values were 999.), then use the "normal" angles
         // Also do this for local angular searches when not doing helical refinement (e.g. for subtomograms picked on certain geometries)
         // Note that helical refinement deals with priors in a special manner... So leave that untouched...
-        if ( (prior_rot > 998.99 && prior_rot < 999.01) || (!do_helical_refine && do_local_angular_searches) )
+        if ( (prior_rot > 998.99 && prior_rot < 999.01) || (!do_helical_refine && do_local_angular_searches && !keep_angular_priors_fixed) )
             prior_rot = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT);
-        if ( (prior_tilt > 998.99 && prior_tilt < 999.01) || (!do_helical_refine && do_local_angular_searches) )
+        if ( (prior_tilt > 998.99 && prior_tilt < 999.01) || (!do_helical_refine && do_local_angular_searches && !keep_angular_priors_fixed) )
             prior_tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_TILT);
-        if ( (prior_psi > 998.99 && prior_psi < 999.01) || (!do_helical_refine && do_local_angular_searches) )
+        if ( (prior_psi > 998.99 && prior_psi < 999.01) || (!do_helical_refine && do_local_angular_searches && !keep_angular_priors_fixed) )
             prior_psi = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI);
         if (prior_psi_flip_ratio > 998.99 && prior_psi_flip_ratio < 999.01)
             prior_psi_flip_ratio = 0.5;

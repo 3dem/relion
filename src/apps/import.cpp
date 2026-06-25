@@ -30,6 +30,7 @@ class import_parameters
 	bool do_write_types, do_continue, do_movies, do_micrographs, do_coordinates, do_halfmaps, do_particles, do_other;
    	FileName optics_group_name, node_type, particles_optics_group_name;
    	RFLOAT kV, Cs, Q0, beamtilt_x, beamtilt_y, pixel_size;
+    long int do_at_most;
 
 	// I/O Parser
 	IOParser parser;
@@ -65,6 +66,7 @@ class import_parameters
 		beamtilt_x = textToFloat(parser.getOption("--beamtilt_x", "Beam tilt (X; mrad)", "0.0"));
 		beamtilt_y = textToFloat(parser.getOption("--beamtilt_y", "Beam tilt (Y; mrad)", "0.0"));
 		do_continue = parser.checkOption("--continue", "Continue and old run, add more files to the same import directory");
+        do_at_most = textToInteger(parser.getOption("--do_at_most", "Add at most this many new movies or micrographs", "-1"));
 
 		// Check for errors in the command-line option
 		if (parser.checkForErrors())
@@ -83,7 +85,8 @@ class import_parameters
 		MetaDataTable MDout, MDopt;
 		std::vector<FileName> fns_in;
 		long nr_input_files = fn_in.globFiles(fns_in);
-		std::ofstream  fh;
+		long int nr_added = 0;
+        std::ofstream  fh;
 
 		int nr_count = 0;
 		if (do_movies) nr_count++;
@@ -96,6 +99,10 @@ class import_parameters
 		}
 
 		std::cout << " importing..." << std::endl;
+        if (do_at_most > 0)
+        {
+            std::cout << " - do at most " << do_at_most << " instances" << std::endl;
+        }
 		// For micrographs or movies
 		if (do_movies || do_micrographs)
 		{
@@ -182,11 +189,12 @@ class import_parameters
 						break;
 					}
 				}
-				if (!already_there)
+				if (!already_there && !(do_at_most > 0 && nr_added >= do_at_most))
 				{
 					MDout.addObject();
 					MDout.setValue(mylabel, fns_in[i]);
 					MDout.setValue(EMDL_IMAGE_OPTICS_GROUP, optics_group_number);
+                    nr_added++;
 				}
 			}
 
