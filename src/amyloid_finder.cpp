@@ -18,6 +18,8 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/amyloid_finder.h"
+
+#include <array>
 //#define DEBUG_BOUNDS
 
 void AmyloidFinder::read(int argc, char **argv, int rank)
@@ -305,6 +307,126 @@ MultidimArray<RFLOAT> AmyloidFinder::growNonSignalMask(MultidimArray<RFLOAT> &in
     return Mresult;
 
 }
+
+namespace
+{
+struct AmyloidPsiScore
+{
+    MultidimArray<RFLOAT> signal;
+    MultidimArray<RFLOAT> nonsignal;
+};
+
+void calculateAmyloidPsiScore(
+        AmyloidFinder &finder,
+        const MultidimArray<RFLOAT> &Mbig,
+        int ipsi,
+        std::vector<FourierTransformer> &rotation_transformers,
+        std::vector<FourierTransformer> &line_transformers,
+        AmyloidPsiScore &out)
+{
+    const int half_nr_psi = finder.nr_psi / 2;
+    const int source_ipsi = ipsi % half_nr_psi;
+    const RFLOAT source_psi = finder.getPsiAngle(source_ipsi);
+
+    MultidimArray<RFLOAT> Mrot;
+    Mrot.setXmippOrigin();
+    Mrot.initZeros(finder.large_box, finder.large_box);
+    rotate(Mbig, Mrot, source_psi, 'Z', true);
+
+    MultidimArray<Complex > FT, FT2;
+    rotation_transformers[0].FourierTransform(Mrot, FT, false);
+    windowFourierTransform(FT, FT2, finder.crop_box);
+    rotation_transformers[0].clear();
+    Mrot.reshape(finder.crop_box, finder.crop_box);
+    rotation_transformers[0].inverseFourierTransform(FT2, Mrot);
+    Mrot.setXmippOrigin();
+
+    if (ipsi >= half_nr_psi)
+    {
+        MultidimArray<RFLOAT> Mrot90;
+        Mrot90.initZeros(finder.crop_box, finder.crop_box);
+        Mrot90.setXmippOrigin();
+        for (long int i = STARTINGY(Mrot90) + 1; i <= FINISHINGY(Mrot90) - 1; i++)
+        {
+            for (long int j = STARTINGX(Mrot90) + 1; j <= FINISHINGX(Mrot90) - 1; j++)
+            {
+                A2D_ELEM(Mrot90, i, j) = A2D_ELEM(Mrot, -j, i);
+            }
+        }
+        Mrot = Mrot90;
+    }
+
+    MultidimArray<RFLOAT> scores_perline, nonscores_perline;
+    scores_perline.initZeros(finder.crop_box, finder.crop_box);
+    scores_perline.setXmippOrigin();
+    nonscores_perline.initZeros(finder.crop_box, finder.crop_box);
+    nonscores_perline.setXmippOrigin();
+
+    out.signal.initZeros(finder.crop_box / finder.shift_step, finder.crop_box / finder.shift_step);
+    out.signal.setXmippOrigin();
+    out.nonsignal.initZeros(finder.crop_box / finder.shift_step, finder.crop_box / finder.shift_step);
+    out.nonsignal.setXmippOrigin();
+
+    const int my_skip_side_length = finder.ilengthmax / 2;
+#pragma omp parallel for num_threads(finder.nr_threads)
+    for (int ypos = my_skip_side_length; ypos < YSIZE(Mrot) - my_skip_side_length; ypos += 1)
+    {
+        const int cen_ypos = ypos - YSIZE(Mrot) / 2;
+        const int tid = omp_get_thread_num();
+        MultidimArray<RFLOAT> oneline(finder.ilengthmax);
+        MultidimArray<Complex> FTline(finder.ilengthmax / 2 + 1);
+
+        for (int xpos = my_skip_side_length; xpos < XSIZE(Mrot) - my_skip_side_length; xpos += 1)
+        {
+            const int cen_xpos = xpos - XSIZE(Mrot) / 2;
+
+            for (int iline = 0; iline < finder.ilengthmax; iline++)
+                DIRECT_A1D_ELEM(oneline, iline) = A2D_ELEM(Mrot, cen_ypos, cen_xpos + iline - finder.ilengthmax / 2);
+
+            line_transformers[tid].FourierTransform(oneline, FTline, false);
+
+            for (int isig = finder.imin_signal; isig <= finder.imax_signal; isig++)
+                A2D_ELEM(scores_perline, cen_ypos, cen_xpos) += norm(DIRECT_A1D_ELEM(FTline, isig));
+
+            for (int isig = finder.imin_nonsignal; isig <= finder.imax_nonsignal; isig++)
+                A2D_ELEM(nonscores_perline, cen_ypos, cen_xpos) += norm(DIRECT_A1D_ELEM(FTline, isig));
+        }
+    }
+
+    const int my_skip_side_width = finder.iwidthmax / 2;
+#pragma omp parallel for num_threads(finder.nr_threads)
+    for (int ypos = 0; ypos < YSIZE(Mrot) / 2 - my_skip_side_width; ypos += finder.shift_step)
+    {
+        for (int ipassy = 0; ipassy < 2; ipassy++)
+        {
+            const int cen_ypos = (ipassy == 0) ? ypos : -ypos;
+            if (ypos == 0 && ipassy == 1) continue;
+
+            for (int xpos = 0; xpos < XSIZE(Mrot) / 2 - my_skip_side_width; xpos += finder.shift_step)
+            {
+                for (int ipass = 0; ipass < 2; ipass++)
+                {
+                    const int cen_xpos = (ipass == 0) ? xpos : -xpos;
+                    if (xpos == 0 && ipass == 1) continue;
+
+                    for (int iwidth = 0; iwidth < finder.iwidthmax; iwidth++)
+                    {
+                        A2D_ELEM(out.signal, cen_ypos / finder.shift_step, cen_xpos / finder.shift_step) +=
+                                A2D_ELEM(scores_perline, cen_ypos + iwidth - finder.iwidthmax / 2, cen_xpos);
+                        A2D_ELEM(out.nonsignal, cen_ypos / finder.shift_step, cen_xpos / finder.shift_step) +=
+                                A2D_ELEM(nonscores_perline, cen_ypos + iwidth - finder.iwidthmax / 2, cen_xpos);
+                    }
+                }
+            }
+        }
+    }
+
+    const RFLOAT psi = finder.getPsiAngle(ipsi);
+    selfRotate(out.signal, -psi);
+    selfRotate(out.nonsignal, -psi);
+}
+}
+
 void AmyloidFinder::getScoreForOneMicrograph(MultidimArray<RFLOAT> &image, MultidimArray<RFLOAT> &Mscore,
                                              MultidimArray<RFLOAT> &Mangle, RFLOAT &skew, RFLOAT &kurt, bool myverb)
 {
@@ -329,215 +451,47 @@ void AmyloidFinder::getScoreForOneMicrograph(MultidimArray<RFLOAT> &image, Multi
         }
     }
 
-    // Rotate the large image, and store downscaled images by cropping their Fourier Transform
-    std::vector<MultidimArray<RFLOAT> > rotated_imgs(nr_psi), rotated_scores_perline(nr_psi), rotated_scores(nr_psi);
-    std::vector<MultidimArray<RFLOAT> > rotated_nonscores_perline(nr_psi), rotated_nonscores(nr_psi);
-    std::vector<FourierTransformer> transformer(nr_threads);
-    // TODO: in principle, only need to rotate to 90 degrees, as I can use both the X and the Y direction for the 1D FFTs!
-    if (myverb)
-    {
-        std::cout << " - Rotating the input image ..." << std::endl;
-        init_progress_bar(nr_psi);
-    }
-
-#pragma omp parallel for num_threads(nr_threads)
-    for (int ipsi = 0; ipsi < nr_psi/2; ipsi++)
-    {
-        const int tid = omp_get_thread_num();
-        RFLOAT psi = getPsiAngle(ipsi);
-
-        // Rotate the images in their original size to prevent interpolation artefacts near the signal frequencies
-        MultidimArray<RFLOAT> Mrot;
-        Mrot.setXmippOrigin();
-        Mrot.initZeros(large_box, large_box);
-        rotate(Mbig, Mrot, psi, 'Z', true);
-
-        //Image<RFLOAT> Ir;
-        //Ir()=Mrot;
-        //Ir.write("Ir_psi"+ integerToString(ipsi)+".spi");
-        //std::cerr << " written: " << "Ir_psi"<< integerToString(ipsi)<<".spi" << std::endl;
-
-        // Re-scale image so that Nyquist is at down_angpix
-        MultidimArray<Complex > FT, FT2;
-        transformer[tid].FourierTransform(Mrot, FT, false);
-        windowFourierTransform(FT, FT2, crop_box);
-        Mrot.resize(crop_box, crop_box);
-        transformer[tid].inverseFourierTransform(FT2, Mrot);
-        Mrot.setXmippOrigin();
-        rotated_imgs[ipsi] = Mrot;
-
-    }
-    MultidimArray<RFLOAT> Mzero(crop_box, crop_box);
-    Mzero.setXmippOrigin();
-    for (int ipsi = nr_psi/2; ipsi < nr_psi; ipsi++)
-    {
-        rotated_imgs[ipsi] = Mzero;
-        // stay away from boundary to prevent many if-statements below. Images are cropped in larger box anyway, so boundaries should be zero
-        for (long int i=STARTINGY(Mzero)+1; i<=FINISHINGY(Mzero)-1; i++)
-        {
-            for (long int j=STARTINGX(Mzero)+1; j<=FINISHINGX(Mzero)-1; j++)
-            {
-                A2D_ELEM(rotated_imgs[ipsi], i, j) = A2D_ELEM(rotated_imgs[ipsi-nr_psi/2], -j, i);
-            }
-        }
-    }
-
-    if (myverb) progress_bar(nr_psi);
-
-    // Just prepare the rotated_scores vector too
-    for (int ipsi = 0; ipsi < nr_psi; ipsi++)
-    {
-        rotated_scores_perline[ipsi].initZeros(crop_box, crop_box);
-        rotated_scores_perline[ipsi].setXmippOrigin();
-        rotated_nonscores_perline[ipsi].initZeros(crop_box, crop_box);
-        rotated_nonscores_perline[ipsi].setXmippOrigin();
-        rotated_scores[ipsi].initZeros(crop_box/shift_step, crop_box/shift_step);
-        rotated_scores[ipsi].setXmippOrigin();
-        rotated_nonscores[ipsi].initZeros(crop_box/shift_step, crop_box/shift_step);
-        rotated_nonscores[ipsi].setXmippOrigin();
-    }
-
-    // Prepare all the transformers for the 1D lines
+    std::vector<FourierTransformer> rotation_transformers(1);
+    std::vector<FourierTransformer> line_transformers(nr_threads);
     MultidimArray<RFLOAT> oneline_tmp(ilengthmax);
     for (int i = 0; i < nr_threads; i++)
-        transformer[i].setReal(oneline_tmp);
+        line_transformers[i].setReal(oneline_tmp);
 
-    // Now loop over all positions to calculate 1D FFTs
-    if (myverb)
-    {
-        std::cout << " - Searching over all coordinates ..." << std::endl;
-        init_progress_bar(nr_psi);
-    }
-
-    int my_skip_side_length = ilengthmax/2;
-    for (int ipsi = 0; ipsi < nr_psi; ipsi++)
-    {
-#pragma omp parallel for num_threads(nr_threads)
-        for (int ypos = my_skip_side_length; ypos < YSIZE(rotated_imgs[ipsi]) - my_skip_side_length; ypos += 1)
-        {
-            int cen_ypos = ypos - YSIZE(rotated_imgs[ipsi])/2;
-            const int tid = omp_get_thread_num();
-            MultidimArray<RFLOAT> oneline(ilengthmax);
-            MultidimArray<Complex> FTline(ilengthmax/2 + 1);
-
-            for (int xpos = my_skip_side_length; xpos < XSIZE(rotated_imgs[ipsi]) - my_skip_side_length; xpos += 1)
-            {
-                int cen_xpos = xpos - XSIZE(rotated_imgs[ipsi])/2;
-
-                // Grab the line from the rotated image, in X and in Y directions
-                for (int iline = 0; iline < ilengthmax; iline++)
-                    DIRECT_A1D_ELEM(oneline, iline) = A2D_ELEM(rotated_imgs[ipsi], cen_ypos, cen_xpos+iline-ilengthmax/2);
-
-                transformer[tid].FourierTransform(oneline, FTline, false);
-
-                for (int isig = imin_signal; isig <= imax_signal; isig++)
-                {
-                    A2D_ELEM(rotated_scores_perline[ipsi], cen_ypos, cen_xpos) += norm(DIRECT_A1D_ELEM(FTline, isig));
-                }
-                for (int isig = imin_nonsignal; isig <= imax_nonsignal; isig++)
-                {
-                    A2D_ELEM(rotated_nonscores_perline[ipsi], cen_ypos, cen_xpos) += norm(DIRECT_A1D_ELEM(FTline, isig));
-                }
-
-            } // end loop ypos
-        } // end for xpos
-
-        /*
-        Image<RFLOAT> It0;
-        It0()= rotated_scores_perline[ipsi];
-        FileName fnt0="It0_scores_psi"+ integerToString(ipsi)+".spi";
-        It0.write(fnt0);
-        std::cerr <<" written: "<<fnt0 << std::endl;
-        It0()= rotated_nonscores_perline[ipsi];
-        fnt0="It0_nonscores_psi"+ integerToString(ipsi)+".spi";
-        It0.write(fnt0);
-        std::cerr <<" written: "<<fnt0 << std::endl;
-        */
-
-        // Now that we have signal per individual line for each coordinate, sum over the width of the search box
-        // The below is split in two halves, becauses otherwise cen_pos=0 may be sampled twice!!!
-        int my_skip_side_width = iwidthmax/2;
- #pragma omp parallel for num_threads(nr_threads)
-        for (int ypos = 0; ypos < YSIZE(rotated_imgs[ipsi])/2 - my_skip_side_width; ypos += shift_step)
-        {
-           for (int ipassy = 0; ipassy < 2; ipassy++)
-           {
-               int cen_ypos = (ipassy == 0) ? ypos : -ypos;
-               if (ypos == 0 && ipassy == 1) continue;
-
-               for (int xpos = 0; xpos < XSIZE(rotated_imgs[ipsi])/2 - my_skip_side_width; xpos += shift_step)
-               {
-                   for (int ipass = 0; ipass < 2; ipass++)
-                   {
-                       int cen_xpos = (ipass == 0) ? xpos : -xpos;
-                       if (xpos == 0 && ipass == 1) continue;
-                       for (int iwidth = 0; iwidth < iwidthmax; iwidth++)
-                       {
-                           // Grab the line from the rotated image, in X and in Y directions
-                           A2D_ELEM(rotated_scores[ipsi], cen_ypos/shift_step, cen_xpos/shift_step) +=
-                                   A2D_ELEM(rotated_scores_perline[ipsi], cen_ypos+iwidth-iwidthmax/2, cen_xpos);
-                           A2D_ELEM(rotated_nonscores[ipsi], cen_ypos/shift_step, cen_xpos/shift_step) +=
-                                   A2D_ELEM(rotated_nonscores_perline[ipsi], cen_ypos+iwidth-iwidthmax/2, cen_xpos);
-                       } // end loop iwidth
-                   } // end loop ipass
-               } // end loop xpos
-           } // end for ipassy
-        } // end for ypos
-
-        if (myverb) progress_bar(ipsi);
-
-    } // end for ipsi
-    if (myverb) progress_bar(nr_psi);
-
-
-    // Now loop over all positions and find the best Zscore and the best ipsi
-    // Note that each translation in the original image has a different coordinate in the rotated_score images!
-    // So, rotate those back first
-    if (myverb)
-    {
-        std::cout << " - Gathering search results ..." << std::endl;
-        init_progress_bar(nr_psi);
-    }
-
-#pragma omp parallel for num_threads(nr_threads)
-    for (int ipsi = 0; ipsi < nr_psi; ipsi++)
-    {
-        RFLOAT psi = getPsiAngle(ipsi);
-        selfRotate(rotated_scores[ipsi], -psi);
-        selfRotate(rotated_nonscores[ipsi], -psi);
-
-        /*
-        Image<RFLOAT> It;
-        It()= rotated_scores[ipsi];
-        FileName fnt="It_scores_psi"+ integerToString(ipsi)+".spi";
-        It.write(fnt);
-        std::cerr <<" written: "<<fnt << std::endl;
-        It()= rotated_nonscores[ipsi];
-        fnt="It_nonscores_psi"+ integerToString(ipsi)+".spi";
-        It.write(fnt);
-        std::cerr <<" written: "<<fnt << std::endl;
-        */
-    }
-
-
-
-    Mangle.resize(down_ysize/shift_step, down_xsize/shift_step);
+    Mangle.initZeros(down_ysize/shift_step, down_xsize/shift_step);
     Mangle.setXmippOrigin();
-    Mscore.resize(Mangle);
+    Mscore.initZeros(Mangle);
     MultidimArray<RFLOAT> Msum, Mnonsum, Mnonscore, Mneighbour, Mneighbour2;
-    Msum.resize(Mangle);
-    Mnonsum.resize(Mangle);
-    Mnonscore.resize(Mangle);
-    Mneighbour.resize(Mangle);
-    Mneighbour2.resize(Mangle);
+    Msum.initZeros(Mangle);
+    Mnonsum.initZeros(Mangle);
+    Mnonscore.initZeros(Mangle);
+    Mneighbour.initZeros(Mangle);
+    Mneighbour2.initZeros(Mangle);
 
-    // This can't be parallelised efficiently because need to protect Msums, Mscore and Mangle from simultaneous writing...
-    // Calculate Z-scores over psi: (max_psi - avg_psi) /stddev_psi
-    int xsize = XSIZE(Mscore);
-    int ysize = YSIZE(Mscore);
+    if (myverb)
+    {
+        std::cout << " - Searching over all orientations and coordinates ..." << std::endl;
+        init_progress_bar(nr_psi);
+    }
+
+    std::array<AmyloidPsiScore, 3> psi_scores;
+    int prev_slot = 0;
+    int curr_slot = 1;
+    int next_slot = 2;
+
+    calculateAmyloidPsiScore(*this, Mbig, nr_psi - 1, rotation_transformers, line_transformers, psi_scores[prev_slot]);
+    calculateAmyloidPsiScore(*this, Mbig, 0, rotation_transformers, line_transformers, psi_scores[curr_slot]);
+
+    const int xsize = XSIZE(Mscore);
+    const int ysize = YSIZE(Mscore);
     for (int ipsi = 0; ipsi < nr_psi; ipsi++)
     {
-        RFLOAT mypsi = getPsiAngle(ipsi);
+        calculateAmyloidPsiScore(*this, Mbig, (ipsi + 1) % nr_psi, rotation_transformers, line_transformers, psi_scores[next_slot]);
+
+        const RFLOAT mypsi = getPsiAngle(ipsi);
+        const AmyloidPsiScore &previous = psi_scores[prev_slot];
+        const AmyloidPsiScore &current = psi_scores[curr_slot];
+        const AmyloidPsiScore &next = psi_scores[next_slot];
+
         for (int ypos = 0; ypos < ysize; ypos ++)
         {
             int cen_ypos = ypos - ysize/2;
@@ -545,8 +499,8 @@ void AmyloidFinder::getScoreForOneMicrograph(MultidimArray<RFLOAT> &image, Multi
             {
                 int cen_xpos = xpos - xsize/2;
 
-                RFLOAT myscore = A2D_ELEM(rotated_scores[ipsi], cen_ypos, cen_xpos);
-                RFLOAT mynonscore = A2D_ELEM(rotated_nonscores[ipsi], cen_ypos, cen_xpos);
+                RFLOAT myscore = A2D_ELEM(current.signal, cen_ypos, cen_xpos);
+                RFLOAT mynonscore = A2D_ELEM(current.nonsignal, cen_ypos, cen_xpos);
                 A2D_ELEM(Msum, cen_ypos, cen_xpos) += myscore;
                 A2D_ELEM(Mnonsum, cen_ypos, cen_xpos) += mynonscore;
 
@@ -554,24 +508,29 @@ void AmyloidFinder::getScoreForOneMicrograph(MultidimArray<RFLOAT> &image, Multi
                 {
                     A2D_ELEM(Mscore, cen_ypos, cen_xpos) = myscore;
                     A2D_ELEM(Mangle, cen_ypos, cen_xpos) = mypsi;
-                    int ipsi_nb = (ipsi == 0) ? nr_psi - 1 : ipsi - 1;
-                    A2D_ELEM(Mneighbour, cen_ypos, cen_xpos) = A2D_ELEM(rotated_scores[ipsi_nb], cen_ypos, cen_xpos);
-                    ipsi_nb = (ipsi == nr_psi - 1) ? 0 : ipsi + 1;
-                    A2D_ELEM(Mneighbour, cen_ypos, cen_xpos) += A2D_ELEM(rotated_scores[ipsi_nb], cen_ypos, cen_xpos);
+                    A2D_ELEM(Mneighbour, cen_ypos, cen_xpos) =
+                            A2D_ELEM(previous.signal, cen_ypos, cen_xpos) +
+                            A2D_ELEM(next.signal, cen_ypos, cen_xpos);
                 }
 
                 if (mynonscore > A2D_ELEM(Mnonscore, cen_ypos, cen_xpos))
                 {
                     A2D_ELEM(Mnonscore, cen_ypos, cen_xpos) = mynonscore;
-                    int ipsi_nb = (ipsi == 0) ? nr_psi - 1 : ipsi - 1;
-                    A2D_ELEM(Mneighbour2, cen_ypos, cen_xpos) = A2D_ELEM(rotated_nonscores[ipsi_nb], cen_ypos, cen_xpos);
-                    ipsi_nb = (ipsi == nr_psi - 1) ? 0 : ipsi + 1;
-                    A2D_ELEM(Mneighbour2, cen_ypos, cen_xpos) += A2D_ELEM(rotated_nonscores[ipsi_nb], cen_ypos, cen_xpos);
+                    A2D_ELEM(Mneighbour2, cen_ypos, cen_xpos) =
+                            A2D_ELEM(previous.nonsignal, cen_ypos, cen_xpos) +
+                            A2D_ELEM(next.nonsignal, cen_ypos, cen_xpos);
                 }
-
             }
         }
+
+        if (myverb) progress_bar(ipsi);
+
+        const int old_prev_slot = prev_slot;
+        prev_slot = curr_slot;
+        curr_slot = next_slot;
+        next_slot = old_prev_slot;
     }
+    if (myverb) progress_bar(nr_psi);
 
 //#define DEBUG_FOM
 #ifdef DEBUG_FOM
