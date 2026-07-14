@@ -19,6 +19,8 @@
  ***************************************************************************/
 
 #include "src/displayer.h"
+#include <FL/Fl_Value_Slider.H>
+#include <FL/Fl_Choice.H>
 //#define DEBUG
 //
 #ifdef HAVE_PNG
@@ -38,10 +40,232 @@ const Fl_Menu_Item color_choices[] =
 };
 const int NUM_COLORS = 6;
 
+
+namespace
+{
+class volumeSliceViewerWindow : public Fl_Double_Window
+{
+private:
+    enum SliceAxis
+    {
+        AXIS_X = 0,
+        AXIS_Y = 1,
+        AXIS_Z = 2
+    };
+
+    MultidimArray<RFLOAT> volume;
+    DisplayBox *display_box;
+    Fl_Choice *axis_choice;
+    Fl_Value_Slider *slice_slider;
+    Fl_Value_Slider *black_slider;
+    Fl_Value_Slider *white_slider;
+    MetaDataTable metadata;
+    RFLOAT minval;
+    RFLOAT maxval;
+    RFLOAT volume_minval;
+    RFLOAT volume_maxval;
+    RFLOAT scale;
+
+    static void cb_slice(Fl_Widget *, void *data)
+    {
+        static_cast<volumeSliceViewerWindow *>(data)->showCurrentSlice();
+    }
+
+    static void cb_axis(Fl_Widget *, void *data)
+    {
+        static_cast<volumeSliceViewerWindow *>(data)->changeAxis();
+    }
+
+    static void cb_contrast(Fl_Widget *widget, void *data)
+    {
+        static_cast<volumeSliceViewerWindow *>(data)->changeContrast(widget);
+    }
+
+    int numberOfSlices() const
+    {
+        switch (axis_choice->value())
+        {
+        case AXIS_X: return XSIZE(volume);
+        case AXIS_Y: return YSIZE(volume);
+        default:     return ZSIZE(volume);
+        }
+    }
+
+    void extractCurrentSlice(MultidimArray<RFLOAT> &slice) const
+    {
+        const int index = ROUND(slice_slider->value());
+
+        switch (axis_choice->value())
+        {
+        case AXIS_X:
+            volume.getSlice(index, slice, 'X');
+            break;
+
+        case AXIS_Y:
+           volume.getSlice(index, slice, 'Y');
+           break;
+
+        default:
+            volume.getSlice(index, slice);
+            break;
+        }
+    }
+
+    void changeAxis()
+    {
+        const int count = numberOfSlices();
+        slice_slider->bounds(0, count - 1);
+        slice_slider->value(count / 2);
+        showCurrentSlice();
+    }
+
+    void changeContrast(Fl_Widget *changed_widget)
+    {
+        RFLOAT new_minval = black_slider->value();
+        RFLOAT new_maxval = white_slider->value();
+
+        // Keep a non-zero display range and prevent the controls crossing.
+        const RFLOAT minimum_step = XMIPP_MAX(
+            (volume_maxval - volume_minval) / 1000000.,
+            (RFLOAT)XMIPP_EQUAL_ACCURACY);
+
+        if (new_minval >= new_maxval)
+        {
+            if (changed_widget == black_slider)
+            {
+                new_minval = new_maxval - minimum_step;
+                black_slider->value(new_minval);
+            }
+            else
+            {
+                new_maxval = new_minval + minimum_step;
+                white_slider->value(new_maxval);
+            }
+        }
+
+        minval = new_minval;
+        maxval = new_maxval;
+
+        showCurrentSlice();
+    }
+
+    void showCurrentSlice()
+    {
+        MultidimArray<RFLOAT> slice;
+        extractCurrentSlice(slice);
+
+        // DisplayBox::setData() allocates its display buffer. Release the
+        // previous one before replacing the displayed slice.
+        if (display_box->img_data != NULL)
+        {
+            delete [] display_box->img_data;
+            display_box->img_data = NULL;
+        }
+
+        display_box->setData(slice, metadata.getObject(),
+                             ROUND(slice_slider->value()),
+                             minval, maxval, scale, true);
+        display_box->redraw();
+    }
+
+public:
+    volumeSliceViewerWindow(MultidimArray<RFLOAT> &image,
+                            RFLOAT _minval, RFLOAT _maxval,
+                            RFLOAT _sigma_contrast, RFLOAT _scale,
+                            const char *title)
+        : Fl_Double_Window(
+              XMIPP_MAX(320, CEIL(XMIPP_MAX(XSIZE(image), YSIZE(image)) * _scale)),
+              CEIL(XMIPP_MAX(YSIZE(image), ZSIZE(image)) * _scale) + 115,
+              title),
+          volume(image), display_box(NULL), axis_choice(NULL),
+          slice_slider(NULL), black_slider(NULL), white_slider(NULL),
+          minval(_minval), maxval(_maxval), volume_minval(0.),
+          volume_maxval(0.), scale(_scale)
+    {
+        // Determine one contrast range for the entire volume, so moving the
+        // slider or changing axis does not make the brightness jump.
+        getImageContrast(volume, minval, maxval, _sigma_contrast, true);
+        // Slider limits always span the actual intensity range of the volume.
+        volume.computeDoubleMinMax(volume_minval, volume_maxval);
+        const int canvas_width = w();
+        const int canvas_height = CEIL(XMIPP_MAX(YSIZE(volume), ZSIZE(volume)) * scale);
+        const int controls_y = canvas_height + 8;
+
+        begin();
+        display_box = new DisplayBox(0, 0, canvas_width, canvas_height, "");
+
+        axis_choice = new Fl_Choice(5, controls_y, 50, 25);
+        axis_choice->add("X|Y|Z");
+        axis_choice->value(AXIS_Z);
+        axis_choice->callback(cb_axis, this);
+
+        slice_slider = new Fl_Value_Slider(55, controls_y,
+                                           canvas_width - 65, 25);
+        slice_slider->type(FL_HOR_NICE_SLIDER);
+        slice_slider->bounds(0, ZSIZE(volume) - 1);
+        slice_slider->step(1);
+        slice_slider->precision(0);
+        slice_slider->value(ZSIZE(volume) / 2);
+        slice_slider->callback(cb_slice, this);
+        slice_slider->when(FL_WHEN_CHANGED | FL_WHEN_RELEASE);
+
+        Fl_Box *black_label = new Fl_Box(5, controls_y + 35, 45, 25, "Black:");
+        black_label->align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
+
+        black_slider = new Fl_Value_Slider(55, controls_y + 35,
+                                            canvas_width - 65, 25);
+        black_slider->type(FL_HOR_NICE_SLIDER);
+        black_slider->bounds(volume_minval, volume_maxval);
+        black_slider->precision(2);
+        black_slider->value(minval);
+        black_slider->callback(cb_contrast, this);
+        black_slider->when(FL_WHEN_CHANGED | FL_WHEN_RELEASE);
+
+        Fl_Box *white_label = new Fl_Box(5, controls_y + 70, 45, 25, "White:");
+        white_label->align(FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
+
+        white_slider = new Fl_Value_Slider(55, controls_y + 70,
+                                            canvas_width - 65, 25);
+        white_slider->type(FL_HOR_NICE_SLIDER);
+        white_slider->bounds(volume_minval, volume_maxval);
+        white_slider->precision(2);
+        white_slider->value(maxval);
+        white_slider->callback(cb_contrast, this);
+        white_slider->when(FL_WHEN_CHANGED | FL_WHEN_RELEASE);
+
+        // Fl_Value_Slider clamps initial values to its bounds. Keep the
+        // displayed contrast exactly synchronised with the controls.
+        minval = black_slider->value();
+        maxval = white_slider->value();
+        end();
+
+        metadata.addObject();
+        resizable(display_box);
+        showCurrentSlice();
+    }
+};
+
+int displayVolumeWithSliceSlider(MultidimArray<RFLOAT> &volume,
+                                 RFLOAT minval, RFLOAT maxval,
+                                 RFLOAT sigma_contrast, RFLOAT scale,
+                                 const char *title)
+{
+    volumeSliceViewerWindow win(volume, minval, maxval,
+                                sigma_contrast, scale, title);
+    win.show();
+    return Fl::run();
+}
+} // namespace
+
 /************************************************************************/
 void DisplayBox::draw()
 {
     if (!img_data) return;
+
+    // Clear pixels left behind when the newly displayed slice is smaller
+    // than the previous slice orientation.
+    fl_color(FL_BLACK);
+    fl_rectf(x(), y(), w(), h());
 
 	short xpos = x() + xoff;
 	short ypos = y() + yoff;
@@ -212,7 +436,11 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 			{
 				for (dx = xsize_data, xerr = xsize_data, old_ptr = img.data + sy * line_d; dx > 0; dx --, n++)
 				{
-					img_data[n] = (char)FLOOR((*old_ptr - minval) / step);
+					//img_data[n] = (char)FLOOR((*old_ptr - minval) / step);
+                    RFLOAT scaled_val = 255. * (*old_ptr - minval) / (maxval - minval);
+                    scaled_val = XMIPP_MAX((RFLOAT)0.,
+                                           XMIPP_MIN((RFLOAT)255., scaled_val));
+                    img_data[n] = static_cast<unsigned char>(FLOOR(scaled_val));
 					old_ptr += xstep;
 					xerr    -= xmod;
 					if (xerr <= 0)
@@ -237,8 +465,10 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 			{
 				for (dx = xsize_data, xerr = xsize_data, old_ptr = img.data + sy * line_d; dx > 0; dx --, n++)
 				{
-					unsigned char val = FLOOR((*old_ptr - minval) / step);
-					greyToRGB(colour_scheme, val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
+                    RFLOAT scaled_val = 255. * (*old_ptr - minval) / (maxval - minval);
+                    scaled_val = XMIPP_MAX((RFLOAT)0., XMIPP_MIN((RFLOAT)255., scaled_val));
+                    unsigned char val = static_cast<unsigned char>(FLOOR(scaled_val));
+                    greyToRGB(colour_scheme, val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
 					old_ptr += xstep;
 					xerr    -= xmod;
 					if (xerr <= 0)
@@ -264,15 +494,21 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 		{
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(img, n, old_ptr)
 			{
-				img_data[n] = FLOOR((*old_ptr - minval) / step);
-			}
+                RFLOAT scaled_val = 255. * (*old_ptr - minval) / (maxval - minval);
+                scaled_val = XMIPP_MAX((RFLOAT)0.,
+                                       XMIPP_MIN((RFLOAT)255., scaled_val));
+                img_data[n] = static_cast<unsigned char>(FLOOR(scaled_val));
+
+            }
 		}
 		else
 		{
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(img, n, old_ptr)
 			{
-				unsigned char val = FLOOR((*old_ptr - minval) / step);
-				greyToRGB(colour_scheme, val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
+				RFLOAT scaled_val = 255. * (*old_ptr - minval) / (maxval - minval);
+                scaled_val = XMIPP_MAX((RFLOAT)0., XMIPP_MIN((RFLOAT)255., scaled_val));
+                unsigned char val = static_cast<unsigned char>(FLOOR(scaled_val));
+                greyToRGB(colour_scheme, val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
 			}
 		}
 	}
@@ -3584,6 +3820,13 @@ void Displayer::run()
 		else if (ZSIZE(img()) > 1)
 		{
 
+			// Read the complete volume once. The slider viewer extracts and
+			// displays one Z slice at a time.
+			img.read(fn_in);
+			displayVolumeWithSliceSlider(img(), minval, maxval,
+			                             sigma_contrast, scale, fn_in.c_str());
+
+            /*
 			// Read volume slices from .mrc as if it were a .mrcs stack and then use normal slice viewer
 			// This will not work for Spider volumes...
 			if (fn_in.getFileFormat() != "mrc")
@@ -3610,6 +3853,7 @@ void Displayer::run()
 
 			basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
 			win.fillCanvas(MULTIVIEWER, MDin, &obsModel, EMDL_IMAGE_NAME, text_label, true, false, minval, maxval, sigma_contrast, scale, ori_scale, ncol, max_nr_images, lowpass, highpass);
+             */
 		}
 		else
 		{
