@@ -4083,7 +4083,7 @@ void Displayer::run()
                 if (verb > 0) std::cout << "Getting pixel size from tilt series image header: " << angpix << std::endl;
             }
 
-            if (verb > 0) std::cout << "Reading in all images for tiltseries " << fn_in.afterLastOf("/") << "..." << std::endl;
+            if (verb > 0) std::cout << "Reading in all images for " << fn_in.afterLastOf("/") << "..." << std::endl;
             if (verb > 0) init_progress_bar(n_slices);
 
 #pragma omp parallel for num_threads(nr_threads)
