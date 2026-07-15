@@ -11,7 +11,7 @@ find_path (X11_INCLUDES Xdbe.h)
 
 message(STATUS "CMAKE_BINARY_DIR:" ${CMAKE_BINARY_DIR})
 
-file(GLOB REL_GUI_SRC "${CMAKE_SOURCE_DIR}/src/manualpicker.cpp" "${CMAKE_SOURCE_DIR}/src/gui_*.cpp" "${CMAKE_SOURCE_DIR}/src/displayer.cpp")
+file(GLOB REL_GUI_SRC "${CMAKE_SOURCE_DIR}/src/manualpicker.cpp" "${CMAKE_SOURCE_DIR}/src/tiltseries_selector.cpp" "${CMAKE_SOURCE_DIR}/src/gui_*.cpp" "${CMAKE_SOURCE_DIR}/src/displayer.cpp")
 
 # AUTOMATIC VERSIONING
 # Reference: https://stackoverflow.com/questions/1435953/how-can-i-pass-git-sha1-to-compiler-as-definition-using-cmake
@@ -115,7 +115,7 @@ file(GLOB RELION_JAZ_TOMO_TARGETS "${CMAKE_SOURCE_DIR}/src/jaz/tomography/apps/*
 file(GLOB RELION_MPI_TARGETS RELATIVE "${CMAKE_SOURCE_DIR}/src/apps" "${CMAKE_SOURCE_DIR}/src/apps/*_mpi.cpp")
 list(APPEND RELION_MPI_TARGETS "postprocess.cpp;flex_analyse.cpp;autopick.cpp")
 
-set(GUI_TARGETS maingui display manualpick)
+set(GUI_TARGETS maingui display manualpick tiltseries_select)
 
 #--Remove apps using X11 if no GUI--
 if(NOT GUI)

@@ -400,14 +400,38 @@ private:
             output_metadata.write(fn_out);
         }
 
-        std::cout << "Saved " << fn_out << " with "
-                  << output_metadata.numberOfObjects()
-                  << " selected tilt images." << std::endl;
+        std::cout << "Saved " << fn_out << " with " << output_metadata.numberOfObjects() << " selected tilt images." << std::endl;
     }
 
 protected:
     int handle(int event) override
     {
+        // Space is a keyboard alternative to left-clicking the displayed image.
+        // Handle both events so this also works when one of the sliders has focus.
+        if (event == FL_KEYDOWN || event == FL_SHORTCUT)
+        {
+            const int key = Fl::event_key();
+
+            if (key == ' ')
+            {
+                toggleCurrentSlice();
+                return 1;
+            }
+
+            if (do_allow_save && (key == 's' || key == 'S'))
+            {
+                saveSelectedSlices();
+                hide();
+                return 1;
+            }
+            if (key == 'q' || key == 'Q')
+            {
+                hide();
+                return 1;
+            }
+
+        }
+
         if (event == FL_PUSH && Fl::event_button() == FL_LEFT_MOUSE)
         {
             const int mouse_x = Fl::event_x();
@@ -424,8 +448,8 @@ protected:
         else if (event == FL_PUSH && Fl::event_button() == FL_RIGHT_MOUSE)
         {
             Fl_Menu_Item menu[] = {
-                { "Save selected and Quit" },
-                { "Quit" },
+                { "&Save selected and Quit" },
+                { "&Quit" },
                 { 0 }
             };
 
@@ -436,12 +460,12 @@ protected:
             if (item == NULL)
                 return 0;
 
-            if (strcmp(item->label(), "Save selected and Quit") == 0)
+            if (item == &menu[0])
             {
                 saveSelectedSlices();
                 hide();
             }
-            else if (strcmp(item->label(), "Quit") == 0)
+            else if (item == &menu[1])
                 hide();
 
             return 1;
@@ -4056,11 +4080,11 @@ void Displayer::run()
             if (angpix < 0.)
             {
                 angpix = imgtmp.samplingRateX();
-                std::cerr << "Getting pixel size from tilt series image header: " << angpix << std::endl;
+                if (verb > 0) std::cout << "Getting pixel size from tilt series image header: " << angpix << std::endl;
             }
 
-            std::cout << "Reading in all images..." << std::endl;
-            init_progress_bar(n_slices);
+            if (verb > 0) std::cout << "Reading in all images for tiltseries " << fn_in.afterLastOf("/") << "..." << std::endl;
+            if (verb > 0) init_progress_bar(n_slices);
 
 #pragma omp parallel for num_threads(nr_threads)
             for(long int n= 0; n < n_slices; n++)
@@ -4105,18 +4129,17 @@ void Displayer::run()
                         MAT_ELEM(A, 0, 2) = xoff;
                         MAT_ELEM(A, 1, 2) = yoff;
                         selfApplyGeometry(img2d(), A, IS_INV, DONT_WRAP);
-                        if (lowpass > 0.)
-                            lowPassFilterMap(img2d(), lowpass, angpix);
-
                     }
+                    if (lowpass > 0.)
+                        lowPassFilterMap(img2d(), lowpass, angpix);
 
                     // set the 2D slice in the 3D image
                     img3d().setSlice(n, img2d());
                 }
-                progress_bar(n);
+                if (verb > 0) progress_bar(n);
             }
 
-            progress_bar(n_slices);
+            if (verb > 0) progress_bar(n_slices);
 
             displayTiltSeriesWithSliceSlider(img3d(), MDin, &obsModel,
                                              minval, maxval, sigma_contrast, scale,

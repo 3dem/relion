@@ -3144,17 +3144,38 @@ void JobWindow::initialiseTomoReconParWindow()
 
 void JobWindow::initialiseTomoExcludeTiltImagesWindow()
 {
-    setupTabs(1);
+	setupTabs(2);
 
-    tab1->begin();
-    tab1->label("I/O");
-    resetHeight();
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
 
-    place("in_tiltseries", TOGGLE_DEACTIVATE);
+	place("in_tiltseries", TOGGLE_DEACTIVATE);
 
-    // Add a little spacer
-    current_y += STEPY/2;
+	tab1->end();
 
-    place("cache_size", TOGGLE_DEACTIVATE);
-    tab1->end();
+
+	tab2->begin();
+	tab2->label("Display");
+	resetHeight();
+
+	place("scale");
+	place("sigma_contrast");
+	place("white_val");
+	place("black_val");
+
+	current_y += STEPY / 2;
+
+	place("lowpass");
+
+	current_y += STEPY / 2;
+
+	place("ctf_scale");
+	place("ctf_sigma_contrast");
+
+	tab2->end();
+
+	// This is an interactive GUI program and should always run locally.
+	guientries["do_queue"].deactivate_option = TOGGLE_ALWAYS_DEACTIVATE;
+	myjob.joboptions["do_queue"].setString("No");
 }
