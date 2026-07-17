@@ -3676,7 +3676,7 @@ void Displayer::read(int argc, char **argv)
 	else colour_scheme = GREYSCALE;
 	do_colourbar = parser.checkOption("--colour_bar", "Show colourbar image?");
 	do_ignore_optics = parser.checkOption("--ignore_optics", "Ignore information about optics groups in input STAR file?");
-    do_tiled_volumes = parser.checkOption("--tile3d", "Display 3D volumes as tiled slice as in relion-5.1 and earlier?");
+    do_tiled_volumes = !parser.checkOption("--slider3d", "Display 3D volumes with a slider for subsequent slices (instead of the default multi-slice viewer)");
     nr_threads = textToInteger(parser.getOption("--j", "Number of (openMP) threads", "1"));
 
 	int disp_section  = parser.addSection("Multiviewer options");

@@ -224,6 +224,7 @@ void TiltSeriesSelectorGuiWindow::launchViewer(int index, bool show_ctf)
     command << "relion_display"
             << " --i " << shellQuote(output_tiltseries_stars[index])
             << " --fn_imgs " << shellQuote(output_tiltseries_stars[index])
+            << " --slider3d "
             << " --j " << nr_threads;
 
     if (do_allow_save)
@@ -272,6 +273,7 @@ void TiltSeriesSelectorGuiWindow::launchTomogramViewer(int index)
     std::ostringstream command;
     command << "relion_display"
             << " --i " << shellQuote(filename)
+            << " --slider3d "
             << " --scale " << tomogram_scale
             << " --sigma_contrast " << tomogram_sigma_contrast
             << " --lowpass " << tomogram_lowpass
