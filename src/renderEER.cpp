@@ -44,7 +44,7 @@ TIFFErrorHandler EERRenderer::prevTIFFWarningHandler = NULL;
 void EERRenderer::TIFFWarningHandler(const char* module, const char* fmt, va_list ap)
 {
 	// Silence warnings for private tags
-	if (strcmp("Unknown field with tag %d (0x%x) encountered", fmt) == 0)
+	if (strstr("Unknown field with tag", fmt) == 0 || strstr("encountered", fmt) == 0)
 		return;
 
 	if (prevTIFFWarningHandler != NULL)
