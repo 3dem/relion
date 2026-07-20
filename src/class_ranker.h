@@ -104,6 +104,8 @@ public:
     FileName name;
     int class_index;
     int is_selected;
+    int projection_index;
+    RFLOAT projection_rot, projection_tilt;
 
     int protein_area, solvent_area;
     RFLOAT class_distribution, accuracy_rotation, accuracy_translation, estimated_resolution, particle_nr;
@@ -122,6 +124,9 @@ public:
     classFeatures(): name(""),
 			class_index(0),
     		is_selected(0),
+			projection_index(-1),
+			projection_rot(0.),
+			projection_tilt(0.),
 			particle_nr(0.),
     		class_distribution(0.),
 			accuracy_rotation(999.), //? Double check
@@ -155,6 +160,9 @@ public:
     	name = copy.name;
     	class_index = copy.class_index;
     	is_selected = copy.is_selected;
+		projection_index = copy.projection_index;
+		projection_rot = copy.projection_rot;
+		projection_tilt = copy.projection_tilt;
     	class_distribution = copy.class_distribution;
     	accuracy_rotation = copy.accuracy_rotation;
     	accuracy_translation= copy.accuracy_translation;
@@ -197,6 +205,9 @@ public:
     	name = copy.name;
     	class_index = copy.class_index;
     	is_selected = copy.is_selected;
+		projection_index = copy.projection_index;
+		projection_rot = copy.projection_rot;
+		projection_tilt = copy.projection_tilt;
     	class_distribution = copy.class_distribution;
     	accuracy_rotation = copy.accuracy_rotation;
     	accuracy_translation= copy.accuracy_translation;
@@ -372,6 +383,10 @@ public:
 	bool do_subimages, only_do_subimages;
     int nr_subimages, subimage_boxsize;
 
+	// For 3D classification, project every class in directions spanning the sphere
+	bool do_3d_class_ranking;
+	int nr_3d_projections;
+
 	// Automatically select classes
     RFLOAT select_min_score, select_max_score;
     int select_min_classes, select_min_parts;
@@ -381,6 +396,8 @@ public:
 	bool do_skip_angular_errors, do_granularity_features, do_save_masks, do_save_mask_c;
 
 	bool do_ctf_correction, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak;
+	bool have_average_ctf;
+	CTF average_ctf;
 	MlModel mymodel;
 	Experiment mydata;
 	MetaDataTable MD_optimiser, MD_select;
@@ -388,7 +405,7 @@ public:
 
 public:
 
-	ClassRanker(){}
+	ClassRanker(): do_3d_class_ranking(false), nr_3d_projections(192), have_average_ctf(false) {}
 
 	/** Destructor
 	  *
@@ -446,6 +463,12 @@ private:
 	void onlyGetSubimages();
 
 	void getFeatures();
+
+	void get3DProjectionDirections(std::vector<RFLOAT> &rots, std::vector<RFLOAT> &tilts);
+
+	MultidimArray<RFLOAT> project3DClass(int iclass, RFLOAT rot, RFLOAT tilt);
+
+	void calculateImageFeatures(MultidimArray<RFLOAT> input_image, classFeatures &features_this_class);
 
 	void readFeatures();
 
