@@ -674,6 +674,9 @@ public:
 	// Flag to show colour scalebar image
 	bool do_colourbar;
 
+    // Flag to display volumes as tiled slices to maintain the same functionality as up to relion-5.1
+    bool do_tiled_volumes;
+
 	// data.star metadata (for do_class)
 	MetaDataTable MDdata;
 
@@ -700,6 +703,9 @@ public:
 
 	// Pixel size to calculate lowpass filter in Angstroms and translations in apply_orient
 	RFLOAT angpix;
+
+    // Number of threads (to deal with tilt series)
+    int nr_threads;
 
 	// Show Fourier amplitudes?
 	bool show_fourier_amplitudes;

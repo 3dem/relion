@@ -491,7 +491,7 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 		    type != PROC_TOMO_DENOISE_TOMOGRAM &&
 		    type != PROC_TOMO_PICK_TOMOGRAM &&
 		    type != PROC_TOMO_RECONSTRUCT &&
-		    type != PROC_TOMO_EXCLUDE_TILT_IMAGES &&
+		    type != PROC_TOMO_SELECT_TILTSERIES &&
 		    type != PROC_EXTERNAL)
 			return false;
 
@@ -903,10 +903,10 @@ void RelionJob::initialise(int _job_type)
 		has_mpi = has_thread = false;
 		initialiseTomoImportJob();
 	}
-	else if (type == PROC_TOMO_EXCLUDE_TILT_IMAGES)
+	else if (type == PROC_TOMO_SELECT_TILTSERIES)
 	{
 		has_mpi = has_thread = false;
-		initialiseTomoExcludeTiltImagesJob();
+        initialiseTomoSelectTiltSeriesJob();
 	}
 	else if (type == PROC_TOMO_ALIGN_TILTSERIES)
 	{
@@ -929,10 +929,10 @@ void RelionJob::initialise(int _job_type)
 		has_mpi = has_thread = false;
 		initialiseTomoPickTomogramsJob();
 	}
-	else if (type == PROC_TOMO_EXCLUDE_TILT_IMAGES)
+	else if (type == PROC_TOMO_SELECT_TILTSERIES)
 	{
 		has_mpi = has_thread = false;
-		initialiseTomoExcludeTiltImagesJob();
+        initialiseTomoSelectTiltSeriesJob();
 	}
 	else if (type == PROC_TOMO_SUBTOMO)
 	{
@@ -1197,9 +1197,10 @@ bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &c
 	{
 		result = getCommandsTomoAlignTiltSeriesJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
-	else if (type == PROC_TOMO_EXCLUDE_TILT_IMAGES)
+	else if (type == PROC_TOMO_SELECT_TILTSERIES)
 	{
-		result = getCommandsTomoExcludeTiltImagesJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
+		result = getCommandsTomoSelectTiltSeriesJob(outputname, commands, final_command, do_makedir, job_counter,
+                                                    error_message);
 	}
 	else if (type == PROC_TOMO_RECONSTRUCT_TOMOGRAM)
 	{
@@ -7134,47 +7135,144 @@ bool RelionJob::getCommandsTomoPickTomogramsJob(std::string &outputname, std::ve
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
 
-void RelionJob::initialiseTomoExcludeTiltImagesJob()
-{
-	hidden_name = ".gui_tomo_exclude_tilt_images";
+void RelionJob::initialiseTomoSelectTiltSeriesJob() {
+    hidden_name = ".gui_tomo_select_tilt_series";
 
-	joboptions["in_tiltseries"] = JobOption("Input tilt series:", LABEL_TOMOGRAMS_CPIPE, 1, "", "Tilt sereis STAR files (*.star)",  "Input global tilt series star file.");
-	joboptions["cache_size"] = JobOption("Number of cached tilt series ", 5, 1, 10, 1, "This controls the number of cached tilt series in Napari.");
+    joboptions["in_tiltseries"] = JobOption(
+            "Input tilt series:",
+            LABEL_TOMOGRAMS_CPIPE,
+            1,
+            "",
+            "Tilt series STAR files (*.star)",
+            "Input global tilt-series STAR file.");
+
+    joboptions["scale"] = JobOption(
+            "Scale for tilt images:",
+            0.2,
+            0.05,
+            1.0,
+            0.05,
+            "The tilt images will be displayed at this relative scale.");
+
+    joboptions["sigma_contrast"] = JobOption(
+            "Sigma contrast:",
+            3.0,
+            0.0,
+            10.0,
+            0.5,
+            "Display images with black and white values determined from this "
+            "many standard deviations around the mean. Set this to zero to "
+            "use the explicitly specified black and white values.");
+
+    joboptions["lowpass"] = JobOption(
+            "Lowpass filter (A):",
+            20.0,
+            -1.0,
+            100.0,
+            5.0,
+            "Lowpass filter applied when displaying tilt images. "
+            "Give a negative value to disable lowpass filtering.");
+
+    joboptions["ctf_scale"] = JobOption(
+            "Scale for CTF images:",
+            1.0,
+            0.05,
+            2.0,
+            0.05,
+            "Relative scale used when displaying CTF images.");
+
+    joboptions["ctf_sigma_contrast"] = JobOption(
+            "Sigma contrast for CTF images:",
+            3.0,
+            0.0,
+            10.0,
+            0.5,
+            "Sigma contrast used when displaying CTF images.");
+
+    joboptions["tomogram_scale"] = JobOption(
+			"Scale for tomograms:",
+			1.0,
+			0.05,
+			2.0,
+			0.05,
+			"Relative scale used when displaying reconstructed or "
+			"denoised tomograms.");
+
+	joboptions["tomogram_sigma_contrast"] = JobOption(
+			"Sigma contrast for tomograms:",
+			3.0,
+			0.0,
+			10.0,
+			0.5,
+			"Sigma contrast used when displaying reconstructed or "
+			"denoised tomograms.");
+
+	joboptions["tomogram_lowpass"] = JobOption(
+			"Lowpass filter for tomograms (A):",
+			-1.0,
+			-1.0,
+			100.0,
+			5.0,
+			"Lowpass filter applied when displaying reconstructed or "
+			"denoised tomograms. Give a negative value to disable filtering.");
 }
 
-bool RelionJob::getCommandsTomoExcludeTiltImagesJob(std::string &outputname, std::vector<std::string> &commands,
-                                       std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+bool RelionJob::getCommandsTomoSelectTiltSeriesJob(
+		std::string &outputname,
+		std::vector<std::string> &commands,
+		std::string &final_command,
+		bool do_makedir,
+		int job_counter,
+		std::string &error_message)
 {
 	commands.clear();
 	initialisePipeline(outputname, job_counter);
-	std::string command;
 
-	if (error_message != "") return false;
+	const FileName fn_in = joboptions["in_tiltseries"].getString();
 
-	command="`which relion_python_tomo_exclude_tilt_images` ";
-
-	if (joboptions["in_tiltseries"].getString() == "")
+	if (fn_in == "")
 	{
-		error_message = "ERROR: you need to provide an input STAR file";
+		error_message = "ERROR: you need to provide an input tilt-series STAR file.";
 		return false;
 	}
 
-	command += " --tilt-series-star-file " + joboptions["in_tiltseries"].getString();
-	command += " --cache-size " + joboptions["cache_size"].getString() + ' ';
+	std::string command = "`which relion_tiltseries_select`";
 
-	Node node(joboptions["in_tiltseries"].getString(), joboptions["in_tiltseries"].node_type);
-	inputNodes.push_back(node);
+	command += " --i " + fn_in;
+	Node input_node(fn_in, joboptions["in_tiltseries"].node_type);
+	inputNodes.push_back(input_node);
 
-	command += " --output-directory " + outputname;
-	Node node2(outputname+"selected_tilt_series.star", LABEL_EXCLUDE_TOMOGRAMS);
-	outputNodes.push_back(node2);
+	// The selector creates the individual working STAR files below:
+	//
+	//     <outputname>/tilt_series/
+	//
+	// and makes the outer selection STAR reference those working files.
+	const FileName fn_outstar = outputname + "tilt_series.star";
 
-	// Other arguments for extraction
+	command += " --odir " + outputname;
+	command += " --selection " + fn_outstar;
+	command += " --allow_save";
+
+	Node output_node(fn_outstar, LABEL_EXCLUDE_TOMOGRAMS);
+	outputNodes.push_back(output_node);
+
+	command += " --scale " + joboptions["scale"].getString();
+	command += " --sigma_contrast " + joboptions["sigma_contrast"].getString();
+	command += " --lowpass " + joboptions["lowpass"].getString();
+
+	command += " --ctf_scale " + joboptions["ctf_scale"].getString();
+	command += " --ctf_sigma_contrast "	+ joboptions["ctf_sigma_contrast"].getString();
+
+    command += " --tomogram_scale " + joboptions["tomogram_scale"].getString();
+	command += " --tomogram_sigma_contrast " + joboptions["tomogram_sigma_contrast"].getString();
+	command += " --tomogram_lowpass " + joboptions["tomogram_lowpass"].getString();
+
 	command += " " + joboptions["other_args"].getString();
+
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-} 
+}
 
 void RelionJob::initialiseTomoSubtomoJob()
 {

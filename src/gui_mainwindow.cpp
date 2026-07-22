@@ -429,17 +429,17 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 		browse_grp[nr_browse_tabs]->end();
 		nr_browse_tabs++;
 
-		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Exclude tilt-images");
-		gui_jobwindows[nr_browse_tabs] = new JobWindow();
-		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_EXCLUDE_TILT_IMAGES);
-		browse_grp[nr_browse_tabs]->end();
-		nr_browse_tabs++;
-
         browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
         browser->add("Align tilt-series");
         gui_jobwindows[nr_browse_tabs] = new JobWindow();
         gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_ALIGN_TILTSERIES);
+        browse_grp[nr_browse_tabs]->end();
+        nr_browse_tabs++;
+
+        browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+        browser->add("Select tilt-series");
+        gui_jobwindows[nr_browse_tabs] = new JobWindow();
+        gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_SELECT_TILTSERIES);
         browse_grp[nr_browse_tabs]->end();
         nr_browse_tabs++;
 
@@ -1484,52 +1484,57 @@ void GuiMainWindow::cb_display_io_node_i()
 		command += " " + manualpickjob.joboptions["other_args"].getString() + " &";
 	}
     else if (pipeline.nodeList[mynode].type.find(LABEL_IMPORT_TOMOGRAMS) != std::string::npos ||
-            pipeline.nodeList[mynode].type.find(LABEL_MOCORR_TOMOGRAMS) != std::string::npos ||
-            pipeline.nodeList[mynode].type.find(LABEL_CTFFIND_TOMOGRAMS) != std::string::npos ||
-            pipeline.nodeList[mynode].type.find(LABEL_TILTALIGN_TOMOGRAMS) != std::string::npos ||
-            pipeline.nodeList[mynode].type.find(LABEL_EXCLUDE_TOMOGRAMS) != std::string::npos )
-    {
-
-        command = "relion_python_tomo_view tilt-series --tilt-series-star-file " + pipeline.nodeList[mynode].name;
-
-        // Read cache-size from gui_tomo_exclude_tilt_imagesjob.star if that file exists
-		RelionJob excludetiltseriesjob;
-		FileName fn_job = ".gui_tomo_exclude_tilt_images";
-		bool iscont=false;
-		if (exists(fn_job+"job.star"))
-		{
-			excludetiltseriesjob.read(fn_job.c_str(), iscont, true); // true means do initialise
-            command += " --cache-size " + excludetiltseriesjob.joboptions["cache_size"].getString();
-        }
-
-        // Run in the background
-        command += " &";
-
-    }
-    /*
-    else if (pipeline.nodeList[mynode].type.find(LABEL_RECONSTRUCT_TOMOGRAMS) != std::string::npos ||
+             pipeline.nodeList[mynode].type.find(LABEL_MOCORR_TOMOGRAMS) != std::string::npos ||
+             pipeline.nodeList[mynode].type.find(LABEL_CTFFIND_TOMOGRAMS) != std::string::npos ||
+             pipeline.nodeList[mynode].type.find(LABEL_TILTALIGN_TOMOGRAMS) != std::string::npos ||
+             pipeline.nodeList[mynode].type.find(LABEL_EXCLUDE_TOMOGRAMS) != std::string::npos ||
+             pipeline.nodeList[mynode].type.find(LABEL_RECONSTRUCT_TOMOGRAMS) != std::string::npos ||
              pipeline.nodeList[mynode].type.find(LABEL_DENOISE_TOMOGRAMS) != std::string::npos ||
              pipeline.nodeList[mynode].type.find(LABEL_CTFREFINE_TOMOGRAMS) != std::string::npos ||
-             pipeline.nodeList[mynode].type.find(LABEL_FRAMEALIGN_TOMOGRAMS) != std::string::npos )
+             pipeline.nodeList[mynode].type.find(LABEL_FRAMEALIGN_TOMOGRAMS) != std::string::npos)
     {
+        command = "`which relion_tiltseries_select`"
+                  " --i " + pipeline.nodeList[mynode].name;
 
-        command = "relion_python_tomo_view tomograms --tilt-series-star-file " + pipeline.nodeList[mynode].name;
+        RelionJob selecttiltseriesjob;
+        FileName fn_job = ".gui_tomo_select_tiltseries";
+        bool iscont = false;
 
-        // Read cache-size from gui_tomo_exclude_tilt_imagesjob.star if that file exists
-        RelionJob excludetiltseriesjob;
-        FileName fn_job = ".gui_tomo_exclude_tilt_images";
-        bool iscont=false;
-        if (exists(fn_job+"job.star"))
+        if (exists(fn_job + "job.star") || exists(fn_job + "run.job"))
         {
-            excludetiltseriesjob.read(fn_job.c_str(), iscont, true); // true means do initialise
-            command += " --cache-size " + excludetiltseriesjob.joboptions["cache_size"].getString();
+            selecttiltseriesjob.read(fn_job.c_str(), iscont, true);
+
+            command += " --scale "
+                       + selecttiltseriesjob.joboptions["scale"].getString();
+            command += " --sigma_contrast "
+                       + selecttiltseriesjob.joboptions["sigma_contrast"].getString();
+            command += " --lowpass "
+                       + selecttiltseriesjob.joboptions["lowpass"].getString();
+            command += " --ctf_scale "
+                       + selecttiltseriesjob.joboptions["ctf_scale"].getString();
+            command += " --ctf_sigma_contrast "
+                       + selecttiltseriesjob.joboptions["ctf_sigma_contrast"].getString();
+            command += " --tomogram_lowpass "
+                       + selecttiltseriesjob.joboptions["tomogram_lowpass"].getString();
+            command += " --tomogram_scale "
+                       + selecttiltseriesjob.joboptions["tomogram_scale"].getString();
+            command += " --tomogram_sigma_contrast "
+                       + selecttiltseriesjob.joboptions["tomogram_sigma_contrast"].getString();
+        }
+        else
+        {
+            command += " --scale 0.2";
+            command += " --sigma_contrast 3";
+            command += " --lowpass 20";
+            command += " --ctf_scale 1";
+            command += " --ctf_sigma_contrast 3";
+            command += " --tomogram_scale 1";
+            command += " --tomogram_sigma_contrast 3";
+            command += " --tomogram_lowpass -1";
         }
 
-        // Run in the background
         command += " &";
-
     }
-    */
 	else if (pipeline.nodeList[mynode].type.find(LABEL_LOGFILE_CPIPE) != std::string::npos )
 	{
 		const char * default_pdf_viewer = getenv ("RELION_PDFVIEWER_EXECUTABLE");

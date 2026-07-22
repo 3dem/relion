@@ -339,6 +339,7 @@ static bool do_allow_change_minimum_dedicated;
 #define PROC_TOMO_SUBTOMO_DIRNAME     "Extract"           // Creation of pseudo-subtomograms from tilt series images
 #define PROC_TOMO_CTFREFINE_DIRNAME   "CtfRefine"           // CTF refinement (defocus & aberrations) for tomography
 #define PROC_TOMO_EXCLUDE_TILT_IMAGES_DIRNAME   "ExcludeTiltImages"  // Exclusion of bad tilt-images from tilt-series
+#define PROC_TOMO_SELECT_TILTSERIES_DIRNAME   "SelectTiltSeries"  // New job to select tiltseries and their individual images in relion-5.2. Replaces old exlcude tilt-images job
 #define PROC_TOMO_ALIGN_DIRNAME       "Polish"  // Frame alignment and particle polishing for subtomography
 #define PROC_TOMO_RECONSTRUCT_DIRNAME "Reconstruct" // Calculation of particle average from the individual tilt series images
 #define PROC_TOMO_DENOISE_DIRNAME "Denoise" // Denoise tomograms
@@ -371,6 +372,7 @@ static bool do_allow_change_minimum_dedicated;
 #define PROC_MODELANGELO_LABELNEW      "modelangelo"         // Kiarash's ModelAngelo for automated model building
 #define PROC_TOMO_IMPORT_LABELNEW      "relion.importtomo"              // Import for tomography GUI
 #define PROC_TOMO_EXCLUDE_TILT_IMAGES_LABELNEW "relion.excludetilts"    // Exclude bad tilt-images
+#define PROC_TOMO_SELECT_TILTSERIES_LABELNEW "relion.selecttiltseries"    // New job to select tiltseries, replaces exclude tilt-images job in relion-5.2
 #define PROC_TOMO_SUBTOMO_LABELNEW     "relion.pseudosubtomo"           // Creation of pseudo-subtomograms from tilt series images
 #define PROC_TOMO_CTFREFINE_LABELNEW   "relion.ctfrefinetomo"           // CTF refinement (defocus & aberrations) for tomography
 #define PROC_TOMO_ALIGN_LABELNEW       "relion.framealigntomo"          // Frame alignment and particle polishing for subtomography
@@ -416,6 +418,7 @@ static bool do_allow_change_minimum_dedicated;
 #define PROC_TOMO_EXCLUDE_TILT_IMAGES 57 // Exclude bad tilt-images from tilt-series
 #define PROC_TOMO_DENOISE_TOMOGRAM 58 // Denoise tomograms
 #define PROC_TOMO_PICK_TOMOGRAM 59 // Denoise tomograms
+#define PROC_TOMO_SELECT_TILTSERIES 60 // New job to select tiltseries and tomograms in relion-5.2; replaces PROC_TOMO_EXCLUDE_TILT_IMAGES
 #define PROC_EXTERNAL       99// External scripts
 
 
@@ -450,6 +453,7 @@ static std::map<int, std::string> proc_type2dirname = {{PROC_IMPORT, PROC_IMPORT
  	    {PROC_TOMO_DENOISE_TOMOGRAM, PROC_TOMO_DENOISE_DIRNAME},
         {PROC_TOMO_PICK_TOMOGRAM, PROC_TOMO_PICK_DIRNAME},
         {PROC_TOMO_EXCLUDE_TILT_IMAGES, PROC_TOMO_EXCLUDE_TILT_IMAGES_DIRNAME},
+        {PROC_TOMO_SELECT_TILTSERIES, PROC_TOMO_SELECT_TILTSERIES_DIRNAME},
 		{PROC_EXTERNAL,         PROC_EXTERNAL_DIRNAME}};
 
 static std::map<int, std::string> proc_type2labelnew = {{PROC_IMPORT, PROC_IMPORT_LABELNEW},
@@ -482,7 +486,8 @@ static std::map<int, std::string> proc_type2labelnew = {{PROC_IMPORT, PROC_IMPOR
         {PROC_TOMO_RECONSTRUCT_TOMOGRAM, PROC_TOMO_RECONSTRUCT_TOMOGRAM_LABELNEW},
  	    {PROC_TOMO_DENOISE_TOMOGRAM, PROC_TOMO_DENOISE_LABELNEW},
  	    {PROC_TOMO_PICK_TOMOGRAM, PROC_TOMO_PICK_LABELNEW},
-	    {PROC_TOMO_EXCLUDE_TILT_IMAGES, PROC_TOMO_EXCLUDE_TILT_IMAGES_LABELNEW},
+        {PROC_TOMO_EXCLUDE_TILT_IMAGES, PROC_TOMO_EXCLUDE_TILT_IMAGES_LABELNEW},
+        {PROC_TOMO_SELECT_TILTSERIES, PROC_TOMO_SELECT_TILTSERIES_LABELNEW},
         {PROC_EXTERNAL,         PROC_EXTERNAL_LABELNEW}};
 
 static std::map<std::string, int> proc_dirname2type = {
@@ -551,6 +556,7 @@ static std::map<std::string, int> proc_labelnew2type = {
  	    {PROC_TOMO_DENOISE_LABELNEW, PROC_TOMO_DENOISE_TOMOGRAM},
  	    {PROC_TOMO_PICK_LABELNEW, PROC_TOMO_PICK_TOMOGRAM},
 	    {PROC_TOMO_EXCLUDE_TILT_IMAGES_LABELNEW, PROC_TOMO_EXCLUDE_TILT_IMAGES},
+        {PROC_TOMO_SELECT_TILTSERIES_LABELNEW, PROC_TOMO_SELECT_TILTSERIES},
         {PROC_EXTERNAL_LABELNEW,         PROC_EXTERNAL}};
 
 
@@ -966,9 +972,9 @@ public:
     bool getCommandsTomoPickTomogramsJob(std::string &outputname, std::vector<std::string> &commands,
                                             std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
-    void initialiseTomoExcludeTiltImagesJob();
-    bool getCommandsTomoExcludeTiltImagesJob(std::string &outputname, std::vector<std::string> &commands,
-                                  std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+    void initialiseTomoSelectTiltSeriesJob();
+    bool getCommandsTomoSelectTiltSeriesJob(std::string &outputname, std::vector<std::string> &commands,
+                                            std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 				  
     void initialiseTomoSubtomoJob();
     bool getCommandsTomoSubtomoJob(std::string &outputname, std::vector<std::string> &commands,
