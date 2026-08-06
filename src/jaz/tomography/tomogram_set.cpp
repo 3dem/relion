@@ -151,7 +151,7 @@ void TomogramSet::removeTomogram(std::string tomogramName)
 }
 
 Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenFramesOnly, bool loadOddFramesOnly,
-                                   int _w0, int _h0, int _d0, bool ignore_tomo_size) const //Set loadEven/OddFramesOnly to True to loadImageData from rlnTomoMicrographNameEven/Odd rather than rlnMicrographName
+                                   int _w0, int _h0, int _d0, bool ignore_tomo_size, bool skip_tilt_image_size) const //Set loadEven/OddFramesOnly to True to loadImageData from rlnTomoMicrographNameEven/Odd rather than rlnMicrographName
 {
 	Tomogram out;
 
@@ -208,11 +208,18 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
         {
             out.hasImage = false;
 
-            t3Vector<long int> isl = ImageFileHelper::getSize(out.tiltSeriesFilename);
+            if (skip_tilt_image_size)
+            {
+                stackSize.z = out.frameCount;
+            }
+            else
+            {
+                t3Vector<long int> isl = ImageFileHelper::getSize(out.tiltSeriesFilename);
 
-            stackSize.x = isl.x;
-            stackSize.y = isl.y;
-            stackSize.z = isl.z;
+                stackSize.x = isl.x;
+                stackSize.y = isl.y;
+                stackSize.z = isl.z;
+            }
 
             // Still set image size in header, as this is used for example in TomoBackprojectProgram::getProjectMatrices
             out.stack.xdim = stackSize.x;
@@ -258,11 +265,15 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
         	m.getValueSafely(EMDL_MICROGRAPH_NAME, fn_img, 0);
         }
 
-        Image<RFLOAT> I;
-        I.read(fn_img,false); // false means don't read the actual image data, only the header
+        if (!skip_tilt_image_size)
+        {
+            Image<RFLOAT> I;
+            I.read(fn_img,false); // false means don't read the actual image data, only the header
 
-        stackSize.x = XSIZE(I());
-        stackSize.y = YSIZE(I());
+            stackSize.x = XSIZE(I());
+            stackSize.y = YSIZE(I());
+        }
+
         stackSize.z = out.frameCount;
 
         if (loadImageData)
