@@ -121,9 +121,9 @@ def interpolate_trajectory(traj_star, eer_grouping, old_grouping):
             new_xs[i] = xs[src1] * (1 - frac) + xs[src2] * frac
             new_ys[i] = ys[src1] * (1 - frac) + ys[src2] * frac
 
-    traj_star['global_shift']['rlnMicrographFrameNumber'] = list(np.linspace(1, new_nz, num=new_nz).astype(np.int64).astype(np.str0))
-    traj_star['global_shift']['rlnMicrographShiftX'] = list(new_xs.astype(np.str0))
-    traj_star['global_shift']['rlnMicrographShiftY'] = list(new_ys.astype(np.str0))
+    traj_star['global_shift']['rlnMicrographFrameNumber'] = list(np.linspace(1, new_nz, num=new_nz).astype(np.int64).astype(np.str_))
+    traj_star['global_shift']['rlnMicrographShiftX'] = list(new_xs.astype(np.str_))
+    traj_star['global_shift']['rlnMicrographShiftY'] = list(new_ys.astype(np.str_))
  
     # z is not normalized, so have to be patched.
     if "local_motion_model" in traj_star:
@@ -131,7 +131,7 @@ def interpolate_trajectory(traj_star, eer_grouping, old_grouping):
         coeffs *= scale       # 1st-order in time(z)
         coeffs[1::3] *= scale # 2nd-order
         coeffs[2::3] *= scale # 3rd-order
-        traj_star['local_motion_model']['rlnMotionModelCoeff'] = list(coeffs.astype(np.str0))
+        traj_star['local_motion_model']['rlnMotionModelCoeff'] = list(coeffs.astype(np.str_))
 
     return traj_star
 
@@ -155,8 +155,8 @@ def resample_image(traj_star, eer_upsampling):
 
     xs = np.array(traj_star['global_shift']['rlnMicrographShiftX'], dtype=np.float64) * scale
     ys = np.array(traj_star['global_shift']['rlnMicrographShiftY'], dtype=np.float64) * scale
-    traj_star['global_shift']['rlnMicrographShiftX'] = list(xs.astype(np.str0))
-    traj_star['global_shift']['rlnMicrographShiftY'] = list(ys.astype(np.str0))
+    traj_star['global_shift']['rlnMicrographShiftX'] = list(xs.astype(np.str_))
+    traj_star['global_shift']['rlnMicrographShiftY'] = list(ys.astype(np.str_))
 
     # Hot pixels
     if 'hot_pixels' in traj_star:
@@ -171,8 +171,8 @@ def resample_image(traj_star, eer_upsampling):
             hot_xs = tmp[0, :]
             hot_ys = tmp[1, :]
 
-        traj_star['hot_pixels']['rlnCoordinateX'] = list(hot_xs.astype(np.str0))
-        traj_star['hot_pixels']['rlnCoordinateY'] = list(hot_ys.astype(np.str0))
+        traj_star['hot_pixels']['rlnCoordinateX'] = list(hot_xs.astype(np.str_))
+        traj_star['hot_pixels']['rlnCoordinateY'] = list(hot_ys.astype(np.str_))
 
     return traj_star
 
