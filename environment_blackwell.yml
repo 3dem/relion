@@ -3,7 +3,7 @@ channels:
   - conda-forge
 dependencies:
   - pip
-  - python=3.13
+  - python>=3.10,<=3.13
   - pip:
       - --extra-index-url https://download.pytorch.org/whl/cu128
       # verified compatible 2.7.1->2.13.0 (CPU wheels only - the +cu128 Blackwell
