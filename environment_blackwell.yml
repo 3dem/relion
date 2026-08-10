@@ -32,10 +32,12 @@ dependencies:
       # across many releases than the other bumps in this file.
       - typer==0.9.0
       - biopython>=1.81,<=1.87
-      # <2.0: numpy.product (removed in 2.0) is used by DynaMight's grid.py, and
-      # numpy.str0 (removed in 2.0) by relion's own eer_trajectory_handler.py -
-      # fix both before crossing this ceiling.
-      - numpy>=1.26.1,<2.0
+      # widened past <2.0 now that both numpy 2.0 blockers are fixed: relion's
+      # own eer_trajectory_handler.py (np.str0, this same commit) and
+      # DynaMight's grid.py (np.product, pending PR against upstream
+      # DynaMight - see the git+ pin below). Ceiling matches the audit: no
+      # other removed-symbol breaks found across all six repos up to 2.2.6.
+      - numpy>=1.26.1,<=2.2.6
       # get_particle_poses/{spheres,filaments}.py import the deprecated private
       # scipy.spatial.transform.rotation submodule - fine through 1.15.3 (warning
       # only), slated for removal in a future SciPy major.
@@ -60,7 +62,11 @@ dependencies:
       # reproducibility - previously unpinned git+https installs floated.
       - git+https://github.com/3dem/relion-classranker@352adf8b690ba56e9f4073cfee41c8fcad3dfb81
       - git+https://github.com/3dem/relion-blush@ab48e6380e66b9aaf52362e86e060e9b9d8a40fd
-      - git+https://github.com/3dem/DynaMight@358db04d5c2ec2997f3f17060a456293f0b02185
+      # pinned to a fork commit, not upstream: fixes np.product (removed in
+      # numpy 2.0) in grid.py, needed for the numpy ceiling above -
+      # https://github.com/FlyinTeller/DynaMight/pull/new/fix/numpy2-product-compat
+      # not yet merged upstream. Re-pin to the upstream commit once it is.
+      - git+https://github.com/FlyinTeller/DynaMight@f650ea7d35522a7a323301f2605fbf7b71c049e6
       - git+https://github.com/3dem/topaz@c8dd487cbf9d27139d0d430068033fb90dd9a393
       - git+https://github.com/3dem/model-angelo@994945bdfa6e5368e0d62349a47792f4864eebc3
       - ".[vis]"
