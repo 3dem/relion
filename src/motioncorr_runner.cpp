@@ -1572,11 +1572,12 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 				for (int igroup = 0; igroup < n_groups; igroup++) {
 					const int tid = omp_get_thread_num();
 					Ipatches[tid].reshape(y_end - y_start, x_end - x_start); // end is not included
+					Ipatches[tid].initZeros();
 					RCTIC(TIMING_CLIP_PATCH);
 					for (int iframe = group_start[igroup]; iframe < group_start[igroup] + group_size[igroup]; iframe++) {
 						for (int ipy = y_start; ipy < y_end; ipy++) {
 							for (int ipx = x_start; ipx < x_end; ipx++) {
-								DIRECT_A2D_ELEM(Ipatches[tid], ipy - y_start, ipx - x_start) = DIRECT_A2D_ELEM(Iframes[iframe](), ipy, ipx);
+								DIRECT_A2D_ELEM(Ipatches[tid], ipy - y_start, ipx - x_start) += DIRECT_A2D_ELEM(Iframes[iframe](), ipy, ipx);
 							}
 						}
 					}
