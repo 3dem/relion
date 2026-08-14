@@ -863,8 +863,13 @@ bool AlignTiltseriesRunner::readAreTomoResults(long idx_tomo, std::string &error
 
     if (rot.size() != fc - dark_frames.size())
     {
-        error_message = " ERROR_: unexpected number of data rows in parameter file: " + fn_aln + " : " +
+        error_message = " ERROR: unexpected number of data rows in parameter file: " + fn_aln + " : " +
                 integerToString(rot.size()) + " (expected: " + integerToString(fc) + " - " + integerToString(dark_frames.size()) + " dark frames )";
+        return false;
+    }
+    if (fc = dark_frames.size())
+    {
+        error_message = " ERROR: all frames are dark; inspect AreTomo2 logs for: " + fn_log;
         return false;
     }
 
