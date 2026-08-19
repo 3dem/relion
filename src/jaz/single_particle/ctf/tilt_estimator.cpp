@@ -179,7 +179,7 @@ void TiltEstimator::parametricFit(
 	const int gc = mdts.size();
 	const int ogc = obsModel->numberOfOpticsGroups();
 
-	std::vector<bool> groupUsed(ogc, false);
+	std::vector<char> groupUsed(ogc, false);
 
 	#pragma omp parallel for num_threads(nr_omp_threads)
 	for (int og = 0; og < ogc; og++)
