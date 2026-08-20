@@ -301,7 +301,7 @@ int DisplayBox::unSelect()
 int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, ObservationModel *obsModel, EMDLabel display_label, EMDLabel text_label, bool _do_read_whole_stacks, bool _do_apply_orient,
                                   RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale, RFLOAT _ori_scale, int _ncol, long int max_nr_images, RFLOAT lowpass, RFLOAT highpass, bool _do_class,
                                   MetaDataTable *_MDdata, int _nr_regroup, bool _do_recenter,  bool _is_data, MetaDataTable *_MDgroups,
-                                  bool do_allow_save, FileName fn_selected_imgs, FileName fn_selected_parts, int max_nr_parts_per_class)
+                                  bool do_allow_save, FileName fn_selected_imgs, FileName fn_selected_parts, int max_nr_parts_per_class, RFLOAT angpix)
 {
 	// Scroll bars
 	Fl_Scroll scroll(0, 0, w(), h());
@@ -339,6 +339,7 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, Observat
 		canvas.obsModel = obsModel;
 		canvas.text_label = text_label;
 		canvas.metadata_table_name = MDin.getName();
+		canvas.angpix = angpix;
 		if (canvas.nr_regroups > 0)
 			canvas.MDgroups = _MDgroups;
 		if (_do_class)
@@ -717,15 +718,17 @@ int multiViewerCanvas::handle(int ev)
 						{ "Show Fourier phase angles (2x)" },
 						{ "Show helical layer line profile" },
 						{ "Show particles from selected classes" },
+						{ "Show Fourier amplitudes (2x) from selected classes" },
+						{ "Show Fourier phase angles (2x) from selected classes" },
 						{ "Set selection type" },
-						{ "Save selected classes" }, // idx = 14; change below when re-ordered!!
+						{ "Save selected classes" }, // idx = 16; change below when re-ordered!!
 						{ "Quit" },
 						{ 0 }
 					};
 
 					if (!do_allow_save)
 					{
-						rclick_menu[14].deactivate();
+						rclick_menu[16].deactivate();
 					}
 
 				    const Fl_Menu_Item *m = rclick_menu->popup(Fl::event_x(), Fl::event_y(), 0, 0, 0);
@@ -759,6 +762,10 @@ int multiViewerCanvas::handle(int ev)
 						setSelectionType();
 					else if ( strcmp(m->label(), "Show particles from selected classes") == 0 )
 						showSelectedParticles(current_selection_type);
+					else if ( strcmp(m->label(), "Show Fourier amplitudes (2x) from selected classes") == 0 )
+						showSelectedFourierAmplitudesOrPhases(current_selection_type,true);
+					else if ( strcmp(m->label(), "Show Fourier phase angles (2x) from selected classes") == 0 )
+						showSelectedFourierAmplitudesOrPhases(current_selection_type,false);
 					else if ( strcmp(m->label(), "Save selected classes") == 0 )
 					{
 						saveBackupSelection();
@@ -1427,6 +1434,51 @@ void multiViewerCanvas::showSelectedParticles(int save_selected)
 	{
 		basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, "Particles in the selected classes");
 		win.fillCanvas(MULTIVIEWER, MDpart, obsModel, EMDL_IMAGE_NAME, text_label, do_read_whole_stacks, do_apply_orient, 0., 0., 0., boxes[0]->scale, ori_scale, ncol, multi_max_nr_images);
+	}
+	else
+		std::cout <<" No classes selected. First select one or more classes..." << std::endl;
+}
+
+void multiViewerCanvas::showSelectedFourierAmplitudesOrPhases(int save_selected, bool ampl)
+{
+	MetaDataTable MDpart;
+	makeStarFileSelectedParticles(save_selected, MDpart);
+	int nparts = MDpart.numberOfObjects();
+	if (nparts > 0)
+	{
+		std::string command;
+		int res = 0;
+		if (exists("./PS_tmp.star"))
+		{
+			command = "rm -f ./PS_tmp.star";
+			res = system(command.c_str());
+		}
+		FileName fn = "./PS_tmp.star";
+		MDpart.write(fn);
+		if(ampl)
+			command = "relion_image_handler --i ./PS_tmp.star --o ./PS_tmp_Apix_" + floatToString(angpix) + ".mrc --avg_ampl2_ali";
+		else
+			command = "relion_image_handler --i ./PS_tmp.star --o ./PS_tmp_Apix_" + floatToString(angpix) + ".mrc --avg_phase_ali";
+		res = system(command.c_str());
+		command = "relion_image_handler --i ./PS_tmp_Apix_" + floatToString(angpix) + ".mrc --o ./PS_tmp_Apix_" + floatToString(angpix) + ".png";
+		res = system(command.c_str());
+		command = "relion_display  --i PS_tmp_Apix_" + floatToString(angpix) + ".mrc --scale " + floatToString(ori_scale);
+		command += " --sigma_contrast " + floatToString(sigma_contrast);
+		command += " --black " + floatToString(minval);
+		command += " --white " + floatToString(maxval);
+		switch (colour_scheme)
+		{
+			case (BLACKGREYREDSCALE): { command += " --colour_fire"; break; }
+			case (BLUEGREYWHITESCALE): { command += " --colour_ice"; break; }
+			case (BLUEGREYREDSCALE): { command += " --colour_fire-n-ice"; break; }
+			case (RAINBOWSCALE): { command += " --colour_rainbow"; break; }
+			case (CYANBLACKYELLOWSCALE): { command += " --colour_difference"; break; }
+		}
+		// send job in the background
+		command += " &";
+		res = system(command.c_str());
+		command = "rm -f ./PS_tmp.star";
+		res = system(command.c_str());
 	}
 	else
 		std::cout <<" No classes selected. First select one or more classes..." << std::endl;
@@ -2733,6 +2785,17 @@ void Displayer::initialise()
 			std::cout <<" Warning: cannot find model.star file for " << fn_in << " needed for regrouping..." << std::endl;
 
 	}
+	if (fn_in.isStarFile() && angpix <= 0.)
+	{
+		if (MDdata.containsLabel(EMDL_IMAGE_OPTICS_GROUP))
+		{
+			std::cout <<" Warning: setting angpix from 1st optics group..." << std::endl;
+			int optics_group;
+			MDdata.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group, 0);
+			optics_group--;
+			obsModel.opticsMdt.getValue(EMDL_IMAGE_PIXEL_SIZE, angpix, optics_group);
+		}
+	}
 
 	// Check if input STAR file contains pixel-size information
 	if (!do_class && (do_apply_orient || lowpass > 0 || highpass > 0))
@@ -2764,7 +2827,6 @@ void Displayer::initialise()
 		}
 	}
 
-
 	if (show_fourier_amplitudes && show_fourier_phase_angles)
 		REPORT_ERROR("Displayer::initialise ERROR: cannot display Fourier amplitudes and phase angles at the same time!");
 	if (show_fourier_amplitudes || show_fourier_phase_angles)
@@ -2778,7 +2840,6 @@ void Displayer::initialise()
 		if ( (ZSIZE(img()) > 1) || (NSIZE(img()) > 1) )
 			REPORT_ERROR("Displayer::initialise ERROR: cannot display Fourier maps for 3D images or stacks!");
 	}
-
 }
 
 int Displayer::runGui()
@@ -2994,7 +3055,7 @@ void Displayer::run()
 		basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
 		win.fillCanvas(MULTIVIEWER, MDin, &obsModel, display_label, text_label, do_read_whole_stacks, do_apply_orient, minval, maxval, sigma_contrast, scale, ori_scale, ncol,
 				max_nr_images,  lowpass, highpass, do_class, &MDdata, nr_regroups, do_recenter, fn_in.contains("_data.star"), &MDgroups,
-				do_allow_save, fn_selected_imgs, fn_selected_parts, max_nr_parts_per_class);
+				do_allow_save, fn_selected_imgs, fn_selected_parts, max_nr_parts_per_class, angpix);
 	}
 	else
 	{
