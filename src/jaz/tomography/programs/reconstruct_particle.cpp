@@ -343,7 +343,7 @@ void ReconstructParticleProgram::processTomograms(
 						part_id, fc, tomogram.centre, tomogram.optics.pixelSize);
 			std::vector<d4Matrix> projCut(fc), projPart(fc);
 
-			const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
+			const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, binning * s / 2.0);
 
 			const bool circle_crop = do_circle_crop;
 
