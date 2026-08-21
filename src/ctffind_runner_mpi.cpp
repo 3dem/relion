@@ -72,6 +72,10 @@ void CtffindRunnerMpi::run()
 			{
 				executeCtffind4(imic);
 			}
+			else if (is_ctffind5)
+			{
+				executeCtffind5(imic);
+			}
 			else
 			{
 				executeCtffind3(imic);

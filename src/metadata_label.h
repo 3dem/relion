@@ -157,6 +157,7 @@ enum EMDLabel
 	EMDL_CTF_FOM, ///< ctffind FOM (CC) for quality of CTF-fit
 	EMDL_CTF_IMAGE, ///< name of an image describing the CTF model
 	EMDL_CTF_ICERINGDENSITY, ///< sum of image power in ice ring
+	EMDL_CTF_SAMPLE_THICKNESS, ///< Sample thickness from CtfFind5
 	EMDL_CTF_LENS_STABILITY, ///< Lens stability
 	EMDL_CTF_MAGNIFICATION, ///< Magnification used for CTF-determination (deprecated)
 	EMDL_CTF_PHASESHIFT, ///< Phase-shift from a phase plate
@@ -885,6 +886,7 @@ private:
 		EMDL::addLabel(EMDL_CTF_FOM, EMDL_DOUBLE, "rlnCtfFigureOfMerit", "Figure of merit for the fit of the CTF (not used inside relion_refine)");
 		EMDL::addLabel(EMDL_CTF_IMAGE, EMDL_STRING, "rlnCtfImage", "Name of an image with all CTF values");
 		EMDL::addLabel(EMDL_CTF_ICERINGDENSITY, EMDL_DOUBLE, "rlnCtfIceRingDensity", "Power of the image in the ice ring frequency range (0.25-0.28 A-1)");
+		EMDL::addLabel(EMDL_CTF_SAMPLE_THICKNESS, EMDL_DOUBLE, "rlnSampleThickness", "Thickness of the sample (in Angstroms)");
         EMDL::addLabel(EMDL_CTF_LENS_STABILITY, EMDL_DOUBLE, "rlnLensStability", "Lens stability (in ppm)");
 		EMDL::addLabel(EMDL_CTF_MAGNIFICATION, EMDL_DOUBLE, "rlnMagnification", "Magnification at the detector (in times)");
 		EMDL::addLabel(EMDL_CTF_PHASESHIFT, EMDL_DOUBLE, "rlnPhaseShift", "Phase-shift from a phase-plate (in degrees)");
