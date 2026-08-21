@@ -179,7 +179,10 @@ void AberrationEstimator::parametricFit(
 	const int gc = mdts.size();
 	const int ogc = obsModel->numberOfOpticsGroups();
 
-	std::vector<bool> groupUsed(ogc,false);
+	// write to std::vector<bool> is not thread safe even when writing to different elements (due to bit packing)
+	// https://en.cppreference.com/cpp/container/vector_bool
+	// https://github.com/3dem/relion/pull/1361
+	std::vector<char> groupUsed(ogc,false);
 
 	#pragma omp parallel for num_threads(nr_omp_threads)
 	for (int og = 0; og < ogc; og++)
