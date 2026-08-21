@@ -20,6 +20,19 @@
 #include "src/amyloid_finder.h"
 //#define DEBUG_BOUNDS
 
+namespace
+{
+// Largest prime factor of n, used to pick FFT-friendly box sizes below
+int maxPrimeFactor(int n)
+{
+    int mx = 1;
+    while (n % 2 == 0) { mx = 2; n /= 2; }
+    for (int p = 3; (long int)p * p <= (long int)n; p += 2)
+        while (n % p == 0) { mx = XMIPP_MAX(mx, p); n /= p; }
+    return XMIPP_MAX(mx, n);
+}
+}
+
 void AmyloidFinder::read(int argc, char **argv, int rank)
 {
     parser.setCommandLine(argc, argv);
@@ -201,6 +214,18 @@ void AmyloidFinder::initialise(bool is_leader)
         down_ysize = FLOOR( (ori_ysize * angpix) / down_angpix );
         if (ilengthmax %2 != 0) ilengthmax++;
         nr_psi = ROUND(180./psi_step);
+        // The second half of the psi range is not searched explicitly: it is obtained by
+        // rotating the first half over 90 degrees (a transpose of the downscaled image),
+        // which is only exact when getPsiAngle(ipsi + nr_psi/2) - getPsiAngle(ipsi) is
+        // exactly 90, i.e. when nr_psi is even. With an odd number, the top half of the psi
+        // range would silently get score maps belonging to the wrong angle.
+        if (nr_psi < 2) nr_psi = 2;
+        if (nr_psi % 2 != 0)
+        {
+            nr_psi++;
+            if (verb > 0)
+                std::cout << " - Rounding the number of psi angles up to " << nr_psi << " to make it even" << std::endl;
+        }
         psi_step = 180./nr_psi;
 
         // Calculate Fourier shells for amyloid signal
@@ -213,6 +238,32 @@ void AmyloidFinder::initialise(bool is_leader)
         large_box = sqrt(2.)*XMIPP_MAX(ori_xsize, ori_ysize);
         large_box += ROUND(XMIPP_MAX(search_filament_width, search_filament_length) / angpix);
         if (large_box%2 != 0) large_box++;
+
+        // Grow the padded box until both transforms get an FFT-friendly size. FFTW is much
+        // slower for sizes with a large prime factor, because it falls back to a Rader or
+        // Bluestein convolution. Measured with RELION's own FFTW on the 4096^2 test data at
+        // 0.955 A: the box coming out of the lines above was 6054 = 2*3*1009, and one
+        // forward transform took 0.52 s, against 0.21 s for 6174 = 2*3^2*7^3; the cropped
+        // box improves from 2754 = 2*3^4*17 (0.058 s) to 2808 = 2^3*3^3*13 (0.034 s). Two
+        // codelets serving the prime 1009 were 19% of the run time of the whole program.
+        //
+        // NOTE: this changes the results slightly, because the padding size sets the
+        // downscaled sampling: on the test data the FOM map moved by 0.009 RMS on a map
+        // with a standard deviation of 0.099 (worst pixel 0.055). Delete this loop to keep
+        // the old box sizes exactly.
+        const int box_start = large_box;
+        for (int trial = box_start; trial <= box_start + 1024; trial += 2)
+        {
+            if (maxPrimeFactor(trial) > 7) continue;
+
+            int trial_crop = trial * angpix/down_angpix;
+            if (trial_crop%2 != 0) trial_crop++;
+            if (maxPrimeFactor(trial_crop) > 13) continue;
+
+            large_box = trial;
+            break;
+        }
+
         // Also calculate size of cropped box:
         crop_box = large_box * angpix/down_angpix;
         if (crop_box%2 != 0) crop_box++;
@@ -227,6 +278,9 @@ void AmyloidFinder::initialise(bool is_leader)
             std::cout << " + Size of image to sample (in downscaled pixels): " <<  down_xsize << " x " << down_ysize << std::endl;
             std::cout << " + Fourier shells for the amyloid signal (in downscaled pixels): " << imin_signal  << " - " << imax_signal << std::endl;
             std::cout << " + Fourier shells for the non-signal control (in downscaled pixels): " << imin_nonsignal  << " - " << imax_nonsignal << std::endl;
+            std::cout << " + Padded box for the rotations: " << large_box << " (largest prime factor "
+                      << maxPrimeFactor(large_box) << "), cropped to " << crop_box
+                      << " (largest prime factor " << maxPrimeFactor(crop_box) << ")" << std::endl;
             std::cout << "  ========================== " << std::endl;
         }
     }
@@ -305,9 +359,426 @@ MultidimArray<RFLOAT> AmyloidFinder::growNonSignalMask(MultidimArray<RFLOAT> &in
     return Mresult;
 
 }
+// Single/double precision names for the FFTW calls used below
+#ifdef RELION_SINGLE_PRECISION
+#define AMY_FFTW(name) fftwf_##name
+#define AMY_FFTW_COMPLEX fftwf_complex
+#define AMY_FFTW_PLAN fftwf_plan
+#else
+#define AMY_FFTW(name) fftw_##name
+#define AMY_FFTW_COMPLEX fftw_complex
+#define AMY_FFTW_PLAN fftw_plan
+#endif
+
+namespace
+{
+// Bilinear rotation, parallelised over the rows of the output.
+//
+// This is a faithful copy of applyGeometry() for the 2D, wrap, outside = 0 case, i.e. of
+// what rotate(V1, V2, ang, 'Z', true) does, with the outer loop shared over threads. Each
+// output row is independent, and the accumulation of xp/yp along a row is kept exactly as
+// in the original, so the result is bit-identical to applyGeometry() -- just not serial.
+// applyGeometry() itself is left alone: it is used all over RELION, often from inside
+// parallel regions already.
+void rotateBilinearOmp(const MultidimArray<RFLOAT> &V1, MultidimArray<RFLOAT> &V2,
+                       RFLOAT ang, int nr_threads)
+{
+    Matrix2D<RFLOAT> A;
+    rotation2DMatrix(ang, A, true);
+    // applyGeometry() is called with IS_NOT_INV, so it inverts the matrix itself
+    const Matrix2D<RFLOAT> Aref = A.inv();
+
+    const int cen_y  = (int)(YSIZE(V2) / 2);
+    const int cen_x  = (int)(XSIZE(V2) / 2);
+    const int cen_yp = (int)(YSIZE(V1) / 2);
+    const int cen_xp = (int)(XSIZE(V1) / 2);
+    const RFLOAT minxp = -cen_xp;
+    const RFLOAT minyp = -cen_yp;
+    const RFLOAT maxxp = XSIZE(V1) - cen_xp - 1;
+    const RFLOAT maxyp = YSIZE(V1) - cen_yp - 1;
+    const int Xdim = XSIZE(V1);
+    const int Ydim = YSIZE(V1);
+
+    const RFLOAT a00 = MAT_ELEM(Aref, 0, 0), a01 = MAT_ELEM(Aref, 0, 1), a02 = MAT_ELEM(Aref, 0, 2);
+    const RFLOAT a10 = MAT_ELEM(Aref, 1, 0), a11 = MAT_ELEM(Aref, 1, 1), a12 = MAT_ELEM(Aref, 1, 2);
+
+    const long int ysize = YSIZE(V2), xsize = XSIZE(V2);
+
+#pragma omp parallel for num_threads(nr_threads)
+    for (long int i = 0; i < ysize; i++)
+    {
+        // position of the beginning of this row in the output image
+        const RFLOAT x = -cen_x;
+        const RFLOAT y = i - cen_y;
+        RFLOAT xp = x * a00 + y * a01 + a02;
+        RFLOAT yp = x * a10 + y * a11 + a12;
+
+        for (long int j = 0; j < xsize; j++)
+        {
+            // outside the image, apply a periodic extension (wrap == true)
+            if (xp < minxp - XMIPP_EQUAL_ACCURACY || xp > maxxp + XMIPP_EQUAL_ACCURACY)
+                xp = realWRAP(xp, minxp - 0.5, maxxp + 0.5);
+            if (yp < minyp - XMIPP_EQUAL_ACCURACY || yp > maxyp + XMIPP_EQUAL_ACCURACY)
+                yp = realWRAP(yp, minyp - 0.5, maxyp + 0.5);
+
+            // integer position of the top left corner of the interpolation square, and the
+            // weights for the m1+1, n1+1 corner
+            RFLOAT wx = xp + cen_xp;
+            int m1 = (int) wx;
+            wx = wx - m1;
+            int m2 = m1 + 1;
+
+            RFLOAT wy = yp + cen_yp;
+            int n1 = (int) wy;
+            wy = wy - n1;
+            int n2 = n1 + 1;
+
+            // m2 and n2 can be out by one
+            if (m2 >= Xdim) m2 = 0;
+            if (n2 >= Ydim) n2 = 0;
+
+            RFLOAT tmp = (1 - wy) * (1 - wx) * DIRECT_A2D_ELEM(V1, n1, m1);
+
+            if (m2 < Xdim)
+                tmp += (1 - wy) * wx * DIRECT_A2D_ELEM(V1, n1, m2);
+
+            if (n2 < Ydim)
+            {
+                tmp += wy * (1 - wx) * DIRECT_A2D_ELEM(V1, n2, m1);
+
+                if (m2 < Xdim)
+                    tmp += wy * wx * DIRECT_A2D_ELEM(V1, n2, m2);
+            }
+
+            DIRECT_A2D_ELEM(V2, i, j) = tmp;
+
+            // compute new point inside input image
+            xp += a00;
+            yp += a10;
+        }
+    }
+}
+
+// Forward and inverse 2D transforms, parallelised by splitting them the way FFTW does
+// internally: a transform along x for every row, then one along y for every column. Both
+// were checked against fftw_plan_dft_r2c_2d() / fftw_plan_dft_c2r_2d() on this data and
+// give bit-identical output, at 17x (forward, 6174^2) and 6x (inverse, 2808^2) the speed on
+// 24 threads. Executing a plan from several threads at once is allowed by FFTW; creating one
+// is not, hence the critical sections, which share their name with the one in fftw.cpp.
+void forwardFT2Domp(MultidimArray<RFLOAT> &in, MultidimArray<Complex> &out, int nr_threads)
+{
+    const int N = XSIZE(in);
+    const int Nh = N / 2 + 1;
+
+    if (YSIZE(in) != N)
+        REPORT_ERROR("forwardFT2Domp ERROR: only square images are supported");
+
+    out.reshape(N, Nh);
+
+    RFLOAT *rdata = MULTIDIM_ARRAY(in);
+    AMY_FFTW_COMPLEX *cdata = (AMY_FFTW_COMPLEX*) MULTIDIM_ARRAY(out);
+    int n[1] = { N };
+
+#pragma omp parallel num_threads(nr_threads)
+    {
+        const int tid = omp_get_thread_num();
+        const int nthr = omp_get_num_threads();
+
+        // real-to-complex along x, for a chunk of rows
+        const long int r0 = (long int)N * tid / nthr;
+        const long int r1 = (long int)N * (tid + 1) / nthr;
+        if (r1 > r0)
+        {
+            AMY_FFTW_PLAN p = NULL;
+            #pragma omp critical(FourierTransformer_fftw_plan)
+            p = AMY_FFTW(plan_many_dft_r2c)(1, n, (int)(r1 - r0),
+                                            rdata + r0 * N, NULL, 1, N,
+                                            cdata + r0 * Nh, NULL, 1, Nh, FFTW_ESTIMATE);
+            if (p == NULL) REPORT_ERROR("forwardFT2Domp ERROR: FFTW plan cannot be created");
+            AMY_FFTW(execute)(p);
+            #pragma omp critical(FourierTransformer_fftw_plan)
+            AMY_FFTW(destroy_plan)(p);
+        }
+
+#pragma omp barrier
+
+        // complex transform along y, for a chunk of columns
+        const long int c0 = (long int)Nh * tid / nthr;
+        const long int c1 = (long int)Nh * (tid + 1) / nthr;
+        if (c1 > c0)
+        {
+            AMY_FFTW_PLAN p = NULL;
+            #pragma omp critical(FourierTransformer_fftw_plan)
+            p = AMY_FFTW(plan_many_dft)(1, n, (int)(c1 - c0),
+                                        cdata + c0, NULL, Nh, 1,
+                                        cdata + c0, NULL, Nh, 1, FFTW_FORWARD, FFTW_ESTIMATE);
+            if (p == NULL) REPORT_ERROR("forwardFT2Domp ERROR: FFTW plan cannot be created");
+            AMY_FFTW(execute)(p);
+            #pragma omp critical(FourierTransformer_fftw_plan)
+            AMY_FFTW(destroy_plan)(p);
+        }
+    }
+}
+
+// As above, in the other direction. Like any FFTW complex-to-real transform this destroys
+// its input.
+void inverseFT2Domp(MultidimArray<Complex> &in, MultidimArray<RFLOAT> &out, int nr_threads)
+{
+    const int N = XSIZE(out);
+    const int Nh = N / 2 + 1;
+
+    if (YSIZE(out) != N || XSIZE(in) != Nh || YSIZE(in) != N)
+        REPORT_ERROR("inverseFT2Domp ERROR: unexpected array sizes");
+
+    AMY_FFTW_COMPLEX *cdata = (AMY_FFTW_COMPLEX*) MULTIDIM_ARRAY(in);
+    RFLOAT *rdata = MULTIDIM_ARRAY(out);
+    int n[1] = { N };
+
+#pragma omp parallel num_threads(nr_threads)
+    {
+        const int tid = omp_get_thread_num();
+        const int nthr = omp_get_num_threads();
+
+        const long int c0 = (long int)Nh * tid / nthr;
+        const long int c1 = (long int)Nh * (tid + 1) / nthr;
+        if (c1 > c0)
+        {
+            AMY_FFTW_PLAN p = NULL;
+            #pragma omp critical(FourierTransformer_fftw_plan)
+            p = AMY_FFTW(plan_many_dft)(1, n, (int)(c1 - c0),
+                                        cdata + c0, NULL, Nh, 1,
+                                        cdata + c0, NULL, Nh, 1, FFTW_BACKWARD, FFTW_ESTIMATE);
+            if (p == NULL) REPORT_ERROR("inverseFT2Domp ERROR: FFTW plan cannot be created");
+            AMY_FFTW(execute)(p);
+            #pragma omp critical(FourierTransformer_fftw_plan)
+            AMY_FFTW(destroy_plan)(p);
+        }
+
+#pragma omp barrier
+
+        const long int r0 = (long int)N * tid / nthr;
+        const long int r1 = (long int)N * (tid + 1) / nthr;
+        if (r1 > r0)
+        {
+            AMY_FFTW_PLAN p = NULL;
+            #pragma omp critical(FourierTransformer_fftw_plan)
+            p = AMY_FFTW(plan_many_dft_c2r)(1, n, (int)(r1 - r0),
+                                            cdata + r0 * Nh, NULL, 1, Nh,
+                                            rdata + r0 * N, NULL, 1, N, FFTW_ESTIMATE);
+            if (p == NULL) REPORT_ERROR("inverseFT2Domp ERROR: FFTW plan cannot be created");
+            AMY_FFTW(execute)(p);
+            #pragma omp critical(FourierTransformer_fftw_plan)
+            AMY_FFTW(destroy_plan)(p);
+        }
+    }
+}
+
+// Rotate the mirror-padded image over psi and downscale it by cropping its Fourier
+// transform.
+//
+// This is the memory-heavy step: a large_box^2 real image plus its complex transform is
+// about 1.3 GB for a K3 micrograph with the default settings. How many of these exist at
+// the same time sets the peak memory of the program, and that is what --fom_psi_batch
+// controls.
+void makeRotatedImage(AmyloidFinder &finder,
+                      const MultidimArray<RFLOAT> &Mbig,
+                      int ipsi,
+                      MultidimArray<RFLOAT> &Mrot)
+{
+    const RFLOAT psi = finder.getPsiAngle(ipsi);
+
+    // Rotate the images in their original size to prevent interpolation artefacts near the
+    // signal frequencies. No initZeros: with the periodic extension every output pixel is
+    // written, so zeroing a large_box^2 array first is a pointless memset.
+    Mrot.reshape(finder.large_box, finder.large_box);
+    rotateBilinearOmp(Mbig, Mrot, psi, finder.nr_threads);
+
+    // Re-scale image so that Nyquist is at down_angpix.
+    //
+    // Note the order: crop first, normalise afterwards. FourierTransformer::Transform()
+    // normalises the whole transform, which for a 6174^2 box is 19 M complex divisions of
+    // which windowFourierTransform() keeps only a fifth. Normalising just the survivors is
+    // the same arithmetic on every coefficient we keep, so the result is unchanged.
+    MultidimArray<Complex > FT, FT2;
+    forwardFT2Domp(Mrot, FT, finder.nr_threads);
+    windowFourierTransform(FT, FT2, finder.crop_box);
+    FT.clear();
+
+    const unsigned long int fft_size = (unsigned long int)finder.large_box
+                                       * (unsigned long int)finder.large_box;
+    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(FT2)
+        DIRECT_MULTIDIM_ELEM(FT2, n) /= fft_size;
+
+    Mrot.reshape(finder.crop_box, finder.crop_box);
+    inverseFT2Domp(FT2, Mrot, finder.nr_threads);
+    Mrot.setXmippOrigin();
+}
+
+// The psi angles in the second half of the range are the first half rotated over 90
+// degrees, which for the downscaled image is a transpose.
+void transposeRotatedImage(MultidimArray<RFLOAT> &Mrot, int crop_box,
+                           MultidimArray<RFLOAT> &Mrot90)
+{
+    Mrot90.initZeros(crop_box, crop_box);
+    Mrot90.setXmippOrigin();
+    // stay away from boundary to prevent many if-statements below. Images are cropped in
+    // larger box anyway, so boundaries should be zero
+    for (long int i = STARTINGY(Mrot90) + 1; i <= FINISHINGY(Mrot90) - 1; i++)
+    {
+        for (long int j = STARTINGX(Mrot90) + 1; j <= FINISHINGX(Mrot90) - 1; j++)
+        {
+            A2D_ELEM(Mrot90, i, j) = A2D_ELEM(Mrot, -j, i);
+        }
+    }
+}
+
+// Accumulate the 1D power spectra of the signal and non-signal Fourier shells along every
+// sampled line, then sum those over the width of the search box.
+//
+// Cheap on memory (the two crop_box^2 per-line maps are passed in and reused for every psi)
+// and compute-bound, so this runs for one psi at a time with all threads on the rows.
+void accumulatePsiScore(AmyloidFinder &finder,
+                        MultidimArray<RFLOAT> &Mrot,
+                        MultidimArray<RFLOAT> &scores_perline,
+                        MultidimArray<RFLOAT> &nonscores_perline,
+                        MultidimArray<RFLOAT> &out_scores,
+                        MultidimArray<RFLOAT> &out_nonscores)
+{
+    scores_perline.initZeros(finder.crop_box, finder.crop_box);
+    scores_perline.setXmippOrigin();
+    nonscores_perline.initZeros(finder.crop_box, finder.crop_box);
+    nonscores_perline.setXmippOrigin();
+
+    out_scores.initZeros(finder.crop_box / finder.shift_step, finder.crop_box / finder.shift_step);
+    out_scores.setXmippOrigin();
+    out_nonscores.initZeros(finder.crop_box / finder.shift_step, finder.crop_box / finder.shift_step);
+    out_nonscores.setXmippOrigin();
+
+    const int my_skip_side_length = finder.ilengthmax / 2;
+#pragma omp parallel num_threads(finder.nr_threads)
+    {
+        // Keep these out of the loops, and use our own plan on them rather than
+        // FourierTransformer. Two reasons: setReal() rebuilds its plans whenever the data
+        // pointer changes, which with a fresh array per row meant re-planning ~150,000 times
+        // per micrograph, all serialised on one critical section; and Transform() normalises
+        // all ilengthmax/2+1 coefficients when only the signal and non-signal shells are ever
+        // read -- 61 complex divisions per line where 10 are needed. Profiling showed that
+        // second point alone to be 8% of the run time of the whole program.
+        MultidimArray<RFLOAT> oneline(finder.ilengthmax);
+        MultidimArray<Complex> FTline(finder.ilengthmax / 2 + 1);
+
+#ifdef RELION_SINGLE_PRECISION
+        fftwf_plan line_plan = NULL;
+        #pragma omp critical(FourierTransformer_fftw_plan)
+        line_plan = fftwf_plan_dft_r2c_1d(finder.ilengthmax, MULTIDIM_ARRAY(oneline),
+                                          (fftwf_complex*) MULTIDIM_ARRAY(FTline), FFTW_ESTIMATE);
+#else
+        fftw_plan line_plan = NULL;
+        #pragma omp critical(FourierTransformer_fftw_plan)
+        line_plan = fftw_plan_dft_r2c_1d(finder.ilengthmax, MULTIDIM_ARRAY(oneline),
+                                         (fftw_complex*) MULTIDIM_ARRAY(FTline), FFTW_ESTIMATE);
+#endif
+        if (line_plan == NULL) REPORT_ERROR("accumulatePsiScore ERROR: FFTW plan cannot be created");
+
+        // same normalisation statement as FourierTransformer::Transform(), so the
+        // coefficients we use come out bit-for-bit as before
+        const unsigned long int line_size = (unsigned long int)finder.ilengthmax;
+
+#pragma omp for
+        for (int ypos = my_skip_side_length; ypos < YSIZE(Mrot) - my_skip_side_length; ypos += 1)
+        {
+            const int cen_ypos = ypos - YSIZE(Mrot) / 2;
+
+            // Only columns with cen_xpos % shift_step == 0 are ever read by the summation
+            // over the filament width below, so start at the first such column and step
+            // through them: the 1D transform of every other column is dead work, and its
+            // entry in the per-line maps stays zero exactly as it did before.
+            int first_xpos = my_skip_side_length;
+            {
+                const int cen_first = first_xpos - XSIZE(Mrot) / 2;
+                const int rem = ((cen_first % finder.shift_step) + finder.shift_step) % finder.shift_step;
+                if (rem != 0) first_xpos += finder.shift_step - rem;
+            }
+
+            for (int xpos = first_xpos; xpos < XSIZE(Mrot) - my_skip_side_length; xpos += finder.shift_step)
+            {
+                const int cen_xpos = xpos - XSIZE(Mrot) / 2;
+
+                // Grab the line from the rotated image, in X and in Y directions
+                for (int iline = 0; iline < finder.ilengthmax; iline++)
+                    DIRECT_A1D_ELEM(oneline, iline) = A2D_ELEM(Mrot, cen_ypos, cen_xpos + iline - finder.ilengthmax / 2);
+
+#ifdef RELION_SINGLE_PRECISION
+                fftwf_execute(line_plan);
+#else
+                fftw_execute(line_plan);
+#endif
+
+                for (int isig = finder.imin_signal; isig <= finder.imax_signal; isig++)
+                {
+                    Complex val = DIRECT_A1D_ELEM(FTline, isig);
+                    val /= line_size;
+                    A2D_ELEM(scores_perline, cen_ypos, cen_xpos) += norm(val);
+                }
+
+                for (int isig = finder.imin_nonsignal; isig <= finder.imax_nonsignal; isig++)
+                {
+                    Complex val = DIRECT_A1D_ELEM(FTline, isig);
+                    val /= line_size;
+                    A2D_ELEM(nonscores_perline, cen_ypos, cen_xpos) += norm(val);
+                }
+            }
+        }
+
+#ifdef RELION_SINGLE_PRECISION
+        #pragma omp critical(FourierTransformer_fftw_plan)
+        fftwf_destroy_plan(line_plan);
+#else
+        #pragma omp critical(FourierTransformer_fftw_plan)
+        fftw_destroy_plan(line_plan);
+#endif
+    }
+
+    // Now that we have signal per individual line for each coordinate, sum over the width
+    // of the search box. The below is split in two halves, becauses otherwise cen_pos=0 may
+    // be sampled twice!!!
+    const int my_skip_side_width = finder.iwidthmax / 2;
+#pragma omp parallel for num_threads(finder.nr_threads)
+    for (int ypos = 0; ypos < YSIZE(Mrot) / 2 - my_skip_side_width; ypos += finder.shift_step)
+    {
+        for (int ipassy = 0; ipassy < 2; ipassy++)
+        {
+            const int cen_ypos = (ipassy == 0) ? ypos : -ypos;
+            if (ypos == 0 && ipassy == 1) continue;
+
+            for (int xpos = 0; xpos < XSIZE(Mrot) / 2 - my_skip_side_width; xpos += finder.shift_step)
+            {
+                for (int ipass = 0; ipass < 2; ipass++)
+                {
+                    const int cen_xpos = (ipass == 0) ? xpos : -xpos;
+                    if (xpos == 0 && ipass == 1) continue;
+
+                    for (int iwidth = 0; iwidth < finder.iwidthmax; iwidth++)
+                    {
+                        A2D_ELEM(out_scores, cen_ypos / finder.shift_step, cen_xpos / finder.shift_step) +=
+                                A2D_ELEM(scores_perline, cen_ypos + iwidth - finder.iwidthmax / 2, cen_xpos);
+                        A2D_ELEM(out_nonscores, cen_ypos / finder.shift_step, cen_xpos / finder.shift_step) +=
+                                A2D_ELEM(nonscores_perline, cen_ypos + iwidth - finder.iwidthmax / 2, cen_xpos);
+                    } // end loop iwidth
+                } // end loop ipass
+            } // end loop xpos
+        } // end for ipassy
+    } // end for ypos
+}
+} // end anonymous namespace
+
 void AmyloidFinder::getScoreForOneMicrograph(MultidimArray<RFLOAT> &image, MultidimArray<RFLOAT> &Mscore,
                                              MultidimArray<RFLOAT> &Mangle, RFLOAT &skew, RFLOAT &kurt, bool myverb)
 {
+
+    if (nr_psi % 2 != 0)
+        REPORT_ERROR("getScoreForOneMicrograph ERROR: the number of psi angles must be even; see initialise().");
+
 
     MultidimArray<RFLOAT> Mbig(large_box, large_box);
     Mbig.setXmippOrigin();
@@ -329,166 +800,44 @@ void AmyloidFinder::getScoreForOneMicrograph(MultidimArray<RFLOAT> &image, Multi
         }
     }
 
-    // Rotate the large image, and store downscaled images by cropping their Fourier Transform
-    std::vector<MultidimArray<RFLOAT> > rotated_imgs(nr_psi), rotated_scores_perline(nr_psi), rotated_scores(nr_psi);
-    std::vector<MultidimArray<RFLOAT> > rotated_nonscores_perline(nr_psi), rotated_nonscores(nr_psi);
-    std::vector<FourierTransformer> transformer(nr_threads);
-    // TODO: in principle, only need to rotate to 90 degrees, as I can use both the X and the Y direction for the 1D FFTs!
+    const int half_nr_psi = nr_psi / 2;
+
+    // All per-psi score maps are kept, so the gather over psi further down is unchanged.
+    // They are small: two (crop_box/shift_step)^2 arrays per psi.
+    std::vector<MultidimArray<RFLOAT> > rotated_scores(nr_psi), rotated_nonscores(nr_psi);
+
+    // Scratch, reused for every psi rather than kept per psi
+    MultidimArray<RFLOAT> scores_perline, nonscores_perline;
+    MultidimArray<RFLOAT> Mrot, Mrot90;
+
     if (myverb)
     {
-        std::cout << " - Rotating the input image ..." << std::endl;
+        std::cout << " - Rotating and searching over all coordinates ..." << std::endl;
         init_progress_bar(nr_psi);
     }
 
-#pragma omp parallel for num_threads(nr_threads)
-    for (int ipsi = 0; ipsi < nr_psi/2; ipsi++)
+    // One psi angle at a time. The rotation and both 2D transforms are internally
+    // parallelised over all --j threads, so there is nothing to gain from running several
+    // psi angles at once, and this way only one large_box^2 image and its transform exist
+    // at any moment.
+    for (int ipsi = 0; ipsi < half_nr_psi; ipsi++)
     {
-        const int tid = omp_get_thread_num();
-        RFLOAT psi = getPsiAngle(ipsi);
+        makeRotatedImage(*this, Mbig, ipsi, Mrot);
 
-        // Rotate the images in their original size to prevent interpolation artefacts near the signal frequencies
-        MultidimArray<RFLOAT> Mrot;
-        Mrot.setXmippOrigin();
-        Mrot.initZeros(large_box, large_box);
-        rotate(Mbig, Mrot, psi, 'Z', true);
+        accumulatePsiScore(*this, Mrot, scores_perline, nonscores_perline,
+                           rotated_scores[ipsi], rotated_nonscores[ipsi]);
 
-        //Image<RFLOAT> Ir;
-        //Ir()=Mrot;
-        //Ir.write("Ir_psi"+ integerToString(ipsi)+".spi");
-        //std::cerr << " written: " << "Ir_psi"<< integerToString(ipsi)<<".spi" << std::endl;
+        // the second half of the psi range is this image rotated over 90 degrees
+        transposeRotatedImage(Mrot, crop_box, Mrot90);
+        Mrot.clear();
 
-        // Re-scale image so that Nyquist is at down_angpix
-        MultidimArray<Complex > FT, FT2;
-        transformer[tid].FourierTransform(Mrot, FT, false);
-        windowFourierTransform(FT, FT2, crop_box);
-        Mrot.resize(crop_box, crop_box);
-        transformer[tid].inverseFourierTransform(FT2, Mrot);
-        Mrot.setXmippOrigin();
-        rotated_imgs[ipsi] = Mrot;
+        accumulatePsiScore(*this, Mrot90, scores_perline, nonscores_perline,
+                           rotated_scores[ipsi + half_nr_psi], rotated_nonscores[ipsi + half_nr_psi]);
+        Mrot90.clear();
 
+        if (myverb) progress_bar(2 * (ipsi + 1));
     }
-    MultidimArray<RFLOAT> Mzero(crop_box, crop_box);
-    Mzero.setXmippOrigin();
-    for (int ipsi = nr_psi/2; ipsi < nr_psi; ipsi++)
-    {
-        rotated_imgs[ipsi] = Mzero;
-        // stay away from boundary to prevent many if-statements below. Images are cropped in larger box anyway, so boundaries should be zero
-        for (long int i=STARTINGY(Mzero)+1; i<=FINISHINGY(Mzero)-1; i++)
-        {
-            for (long int j=STARTINGX(Mzero)+1; j<=FINISHINGX(Mzero)-1; j++)
-            {
-                A2D_ELEM(rotated_imgs[ipsi], i, j) = A2D_ELEM(rotated_imgs[ipsi-nr_psi/2], -j, i);
-            }
-        }
-    }
-
     if (myverb) progress_bar(nr_psi);
-
-    // Just prepare the rotated_scores vector too
-    for (int ipsi = 0; ipsi < nr_psi; ipsi++)
-    {
-        rotated_scores_perline[ipsi].initZeros(crop_box, crop_box);
-        rotated_scores_perline[ipsi].setXmippOrigin();
-        rotated_nonscores_perline[ipsi].initZeros(crop_box, crop_box);
-        rotated_nonscores_perline[ipsi].setXmippOrigin();
-        rotated_scores[ipsi].initZeros(crop_box/shift_step, crop_box/shift_step);
-        rotated_scores[ipsi].setXmippOrigin();
-        rotated_nonscores[ipsi].initZeros(crop_box/shift_step, crop_box/shift_step);
-        rotated_nonscores[ipsi].setXmippOrigin();
-    }
-
-    // Prepare all the transformers for the 1D lines
-    MultidimArray<RFLOAT> oneline_tmp(ilengthmax);
-    for (int i = 0; i < nr_threads; i++)
-        transformer[i].setReal(oneline_tmp);
-
-    // Now loop over all positions to calculate 1D FFTs
-    if (myverb)
-    {
-        std::cout << " - Searching over all coordinates ..." << std::endl;
-        init_progress_bar(nr_psi);
-    }
-
-    int my_skip_side_length = ilengthmax/2;
-    for (int ipsi = 0; ipsi < nr_psi; ipsi++)
-    {
-#pragma omp parallel for num_threads(nr_threads)
-        for (int ypos = my_skip_side_length; ypos < YSIZE(rotated_imgs[ipsi]) - my_skip_side_length; ypos += 1)
-        {
-            int cen_ypos = ypos - YSIZE(rotated_imgs[ipsi])/2;
-            const int tid = omp_get_thread_num();
-            MultidimArray<RFLOAT> oneline(ilengthmax);
-            MultidimArray<Complex> FTline(ilengthmax/2 + 1);
-
-            for (int xpos = my_skip_side_length; xpos < XSIZE(rotated_imgs[ipsi]) - my_skip_side_length; xpos += 1)
-            {
-                int cen_xpos = xpos - XSIZE(rotated_imgs[ipsi])/2;
-
-                // Grab the line from the rotated image, in X and in Y directions
-                for (int iline = 0; iline < ilengthmax; iline++)
-                    DIRECT_A1D_ELEM(oneline, iline) = A2D_ELEM(rotated_imgs[ipsi], cen_ypos, cen_xpos+iline-ilengthmax/2);
-
-                transformer[tid].FourierTransform(oneline, FTline, false);
-
-                for (int isig = imin_signal; isig <= imax_signal; isig++)
-                {
-                    A2D_ELEM(rotated_scores_perline[ipsi], cen_ypos, cen_xpos) += norm(DIRECT_A1D_ELEM(FTline, isig));
-                }
-                for (int isig = imin_nonsignal; isig <= imax_nonsignal; isig++)
-                {
-                    A2D_ELEM(rotated_nonscores_perline[ipsi], cen_ypos, cen_xpos) += norm(DIRECT_A1D_ELEM(FTline, isig));
-                }
-
-            } // end loop ypos
-        } // end for xpos
-
-        /*
-        Image<RFLOAT> It0;
-        It0()= rotated_scores_perline[ipsi];
-        FileName fnt0="It0_scores_psi"+ integerToString(ipsi)+".spi";
-        It0.write(fnt0);
-        std::cerr <<" written: "<<fnt0 << std::endl;
-        It0()= rotated_nonscores_perline[ipsi];
-        fnt0="It0_nonscores_psi"+ integerToString(ipsi)+".spi";
-        It0.write(fnt0);
-        std::cerr <<" written: "<<fnt0 << std::endl;
-        */
-
-        // Now that we have signal per individual line for each coordinate, sum over the width of the search box
-        // The below is split in two halves, becauses otherwise cen_pos=0 may be sampled twice!!!
-        int my_skip_side_width = iwidthmax/2;
- #pragma omp parallel for num_threads(nr_threads)
-        for (int ypos = 0; ypos < YSIZE(rotated_imgs[ipsi])/2 - my_skip_side_width; ypos += shift_step)
-        {
-           for (int ipassy = 0; ipassy < 2; ipassy++)
-           {
-               int cen_ypos = (ipassy == 0) ? ypos : -ypos;
-               if (ypos == 0 && ipassy == 1) continue;
-
-               for (int xpos = 0; xpos < XSIZE(rotated_imgs[ipsi])/2 - my_skip_side_width; xpos += shift_step)
-               {
-                   for (int ipass = 0; ipass < 2; ipass++)
-                   {
-                       int cen_xpos = (ipass == 0) ? xpos : -xpos;
-                       if (xpos == 0 && ipass == 1) continue;
-                       for (int iwidth = 0; iwidth < iwidthmax; iwidth++)
-                       {
-                           // Grab the line from the rotated image, in X and in Y directions
-                           A2D_ELEM(rotated_scores[ipsi], cen_ypos/shift_step, cen_xpos/shift_step) +=
-                                   A2D_ELEM(rotated_scores_perline[ipsi], cen_ypos+iwidth-iwidthmax/2, cen_xpos);
-                           A2D_ELEM(rotated_nonscores[ipsi], cen_ypos/shift_step, cen_xpos/shift_step) +=
-                                   A2D_ELEM(rotated_nonscores_perline[ipsi], cen_ypos+iwidth-iwidthmax/2, cen_xpos);
-                       } // end loop iwidth
-                   } // end loop ipass
-               } // end loop xpos
-           } // end for ipassy
-        } // end for ypos
-
-        if (myverb) progress_bar(ipsi);
-
-    } // end for ipsi
-    if (myverb) progress_bar(nr_psi);
-
 
     // Now loop over all positions and find the best Zscore and the best ipsi
     // Note that each translation in the original image has a different coordinate in the rotated_score images!
