@@ -39,16 +39,21 @@ double Zernike::R(int m, int n, double rho)
 	
 	if ((n - m) % 2 == 1) return 0.0;
 	
-	if (R_coeffs.size() <= n)
+	std::vector<double> coeffs_row;
+	#pragma omp critical(Zernike_R_coeffs)
 	{
-		prepCoeffs(n);
+		if (R_coeffs.size() <= n)
+		{
+			prepCoeffs(n);
+		}
+		coeffs_row = R_coeffs[n][m];
 	}
 	
 	double out = 0.0;
 	
 	for (int k = 0; k <= (n-m)/2; k++)
 	{
-		out += R_coeffs[n][m][k] * pow(rho, n - 2*k);
+		out += coeffs_row[k] * pow(rho, n - 2*k);
 	}
 	
 	return out;

@@ -579,6 +579,12 @@ if (FETCH_WEIGHTS)
 			"NOTE: You can skip this step by setting -DFETCH_WEIGHTS=OFF"
 	)
 
+	# `relion_trace_amyloids.py` is necessary for weight download during `cmake`.
+	# The `copy_scripts` target below is executed only during `make`.
+	configure_file("${CMAKE_SOURCE_DIR}/scripts/trace_amyloids.py"
+	               "${CMAKE_BINARY_DIR}/bin/relion_trace_amyloids.py"
+	               COPYONLY)
+
 	execute_process(
 			COMMAND bash ${CMAKE_BINARY_DIR}/bin/relion_python_fetch_weights
 			WORKING_DIRECTORY ${CMAKE_BINARY_DIR}

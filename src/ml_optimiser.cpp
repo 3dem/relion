@@ -1000,7 +1000,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     random_seed = textToInteger(parser.getOption("--random_seed", "Number for the random seed generator", "-1"));
     max_coarse_size = textToInteger(parser.getOption("--coarse_size", "Maximum image size for the first pass of the adaptive sampling approach", "-1"));
     adaptive_fraction = textToFloat(parser.getOption("--adaptive_fraction", "Fraction of the weights to be considered in the first pass of adaptive oversampling ", "0.999"));
-    width_mask_edge = textToInteger(parser.getOption("--maskedge", "Width of the soft edge of the spherical mask (in pixels)", "5"));
+    width_mask_edge = textToInteger(parser.getOption("--maskedge", "Width of the soft edge of the spherical mask (in pixels). The default is 10 for helical refinement, otherwise 5.", "5"));
     // If we're doing helical, and maskedge is not given, use a default maskedge of 10
     if (helical_tube_outer_diameter > 0. && !checkParameter(argc, argv, "--maskedge")) width_mask_edge = 10.;
     fix_sigma_noise = parser.checkOption("--fix_sigma_noise", "Fix the experimental noise spectra?");

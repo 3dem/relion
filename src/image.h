@@ -302,6 +302,16 @@ public:
 			fileName = fileName.addExtension(ext_name);
 		}
 
+		// A ".gain" reference is a TIFF. RELION already assumes this in
+		// EERRenderer::loadEERGain (which appends ":tif" for .gain); make the
+		// generic image path assume the same, so a TIFF gain with a .gain
+		// extension also reads for non-EER (e.g. TIFF) movies and in Bayesian
+		// Polishing, instead of falling through to the SPIDER reader.
+		// See https://github.com/3dem/relion/pull/1346 and the CCPEM thread:
+		// https://www.jiscmail.ac.uk/cgi-bin/wa-jisc.exe?A2=ind2605&L=CCPEM&O=D&P=34021
+		if (ext_name == "gain")
+			ext_name = "tif";
+
 		isTiff = ext_name.contains("tif");
 
 		// Open image file
