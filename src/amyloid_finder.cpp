@@ -244,7 +244,7 @@ void AmyloidFinder::deviceInitialise()
 	untangleDeviceIDs(gpu_ids, allThreadIDs);
 
 	// Sequential initialisation of GPUs on all ranks
-	if (!std::isdigit(*gpu_ids.begin()))
+	if (!hasExplicitDeviceIDs(gpu_ids))
 		device_id = 0;
 	else
 		device_id = textToInteger((allThreadIDs[0][0]).c_str());
