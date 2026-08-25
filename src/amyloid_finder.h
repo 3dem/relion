@@ -31,6 +31,12 @@
 #include <omp.h>
 #include <numeric> // for std::iota
 
+enum class AmyloidImagePrepareBackend
+{
+    LegacyRotateThenDownscale,
+    DownscaleOnceThenRotate
+};
+
 struct AmyloidCoordinate
 {
 	RFLOAT x, y, psi, fom, order;
@@ -66,6 +72,9 @@ public:
 
     // Skip FOM calculation or tracing call
     bool do_skip_fom, do_skip_tracing;
+
+    // Selects the order of rotation and Fourier downscaling
+    AmyloidImagePrepareBackend image_prepare_backend = AmyloidImagePrepareBackend::LegacyRotateThenDownscale;
 
     // width and length of filaments (in A) for searching of 4.7A signal
     RFLOAT search_filament_length, search_filament_width;
