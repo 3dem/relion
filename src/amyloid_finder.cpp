@@ -20,6 +20,21 @@
 #include "src/amyloid_finder.h"
 //#define DEBUG_BOUNDS
 
+namespace
+{
+AmyloidImagePrepareBackend parseAmyloidImagePrepareBackend(const std::string &backend)
+{
+    if (backend == "legacy")
+        return AmyloidImagePrepareBackend::LegacyRotateThenDownscale;
+    if (backend == "downscale_once")
+        return AmyloidImagePrepareBackend::DownscaleOnceThenRotate;
+
+    REPORT_ERROR("ERROR: unknown --image_prepare_backend \"" + backend +
+                 "\". Valid values are legacy and downscale_once.");
+    return AmyloidImagePrepareBackend::LegacyRotateThenDownscale;
+}
+}
+
 void AmyloidFinder::read(int argc, char **argv, int rank)
 {
     parser.setCommandLine(argc, argv);
@@ -62,6 +77,10 @@ void AmyloidFinder::read(int argc, char **argv, int rank)
     nonsignal_maxres = textToFloat(parser.getOption("--nonsignal_maxres", "Maximum resolution value for non-signal (in A)", "4.2"));
     down_angpix = textToFloat(parser.getOption("--down_angpix", "Pixel size for downscaled images (needs to include signal frequency!)", "2.1"));
     angpix = textToFloat(parser.getOption("--force_angpix", "Force this pixel size, regardless of what is in the image header", "-1"));
+    image_prepare_backend = parseAmyloidImagePrepareBackend(
+        parser.getOption("--image_prepare_backend",
+                         "Image preparation order: legacy rotates before downscaling; downscale_once (experimental) downscales before rotating",
+                         "legacy"));
     verb =textToInteger(parser.getOption("--verb", "Verbosity", "1"));
 
     // Check for errors in the command-line option
@@ -173,6 +192,8 @@ void AmyloidFinder::initialise(bool is_leader)
     {
         std::cout << " + Calculating FOM images for " << todo_micrographs_fom.size() << " micrographs... " << std::endl;
         std::cout << " + Tracing filaments for " << todo_micrographs_tracing.size() << " micrographs... " << std::endl;
+        if (image_prepare_backend == AmyloidImagePrepareBackend::DownscaleOnceThenRotate)
+            std::cout << " + WARNING: downscale_once changes interpolation order; validate FOM/PSI quality before production use." << std::endl;
     }
 
     // Read in header of first image
@@ -329,10 +350,25 @@ void AmyloidFinder::getScoreForOneMicrograph(MultidimArray<RFLOAT> &image, Multi
         }
     }
 
-    // Rotate the large image, and store downscaled images by cropping their Fourier Transform
+    // Rotate the image and store all orientations.
     std::vector<MultidimArray<RFLOAT> > rotated_imgs(nr_psi), rotated_scores_perline(nr_psi), rotated_scores(nr_psi);
     std::vector<MultidimArray<RFLOAT> > rotated_nonscores_perline(nr_psi), rotated_nonscores(nr_psi);
     std::vector<FourierTransformer> transformer(nr_threads);
+
+    const bool do_downscale_once = image_prepare_backend == AmyloidImagePrepareBackend::DownscaleOnceThenRotate;
+    MultidimArray<RFLOAT> Mdown;
+    if (do_downscale_once)
+    {
+        // Fourier-crop once before rotating the smaller image at each angle.
+        MultidimArray<Complex> FT, FT2;
+        transformer[0].FourierTransform(Mbig, FT, false);
+        windowFourierTransform(FT, FT2, crop_box);
+        transformer[0].clear();
+        Mdown.reshape(crop_box, crop_box);
+        transformer[0].inverseFourierTransform(FT2, Mdown);
+        Mdown.setXmippOrigin();
+    }
+
     // TODO: in principle, only need to rotate to 90 degrees, as I can use both the X and the Y direction for the 1D FFTs!
     if (myverb)
     {
@@ -345,6 +381,17 @@ void AmyloidFinder::getScoreForOneMicrograph(MultidimArray<RFLOAT> &image, Multi
     {
         const int tid = omp_get_thread_num();
         RFLOAT psi = getPsiAngle(ipsi);
+
+        if (do_downscale_once)
+        {
+            MultidimArray<RFLOAT> Mrot;
+            Mrot.setXmippOrigin();
+            Mrot.initZeros(crop_box, crop_box);
+            rotate(Mdown, Mrot, psi, 'Z', true);
+            Mrot.setXmippOrigin();
+            rotated_imgs[ipsi] = Mrot;
+            continue;
+        }
 
         // Rotate the images in their original size to prevent interpolation artefacts near the signal frequencies
         MultidimArray<RFLOAT> Mrot;
