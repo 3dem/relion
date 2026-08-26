@@ -33,25 +33,25 @@
 
 using namespace gravis;
 
-std::vector<std::vector<Image<RFLOAT>>> MotionHelper::movieCC(
-		const std::vector<std::vector<Image<Complex>>>& movie,
+void MotionHelper::movieCC(
+		const ContiguousImageStack<Complex>& movie,
 		const std::vector<Image<Complex>>& preds,
 		const std::vector<Image<RFLOAT> > &damageWeights,
-		double pad, int threads)
+		double pad, int threads,
+		ContiguousImageStack<RFLOAT>& out)
 {
-	const int pc = movie.size();
-	const int fc = movie[0].size();
+	const int pc = movie.particleCount();
+	const int fc = movie.frameCount();
 
-	const int s = movie[0][0]().ydim;
+	const int s = movie.ydim();
 	const int sh = s/2 + 1;
-
-	std::vector<std::vector<Image<RFLOAT>>> out(pc);
 
 	std::vector<Image<dComplex>> ccsFs(threads);
 	std::vector<Image<double>> ccsRs(threads);
 	
 	const int s2 = (int)(pad * s);
 	const int sh2 = s2/2 + 1;
+	out.resize(pc, fc, s2, s2);
 
 	for (int t = 0; t < threads; t++)
 	{
@@ -68,8 +68,6 @@ std::vector<std::vector<Image<RFLOAT>>> MotionHelper::movieCC(
 
 	for (int p = 0; p < pc; p++)
 	{
-		out[p] = std::vector<Image<RFLOAT>>(fc, Image<RFLOAT>(s2,s2));
-
 #pragma omp parallel for num_threads(threads)
 		for (int f = 0; f < fc; f++)
 		{
@@ -78,7 +76,7 @@ std::vector<std::vector<Image<RFLOAT>>> MotionHelper::movieCC(
 			for (int y = 0; y < s; y++)
 				for (int x = 0; x < sh; x++)
 				{
-					Complex z = movie[p][f](y,x) * damageWeights[f](y,x) * preds[p](y,x).conj();
+					Complex z = movie(p, f)(y,x) * damageWeights[f](y,x) * preds[p](y,x).conj();
 
 					const int yy = y < sh? y : s2 - (s - y);
 
@@ -90,12 +88,10 @@ std::vector<std::vector<Image<RFLOAT>>> MotionHelper::movieCC(
 			for (int y = 0; y < s2; y++)
 				for (int x = 0; x < s2; x++)
 				{
-					out[p][f](y,x) = s * s * ccsRs[t](y,x);
+					out(p, f)(y,x) = s * s * ccsRs[t](y,x);
 				}
 		}
 	}
-
-	return out;
 }
 
 /*std::vector<std::vector<Image<RFLOAT>>> MotionHelper::movieCC(
@@ -220,12 +216,12 @@ std::vector<std::vector<Image<RFLOAT>>> MotionHelper::movieCC(
 }*/
 
 std::vector<Image<RFLOAT> > MotionHelper::addCCs(
-		const std::vector<std::vector<Image<RFLOAT>>> &movieCC)
+		const ContiguousImageStack<RFLOAT>& movieCC)
 {
-	const int pc = movieCC.size();
-	const int fc = movieCC[0].size();
+	const int pc = movieCC.particleCount();
+	const int fc = movieCC.frameCount();
 
-	const int s = movieCC[0][0]().xdim;
+	const int s = movieCC.xdim();
 
 	std::vector<Image<RFLOAT>> e_sum(fc);
 
@@ -239,7 +235,7 @@ std::vector<Image<RFLOAT> > MotionHelper::addCCs(
 			for (int y = 0; y < s; y++)
 				for (int x = 0; x < s; x++)
 				{
-					e_sum[f](y,x) += movieCC[p][f](y,x);
+					e_sum[f](y,x) += movieCC(p, f)(y,x);
 				}
 		}
 	}
@@ -271,14 +267,16 @@ std::vector<d2Vector> MotionHelper::getGlobalTrack(
 	return out;
 }
 
+
+
 std::vector<d2Vector> MotionHelper::getGlobalOffsets(
-		const std::vector<std::vector<Image<RFLOAT>>>& movieCC,
+		const ContiguousImageStack<RFLOAT>& movieCC,
 		const std::vector<std::vector<gravis::d2Vector>>& initialTracks,
 		double cc_pad, double sigma, int wMax, int hMax, int threads)
 {
-	const int pc = movieCC.size();
-	const int fc = movieCC[0].size();
-	const int s = movieCC[0][0]().xdim;
+	const int pc = movieCC.particleCount();
+	const int fc = movieCC.frameCount();
+	const int s = movieCC.xdim();
 	const int sh = s/2 + 1;
 	const double eps = 1e-30;
 
@@ -307,7 +305,7 @@ std::vector<d2Vector> MotionHelper::getGlobalOffsets(
 			for (int y = 0; y < s; y++)
 				for (int x = 0; x < s; x++)
 				{
-					pSum(y,x) += Interpolation::cubicXY(movieCC[p][f], x + g.x, y + g.y, 0, 0, true);
+					pSum(y,x) += Interpolation::cubicXY(movieCC(p, f), x + g.x, y + g.y, 0, 0, true);
 				}
 		}
 
@@ -461,5 +459,3 @@ std::vector<std::vector<d2Vector>> MotionHelper::readTracksInPix(std::string fn,
 
 	return out;
 }
-
-

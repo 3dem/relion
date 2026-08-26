@@ -65,6 +65,7 @@ class FilterHelper
         static Image<RFLOAT> padCorner2D(const Image<RFLOAT> &img, int w, int h);
         static Image<RFLOAT> cropCorner2D(const Image<RFLOAT> &img, int w, int h);
         static Image<Complex> cropCorner2D(const Image<Complex> &img, int w, int h);
+        static void cropCorner2D(const Image<Complex>& img, Image<Complex>& out);
         static Image<RFLOAT> zeroOutsideCorner2D(Image<RFLOAT>& img, double radius);
         static void GaussianEnvelopeCorner2D(Image<RFLOAT>& img, double sigma);
 		static Image<RFLOAT> raisedCosEnvCorner2D(Image<RFLOAT>& img, double radIn, double radOut);
