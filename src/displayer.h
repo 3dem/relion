@@ -73,6 +73,7 @@ static int predrag_yc;
 static bool has_shift;
 static int preshift_ipos;
 static int current_selection_type;
+static int current_line_id;
 static int colour_scheme;
 static int fom_is_grey_instead;
 
