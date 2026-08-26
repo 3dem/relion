@@ -26,6 +26,7 @@
 
 #include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/single_particle/parallel_ft.h>
+#include <src/jaz/image/contiguous_image_stack.h>
 
 #include <src/micrograph_model.h>
 #include <src/image.h>
@@ -76,11 +77,11 @@ class MicrographHandler
 		const std::vector<MetaDataTable>& mdts,
 		int fc, int verb);
 
-	// load a movie and extract all particles
-	// returns a per-particle vector of per-frame images of size (s/2+1) x s
-	std::vector<std::vector<Image<Complex>>> loadMovie(
+	// load a movie and extract all particles into contiguous per-frame storage
+	void loadMovie(
 		const MetaDataTable& mdt, int s, double angpix, 
 		std::vector<ParFourierTransformer>& fts,
+		ContiguousImageStack<Complex>& movie,
 		const std::vector<std::vector<gravis::d2Vector>>* offsets_in = 0,
 		std::vector<std::vector<gravis::d2Vector>>* offsets_out = 0,
 		double data_angpix = -1,
