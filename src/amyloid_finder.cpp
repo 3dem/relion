@@ -18,6 +18,9 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/amyloid_finder.h"
+
+#include <algorithm>
+#include <cmath>
 //#define DEBUG_BOUNDS
 
 void AmyloidFinder::read(int argc, char **argv, int rank)
@@ -305,6 +308,219 @@ MultidimArray<RFLOAT> AmyloidFinder::growNonSignalMask(MultidimArray<RFLOAT> &in
     return Mresult;
 
 }
+
+namespace
+{
+struct AmyloidFrequencyBin
+{
+    int k;
+    bool is_signal;
+};
+
+struct AmyloidFrequencyTables
+{
+    int n;
+    std::vector<AmyloidFrequencyBin> bins;
+    std::vector<std::vector<RFLOAT> > cos_lut, sin_lut;
+    std::vector<RFLOAT> phase_cos, phase_sin;
+};
+
+AmyloidFrequencyTables buildAmyloidFrequencyTables(const AmyloidFinder &finder)
+{
+    AmyloidFrequencyTables tables;
+    tables.n = finder.ilengthmax;
+
+    for (int k = finder.imin_signal; k <= finder.imax_signal; k++)
+        tables.bins.push_back({k, true});
+    for (int k = finder.imin_nonsignal; k <= finder.imax_nonsignal; k++)
+        tables.bins.push_back({k, false});
+
+    tables.cos_lut.resize(tables.bins.size());
+    tables.sin_lut.resize(tables.bins.size());
+    tables.phase_cos.resize(tables.bins.size());
+    tables.phase_sin.resize(tables.bins.size());
+    for (long int ibin = 0; ibin < (long int)tables.bins.size(); ibin++)
+    {
+        const RFLOAT phase = 2. * PI * tables.bins[ibin].k / tables.n;
+        tables.phase_cos[ibin] = cos(phase);
+        tables.phase_sin[ibin] = sin(phase);
+        tables.cos_lut[ibin].resize(tables.n);
+        tables.sin_lut[ibin].resize(tables.n);
+        for (int i = 0; i < tables.n; i++)
+        {
+            tables.cos_lut[ibin][i] = cos(-phase * i);
+            tables.sin_lut[ibin][i] = sin(-phase * i);
+        }
+    }
+
+    return tables;
+}
+
+std::vector<int> getAmyloidSamplingCenters(int size, int skip_side_width, int shift_step)
+{
+    std::vector<int> centers;
+    for (int pos = 0; pos < size / 2 - skip_side_width; pos += shift_step)
+    {
+        centers.push_back(pos);
+        if (pos != 0)
+            centers.push_back(-pos);
+    }
+    std::sort(centers.begin(), centers.end());
+    return centers;
+}
+
+struct AmyloidScoreGeometry
+{
+    std::vector<int> x_centers;
+    std::vector<std::vector<int> > output_rows;
+};
+
+struct AmyloidRowScratch
+{
+    std::vector<RFLOAT> signal, nonsignal, real, imag;
+};
+
+AmyloidScoreGeometry buildAmyloidScoreGeometry(const AmyloidFinder &finder)
+{
+    AmyloidScoreGeometry geometry;
+    const int skip_side_width = finder.iwidthmax / 2;
+    const int skip_side_length = finder.ilengthmax / 2;
+    const int first_scored = skip_side_length - finder.crop_box / 2;
+    const int last_scored = finder.crop_box - skip_side_length - 1 - finder.crop_box / 2;
+
+    std::vector<int> x_centers = getAmyloidSamplingCenters(
+            finder.crop_box, skip_side_width, finder.shift_step);
+    for (long int i = 0; i < (long int)x_centers.size(); i++)
+        if (x_centers[i] >= first_scored && x_centers[i] <= last_scored)
+            geometry.x_centers.push_back(x_centers[i]);
+
+    geometry.output_rows.resize(finder.crop_box);
+    std::vector<int> y_centers = getAmyloidSamplingCenters(
+            finder.crop_box, skip_side_width, finder.shift_step);
+    for (long int i = 0; i < (long int)y_centers.size(); i++)
+    {
+        const int out_y = y_centers[i] / finder.shift_step;
+        for (int iwidth = 0; iwidth < finder.iwidthmax; iwidth++)
+        {
+            const int row_y = y_centers[i] + iwidth - finder.iwidthmax / 2;
+            if (row_y >= first_scored && row_y <= last_scored)
+                geometry.output_rows[row_y + finder.crop_box / 2].push_back(out_y);
+        }
+    }
+
+    return geometry;
+}
+
+void scoreAmyloidRowSliding(
+        const MultidimArray<RFLOAT> &image,
+        int row_y,
+        const AmyloidFrequencyTables &tables,
+        const std::vector<int> &x_centers,
+        AmyloidRowScratch &scratch)
+{
+    scratch.signal.assign(x_centers.size(), 0.);
+    scratch.nonsignal.assign(x_centers.size(), 0.);
+    if (x_centers.empty())
+        return;
+
+    const int half_length = tables.n / 2;
+    const int first_xpos = half_length;
+    const int last_xpos = XSIZE(image) - half_length - 1;
+    const int first_x = first_xpos - XSIZE(image) / 2;
+    const RFLOAT power_scale = 1. / ((RFLOAT)tables.n * tables.n);
+    scratch.real.assign(tables.bins.size(), 0.);
+    scratch.imag.assign(tables.bins.size(), 0.);
+
+    for (long int ibin = 0; ibin < (long int)tables.bins.size(); ibin++)
+    {
+        for (int i = 0; i < tables.n; i++)
+        {
+            const RFLOAT value = A2D_ELEM(image, row_y, first_x + i - half_length);
+            scratch.real[ibin] += value * tables.cos_lut[ibin][i];
+            scratch.imag[ibin] += value * tables.sin_lut[ibin][i];
+        }
+    }
+
+    long int next_center = 0;
+    for (int xpos = first_xpos; xpos <= last_xpos; xpos++)
+    {
+        const int x = xpos - XSIZE(image) / 2;
+        if (x == x_centers[next_center])
+        {
+            for (long int ibin = 0; ibin < (long int)tables.bins.size(); ibin++)
+            {
+                const RFLOAT power = (scratch.real[ibin] * scratch.real[ibin] +
+                                      scratch.imag[ibin] * scratch.imag[ibin]) * power_scale;
+                if (tables.bins[ibin].is_signal)
+                    scratch.signal[next_center] += power;
+                else
+                    scratch.nonsignal[next_center] += power;
+            }
+            if (++next_center == (long int)x_centers.size())
+                break;
+        }
+
+        const RFLOAT old_pixel = A2D_ELEM(image, row_y, x - half_length);
+        const RFLOAT new_pixel = A2D_ELEM(image, row_y, x + half_length);
+        for (long int ibin = 0; ibin < (long int)tables.bins.size(); ibin++)
+        {
+            const RFLOAT shifted_real = scratch.real[ibin] - old_pixel + new_pixel;
+            const RFLOAT shifted_imag = scratch.imag[ibin];
+            scratch.real[ibin] = tables.phase_cos[ibin] * shifted_real - tables.phase_sin[ibin] * shifted_imag;
+            scratch.imag[ibin] = tables.phase_sin[ibin] * shifted_real + tables.phase_cos[ibin] * shifted_imag;
+        }
+    }
+}
+
+void calculateAmyloidScoresFused(
+        const AmyloidFinder &finder,
+        const MultidimArray<RFLOAT> &image,
+        const AmyloidFrequencyTables &tables,
+        const AmyloidScoreGeometry &geometry,
+        MultidimArray<RFLOAT> &signal,
+        MultidimArray<RFLOAT> &nonsignal)
+{
+#pragma omp parallel num_threads(finder.nr_threads)
+    {
+        MultidimArray<RFLOAT> local_signal, local_nonsignal;
+        local_signal.initZeros(signal);
+        local_signal.setXmippOrigin();
+        local_nonsignal.initZeros(nonsignal);
+        local_nonsignal.setXmippOrigin();
+        AmyloidRowScratch scratch;
+
+#pragma omp for schedule(dynamic)
+        for (long int irow = 0; irow < (long int)geometry.output_rows.size(); irow++)
+        {
+            if (geometry.output_rows[irow].empty())
+                continue;
+
+            const int row_y = irow - YSIZE(image) / 2;
+            scoreAmyloidRowSliding(image, row_y, tables, geometry.x_centers, scratch);
+            for (long int ix = 0; ix < (long int)geometry.x_centers.size(); ix++)
+            {
+                const int out_x = geometry.x_centers[ix] / finder.shift_step;
+                for (long int iy = 0; iy < (long int)geometry.output_rows[irow].size(); iy++)
+                {
+                    const int out_y = geometry.output_rows[irow][iy];
+                    A2D_ELEM(local_signal, out_y, out_x) += scratch.signal[ix];
+                    A2D_ELEM(local_nonsignal, out_y, out_x) += scratch.nonsignal[ix];
+                }
+            }
+        }
+
+#pragma omp critical
+        {
+            FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(signal)
+            {
+                DIRECT_MULTIDIM_ELEM(signal, n) += DIRECT_MULTIDIM_ELEM(local_signal, n);
+                DIRECT_MULTIDIM_ELEM(nonsignal, n) += DIRECT_MULTIDIM_ELEM(local_nonsignal, n);
+            }
+        }
+    }
+}
+}
+
 void AmyloidFinder::getScoreForOneMicrograph(MultidimArray<RFLOAT> &image, MultidimArray<RFLOAT> &Mscore,
                                              MultidimArray<RFLOAT> &Mangle, RFLOAT &skew, RFLOAT &kurt, bool myverb)
 {
@@ -330,8 +546,7 @@ void AmyloidFinder::getScoreForOneMicrograph(MultidimArray<RFLOAT> &image, Multi
     }
 
     // Rotate the large image, and store downscaled images by cropping their Fourier Transform
-    std::vector<MultidimArray<RFLOAT> > rotated_imgs(nr_psi), rotated_scores_perline(nr_psi), rotated_scores(nr_psi);
-    std::vector<MultidimArray<RFLOAT> > rotated_nonscores_perline(nr_psi), rotated_nonscores(nr_psi);
+    std::vector<MultidimArray<RFLOAT> > rotated_imgs(nr_psi), rotated_scores(nr_psi), rotated_nonscores(nr_psi);
     std::vector<FourierTransformer> transformer(nr_threads);
     // TODO: in principle, only need to rotate to 90 degrees, as I can use both the X and the Y direction for the 1D FFTs!
     if (myverb)
@@ -387,102 +602,25 @@ void AmyloidFinder::getScoreForOneMicrograph(MultidimArray<RFLOAT> &image, Multi
     // Just prepare the rotated_scores vector too
     for (int ipsi = 0; ipsi < nr_psi; ipsi++)
     {
-        rotated_scores_perline[ipsi].initZeros(crop_box, crop_box);
-        rotated_scores_perline[ipsi].setXmippOrigin();
-        rotated_nonscores_perline[ipsi].initZeros(crop_box, crop_box);
-        rotated_nonscores_perline[ipsi].setXmippOrigin();
         rotated_scores[ipsi].initZeros(crop_box/shift_step, crop_box/shift_step);
         rotated_scores[ipsi].setXmippOrigin();
         rotated_nonscores[ipsi].initZeros(crop_box/shift_step, crop_box/shift_step);
         rotated_nonscores[ipsi].setXmippOrigin();
     }
 
-    // Prepare all the transformers for the 1D lines
-    MultidimArray<RFLOAT> oneline_tmp(ilengthmax);
-    for (int i = 0; i < nr_threads; i++)
-        transformer[i].setReal(oneline_tmp);
-
-    // Now loop over all positions to calculate 1D FFTs
+    // Now loop over all positions to calculate and aggregate the selected DFT bins
     if (myverb)
     {
         std::cout << " - Searching over all coordinates ..." << std::endl;
         init_progress_bar(nr_psi);
     }
 
-    int my_skip_side_length = ilengthmax/2;
+    const AmyloidFrequencyTables frequency_tables = buildAmyloidFrequencyTables(*this);
+    const AmyloidScoreGeometry score_geometry = buildAmyloidScoreGeometry(*this);
     for (int ipsi = 0; ipsi < nr_psi; ipsi++)
     {
-#pragma omp parallel for num_threads(nr_threads)
-        for (int ypos = my_skip_side_length; ypos < YSIZE(rotated_imgs[ipsi]) - my_skip_side_length; ypos += 1)
-        {
-            int cen_ypos = ypos - YSIZE(rotated_imgs[ipsi])/2;
-            const int tid = omp_get_thread_num();
-            MultidimArray<RFLOAT> oneline(ilengthmax);
-            MultidimArray<Complex> FTline(ilengthmax/2 + 1);
-
-            for (int xpos = my_skip_side_length; xpos < XSIZE(rotated_imgs[ipsi]) - my_skip_side_length; xpos += 1)
-            {
-                int cen_xpos = xpos - XSIZE(rotated_imgs[ipsi])/2;
-
-                // Grab the line from the rotated image, in X and in Y directions
-                for (int iline = 0; iline < ilengthmax; iline++)
-                    DIRECT_A1D_ELEM(oneline, iline) = A2D_ELEM(rotated_imgs[ipsi], cen_ypos, cen_xpos+iline-ilengthmax/2);
-
-                transformer[tid].FourierTransform(oneline, FTline, false);
-
-                for (int isig = imin_signal; isig <= imax_signal; isig++)
-                {
-                    A2D_ELEM(rotated_scores_perline[ipsi], cen_ypos, cen_xpos) += norm(DIRECT_A1D_ELEM(FTline, isig));
-                }
-                for (int isig = imin_nonsignal; isig <= imax_nonsignal; isig++)
-                {
-                    A2D_ELEM(rotated_nonscores_perline[ipsi], cen_ypos, cen_xpos) += norm(DIRECT_A1D_ELEM(FTline, isig));
-                }
-
-            } // end loop ypos
-        } // end for xpos
-
-        /*
-        Image<RFLOAT> It0;
-        It0()= rotated_scores_perline[ipsi];
-        FileName fnt0="It0_scores_psi"+ integerToString(ipsi)+".spi";
-        It0.write(fnt0);
-        std::cerr <<" written: "<<fnt0 << std::endl;
-        It0()= rotated_nonscores_perline[ipsi];
-        fnt0="It0_nonscores_psi"+ integerToString(ipsi)+".spi";
-        It0.write(fnt0);
-        std::cerr <<" written: "<<fnt0 << std::endl;
-        */
-
-        // Now that we have signal per individual line for each coordinate, sum over the width of the search box
-        // The below is split in two halves, becauses otherwise cen_pos=0 may be sampled twice!!!
-        int my_skip_side_width = iwidthmax/2;
- #pragma omp parallel for num_threads(nr_threads)
-        for (int ypos = 0; ypos < YSIZE(rotated_imgs[ipsi])/2 - my_skip_side_width; ypos += shift_step)
-        {
-           for (int ipassy = 0; ipassy < 2; ipassy++)
-           {
-               int cen_ypos = (ipassy == 0) ? ypos : -ypos;
-               if (ypos == 0 && ipassy == 1) continue;
-
-               for (int xpos = 0; xpos < XSIZE(rotated_imgs[ipsi])/2 - my_skip_side_width; xpos += shift_step)
-               {
-                   for (int ipass = 0; ipass < 2; ipass++)
-                   {
-                       int cen_xpos = (ipass == 0) ? xpos : -xpos;
-                       if (xpos == 0 && ipass == 1) continue;
-                       for (int iwidth = 0; iwidth < iwidthmax; iwidth++)
-                       {
-                           // Grab the line from the rotated image, in X and in Y directions
-                           A2D_ELEM(rotated_scores[ipsi], cen_ypos/shift_step, cen_xpos/shift_step) +=
-                                   A2D_ELEM(rotated_scores_perline[ipsi], cen_ypos+iwidth-iwidthmax/2, cen_xpos);
-                           A2D_ELEM(rotated_nonscores[ipsi], cen_ypos/shift_step, cen_xpos/shift_step) +=
-                                   A2D_ELEM(rotated_nonscores_perline[ipsi], cen_ypos+iwidth-iwidthmax/2, cen_xpos);
-                       } // end loop iwidth
-                   } // end loop ipass
-               } // end loop xpos
-           } // end for ipassy
-        } // end for ypos
+        calculateAmyloidScoresFused(*this, rotated_imgs[ipsi], frequency_tables, score_geometry,
+                                    rotated_scores[ipsi], rotated_nonscores[ipsi]);
 
         if (myverb) progress_bar(ipsi);
 
