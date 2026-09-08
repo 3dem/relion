@@ -170,6 +170,16 @@ static const std::vector<std::string> job_blush_version_options{
         "amy-v1.0"
 };
 
+static const std::vector<std::string> job_extract_selection_type_options{
+	     "All particles",
+		 "1 (red)",
+	     "2 (green)",
+	     "3 (blue)",
+		 "4 (cyan)",
+		 "5 (magenta)",
+		 "6 (yellow)"
+};
+
 // To have a line on the GUI to change the minimum number of dedicated in a job
 static bool do_allow_change_minimum_dedicated;
 
