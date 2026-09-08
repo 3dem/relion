@@ -1005,7 +1005,7 @@ int multiViewerCanvas::handle(int ev)
 				}
 				else
 				{
-					boxes[ipos]->toggleSelect(current_line_id);
+					boxes[ipos]->toggleSelect(current_selection_type);
 				}
 			}
 			else  if ( Fl::event_button() == FL_RIGHT_MOUSE )
