@@ -124,7 +124,7 @@ private:
 	{
 		Alloc *a = first;
 		//If not the last and too small or not free go to next allocation region
-		while (a != NULL && ( a->size <= size || ! a->free ) )
+		while (a != NULL && ( a->size < size || ! a->free ) )
 			a = a->next;
 
 		return a;
