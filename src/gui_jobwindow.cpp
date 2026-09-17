@@ -1076,6 +1076,9 @@ Pixels values higher than this many times the image stddev will be replaced with
 	group7->end();
 	guientries["do_fom_threshold"].cb_menu_i();
 
+	current_y += STEPY/2;
+	place("selection_type", TOGGLE_DEACTIVATE);
+
 	tab2->end();
 	tab3->begin();
 	tab3->label("Helix");

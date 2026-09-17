@@ -498,6 +498,7 @@ enum EMDLabel
 	EMDL_PARTICLE_HELICAL_TUBE_PITCH,
 	EMDL_PARTICLE_HELICAL_TRACK_LENGTH, //deprecated
 	EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM,
+	EMDL_PARTICLE_HELICAL_LINE_ID,
 	EMDL_PARTICLE_SELECTION_TYPE,
 	EMDL_PARTICLE_CLASS,
 	EMDL_PARTICLE_DLL,
@@ -1237,6 +1238,7 @@ private:
 		EMDL::addLabel(EMDL_PARTICLE_HELICAL_TUBE_PITCH, EMDL_DOUBLE, "rlnHelicalTubePitch", "Cross-over distance for a helical segment (A)");
 		EMDL::addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, EMDL_DOUBLE, "rlnHelicalTrackLength", "Distance (in pix) from the position of this helical segment to the starting point of the tube");
 		EMDL::addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM, EMDL_DOUBLE, "rlnHelicalTrackLengthAngst", "Distance (in A) from the position of this helical segment to the starting point of the tube");
+		EMDL::addLabel(EMDL_PARTICLE_HELICAL_LINE_ID, EMDL_INT, "rlnHelicalLineId", "Helical line ID for a manually selected helical line");
 		EMDL::addLabel(EMDL_PARTICLE_CLASS, EMDL_INT, "rlnClassNumber", "Class number for which a particle has its highest probability");
 		EMDL::addLabel(EMDL_PARTICLE_SELECTION_TYPE, EMDL_INT, "rlnParticleSelectionType", "Selection type for manually picked particles");
 		EMDL::addLabel(EMDL_PARTICLE_DLL, EMDL_DOUBLE, "rlnLogLikeliContribution", "Contribution of a particle to the log-likelihood target function");
