@@ -407,6 +407,27 @@ Image<Complex> FilterHelper::cropCorner2D(const Image<Complex>& img, int w, int 
     return out;
 }
 
+void FilterHelper::cropCorner2D(const Image<Complex>& img, Image<Complex>& out)
+{
+	const int w = out.data.xdim;
+	const int h = out.data.ydim;
+	const int w1 = img.data.xdim;
+	const int h1 = img.data.ydim;
+
+	for (int y = 0; y < h1; y++)
+	for (int x = 0; x < w1; x++)
+	{
+		const int x1 = x;
+		const int y1 = y < h1 / 2? y : y - h1;
+
+		if (x1 < w && y1 < h / 2 && y1 >= -h / 2)
+		{
+			const int y0 = y1 < 0? y1 + h : y1;
+			DIRECT_A2D_ELEM(out.data, y0, x1) = DIRECT_A2D_ELEM(img.data, y, x);
+		}
+	}
+}
+
 Image<RFLOAT> FilterHelper::zeroOutsideCorner2D(Image<RFLOAT> &img, double radius)
 {
     const int w = img.data.xdim;

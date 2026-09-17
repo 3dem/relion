@@ -24,6 +24,7 @@
 #include <src/image.h>
 #include <src/jaz/optimization/optimization.h>
 #include <src/jaz/gravis/t2Vector.h>
+#include <src/jaz/image/contiguous_image_stack.h>
 #include <vector>
 
 class GpMotionFit : public DifferentiableOptimization
@@ -31,7 +32,7 @@ class GpMotionFit : public DifferentiableOptimization
     public:
 
         GpMotionFit(
-                const std::vector<std::vector<Image<double>>>& correlation,
+                const ContiguousImageStack<double>& correlation,
                 double cc_pad,
 				double sig_vel_px, double sig_div_px, double sig_acc_px,
                 int maxDims,
@@ -74,7 +75,7 @@ class GpMotionFit : public DifferentiableOptimization
         Matrix2D<RFLOAT> basis;
         std::vector<double> eigenVals;
 
-        const std::vector<std::vector<Image<double>>>& correlation;
+        const ContiguousImageStack<double>& correlation;
         const std::vector<gravis::d2Vector>& positions;
         const std::vector<gravis::d2Vector>& perFrameOffsets;
 };
