@@ -27,6 +27,7 @@
 #include  <stdlib.h>
 #include  <unistd.h>
 #include  <stdio.h>
+#include "src/args.h"
 #include <src/metadata_table.h>
 #include <src/image.h>
 #include <src/time.h>

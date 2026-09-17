@@ -46,6 +46,7 @@
 #include "src/gcc_version.h"
 #include "src/matrix1d.h"
 #include <algorithm>
+#include <cctype>
 
 // Get parameters from the command line ====================================
 std::string getParameter(int argc, char **argv, const std::string param, const std::string option)
@@ -472,3 +473,30 @@ void untangleDeviceIDs(std::string &tangled, std::vector < std::vector < std::st
 #endif
 }
 
+bool hasExplicitDeviceIDs(const std::string &gpu_ids)
+{
+	return gpu_ids.size() > 0 && std::isdigit(static_cast<unsigned char>(gpu_ids[0]));
+}
+
+const std::vector<std::string>& getDeviceIDsForRank(
+	const std::vector < std::vector < std::string > > &allThreadIDs,
+	int rank)
+{
+	if (rank < 0)
+		REPORT_ERROR("Negative MPI rank requested for GPU ID assignment.");
+
+	if (allThreadIDs.size() == 0)
+		REPORT_ERROR("No GPU IDs parsed from --gpu.");
+
+	const std::vector<std::string> &rankThreadIDs = allThreadIDs[rank % allThreadIDs.size()];
+	if (rankThreadIDs.size() == 0)
+		REPORT_ERROR("No GPU IDs parsed for MPI rank from --gpu.");
+
+	for (int i = 0; i < rankThreadIDs.size(); i++)
+	{
+		if (rankThreadIDs[i] == "")
+			REPORT_ERROR("Empty GPU ID parsed from --gpu.");
+	}
+
+	return rankThreadIDs;
+}
