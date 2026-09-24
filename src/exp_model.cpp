@@ -289,7 +289,7 @@ void Experiment::divideParticlesInRandomHalves(int seed, bool do_helical_refine)
 	if (all_are_zero)
 	{
 		// Only randomise them if the random_subset values were not read in from the STAR file
-		srand(seed);
+		RandomStream rng(seed, RANDOM_HALVES, 0);
 		if (do_helical_refine)
 		{
 			std::string mic_name, img_name;
@@ -329,7 +329,7 @@ void Experiment::divideParticlesInRandomHalves(int seed, bool do_helical_refine)
 			for (int ptr_a = 0; ptr_a < (vec_mics.size() - 1); ptr_a++)
 			{
 				std::pair<std::string, int> tmp;
-				int ptr_b = ROUND(rnd_unif(ptr_a, vec_mics.size() - 1));
+				int ptr_b = ROUND(rng.unif(ptr_a, vec_mics.size() - 1));
 				if ( (ptr_b <= ptr_a) || (ptr_b >= vec_mics.size()) )
 					continue;
 				nr_swaps++;
@@ -375,7 +375,7 @@ void Experiment::divideParticlesInRandomHalves(int seed, bool do_helical_refine)
 		{
 			for (long int part_id = 0; part_id < particles.size(); part_id++)
 			{
-				int random_subset = rand() % 2 + 1;
+				int random_subset = rng.next() % 2 + 1;
 				particles[part_id].random_subset = random_subset; // randomly 1 or 2
 			}
 		}

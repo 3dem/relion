@@ -1,4 +1,5 @@
 include_directories("${CMAKE_SOURCE_DIR}")
+include_directories("${random123_SOURCE_DIR}/include")
 
 message("Running apps/CMakeLists.txt...")
 
