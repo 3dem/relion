@@ -769,7 +769,7 @@ bool RelionJob::prepareFinalCommand(std::string &outputname, std::vector<std::st
 	char * my_warn = getenv("RELION_ERROR_LOCAL_MPI");
 	int my_nr_warn = (my_warn == NULL) ? DEFAULTWARNINGLOCALMPI : textToInteger(my_warn);
 
-	if (nr_mpi > my_nr_warn && !joboptions["do_queue"].getBoolean())
+	if (!joboptions["do_queue"].getBoolean() && nr_mpi > my_nr_warn)
 	{
 		error_message = "You're submitting a local job with " + floatToString(nr_mpi) + " parallel MPI processes. That's more than allowed by the RELION_ERROR_LOCAL_MPI environment variable.";
 		return false;

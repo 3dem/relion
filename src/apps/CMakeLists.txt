@@ -566,7 +566,7 @@ foreach (_target ${RELION_JAZ_EXPERIMENTAL_TARGETS})
 endforeach()
 
 if (NOT SYCL)
-	target_link_libraries(relion_lib ${OpenMP_omp_LIBRARY})
+	target_link_libraries(relion_lib PUBLIC ${OpenMP_omp_LIBRARY})
 endif()
 
 # Set this flag to activate bounds checking in stl-vectors (incl. strings)
