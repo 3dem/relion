@@ -3661,6 +3661,9 @@ void MlOptimiserMpi::calculateExpectedAngularErrors(long int my_first_part_id, l
 	// The reconstructing follower Bcast acc_rottilt, acc_psi, acc_trans to all other nodes!
 	node->relion_MPI_Bcast(&acc_rot, 1, MY_MPI_DOUBLE, first_follower, MPI_COMM_WORLD);
 	node->relion_MPI_Bcast(&acc_trans, 1, MY_MPI_DOUBLE, first_follower, MPI_COMM_WORLD);
+	// Also Bcast full per-body/class vectors, e.g. for synching body fixing logic during multibody refinement
+	node->relion_MPI_Bcast(&mymodel.acc_rot[0], mymodel.acc_rot.size(), MY_MPI_DOUBLE, first_follower, MPI_COMM_WORLD);
+	node->relion_MPI_Bcast(&mymodel.acc_trans[0], mymodel.acc_trans.size(), MY_MPI_DOUBLE, first_follower, MPI_COMM_WORLD);
 }
 
 void MlOptimiserMpi::updateAngularSamplingGrad(long int my_first_part_id, long int my_last_part_id, bool myverb)
