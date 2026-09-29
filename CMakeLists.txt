@@ -17,6 +17,15 @@ add_definitions(-DSOURCE_DIR=${CMAKE_SOURCE_DIR}/src/)
 # message(STATUS "INSTALL_LIBRARY_DIR set to ${CMAKE_INSTALL_PREFIX}/lib/")
 # message(STATUS "SOURCE_DIR set to ${CMAKE_SOURCE_DIR}/src/")
 
+# -------------------------------------------------------------RANDOM123 --
+include(FetchContent)
+FetchContent_Declare(
+		Random123
+		DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+		URL https://github.com/DEShawResearch/random123/archive/refs/tags/v1.14.0.zip
+)
+FetchContent_MakeAvailable(Random123)
+
 # ------------------------------------------------------------------RPATH SETTINGS--
 if(NOT APPLE)
     # use, i.e. don't skip the full RPATH for the build tree

@@ -369,7 +369,6 @@ void getFourierTransformsAndCtfs(long int part_id,
 
                 // Set up scalar adjustment factor and random seed
                 XFLOAT temp_sigmaFudgeFactor = baseMLO->sigma2_fudge;
-                int seed(baseMLO->random_seed + part_id);
 
 
     			// Remap mymodel.sigma2_noise[optics_group] onto remapped_sigma2_noise for this images's size and angpix
@@ -391,7 +390,8 @@ void getFourierTransformsAndCtfs(long int part_id,
                 // construct the noise-image
                 AccUtilities::makeNoiseImage<MlClass>(	temp_sigmaFudgeFactor,
                 								remapped_sigma2_noise,
-												seed,
+												baseMLO->random_seed,
+												part_id,
 												accMLO,
 												RandomImage,
 												RandomImage.is3D());

@@ -433,7 +433,7 @@ void FourierTransformer::enforceHermitianSymmetry()
 }
 
 
-void randomizePhasesBeyond(MultidimArray<RFLOAT> &v, int index)
+void randomizePhasesBeyond(MultidimArray<RFLOAT> &v, int index, RandomStream *rng)
 {
 	MultidimArray< Complex > FT;
 	FourierTransformer transformer;
@@ -446,7 +446,7 @@ void randomizePhasesBeyond(MultidimArray<RFLOAT> &v, int index)
 		if (kp*kp + ip*ip + jp*jp >= index2)
 		{
 			RFLOAT mag = abs(DIRECT_A3D_ELEM(FT, k, i, j));
-			RFLOAT phas = rnd_unif(0., 2.*PI);
+			RFLOAT phas = rng ? rng->unif(0., 2.*PI) : rnd_unif(0., 2.*PI);
 			RFLOAT realval = mag * cos(phas);
 			RFLOAT imagval = mag * sin(phas);
 			DIRECT_A3D_ELEM(FT, k, i, j) = Complex(realval, imagval);
