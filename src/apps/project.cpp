@@ -43,7 +43,7 @@ public:
 	RFLOAT rot, tilt, psi, xoff, yoff, zoff, angpix, maxres, stddev_white_noise, particle_diameter, ana_prob_range, ana_prob_step, sigma_offset;
 	int padding_factor;
 	int r_max, r_min_nn, interpolator, nr_uniform;
-	bool do_only_one, do_ctf, do_ctf2, ctf_phase_flipped, do_ctf_intact_1st_peak, do_timing, do_add_noise, do_subtract_exp, do_ignore_particle_name, do_3d_rot, write_float16;
+	bool do_only_one, do_ctf, do_ctf2, ctf_phase_flipped, do_ctf_intact_1st_peak, do_timing, do_add_noise, do_subtract_exp, do_overwrite_exp, do_ignore_particle_name, do_3d_rot, write_float16;
 	bool do_simulate;
 	RFLOAT simulate_SNR;
 	// I/O Parser
@@ -81,6 +81,7 @@ public:
 		stddev_white_noise = textToFloat(parser.getOption("--white_noise", "Standard deviation of added white Gaussian noise", "0"));
 		fn_model = parser.getOption("--model_noise", "Model STAR file with power spectra for coloured Gaussian noise", "");
 		do_subtract_exp = parser.checkOption("--subtract_exp", "Subtract projections from experimental images (in --ang)");
+		do_overwrite_exp = parser.checkOption("--overwrite_exp", "Overwrite experimental images with projections (in --ang)");
 		do_ignore_particle_name = parser.checkOption("--ignore_particle_name", "Ignore the rlnParticleName column (in --ang)");
 		do_only_one = (fn_ang == "None" && nr_uniform < 0);
 		do_3d_rot = parser.checkOption("--3d_rot", "Perform 3D rotations instead of projection into 2D images");
@@ -641,19 +642,31 @@ public:
 				}
 				else
 				{
-					// Write this particle to the stack on disc
-					// First particle: write stack in overwrite mode, from then on just append to it
-					fn_img.compose(imgno+1,fn_out+".mrcs");
-					if (imgno == 0)
-						img.write(fn_img, -1, false, WRITE_OVERWRITE, write_float16 ? Float16: Float);
+					if (do_overwrite_exp)
+					{
+						DataType dt = static_cast<DataType>(expimg.dataType());
+						img.write(fn_expimg, -1, false, WRITE_REPLACE, dt);
+					}
 					else
-						img.write(fn_img, -1, false, WRITE_APPEND, write_float16 ? Float16: Float);
+					{
+						// Write this particle to the stack on disc
+						// First particle: write stack in overwrite mode, from then on just append to it
+						fn_img.compose(imgno+1,fn_out+".mrcs");
+						if (imgno == 0)
+							img.write(fn_img, -1, false, WRITE_OVERWRITE, write_float16 ? Float16: Float);
+						else
+							img.write(fn_img, -1, false, WRITE_APPEND, write_float16 ? Float16: Float);
+					}
 				}
 
 				// Set the image name to the output STAR file
 				DFo.addObject();
 				DFo.setObject(MDang.getObject());
-				DFo.setValue(EMDL_IMAGE_NAME,fn_img);
+
+				if (do_overwrite_exp)
+					DFo.setValue(EMDL_IMAGE_NAME, fn_expimg);
+				else
+					DFo.setValue(EMDL_IMAGE_NAME, fn_img);
 
 				if (do_simulate)
 				{

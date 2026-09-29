@@ -29,6 +29,7 @@ void local_symmetry_parameters_mpi::run()
 	Matrix1D<RFLOAT> op_search_ranges, op, com0_int, com1_int, com1_float, com1_diff, vecR3;
 	std::vector<FileName> fn_mask_list;
 	std::vector<std::vector<Matrix1D<RFLOAT> > > op_list;
+    std::vector<std::vector<RFLOAT> > weights;
 	std::vector<std::vector<FileName> > op_mask_list;
 	std::vector<Matrix1D<RFLOAT> > op_samplings, op_samplings_batch;
 	MultidimArray<RFLOAT> op_samplings_batch_packed, src_cropped, dest_cropped, mask_cropped;
@@ -39,6 +40,7 @@ void local_symmetry_parameters_mpi::run()
 	op_search_ranges.clear(); op.clear(); com0_int.clear(); com1_int.clear(); com1_float.clear(); com1_diff.clear(); vecR3.clear();
 	fn_mask_list.clear();
 	op_list.clear();
+    weights.clear();
 	op_mask_list.clear();
 	op_samplings.clear(); op_samplings_batch.clear();
 	op_samplings_batch_packed.clear(); src_cropped.clear(); dest_cropped.clear(); mask_cropped.clear();
@@ -107,14 +109,16 @@ void local_symmetry_parameters_mpi::run()
 		{
 			if (fn_info_in.getExtension() == "star")
 			{
-				readRelionFormatMasksAndOperators(fn_info_in, fn_mask_list, op_list, angpix_image, true);
+				readRelionFormatMasksAndOperators(fn_info_in, fn_mask_list, op_list, weights, angpix_image, true);
 			}
 			else
 			{
 				fn_parsed = fn_info_in + std::string(".") + fn_info_in_parsed_ext;
 				parseDMFormatMasksAndOperators(fn_info_in, fn_parsed);
 				readDMFormatMasksAndOperators(fn_parsed, fn_mask_list, op_list, angpix_image, true);
-			}
+                for (int i=0; i < op_list.size(); i++)
+                    weights[i].resize(op_list[i].size(), 1.);
+            }
 		}
 		else
 		{

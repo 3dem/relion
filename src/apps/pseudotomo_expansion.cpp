@@ -119,9 +119,9 @@ class pseudotomo_expansion
                         shift3d_x, shift3d_y, shift3d_z,
                         shift2d_x, shift2d_y, shift2d_z
                 );
-                md.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, shift3d_x);
-                md.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, shift3d_y);
-                md.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, shift3d_z);
+                md.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, shift2d_x);
+                md.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, shift2d_y);
+                md.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, shift2d_z);
             }
         }
 

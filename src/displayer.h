@@ -49,7 +49,7 @@
 
 #define GUI_BACKGROUND_COLOR (fl_rgb_color(240,240,240))
 #define GUI_INPUT_COLOR (fl_rgb_color(255,255,230))
-#define GUI_RUNBUTTON_COLOR (fl_rgb_color(100, 60, 255))
+#define GUI_RUNBUTTON_COLOR (fl_rgb_color(100, 178, 178))
 
 
 
@@ -72,9 +72,9 @@ static int predrag_xc;
 static int predrag_yc;
 static bool has_shift;
 static int preshift_ipos;
-
 static int current_selection_type;
 static int colour_scheme;
+static int fom_is_grey_instead;
 
 class DisplayBox : public Fl_Box
 {
@@ -99,6 +99,9 @@ public:
 
 	// The actual image data array
 	unsigned char *img_data;
+    // A copy of the actual image data array (to allow toggling of FOM-colouring)
+    unsigned char *img_data2;
+
 	std::string img_label;
 
 	// For getting back close the original image values from the uchar ones...
@@ -111,6 +114,12 @@ public:
 
 	void setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, int ipos, RFLOAT minval, RFLOAT maxval,
 	             RFLOAT _scale, bool do_relion_scale = false);
+
+    void setData(MultidimArray<RFLOAT> &img, MultidimArray<RFLOAT> &fom_img, MetaDataContainer *MDCin, int ipos,
+                 RFLOAT minval, RFLOAT maxval, RFLOAT _fom_min, RFLOAT _fom_max,
+                 RFLOAT _scale, bool do_relion_scale = false);
+    void setData(MultidimArray<RFLOAT> &img, MultidimArray<RFLOAT> &mask_img, int _ipos,
+                         RFLOAT _minval, RFLOAT _maxval, RFLOAT _scale, bool do_relion_scale);
 
 	// Destructor
 	~DisplayBox()
@@ -147,10 +156,13 @@ public:
 	               int _nr_regroup = -1, bool do_recenter = false, bool _is_data = false, MetaDataTable *MDgroups = NULL,
 	               bool do_allow_save = false, FileName fn_selected_imgs="", FileName fn_selected_parts="", int max_nr_parts_per_class = -1);
 	int fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale);
-	int fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale, RFLOAT _coord_scale,
-	                           int _particle_radius, bool do_startend = false, FileName _fn_coords = "",
+	int fillPickerViewerCanvas(MultidimArray<RFLOAT> image, MultidimArray<RFLOAT> fom_image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale, RFLOAT _coord_scale,
+	                           int _particle_radius, bool do_startend = false, bool do_lines = false, FileName _fn_coords = "",
 	                           FileName _fn_color = "", FileName _fn_mic= "", FileName _color_label = "", RFLOAT _color_blue_value = 0., RFLOAT _color_red_value = 1.,
-							   RFLOAT _minimum_pick_fom = -999.);
+							   RFLOAT _minimum_pick_fom = -999., RFLOAT _min_fom = 0., RFLOAT _max_fom = 0.);
+    int fillMaskerViewerCanvas(MultidimArray<RFLOAT> image, MultidimArray<RFLOAT> mask_image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast,
+                               RFLOAT _scale, int _pencil_radius, FileName _fn_mask, RFLOAT angpix);
+
 };
 
 class basisViewerCanvas : public Fl_Widget
@@ -189,7 +201,10 @@ public:
 	void fill(MetaDataTable &MDin, ObservationModel *obsModel, EMDLabel display_label, EMDLabel text_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
 	          RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool do_recenter = false, long int max_images = -1,
 	          RFLOAT lowpass = -1.0, RFLOAT highpass = -1.0);
-	void fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale = 1.);
+    void fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale = 1.);
+    void fill(MultidimArray<RFLOAT> &image, MultidimArray<RFLOAT> &fom_image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _fom_min, RFLOAT _fom_max, RFLOAT _sigma_contrast, RFLOAT _scale = 1.);
+    void fill(MultidimArray<RFLOAT> &image, MultidimArray<RFLOAT> &mask_image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale);
+
 	void setSelectionType();
 	void setFOMThreshold();
 };
@@ -410,6 +425,9 @@ public:
 	// Draw lines between start-end coordinates?
 	bool do_startend;
 
+    // Draw lines for curvy filaments?
+    bool do_lines;
+
 	// Micrograph name (useful to search relevant particles in fn_color)
 	FileName fn_mic;
 
@@ -424,11 +442,49 @@ public:
 private:
 
 	// Functionalities for  popup menu
+    void toggleFomImageIsGreyInstead();
 	void saveCoordinates(bool ask_filename = false);
 	void clearCoordinates();
 	void printHelp();
 	void viewExtractedParticles();
 };
+
+
+class maskerViewerCanvas : public basisViewerCanvas
+{
+protected:
+    int handle(int ev);
+    void draw() {};
+
+public:
+
+    int pencil_radius;
+
+    // Scale for pencil_radius
+	RFLOAT mask_scale;
+
+    // Original angpix
+    RFLOAT angpix;
+
+    // Filename of the mask
+    FileName fn_mask;
+
+    // Image with the mask
+    Image<RFLOAT> Imask;
+
+    // Constructor with w x h size of the window and a title
+    maskerViewerCanvas(int X, int Y, int W, int H, const char* title=0): basisViewerCanvas(X,Y,W, H, title) { }
+
+private:
+
+    // Functionalities for  popup menu
+    void saveMask();
+    void setPencilRadius();
+    void clearMask();
+    void printHelp();
+
+};
+
 
 // This class only puts scrollbars around the resizable canvas
 class displayerGuiWindow : public Fl_Window
@@ -555,7 +611,10 @@ public:
 	RFLOAT coord_scale;
 
 	// Input & Output rootname
-	FileName fn_in;
+	FileName fn_in, fn_fom;
+
+    // Min and max for FOM scale
+    RFLOAT fom_min, fom_max;
 
 	// Ignore optics groups
 	bool do_ignore_optics;
@@ -583,6 +642,9 @@ public:
 
 	// Flag to pick start-end
 	bool do_pick_startend;
+
+    // Flag to pick lines
+    bool do_pick_lines;
 
 	// Flag for looking at classes
 	bool do_class;
@@ -650,6 +712,15 @@ public:
 
 	// Shell for calling Topaz
 	FileName fn_shell;
+
+    // Flag to design mask
+    bool do_mask;
+
+    // Filename for coordinates star file
+	FileName fn_mask;
+
+	// pencil radius for drawing masks
+	int pencil_radius;
 
 public:
 	// Read command line arguments

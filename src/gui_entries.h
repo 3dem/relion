@@ -126,20 +126,18 @@ extern bool create_scheduler_gui;
 //version-3.1 #define GUI_BUTTON_COLOR (fl_rgb_color(238,130,238))
 //version-3.1 #define GUI_BUTTON_DARK_COLOR (fl_rgb_color(200, 110, 200))
 //version-3.1 #define GUI_RUNBUTTON_COLOR (fl_rgb_color(170, 0, 170))
-// Dont forget GUI  runbutton colour in src/displayer.h!
-//version-4.0
-//#define GUI_BUTTON_COLOR (fl_rgb_color(200,80,110))
-//#define GUI_BUTTON_DARK_COLOR (fl_rgb_color(170, 40, 70))
-//#define GUI_RUNBUTTON_COLOR (fl_rgb_color(160, 30, 60))
-#define GUI_BACKGROUND_COLOR (fl_rgb_color(230,230,240)) // slightly blue because of blue buttons in 2.0!
-#define GUI_BACKGROUND_COLOR2 (fl_rgb_color(180,180,190)) // slightly blue because of blue buttons in 2.0!
-//version-5.0
-#define GUI_BUTTON_COLOR (fl_rgb_color(120, 120, 255))
-#define GUI_BUTTON_DARK_COLOR (fl_rgb_color(80, 80, 255))
+//version-4.0 #define GUI_BUTTON_COLOR (fl_rgb_color(200,80,110))
+//version-4.0 #define GUI_BUTTON_DARK_COLOR (fl_rgb_color(170, 40, 70))
+//version-4.0 #define GUI_RUNBUTTON_COLOR (fl_rgb_color(160, 30, 60))
+//version-5.0 #define GUI_BUTTON_COLOR (fl_rgb_color(120, 120, 255))
+//version-5.0 #define GUI_BUTTON_DARK_COLOR (fl_rgb_color(80, 80, 255))
+//version-5.1
+#define GUI_BUTTON_COLOR (fl_rgb_color(100, 178, 178))
+#define GUI_BUTTON_DARK_COLOR (fl_rgb_color(50, 128, 128))
 // Dont forget to change runbutton in src/displayer.h too!!
-#define GUI_RUNBUTTON_COLOR (fl_rgb_color(100, 60, 255))
-#define GUI_BACKGROUND_COLOR (fl_rgb_color(230,230,240)) // slightly blue because of blue buttons in 2.0!
-#define GUI_BACKGROUND_COLOR2 (fl_rgb_color(180,180,190)) // slightly blue because of blue buttons in 2.0!
+#define GUI_RUNBUTTON_COLOR (fl_rgb_color(50, 128, 128))
+#define GUI_BACKGROUND_COLOR (fl_rgb_color(235,235,230)) // slightly yellow in relion-5.1
+#define GUI_BACKGROUND_COLOR2 (fl_rgb_color(185,185,180)) // slightly yellow in relion-5.1
 //possible?#define GUI_BUTTON_COLOR (fl_rgb_color(50, 200, 255))
 //devel-version
 //possible #define GUI_RUNBUTTON_COLOR (fl_rgb_color(205,0,155))

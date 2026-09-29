@@ -90,6 +90,7 @@ void Reconstructor::read(int argc, char **argv)
 	do_debug = parser.checkOption("--write_debug_output", "Write out arrays with data and weight terms prior to reconstruct");
 	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Write out BP denominator and numerator for external_reconstruct program");
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
+	nr_threads = textToInteger(parser.getOption("--j", "Number of threads (only for symmetrisation for now)", "1"));
 
 	// Hidden
 	r_min_nn = textToInteger(getParameter(argc, argv, "--r_min_nn", "10"));
@@ -768,7 +769,7 @@ void Reconstructor::reconstruct()
 	if (verb > 0)
 		std::cout << " + Starting the reconstruction ..." << std::endl;
 
-	backprojector.symmetrise(nr_helical_asu, helical_twist, helical_rise/angpix);
+	backprojector.symmetrise(nr_helical_asu, helical_twist, helical_rise/angpix, nr_threads);
 
 	if (do_reconstruct_ctf)
 	{

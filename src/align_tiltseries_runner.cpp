@@ -46,11 +46,19 @@ void AlignTiltseriesRunner::read(int argc, char **argv, int rank)
     do_aretomo_tiltcorrect = parser.checkOption("--aretomo_tiltcorrect", "Specify to correct the tilt angle offset in the tomogram (AreTomo -TiltCor option; default=false)");
     aretomo_tilcorrect_angle = textToFloat(parser.getOption("--aretomo_tiltcorrect_angle", "User-specified tilt angle correction (value > 180, means estimate automatically", "999."));
     do_aretomo_ctf = parser.checkOption("--aretomo_ctf", "Perform CTF estimation in AreTomo? (default=false)");
-    do_aretomo_phaseshift = parser.checkOption("--aretomo_phaseshift", "Perform CTF estimation in AreTomo? (default=false)");
+    do_aretomo_phaseshift = parser.checkOption("--aretomo_phaseshift", "Perform CTF estimation in AreTomo?");
+    do_aretomo_reconstruct = parser.checkOption("--aretomo_reconstruct", "Perform Tomogram reconstruction (WBP) in AreTomo?");
+    do_only_aretomo_reconstruct = parser.checkOption("--aretomo_only_reconstruct", "Only perform Tomogram reconstruction in AreTomo, and skip alignment/CTF estimation?");
+    if (do_only_aretomo_reconstruct) do_aretomo_reconstruct = true;
+    aretomo_OutBin = textToInteger(parser.getOption("--aretomo_OutBin", "Binning for the output reconstruction by AreTomo", "4"));
+    aretomo_VolZ = textToInteger(parser.getOption("--aretomo_VolZ", "Height of the output tomogram reconstruction (in unbinned voxels)", "0"));
     gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread, e.g 0:1:2:3", "");
 
     int exp_section = parser.addSection("Expert options");
     other_wrapper_args  = parser.getOption("--other_wrapper_args", "Additional command-line arguments that will be passed onto the wrapper.", "");
+    do_aretomo_sart = parser.checkOption("--aretomo_sart", "Use SART instead of weighted backprojection for aretomo reconstructions.");
+    aretomo_sart_iter = textToInteger(parser.getOption("--aretomo_sart_iter", "Number of iterations for aretomo SART reconstruction", "20"));
+    aretomo_sart_proj = textToInteger(parser.getOption("--aretomo_sart_proj", "Number of projections per iterations for aretomo SART reconstruction", "5"));
 
     // Initialise verb for non-parallel execution
 	verb = 1;
@@ -260,15 +268,12 @@ bool AlignTiltseriesRunner::checkResults(long idx_tomo)
         // check that .aln (and _ctf.txt if do_aretomo_ctf) file(s) has been written out
         FileName fn_aln = fn_dir + tomoname + ".aln";
         FileName fn_ctf = fn_dir + tomoname + "_ctf.txt";
+        FileName fn_tomo = fn_out + "tomograms/rec_" + tomoname + ".mrc";
 
-        if (do_aretomo_ctf)
-        {
-            return (exists(fn_ctf) && exists(fn_aln));
-        }
-        else
-        {
-            return exists(fn_aln);
-        }
+        bool has_required = exists(fn_aln);
+        if (has_required && do_aretomo_ctf) has_required = exists(fn_ctf);
+        if (has_required && do_aretomo_reconstruct) has_required = exists(fn_tomo);
+        return has_required;
 
     }
     else
@@ -284,44 +289,82 @@ bool AlignTiltseriesRunner::checkResults(long idx_tomo)
     return false;
 }
 
-void AlignTiltseriesRunner::generateMRCStackAndRawTiltFile(long idx_tomo, bool is_aretomo)
+void AlignTiltseriesRunner::generateMRCStackAndRawTiltFileOrAlnFile(long idx_tomo, bool is_aretomo)
 {
     FileName fn_dir = fn_out + "external/" + tomogramSet.getTomogramName(idx_tomo) + '/';
-    FileName fn_tilt = fn_dir + tomogramSet.getTomogramName(idx_tomo) + ".rawtlt";
-    FileName fn_series = fn_dir + tomogramSet.getTomogramName(idx_tomo) + ".mrc";
 
-    std::ofstream  fh;
-    fh.open((fn_tilt).c_str(), std::ios::out);
+    // Write out tilt series stack
     Image<RFLOAT> Imic, Iseries;
-    std::vector<int> frame_dose_order = tomogramSet.getFrameDoseOrder(idx_tomo);
-
+    RFLOAT angpix = tomogramSet.getTiltSeriesPixelSize(idx_tomo);
     int fc = tomogramSet.tomogramTables[idx_tomo].numberOfObjects();
     for (int f = 0; f < fc; f++)
     {
         FileName fn_mic;
-        RFLOAT tiltangle;
         tomogramSet.tomogramTables[idx_tomo].getValue(EMDL_MICROGRAPH_NAME, fn_mic, f);
-        tomogramSet.tomogramTables[idx_tomo].getValue(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE, tiltangle, f);
-        RFLOAT dose;
-        tomogramSet.tomogramTables[idx_tomo].getValue(EMDL_MICROGRAPH_PRE_EXPOSURE, dose, f);
-        // IMOD: 1-column and AreTomo2 2-column raw tilt angle file with tilt angles (and order of acquisition).
-        fh << tiltangle;
-        if (is_aretomo) fh << " " << frame_dose_order[f];
-        fh << std::endl;
         Imic.read(fn_mic);
         if (f == 0) Iseries().resize(fc, YSIZE(Imic()), XSIZE(Imic()));
         Iseries().setSlice(f, Imic());
-
     }
 
-    RFLOAT angpix = tomogramSet.getTiltSeriesPixelSize(idx_tomo);
     tomogramSet.globalTable.getDouble(EMDL_TOMO_IMPORT_FRACT_DOSE, idx_tomo);
     if (is_aretomo) Iseries.setSamplingRateInHeader(angpix);
+    FileName fn_series = fn_dir + tomogramSet.getTomogramName(idx_tomo) + ".mrc";
     Iseries.write(fn_series);
+
+   // Write out text file with rawtilt or aln
+    std::ofstream  fh;
+    if (do_only_aretomo_reconstruct)
+    {
+        // make aln file
+        FileName fn_aln = fn_dir + tomogramSet.getTomogramName(idx_tomo) + ".aln";
+        fh.open((fn_aln).c_str(), std::ios::out);
+
+        std::vector<int> frame_tilt_order_index = tomogramSet.getFrameTiltOrderIndex(idx_tomo);
+
+        fh << "# AreTomo Alignment / Priims bprmMn \n";
+        fh << "# RawSize = " << integerToString(XSIZE(Iseries())) << " " << integerToString(YSIZE(Iseries())) << " " << integerToString(ZSIZE(Iseries()))  <<"\n";
+        fh << "# NumPatches = 0\n";
+        fh << "# SEC     ROT         GMAG       TX          TY      SMEAN     SFIT    SCALE     BASE     TILT\n";
+        for (int f = 0; f < fc; f++)
+        {
+
+            int fp = frame_tilt_order_index[f];
+            RFLOAT xtilt=0., ytilt, zrot, xshift, yshift;
+            tomogramSet.tomogramTables[idx_tomo].getValue(EMDL_TOMO_YTILT, ytilt, fp);
+            tomogramSet.tomogramTables[idx_tomo].getValue(EMDL_TOMO_ZROT, zrot, fp);
+            tomogramSet.tomogramTables[idx_tomo].getValue(EMDL_TOMO_XSHIFT_ANGST, xshift, fp);
+            tomogramSet.tomogramTables[idx_tomo].getValue(EMDL_TOMO_YSHIFT_ANGST, yshift, fp);
+            //AreTomo shifts are in pixels, bnot Angstroms!
+            xshift /= angpix;
+            yshift /= angpix;
+
+            char buffer[256];
+            std::snprintf(buffer, sizeof(buffer),
+                          "%5d  %9.4f  %9.5f  %9.3f  %9.3f  %7.2f %7.2f  %7.2f  %7.2f  %8.2f\n",
+                          fp, zrot, 1., xshift, yshift, 1., 1., 1., 0., ytilt);
+            fh << buffer;
+        }
+    }
+    else
+    {
+        // make rawtlt file
+        FileName fn_tilt = fn_dir + tomogramSet.getTomogramName(idx_tomo) + ".rawtlt";
+        fh.open((fn_tilt).c_str(), std::ios::out);
+
+        std::vector<int> frame_dose_order = tomogramSet.getFrameDoseOrder(idx_tomo);
+        for (int f = 0; f < fc; f++)
+        {
+            RFLOAT tiltangle;
+            tomogramSet.tomogramTables[idx_tomo].getValue(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE, tiltangle, f);
+            RFLOAT dose;
+            tomogramSet.tomogramTables[idx_tomo].getValue(EMDL_MICROGRAPH_PRE_EXPOSURE, dose, f);
+            // IMOD: 1-column and AreTomo2 2-column raw tilt angle file with tilt angles (and order of acquisition).
+            fh << tiltangle;
+            if (is_aretomo) fh << " " << frame_dose_order[f];
+            fh << std::endl;
+        }
+    }
     fh.close();
-
-
-
 
 }
 
@@ -389,7 +432,7 @@ void AlignTiltseriesRunner::executeIMOD(long idx_tomo, int rank)
     // Make sure metadata table is sorted on rlnTomoNominalStageTiltAngle (it should be, but anyways...)
     tomogramSet.tomogramTables[idx_tomo].newSort(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE);
 
-    generateMRCStackAndRawTiltFile(idx_tomo, false);
+    generateMRCStackAndRawTiltFileOrAlnFile(idx_tomo, false);
 
     // Now run the actual IMOD command
     std::string command = fn_batchtomo_exe;
@@ -430,14 +473,12 @@ void AlignTiltseriesRunner::executeAreTomo(long idx_tomo, int rank)
     FileName fn_ali = fn_dir + tomoname + "_aligned.mrc";
     FileName fn_log = fn_dir + tomoname + ".log";
     FileName fn_com = fn_dir + tomoname + ".com";
+    FileName fn_aln = fn_dir + tomoname + ".aln";
 
-    std::ofstream  fh;
-    fh.open((fn_tilt).c_str(), std::ios::out);
-    Image<RFLOAT> Imic, Iseries;
-    int fc = tomogramSet.tomogramTables[idx_tomo].numberOfObjects();
-    std::vector<int> frame_dose_order = tomogramSet.getFrameDoseOrder(idx_tomo);
+    // Make sure metadata table is sorted on rlnTomoNominalStageTiltAngle (it should be, but anyways...)
+    tomogramSet.tomogramTables[idx_tomo].newSort(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE);
 
-    generateMRCStackAndRawTiltFile(idx_tomo, true);
+    generateMRCStackAndRawTiltFileOrAlnFile(idx_tomo, true);
 
     RFLOAT frac_dose = tomogramSet.globalTable.getDouble(EMDL_TOMO_IMPORT_FRACT_DOSE, idx_tomo);
     RFLOAT pixel_size = tomogramSet.getTiltSeriesPixelSize(idx_tomo);
@@ -450,46 +491,74 @@ void AlignTiltseriesRunner::executeAreTomo(long idx_tomo, int rank)
     // Now run the actual AreTomo command
     std::string command = fn_aretomo_exe + " ";
     command += " -InMrc " + fn_series;
-    command += " -AngFile " + fn_tilt;
     command += " -OutMrc " + fn_ali;
-    command += " -ImgDose " + floatToString(frac_dose);
-    // Tomogram thickness should be in unbinned pixels
-    command += " -AlignZ " + floatToString(thickness_pix);
-    // Skip reconstruction of the tomogram in AreTomo...
-    command += " -volZ 0";
 
-    if (tomogramSet.tomogramTables[idx_tomo].containsLabel(EMDL_TOMO_NOMINAL_TILT_AXIS_ANGLE))
+    if (do_only_aretomo_reconstruct)
     {
-        RFLOAT tiltaxis_angle = tomogramSet.tomogramTables[idx_tomo].getDouble(EMDL_TOMO_NOMINAL_TILT_AXIS_ANGLE, 0);
-        command += " -TiltAxis " + floatToString(tiltaxis_angle);
-    }
-
-    if (do_aretomo_tiltcorrect)
-    {
-        command += " -TiltCor 1 ";
-        if (aretomo_tilcorrect_angle < 180.)
-            command += floatToString(aretomo_tilcorrect_angle);
+        command += " -Align 0 ";
+        command += " -AlnFile " + fn_aln;
     }
     else
     {
-        command += " -TiltCor -1 ";
+        command += " -AngFile " + fn_tilt;
+        command += " -ImgDose " + floatToString(frac_dose);
+        // Tomogram thickness should be in unbinned pixels
+        command += " -AlignZ " + floatToString(thickness_pix);
+    }
+    if (do_aretomo_reconstruct)
+    {
+        command += " -FlipVol 1 -volZ " + integerToString(aretomo_VolZ);
+        command += " -OutBin " + integerToString(aretomo_OutBin);
+        if (do_aretomo_sart)
+        {
+            command += " -Sart " + integerToString(aretomo_sart_iter) + " " + integerToString(aretomo_sart_proj);
+        }
+        else
+        {
+            command += " -Wbp 1";
+        }
+    }
+    else
+    {
+        command += " -volZ 0";
     }
 
 
-    if (do_aretomo_ctf)
+    if (!do_only_aretomo_reconstruct)
     {
-        // Also estimate CTF parameters in AreTomo
-        RFLOAT kV, Cs, Q0;
-        RFLOAT angpix = tomogramSet.getTiltSeriesPixelSize(idx_tomo);
-        tomogramSet.globalTable.getValue(EMDL_CTF_VOLTAGE, kV, idx_tomo);
-        tomogramSet.globalTable.getValue(EMDL_CTF_CS, Cs, idx_tomo);
-        tomogramSet.globalTable.getValue(EMDL_CTF_Q0, Q0, idx_tomo);
-        command += " -Kv " + floatToString(kV);
-        command += " -Cs " + floatToString(Cs);
-        command += " -AmpContrast " + floatToString(Q0);
-        command += " -PixSize " + floatToString(angpix);
-        if (do_aretomo_phaseshift)
-            command += " -ExtPhase 90 180";
+        if (tomogramSet.tomogramTables[idx_tomo].containsLabel(EMDL_TOMO_NOMINAL_TILT_AXIS_ANGLE))
+        {
+            RFLOAT tiltaxis_angle = tomogramSet.tomogramTables[idx_tomo].getDouble(EMDL_TOMO_NOMINAL_TILT_AXIS_ANGLE, 0);
+            command += " -TiltAxis " + floatToString(tiltaxis_angle);
+        }
+
+        if (do_aretomo_tiltcorrect)
+        {
+            command += " -TiltCor 1 ";
+            if (aretomo_tilcorrect_angle < 180.)
+                command += floatToString(aretomo_tilcorrect_angle);
+        }
+        else
+        {
+            command += " -TiltCor -1 ";
+        }
+
+
+        if (do_aretomo_ctf)
+        {
+            // Also estimate CTF parameters in AreTomo
+            RFLOAT kV, Cs, Q0;
+            RFLOAT angpix = tomogramSet.getTiltSeriesPixelSize(idx_tomo);
+            tomogramSet.globalTable.getValue(EMDL_CTF_VOLTAGE, kV, idx_tomo);
+            tomogramSet.globalTable.getValue(EMDL_CTF_CS, Cs, idx_tomo);
+            tomogramSet.globalTable.getValue(EMDL_CTF_Q0, Q0, idx_tomo);
+            command += " -Kv " + floatToString(kV);
+            command += " -Cs " + floatToString(Cs);
+            command += " -AmpContrast " + floatToString(Q0);
+            command += " -PixSize " + floatToString(angpix);
+            if (do_aretomo_phaseshift)
+                command += " -ExtPhase 90 180";
+        }
     }
 
     if (gpu_ids.length() > 0)
@@ -838,6 +907,31 @@ bool AlignTiltseriesRunner::readAreTomoResults(long idx_tomo, std::string &error
         }
     }
 
+    if (do_aretomo_reconstruct)
+    {
+        std::string tomoname = tomogramSet.getTomogramName(idx_tomo);
+        FileName fn_inmap = fn_out + "external/" + tomoname + "/" + tomoname + "_aligned.mrc";
+        FileName fn_tomodir = fn_out + "tomograms/";
+        if (!exists(fn_tomodir)) mktree(fn_tomodir);
+        FileName fn_outmap = fn_tomodir + "rec_" + tomoname + ".mrc";
+        std::string command = "mv -f " + fn_inmap + " " + fn_outmap;
+        int res = system(command.c_str());
+
+        // Read image size from header (don't read data!)
+        Image<RFLOAT> Itomo;
+        Itomo.read(fn_outmap, false);
+        // Set information about the tomogram in the globalTable
+        float floatbin = aretomo_OutBin;
+        int xs = aretomo_OutBin*XSIZE(Itomo());
+        int ys = aretomo_OutBin*YSIZE(Itomo());
+        int zs = aretomo_OutBin*ZSIZE(Itomo());
+        tomogramSet.globalTable.setValue(EMDL_TOMO_TOMOGRAM_BINNING, floatbin, idx_tomo);
+        tomogramSet.globalTable.setValue(EMDL_TOMO_SIZE_X, xs, idx_tomo);
+        tomogramSet.globalTable.setValue(EMDL_TOMO_SIZE_Y, ys, idx_tomo);
+        tomogramSet.globalTable.setValue(EMDL_TOMO_SIZE_Z, zs, idx_tomo);
+        tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME, fn_outmap, idx_tomo);
+
+    }
 
     MetaDataTable MDnew;
     for (int i = 0; i < rot.size(); i++)
@@ -946,7 +1040,8 @@ void AlignTiltseriesRunner::joinResults()
         }
     }
 
-    tomogramSet.write(fn_out+"aligned_tilt_series.star");
+    FileName fnt = (do_aretomo && do_aretomo_reconstruct) ? fn_out+"tomograms.star" : fn_out+"aligned_tilt_series.star";
+    tomogramSet.write(fnt);
 
     if (do_aretomo && do_aretomo_ctf)
     {

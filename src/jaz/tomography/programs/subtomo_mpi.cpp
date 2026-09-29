@@ -75,7 +75,7 @@ void SubtomoProgramMpi::run()
 	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories, node->isLeader(), &tomogramSet);
 	std::vector<std::vector<ParticleIndex> > particles = particleSet.splitByTomogram(tomogramSet, node->isLeader());
 
-	if (cropSize < 0) cropSize = boxSize;
+    setBoxsizes(tomogramSet, node->isLeader());
 
 	const long int s2D = boxSize;
 

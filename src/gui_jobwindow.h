@@ -56,7 +56,7 @@ public:
 	Fl_Group *tab1, *tab2, *tab3, *tab4, *tab5, *tab6, *tab7, *runtab;
 
 	// Groups
-	Fl_Group *group0, *group1, *group2, *group3, *group4, *group5, *group6, *group7, *group8, *queue_group;
+	Fl_Group *group0, *group1, *group2, *group3, *group4, *group5, *group6, *group7, *group8, *group9, *queue_group;
 
 public:
 	// Constructor with x, y, w, h and a title

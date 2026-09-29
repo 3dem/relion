@@ -810,7 +810,7 @@ void RelionJob::initialise(int _job_type)
 	else if (type == PROC_AUTOPICK)
 	{
 		has_mpi = true;
-		has_thread = false;
+		has_thread = true;
 		initialiseAutopickJob();
 	}
 	else if (type == PROC_EXTRACT)
@@ -1443,6 +1443,9 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 	if (is_continue)
 		command += " --continue ";
 
+    // Other arguments
+	command += " " + joboptions["other_args"].getString();
+
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
@@ -1861,7 +1864,8 @@ to the average PLUS this value times the standard deviation. Use zero to set the
 	joboptions["angpix"] = JobOption("Pixel size (A)", -1, 0.3, 5, 0.1, "Pixel size in Angstroms. This will be used to calculate the filters and the particle diameter in pixels. If a CTF-containing STAR file is input, then the value given here will be ignored, and the pixel size will be calculated from the values in the STAR file. A negative value can then be given here.");
 	joboptions["do_topaz_denoise"] = JobOption("OR: use Topaz denoising?", false, "If set to true, Topaz denoising will be performed instead of lowpass filtering.");
 
-	joboptions["do_startend"] = JobOption("Pick start-end coordinates helices?", false, "If set to true, start and end coordinates are picked subsequently and a line will be drawn between each pair");
+    joboptions["do_startend"] = JobOption("Pick start-end coordinates helices?", false, "If set to true, start and end coordinates are picked subsequently and a line will be drawn between each pair");
+    joboptions["do_lines"] = JobOption("Pick helices as lines?", false, "If set to true, lines of coordinates are picked as one drags the mouse");
 
 	joboptions["do_fom_threshold"] = JobOption("Use autopick FOM threshold?", false, "If set to Yes, only particles with rlnAutopickFigureOfMerit values below the threshold below will be extracted.");
 	joboptions["minimum_pick_fom"] = JobOption("Minimum autopick FOM: ", 0, -5, 10, 0.1, "The minimum value for the rlnAutopickFigureOfMerit for particles to be extracted.");
@@ -1935,11 +1939,12 @@ bool RelionJob::getCommandsManualpickJob(std::string &outputname, std::vector<st
 
 	command += " --particle_diameter " + joboptions["diameter"].getString();
 
-	if (joboptions["do_startend"].getBoolean())
+	if (joboptions["do_startend"].getBoolean() || joboptions["do_lines"].getBoolean())
 	{
 		label += ".helical";
 
-		command += " --pick_start_end ";
+		if (joboptions["do_lines"].getBoolean()) command += " --pick_lines ";
+        else command += " --pick_start_end ";
 
 		// new version: no longer save coords_suffix nodetype, but 2-column list of micrographs and coordinate files
 		Node node2(outputname + "manualpick.star", LABEL_MANPICK_COORDS_HELIX);
@@ -2033,21 +2038,33 @@ The samplings are approximate numbers and vary slightly over the sphere.\n\n For
 	joboptions["shrink"] = JobOption("Shrink factor:", 0, 0, 1, 0.1, "This is useful to speed up the calculations, and to make them less memory-intensive. The micrographs will be downscaled (shrunk) to calculate the cross-correlations, and peak searching will be done in the downscaled FOM maps. When set to 0, the micrographs will de downscaled to the lowpass filter of the references, a value between 0 and 1 will downscale the micrographs by that factor. Note that the results will not be exactly the same when you shrink micrographs!\
 \n\nIn the Laplacian-of-Gaussian picker, this option is ignored and the shrink factor always becomes 0.");
 	joboptions["use_gpu"] = JobOption("Use GPU acceleration?", false, "If set to Yes, the job will try to use GPU acceleration. The Laplacian-of-Gaussian picker does not support GPU.");
-	joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':'. For example: 0:1:0:1:0:1");
+    joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':'. For example: 0:1:0:1:0:1");
 
 	joboptions["do_pick_helical_segments"] = JobOption("Pick 2D helical segments?", false, "Set to Yes if you want to pick 2D helical segments. Note this will run the old algorithms for reference-based helical segment picking, as described by He & Scheres, J Struct Biol, 2017. Often, we now run filament picking from the Topaz tab instead....");
-	joboptions["do_amyloid"] = JobOption("Pick amyloid segments?", false, "Set to Yes if you want to use the algorithm that was developed specifically for picking amyloids.");
 
 	joboptions["helical_tube_outer_diameter"] = JobOption("Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
 This value should be slightly larger than the actual width of the tubes.");
-	joboptions["helical_nr_asu"] = JobOption("Number of unique asymmetrical units:", 1, 1, 100, 1, "Number of unique helical asymmetrical units in each segment box. This integer should not be less than 1. The inter-box distance (pixels) = helical rise (Angstroms) * number of asymmetrical units / pixel size (Angstroms). \
+	joboptions["helical_nr_asu"] = JobOption("Number of unique asymmetrical units:", 3, 1, 100, 1, "Number of unique helical asymmetrical units in each segment box. This integer should not be less than 1. The inter-box distance (pixels) = helical rise (Angstroms) * number of asymmetrical units / pixel size (Angstroms). \
 The optimal inter-box distance might also depend on the box size, the helical rise and the flexibility of the structure. In general, an inter-box distance of ~10% * the box size seems appropriate.");
-	joboptions["helical_rise"] = JobOption("Helical rise (A):", -1, 0, 100, 0.01, "Helical rise in Angstroms. (Please click '?' next to the option above for details about how the inter-box distance is calculated.)");
-	joboptions["helical_tube_kappa_max"] = JobOption("Maximum curvature (kappa): ", 0.1, 0.05, 0.5, 0.01, "Maximum curvature allowed for picking helical tubes. \
+	joboptions["helical_rise"] = JobOption("Helical rise (A):", 4.75, 0, 100, 0.01, "Helical rise in Angstroms. (Please click '?' next to the option above for details about how the inter-box distance is calculated.)");
+	joboptions["helical_tube_kappa_max"] = JobOption("Maximum curvature (kappa): ", 0.07, 0.05, 0.5, 0.01, "Maximum curvature allowed for picking helical tubes. \
 Kappa = 0.3 means that the curvature of the picked helical tubes should not be larger than 30% the curvature of a circle (diameter = particle mask diameter). \
 Kappa ~ 0.05 is recommended for long and straight tubes (e.g. TMV, VipA/VipB and AChR tubes) while 0.20 ~ 0.40 seems suitable for flexible ones (e.g. ParM and MAVS-CARD filaments).");
-	joboptions["helical_tube_length_min"] = JobOption("Minimum length (A): ", -1, 100, 1000, 10, "Minimum length (in Angstroms) of helical tubes for auto-picking. \
+	joboptions["helical_tube_length_min"] = JobOption("Minimum length (A): ", 400, 100, 1000, 10, "Minimum length (in Angstroms) of helical tubes for auto-picking. \
 Helical tubes with shorter lengths will not be picked. Note that a long helical tube seen by human eye might be treated as short broken pieces due to low FOM values or high picking threshold.");
+
+    // find_amyloid
+    joboptions["do_amyloid"] = JobOption("Pick amyloid segments?", false, "Set to Yes if you want to use the find_amyloid program that was developed specifically for picking amyloids. Note that autopicking of amyloids needs to be split into two separate jobs: the first job calculates FOM/PSI maps for all filaments. This job needs to be run multi-threaded (any n, where 36/n is an integer is a good number) on the CPU. The job job uses a neural network to trace filaments. This job takes the micrographs_autopick.star output file from the first job as input (or a subset selection thereof, e.g. with rlnMicrographScoreSkewness>1). And this second job only runs on GPUs.");
+    joboptions["do_amyloid_fom"] = JobOption("Calculate amyloid FOM images (on CPU)? ", true, "Calculate FOM images with 4.7A Fourier signal for all input micrographs? Note this code runs only on the CPU, and best multi-threaded (any n with 36/n being an integer is a good number; we often use 18 threads on our cluster). You need to run a first job to calculate FOM images using this option, before you can use its output as input for a second job to trace the filaments, using the option below.");
+    joboptions["do_amyloid_tracing"] = JobOption("Trace amyloids in FOM images (on GPU)? ", false, "Trace amyloids (as lines) in the FOM images that were calculated in a first (CPU-based) job? Note this part of the code runs on the GPU. This job takes the micrographs_autopick.star output file from the first job as input (or a subset selection thereof, e.g. with rlnMicrographScoreSkewness>1).");
+    joboptions["amyloid_gpu_ids"] = JobOption("Which GPUs to use for tracing:", std::string(""), "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs to use. MPI-processes are separated by ':'. For example: 0:1:2:3. Note, only the amyloid tracing part of the job is run on the GPU; FOM calculation has only been implemented for the CPU.");
+    joboptions["amyloid_threshold"] = JobOption("Amyloid pick threshold (sigma): ", 0.25, 0.05, 1, 0.05, "How many sigma does the peaks need to be above the mean for the filament tracing to include a coordinate?");
+    joboptions["do_amyloid_plot"] = JobOption("Plot results per micrograph?", false, "Set this option to Yes to visualise intermediate results for amyloid tracing, which may help with setting values for filament length, width and picking threshold. This writes a PNG file for each micrograph, next to its output star file, so you may want to limit the number of input micrographs.");
+    joboptions["amyloid_width"] = JobOption("Minimum distance between filaments (A): ", 100, 50, 1000, 10, "Minimum distance between ends of traced filaments (in Angstroms). ");
+    joboptions["amyloid_length"] = JobOption("Minimum filament length (A): ", 500, 100, 1000, 10, "Length (in Angstroms) used for FOM calculation, and minimum length of filaments for tracing.");
+    joboptions["do_amyloid_carbon"] = JobOption("Ignore filaments on carbon?", false, "Set to Yes if you want to use automated carbon detection to avoid picking filaments on carbon.");
+    joboptions["amyloid_carbon_threshold"] = JobOption("Carbon threshold: ", 0.9, 0.05, 1, 0.05, "At what probability should pixels in the micrographs be deemed carbon? Use lower values to have more areas exclude from the picking.");
+
 }
 
 bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std::string> &commands,
@@ -2144,9 +2161,94 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 		}
 
 	}
-	else
+    else if (joboptions["do_amyloid"].getBoolean())
+    {
+        label += ".amypick";
+
+        // Run find_amyloid instead of autopick!!
+        if (joboptions["nr_mpi"].getNumber(error_message) > 1)
+            command="`which relion_find_amyloid_mpi`";
+        else
+            command="`which relion_find_amyloid`";
+        if (error_message != "") return false;
+
+        if (joboptions["do_amyloid_plot"].getBoolean())
+        {
+            if (joboptions["nr_mpi"].getNumber(error_message) > 1 || joboptions["do_queue"].getBoolean())
+            {
+                error_message = "You cannot use parallel execution or job submission when plotting intermediate results.";
+                return false;
+            }
+        }
+
+        command += " --odir " + outputname;
+        command += " --pickname autopick";
+
+
+        if (joboptions["do_amyloid_fom"].getBoolean())
+        {
+
+            if (joboptions["do_amyloid_tracing"].getBoolean())
+            {
+                error_message = "ERROR: you need to run a separate FOM calculation job, followed by a tracing job. FOM is CPU-only; tracing is GPU-only!";
+                return false;
+            }
+
+            command += " --j " + joboptions["nr_threads"].getString();
+
+            // Also output micrographs.star file with kurtosis and skewness of the autopicking scores
+            Node node3c(outputname + "micrographs_autopick.star", joboptions["fn_input_autopick"].node_type);
+            outputNodes.push_back(node3c);
+
+        }
+        else
+        {
+            command += " --skip_fom ";
+        }
+
+
+        if (joboptions["do_amyloid_tracing"].getBoolean())
+        {
+            // Output new version: no longer save coords_suffix nodetype, but 2-column list of micrographs and coordinate files
+            Node node3(outputname + "autopick.star", LABEL_AUTOPICK_COORDS);
+            outputNodes.push_back(node3);
+
+            command += " --trace_filament_length " + joboptions["amyloid_length"].getString();
+            command += " --trace_filament_width " + joboptions["amyloid_width"].getString();
+            command += " --threshold " + joboptions["amyloid_threshold"].getString();
+            command += " --gpu \"" + joboptions["amyloid_gpu_ids"].getString() + "\"";
+
+            if (joboptions["do_amyloid_carbon"].getBoolean())
+            {
+                command += " --detect_carbon --carbon_threshold " + joboptions["amyloid_carbon_threshold"].getString();
+            }
+
+            if (joboptions["do_amyloid_plot"].getBoolean()) command += " --plot ";
+
+        }
+        else
+        {
+            command += " --skip_tracing ";
+        }
+
+        command += " --i " + joboptions["fn_input_autopick"].getString();
+        Node node(joboptions["fn_input_autopick"].getString(), joboptions["fn_input_autopick"].node_type);
+        inputNodes.push_back(node);
+
+        // PDF with histograms of the eigenvalues
+        Node node3b(outputname + "logfile.pdf", LABEL_AUTOPICK_LOG);
+        outputNodes.push_back(node3b);
+
+        // If this is a continue job, then only process unfinished micrographs
+        if (is_continue)
+            command += " --only_do_unfinished ";
+
+
+    }
+    else
 	{
-		// Run autopicking
+
+        // Run autopicking
 		if (joboptions["nr_mpi"].getNumber(error_message) > 1)
 			command="`which relion_autopick_mpi`";
 		else
@@ -2157,11 +2259,12 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 		int icheck = 0;
 		if (joboptions["do_log"].getBoolean()) icheck++;
 		if (joboptions["do_topaz"].getBoolean()) icheck++;
-		if (joboptions["do_refs"].getBoolean()) icheck++;
+        if (joboptions["do_refs"].getBoolean()) icheck++;
+        if (joboptions["do_amyloid"].getBoolean()) icheck++;
 
 		if ( icheck != 1)
 		{
-			error_message = "ERROR: On the I/O tab specify (only) one of three methods: template-matching, LoG or topaz ...";
+			error_message = "ERROR: On the I/O tab specify (only) one of four methods: template-matching, LoG, topaz or amyloid ...";
 			return false;
 		}
 
@@ -2270,7 +2373,7 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 			}
 
 		}
-		else if (joboptions["do_log"].getBoolean())
+        else if (joboptions["do_log"].getBoolean())
 		{
 			if (joboptions["use_gpu"].getBoolean())
 			{
@@ -2408,7 +2511,7 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 			if (is_continue && !(joboptions["do_read_fom_maps"].getBoolean() || joboptions["do_write_fom_maps"].getBoolean()))
 				command += " --only_do_unfinished ";
 		}
-		else if (joboptions["do_topaz"].getBoolean())
+		else if (joboptions["do_topaz"].getBoolean() || joboptions["do_amyloid"].getBoolean() )
 		{
 			if (is_continue)
 				command += " --only_do_unfinished ";
@@ -2458,13 +2561,9 @@ Pixels values higher than this many times the image stddev will be replaced with
 This value should be slightly larger than the actual width of helical tubes.");
 	joboptions["helical_bimodal_angular_priors"] = JobOption("Use bimodal angular priors?", true, "Normally it should be set to Yes and bimodal angular priors will be applied in the following classification and refinement jobs. \
 Set to No if the 3D helix looks the same when rotated upside down.");
-	joboptions["do_extract_helical_tubes"] = JobOption("Coordinates are start-end only?", true, "Set to Yes if you want to extract helical segments from manually picked tube coordinates (starting and end points of helical tubes in RELION, EMAN or XIMDISP format). \
-Set to No if segment coordinates (RELION auto-picked results or EMAN / XIMDISP segments) are provided.");
-	joboptions["do_cut_into_segments"] = JobOption("Cut helical tubes into segments?", true, "Set to Yes if you want to extract multiple helical segments with a fixed inter-box distance. \
-If it is set to No, only one box at the center of each helical tube will be extracted.");
 	joboptions["helical_nr_asu"] = JobOption("Number of unique asymmetrical units:", 1, 1, 100, 1, "Number of unique helical asymmetrical units in each segment box. This integer should not be less than 1. The inter-box distance (pixels) = helical rise (Angstroms) * number of asymmetrical units / pixel size (Angstroms). \
 The optimal inter-box distance might also depend on the box size, the helical rise and the flexibility of the structure. In general, an inter-box distance of ~10% * the box size seems appropriate.");
-	joboptions["helical_rise"] = JobOption("Helical rise (A):", 1, 0, 100, 0.01, "Helical rise in Angstroms. (Please click '?' next to the option above for details about how the inter-box distance is calculated.)");
+    joboptions["helical_rise"] = JobOption("Helical rise (A):", 1, 0, 100, 0.01, "Helical rise in Angstroms. (Please click '?' next to the option above for details about how the inter-box distance is calculated.)");
 
 }
 
@@ -2556,7 +2655,7 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 		command += " --pick_star " + fn_pickstar;
 	}
 
-	if (joboptions["do_extract_helix"].getBoolean() && joboptions["do_extract_helical_tubes"].getBoolean())
+	if (joboptions["do_extract_helix"].getBoolean()  )
 	{
 		FileName fn_pickstar = outputname + "extractpick.star";
 		Node node(fn_pickstar, LABEL_EXTRACT_COORDS_HELIX);
@@ -2617,18 +2716,9 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 		command += " --helical_outer_diameter " + joboptions["helical_tube_outer_diameter"].getString();
 		if (joboptions["helical_bimodal_angular_priors"].getBoolean())
 			command += " --helical_bimodal_angular_priors";
-		if (joboptions["do_extract_helical_tubes"].getBoolean())
-		{
-			command += " --helical_tubes";
-			if (joboptions["do_cut_into_segments"].getBoolean())
-			{
-				command += " --helical_cut_into_segments";
-				command += " --helical_nr_asu " + joboptions["helical_nr_asu"].getString();
-				command += " --helical_rise " + joboptions["helical_rise"].getString();
-			}
-			else
-				command += " --helical_nr_asu 1 --helical_rise 1";
-		}
+        command += " --helical_cut_into_segments";
+        command += " --helical_nr_asu " + joboptions["helical_nr_asu"].getString();
+        command += " --helical_rise " + joboptions["helical_rise"].getString();
 	}
 	else
 	{
@@ -2651,13 +2741,6 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 		Node node(outputname + "reextract.star", LABEL_EXTRACT_COORDS_REEX);
 		outputNodes.push_back(node);
 	}
-
-	if (joboptions["do_extract_helix"].getBoolean() && joboptions["do_extract_helical_tubes"].getBoolean())
-	{
-		Node node(outputname + "helix_segments.star", LABEL_EXTRACT_COORDS_HELIX);
-		outputNodes.push_back(node);
-	}
-
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
@@ -2976,9 +3059,9 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 				Node node2(fn_parts, LABEL_SELECT_PARTS);
 				outputNodes.push_back(node2);
 
-				// Only save the 2D class averages for 2D jobs
+				// Only save the 2D class averages for 2D jobs (normal Class2D or from David's filament selection program)
 				FileName fnt = joboptions["fn_model"].getString();
-				if (fnt.contains("Class2D/"))
+				if (fnt.contains("Class2D/") || ( fnt.contains("Select/") && fnt.contains("run_optimiser.star") ) )
 				{
 					FileName fn_imgs = outputname+"class_averages.star";
 					command += " --fn_imgs " + fn_imgs;
@@ -3311,6 +3394,7 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 		label += ".helical";
 
 		command += " --helical_outer_diameter " + joboptions["helical_tube_outer_diameter"].getString();
+        command += " --no_init_blobs";
 
 		if (joboptions["dont_skip_align"].getBoolean())
 		{
@@ -3706,7 +3790,8 @@ High-resolution refinements (e.g. ribosomes or other large complexes in 3D auto-
 	joboptions["highres_limit"] = JobOption("Limit resolution E-step to (A): ", -1, -1, 20, 1, "If set to a positive number, then the expectation step (i.e. the alignment) will be done only including the Fourier components up to this resolution (in Angstroms). \
 This is useful to prevent overfitting, as the classification runs in RELION are not to be guaranteed to be 100% overfitting-free (unlike the 3D auto-refine with its gold-standard FSC). In particular for very difficult data sets, e.g. of very small or featureless particles, this has been shown to give much better class averages. \
 In such cases, values in the range of 7-12 Angstroms have proven useful.");
-	joboptions["do_blush"] = JobOption("Use Blush regularisation?", false, "If set to Yes, relion_refine will use a neural network to perform regularisation by denoising at every iteration, instead of the standard smoothness regularisation.");
+    joboptions["do_blush"] = JobOption("Use Blush regularisation?", false, "If set to Yes, relion_refine will use a neural network to perform regularisation by denoising at every iteration, instead of the standard smoothness regularisation.");
+    joboptions["blush_version"] = JobOption("Blush network version:", job_blush_version_options, 0, "Which version of the Blush network to use. v1.0 is the original version published in Kiamnius et al (2024) Nature Methods; amy-v1.0 is a newer version that was trained specifically for use with amyloid filaments.");
 
 	joboptions["dont_skip_align"] = JobOption("Perform image alignment?", true, "If set to No, then rather than \
 performing both alignment and classification, only classification will be performed. This allows the use of very focused masks.\
@@ -3766,7 +3851,6 @@ in the previous iteration will get higher weights than those further away.\n\nTh
 rot, tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
 Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
 A range of 15 degrees means sigma = 5 degrees.\n\nThese options will be invalid if you choose to perform local angular searches or not to perform image alignment on 'Sampling' tab.");
-	joboptions["do_apply_helical_symmetry"] = JobOption("Apply helical symmetry?", true, "If set to Yes, helical symmetry will be applied in every iteration. Set to No if you have just started a project, helical symmetry is unknown or not yet estimated.");
 	joboptions["helical_nr_asu"] = JobOption("Number of unique asymmetrical units:", 1, 1, 100, 1, "Number of unique helical asymmetrical units in each segment box. If the inter-box distance (set in segment picking step) \
 is 100 Angstroms and the estimated helical rise is ~20 Angstroms, then set this value to 100 / 20 = 5 (nearest integer). This integer should not be less than 1. The correct value is essential in measuring the \
 signal to noise ratio in helical reconstruction.");
@@ -3797,8 +3881,10 @@ does not guarantee convergence. The program cannot find a reasonable symmetry if
 	joboptions["helical_rise_inistep"] = JobOption("Helical rise search (A) - Step:", std::string("0"), "Minimum, maximum and initial step for helical rise search. Helical rise is a positive value in Angstroms. \
 Generally it is not necessary for the user to provide an initial step (less than 1% the initial helical rise, 5~1000 samplings as default). But it needs to be set manually if the default value \
 does not guarantee convergence. The program cannot find a reasonable symmetry if the true helical parameters fall out of the given ranges. Note that the final reconstruction can still converge if wrong helical and point group symmetry are provided.");
-	joboptions["helical_range_distance"] = JobOption("Range factor of local averaging:", -1., 1., 5., 0.1, "Local averaging of orientations and translations will be performed within a range of +/- this value * the box size. Polarities are also set to be the same for segments coming from the same tube during local refinement. \
-Values of ~ 2.0 are recommended for flexible structures such as MAVS-CARD filaments, ParM, MamK, etc. This option might not improve the reconstructions of helices formed from curled 2D lattices (TMV and VipA/VipB). Set to negative to disable this option.");
+	joboptions["helical_range_distance"] = JobOption("Local averaging - range (box)", std::string("-1"), "Local averaging of orientations and translations will be performed within a range of +/- this value * the box size. This also requires providing the N-start number of the helical symmetry (e.g. 2 for tau PHFs and 1 for tau SFs). Polarities are also set to be the same for segments coming from the same tube during local refinement. \
+Values of ~ 2.0 are recommended for the range. Set the range to negative to disable local averaging (in which case the Nstart number is also ignored).");
+    joboptions["helical_nstart"] = JobOption("Local averaging - N-start symmetry", std::string("1"), "Local averaging of orientations and translations will be performed within a range of +/- this value * the box size. This also requires providing the N-start number of the helical symmetry (e.g. 2 for tau PHFs and 1 for tau SFs). Polarities are also set to be the same for segments coming from the same tube during local refinement. \
+Values of ~ 2.0 are recommended for the range. Set the range to negative to disable local averaging (in which case the Nstart number is also ignored).");
 	joboptions["keep_tilt_prior_fixed"] = JobOption("Keep tilt-prior fixed:", true, "If set to yes, the tilt prior will not change during the optimisation. If set to No, at each iteration the tilt prior will move to the optimal tilt value for that segment from the previous iteration.");
 
 	joboptions["do_parallel_discio"] = JobOption("Use parallel disc I/O?", true, "If set to Yes, all MPI followers will read their own images from disc. \
@@ -3871,7 +3957,7 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 	{
         if (is_tomo)
         {
-            error_message = getTomoInputCommmand(true, command, HAS_COMPULSORY, HAS_COMPULSORY, HAS_NOT, HAS_NOT);
+            error_message = getTomoInputCommmand(true, command, HAS_OPTIONAL, HAS_COMPULSORY, HAS_NOT, HAS_NOT);
             if (error_message != "") return false;
 
             Node node1( outputname + fn_run + "_optimisation_set.star", LABEL_CLASS3D_OPTSET);
@@ -3972,7 +4058,10 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 	}
 
 	if (joboptions["do_blush"].getBoolean())
-		command += " --blush ";
+    {
+        command += " --blush ";
+        command += " --blush_model " + joboptions["blush_version"].getString();
+    }
 
 	if (joboptions["fn_mask"].getString().length() > 0)
 	{
@@ -4040,38 +4129,33 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 			command += " --helical_inner_diameter " + joboptions["helical_tube_inner_diameter"].getString();
 
 		command += " --helical_outer_diameter " + joboptions["helical_tube_outer_diameter"].getString();
-		if (joboptions["do_apply_helical_symmetry"].getBoolean())
-		{
-			command += " --helical_nr_asu " + joboptions["helical_nr_asu"].getString();
-			command += " --helical_twist_initial " + joboptions["helical_twist_initial"].getString();
-			command += " --helical_rise_initial " + joboptions["helical_rise_initial"].getString();
+        command += " --helical_nr_asu " + joboptions["helical_nr_asu"].getString();
+        command += " --helical_twist_initial " + joboptions["helical_twist_initial"].getString();
+        command += " --helical_rise_initial " + joboptions["helical_rise_initial"].getString();
 
-			float myz = joboptions["helical_z_percentage"].getNumber(error_message) / 100.;
-			if (error_message != "") return false;
-			command += " --helical_z_percentage " + floatToString(myz);
+        float myz = joboptions["helical_z_percentage"].getNumber(error_message) / 100.;
+        if (error_message != "") return false;
+        command += " --helical_z_percentage " + floatToString(myz);
 
-			if (joboptions["do_local_search_helical_symmetry"].getBoolean())
-			{
-				command += " --helical_symmetry_search";
-				command += " --helical_twist_min " + joboptions["helical_twist_min"].getString();
-				command += " --helical_twist_max " + joboptions["helical_twist_max"].getString();
+        if (joboptions["do_local_search_helical_symmetry"].getBoolean())
+        {
+            command += " --helical_symmetry_search";
+            command += " --helical_twist_min " + joboptions["helical_twist_min"].getString();
+            command += " --helical_twist_max " + joboptions["helical_twist_max"].getString();
 
-				float twist_inistep = joboptions["helical_twist_inistep"].getNumber(error_message);
-				if (error_message != "") return false;
-				if (twist_inistep > 0.)
-					command += " --helical_twist_inistep " + joboptions["helical_twist_inistep"].getString();
+            float twist_inistep = joboptions["helical_twist_inistep"].getNumber(error_message);
+            if (error_message != "") return false;
+            if (twist_inistep > 0.)
+                command += " --helical_twist_inistep " + joboptions["helical_twist_inistep"].getString();
 
-				command += " --helical_rise_min " + joboptions["helical_rise_min"].getString();
-				command += " --helical_rise_max " + joboptions["helical_rise_max"].getString();
+            command += " --helical_rise_min " + joboptions["helical_rise_min"].getString();
+            command += " --helical_rise_max " + joboptions["helical_rise_max"].getString();
 
-				float rise_inistep = joboptions["helical_rise_inistep"].getNumber(error_message);
-				if (error_message != "") return false;
-				if (rise_inistep > 0.)
-					command += " --helical_rise_inistep " + joboptions["helical_rise_inistep"].getString();
-			}
-		}
-		else
-			command += " --ignore_helical_symmetry";
+            float rise_inistep = joboptions["helical_rise_inistep"].getNumber(error_message);
+            if (error_message != "") return false;
+            if (rise_inistep > 0.)
+                command += " --helical_rise_inistep " + joboptions["helical_rise_inistep"].getString();
+        }
 		if (joboptions["keep_tilt_prior_fixed"].getBoolean())
 			command += " --helical_keep_tilt_prior_fixed";
 		if ( (joboptions["dont_skip_align"].getBoolean()) && (!joboptions["do_local_ang_searches"].getBoolean()) )
@@ -4097,7 +4181,11 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 			val = joboptions["helical_range_distance"].getNumber(error_message);
 			if (error_message != "") return false;
 			if (val > 0.)
+            {
 				command += " --helical_sigma_distance " + floatToString(val / 3.);
+                int nstart = joboptions["helical_nstart"].getNumber(error_message);
+                command += " --helical_nstart " + floatToString(nstart);
+            }
 		}
 	}
 
@@ -4201,6 +4289,7 @@ High-resolution refinements (e.g. ribosomes or other large complexes in 3D auto-
 masked half-maps are used and a post-processing-like correction of the FSC curves (with phase-randomisation) is performed every iteration. This only works when a reference mask is provided on the I/O tab. \
 This may yield higher-resolution maps, especially when the mask contains only a relatively small volume inside the box.");
 	joboptions["do_blush"] = JobOption("Use Blush regularisation?", false, "If set to Yes, relion_refine will use a neural network to perform regularisation by denoising at every iteration, instead of the standard smoothness regularisation.");
+    joboptions["blush_version"] = JobOption("Blush network version:", job_blush_version_options, 0, "Which version of the Blush network to use. v1.0 is the original version published in Kiamnius et al (2024) Nature Methods; amy-v1.0 is a newer version that was trained specifically for use with amyloid filaments.");
 
 	joboptions["sampling"] = JobOption("Initial angular sampling:", job_sampling_options, 2, "There are only a few discrete \
 angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
@@ -4254,7 +4343,6 @@ in the previous iteration will get higher weights than those further away.\n\nTh
 rot, tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
 Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
 A range of 15 degrees means sigma = 5 degrees.\n\nThese options will be invalid if you choose to perform local angular searches or not to perform image alignment on 'Sampling' tab.");
-	joboptions["do_apply_helical_symmetry"] = JobOption("Apply helical symmetry?", true, "If set to Yes, helical symmetry will be applied in every iteration. Set to No if you have just started a project, helical symmetry is unknown or not yet estimated.");
 	joboptions["helical_nr_asu"] = JobOption("Number of unique asymmetrical units:", 1, 1, 100, 1, "Number of unique helical asymmetrical units in each segment box. If the inter-box distance (set in segment picking step) \
 is 100 Angstroms and the estimated helical rise is ~20 Angstroms, then set this value to 100 / 20 = 5 (nearest integer). This integer should not be less than 1. The correct value is essential in measuring the \
 signal to noise ratio in helical reconstruction.");
@@ -4285,8 +4373,10 @@ does not guarantee convergence. The program cannot find a reasonable symmetry if
 	joboptions["helical_rise_inistep"] = JobOption("Helical rise search (A) - Step:", std::string("0"), "Minimum, maximum and initial step for helical rise search. Helical rise is a positive value in Angstroms. \
 Generally it is not necessary for the user to provide an initial step (less than 1% the initial helical rise, 5~1000 samplings as default). But it needs to be set manually if the default value \
 does not guarantee convergence. The program cannot find a reasonable symmetry if the true helical parameters fall out of the given ranges. Note that the final reconstruction can still converge if wrong helical and point group symmetry are provided.");
-	joboptions["helical_range_distance"] = JobOption("Range factor of local averaging:", -1., 1., 5., 0.1, "Local averaging of orientations and translations will be performed within a range of +/- this value * the box size. Polarities are also set to be the same for segments coming from the same tube during local refinement. \
-Values of ~ 2.0 are recommended for flexible structures such as MAVS-CARD filaments, ParM, MamK, etc. This option might not improve the reconstructions of helices formed from curled 2D lattices (TMV and VipA/VipB). Set to negative to disable this option.");
+    joboptions["helical_range_distance"] = JobOption("Local averaging - range (box)", std::string("-1"), "Local averaging of orientations and translations will be performed within a range of +/- this value * the box size. This also requires providing the N-start number of the helical symmetry (e.g. 2 for tau PHFs and 1 for tau SFs). Polarities are also set to be the same for segments coming from the same tube during local refinement. \
+Values of ~ 2.0 are recommended for the range. Set the range to negative to disable local averaging (in which case the Nstart number is also ignored).");
+    joboptions["helical_nstart"] = JobOption("Local averaging - N-start symmetry", std::string("1"), "Local averaging of orientations and translations will be performed within a range of +/- this value * the box size. This also requires providing the N-start number of the helical symmetry (e.g. 2 for tau PHFs and 1 for tau SFs). Polarities are also set to be the same for segments coming from the same tube during local refinement. \
+Values of ~ 2.0 are recommended for the range. Set the range to negative to disable local averaging (in which case the Nstart number is also ignored).");
 	joboptions["keep_tilt_prior_fixed"] = JobOption("Keep tilt-prior fixed:", true, "If set to yes, the tilt prior will not change during the optimisation. If set to No, at each iteration the tilt prior will move to the optimal tilt value for that segment from the previous iteration.");
 
 	joboptions["do_parallel_discio"] = JobOption("Use parallel disc I/O?", true, "If set to Yes, all MPI followers will read their own images from disc. \
@@ -4361,7 +4451,7 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 
         if (is_tomo)
         {
-            error_message = getTomoInputCommmand(true, command, HAS_COMPULSORY, HAS_COMPULSORY, HAS_NOT, HAS_NOT);
+            error_message = getTomoInputCommmand(true, command, HAS_OPTIONAL, HAS_COMPULSORY, HAS_NOT, HAS_NOT);
             if (error_message != "") return false;
 
             Node node1( outputname + fn_run + "_optimisation_set.star", LABEL_REFINE3D_OPTSET);
@@ -4421,6 +4511,7 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
     if (joboptions["do_blush"].getBoolean())
     {
         command += " --blush ";
+        command += " --blush_model " + joboptions["blush_version"].getString();
     }
 
     // Always do compute stuff
@@ -4522,38 +4613,33 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 				command += " --helical_inner_diameter " + joboptions["helical_tube_inner_diameter"].getString();
 
 			command += " --helical_outer_diameter " + joboptions["helical_tube_outer_diameter"].getString();
-			if (joboptions["do_apply_helical_symmetry"].getBoolean())
-			{
-				command += " --helical_nr_asu " + joboptions["helical_nr_asu"].getString();
-				command += " --helical_twist_initial " + joboptions["helical_twist_initial"].getString();
-				command += " --helical_rise_initial " + joboptions["helical_rise_initial"].getString();
+            command += " --helical_nr_asu " + joboptions["helical_nr_asu"].getString();
+            command += " --helical_twist_initial " + joboptions["helical_twist_initial"].getString();
+            command += " --helical_rise_initial " + joboptions["helical_rise_initial"].getString();
 
-				float myz = joboptions["helical_z_percentage"].getNumber(error_message) / 100.;
-				if (error_message != "") return false;
-				command += " --helical_z_percentage " + floatToString(myz);
+            float myz = joboptions["helical_z_percentage"].getNumber(error_message) / 100.;
+            if (error_message != "") return false;
+            command += " --helical_z_percentage " + floatToString(myz);
 
-				if (joboptions["do_local_search_helical_symmetry"].getBoolean())
-				{
-					command += " --helical_symmetry_search";
-					command += " --helical_twist_min " + joboptions["helical_twist_min"].getString();
-					command += " --helical_twist_max " + joboptions["helical_twist_max"].getString();
+            if (joboptions["do_local_search_helical_symmetry"].getBoolean())
+            {
+                command += " --helical_symmetry_search";
+                command += " --helical_twist_min " + joboptions["helical_twist_min"].getString();
+                command += " --helical_twist_max " + joboptions["helical_twist_max"].getString();
 
-					float twist_inistep = joboptions["helical_twist_inistep"].getNumber(error_message);
-					if (error_message != "") return false;
-					if (twist_inistep > 0.)
-						command += " --helical_twist_inistep " + joboptions["helical_twist_inistep"].getString();
+                float twist_inistep = joboptions["helical_twist_inistep"].getNumber(error_message);
+                if (error_message != "") return false;
+                if (twist_inistep > 0.)
+                    command += " --helical_twist_inistep " + joboptions["helical_twist_inistep"].getString();
 
-					command += " --helical_rise_min " + joboptions["helical_rise_min"].getString();
-					command += " --helical_rise_max " + joboptions["helical_rise_max"].getString();
+                command += " --helical_rise_min " + joboptions["helical_rise_min"].getString();
+                command += " --helical_rise_max " + joboptions["helical_rise_max"].getString();
 
-					float rise_inistep = joboptions["helical_rise_inistep"].getNumber(error_message);
-					if (error_message != "") return false;
-					if (rise_inistep > 0.)
-						command += " --helical_rise_inistep " + joboptions["helical_rise_inistep"].getString();
-				}
-			}
-			else
-				command += " --ignore_helical_symmetry";
+                float rise_inistep = joboptions["helical_rise_inistep"].getNumber(error_message);
+                if (error_message != "") return false;
+                if (rise_inistep > 0.)
+                    command += " --helical_rise_inistep " + joboptions["helical_rise_inistep"].getString();
+            }
 
 			float val;
 			if (sampling != auto_local_sampling)
@@ -4580,7 +4666,11 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 			val = joboptions["helical_range_distance"].getNumber(error_message);
 			if (error_message != "") return false;
 			if (val > 0.)
+            {
 				command += " --helical_sigma_distance " + floatToString(val / 3.);
+                int nstart = joboptions["helical_nstart"].getNumber(error_message);
+                command += " --helical_nstart " + floatToString(nstart);
+            }
 
 			if (joboptions["keep_tilt_prior_fixed"].getBoolean())
 				command += " --helical_keep_tilt_prior_fixed";
@@ -4646,6 +4736,7 @@ Also note that larger bodies should be above smaller bodies in the STAR file. Fo
 	joboptions["do_subtracted_bodies"] = JobOption("Reconstruct subtracted bodies?", true, "If set to Yes, then the reconstruction of each of the bodies will use the subtracted images. This may give \
 useful insights about how well the subtraction worked. If set to No, the original particles are used for reconstruction (while the subtracted ones are still used for alignment). This will result in fuzzy densities for bodies outside the one used for refinement.");
 	joboptions["do_blush"] = JobOption("Use Blush regularisation?", false, "If set to Yes, relion_refine will use a neural network to perform regularisation by denoising at every iteration, instead of the standard smoothness regularisation.");
+    joboptions["blush_version"] = JobOption("Blush network version:", job_blush_version_options, 0, "Which version of the Blush network to use. v1.0 is the original version published in Kiamnius et al (2024) Nature Methods; amy-v1.0 is a newer version that was trained specifically for use with amyloid filaments.");
 
 	joboptions["sampling"] = JobOption("Initial angular sampling:", job_sampling_options, 4, "There are only a few discrete \
 angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
@@ -4770,7 +4861,10 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 		}
 
         if (joboptions["do_blush"].getBoolean())
+        {
             command += " --blush ";
+            command += " --blush_model " + joboptions["blush_version"].getString();
+        }
 
 		if (joboptions["do_subtracted_bodies"].getBoolean())
 			command += " --reconstruct_subtracted_bodies ";
@@ -5698,7 +5792,7 @@ void RelionJob::initialiseModelAngeloJob()
 
 	joboptions["do_hhmer"] = JobOption("Perform HMMer search?", false ,"If set to Yes, model-angelo will perform a HMM search using HHMer in the output directory of the model-angelo run (without sequence). You can continue an old run with this option switched on, and the model building step will be skipped if the output .cif exists. This way, you can try multiple HHMer runs.");
 	joboptions["fn_lib"] = JobOption("Library with sequences for HMMer search:", LABEL_SEQUENCE_CPIPE, 1, "", "FASTA sequence files (*.{fasta,txt})", "FASTA file with library with all sequences for HMMer search. This is often an entire proteome.");
-	joboptions["alphabet"] = JobOption("Alphabet for the HMMer search:", job_modelangelo_alphabet_options, 0, "Type of Alphabet for HMM searches.");
+    joboptions["alphabet"] = JobOption("Alphabet for the HMMer search:", job_modelangelo_alphabet_options, 0, "Type of Alphabet for HMM searches.");
 	joboptions["F1"] = JobOption("HMMSearch F1: ", 0.02, 1., 10., 0.1, "F1 parameter for HMMSearch, see their documentation at http://eddylab.org/software/hmmer/Userguide.pdf");
 	joboptions["F2"] = JobOption("HMMSearch F2: ", 0.001, 1., 10., 0.1, "F2 parameter for HMMSearch, see their documentation at http://eddylab.org/software/hmmer/Userguide.pdf");
 	joboptions["F3"] = JobOption("HMMSearch F3: ", 0.00001, 0., 10., 0.1, "F3 parameter for HMMSearch, see their documentation at http://eddylab.org/software/hmmer/Userguide.pdf");
@@ -6384,14 +6478,17 @@ std::string RelionJob::getTomoInputCommmand(bool is_for_refine, std::string &com
             inputNodes.push_back(node);
             command += " --i " + joboptions["in_particles"].getString();
 
-            Node node2(joboptions["in_tomograms"].getString(), joboptions["in_tomograms"].node_type);
-            inputNodes.push_back(node2);
-            command += " --tomograms " + joboptions["in_tomograms"].getString();
+            if (joboptions["in_tomograms"].getString() != "")
+            {
+                Node node2(joboptions["in_tomograms"].getString(), joboptions["in_tomograms"].node_type);
+                inputNodes.push_back(node2);
+                command += " --tomograms " + joboptions["in_tomograms"].getString();
+            }
 
             if (joboptions["in_trajectories"].getString() != "")
             {
                 Node node3(joboptions["in_trajectories"].getString(), joboptions["in_trajectories"].node_type);
-                inputNodes.push_back(node2);
+                inputNodes.push_back(node3);
                 command += " --trajectories " + joboptions["in_trajectories"].getString();
             }
 
@@ -6566,6 +6663,13 @@ void RelionJob::initialiseTomoAlignTiltSeriesJob()
     joboptions["do_aretomo_phaseshift"] = JobOption("Also estimate phase shift? ", false, "If set to Yes, AreTomo2 will also perform estimation of the phase shift (due to a phase plate) during CTF estimation.");
     joboptions["do_aretomo_tiltcorrect"] = JobOption("Correct Tilt Angle Offset?", false, "Specify Yes to correct the tilt angle offset in the tomogram (applies the AreTomo -TiltCor option). This is useful for correcting slanting in tomograms which can arise due to sample mounting or milling angle. This can be useful for in situ data.");
     joboptions["aretomo_tiltcorrect_angle"] = JobOption("Tilt Angle Offset:", 999 , -50, 50, 5, "The tilt angle (in degrees) to be offset. If set to a value larger than 180, AreTomo will search for the optimal value itself, otherwise the value specified here will be used.");
+
+
+    joboptions["do_aretomo_reconstruct"] = JobOption("Reconstruct tomograms? ", false, "If set to Yes, AreTomo2 will also perform tomogram reconstruction (the default is to use weighted backprojection, but you can use SART by providing the additional argument --aretomo_sart.");
+    joboptions["do_skip_aretomo_align"] = JobOption("Skip alignment and only reconstruct?", false, "If set to Yes, AreTomo2 alignment (and CTF estimation) will be skipped, and only tomogram reconstruction will be performed. For this to work, tilt series alignment parameters need to be present in the input tiltseries STAR file. This allows AreTomo2 reconstructions from IMOD alignments.");
+    joboptions["aretomo_VolZ"] = JobOption("Tomogram thickness (in unbinned voxels):", 1000 , 50, 5000, 50, "The tomogram will be reconstructed to this thickness, using the -VolZ parameter from AreTomo.");
+    joboptions["aretomo_OutBin"] = JobOption("Tomogram binning:", 4 , 1, 20, 1, "The tomogram will be reconstructed with this integer binning factor, using the -OutBin parameter from AreTomo.");
+
     joboptions["other_aretomo_args"] = JobOption("Other AreTomo2 arguments", std::string(""), "Additional arguments that need to be passed to AreTomo2.");
 	joboptions["gpu_ids"] = JobOption("Which GPUs to use for AreTomo:", std::string(""), "Provide a list of which GPUs (e.g. 0:1:2:3) to use in AreTomo2. MPI-processes are separated by ':'. For example, to place one rank on device 0 and one rank on device 1, provide '0:1'.");
 
@@ -6644,6 +6748,17 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
 
         }
 
+        if (joboptions["do_aretomo_reconstruct"].getBoolean())
+        {
+            command += " --aretomo_reconstruct ";
+            if (joboptions["do_skip_aretomo_align"].getBoolean())
+                command += " --aretomo_only_reconstruct ";
+            command += " --aretomo_VolZ " + joboptions["aretomo_VolZ"].getString();
+            command += " --aretomo_OutBin " + joboptions["aretomo_OutBin"].getString();
+
+        }
+
+
         command += " --other_wrapper_args \" " + joboptions["other_aretomo_args"].getString() + " \"";
         command += " --gpu " + joboptions["gpu_ids"].getString() + ' ';
 
@@ -6657,7 +6772,9 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
 	Node node(joboptions["in_tiltseries"].getString(), joboptions["in_tiltseries"].node_type);
 	inputNodes.push_back(node);
 
-	Node node2(outputname+"aligned_tilt_series.star", LABEL_TILTALIGN_TOMOGRAMS);
+	FileName fn_output = (joboptions["do_aretomo2"].getBoolean() && joboptions["do_aretomo_reconstruct"].getBoolean()) ?
+            outputname+"tomograms.star" : outputname+"aligned_tilt_series.star";
+    Node node2(fn_output, LABEL_TILTALIGN_TOMOGRAMS);
 	outputNodes.push_back(node2);
 
     Node node3(outputname + "logfile.pdf", LABEL_TILTALIGN_LOG);
@@ -6675,9 +6792,7 @@ void RelionJob::initialiseTomoReconstructTomogramsJob()
 	hidden_name = ".gui_tomo_reconstruct_tomograms";
 
 	joboptions["in_tiltseries"] = JobOption("Input tilt series:", LABEL_TOMOGRAMS_CPIPE, 1, "", "STAR files (*.star)",  "Input global tilt series star file.");
-
 	joboptions["tiltangle_offset"] = JobOption("Tilt angle offset (deg): ", 0., -25., 25, 1, "The tomogram tilt angles will all be changed by this value. This may be useful to reconstruct lamellae that are all milled under a given angle. All tomograms will be reconstructed with the same offset. Use the tomogram name option below to reconstruct only a single tomogram.");
-
     joboptions["tomo_name"] = JobOption("Reconstruct only this tomogram:", std::string(""), "If not left empty, the program will only reconstruct this particular tomogram");
 	joboptions["generate_split_tomograms"] = JobOption("Generate tomograms for denoising?:", false, "Generate tomograms for input into a denoising job. For this option to work, Save images for denoising? should have been True during Motion Correction. Additionally, adjust zdim to minimise the amount of empty space without sample within the tomograms.");
 
@@ -6688,7 +6803,8 @@ void RelionJob::initialiseTomoReconstructTomogramsJob()
 	joboptions["ydim"] = JobOption("Unbinned tomogram height (Ydim): ", 4000, 1, 6000, 100, "The tomogram Y-dimension in unbinned pixels.");
 	joboptions["zdim"] = JobOption("Unbinned tomogram thickness (Zdim): ", 2000, 1, 6000, 100, "The tomogram Z-dimension in unbinned pixels.");
 
-    joboptions["do_fourier"] = JobOption("Fourier-inversion with odd/even frames?", true, "When set to Yes, a Wiener-filtered reconstruction will be calculated by Fourier inversion. The SNRs of all frames will be measured from the odd/even frames, which should have thus been calculated");
+    joboptions["do_fourier"] = JobOption("Use Fourier-inversion?", true, "When set to Yes, instead of using real-space backprojection, a Fourier-space inversion algorithm is used.");
+    joboptions["do_skip_wiener"] = JobOption("Skip Wiener filter?", false, "By default, the Fourier-inversion method uses a Wiener-filter, where the signal-to-noise ratios are calculated from Fourier shell correlations between the odd/even frames, which should have thus been calculated during MotionCorrection. If this option is true, then the odd/even frames are not necessary, and the images will only be pre-calculated with the CTF, without any division by CTF^2 as in the Wiener filter. This is the option that should be used for subsequent (real) sub-tomogram averaging");
     joboptions["ctf_intact_first_peak"] =JobOption("Ignore CTFs until first peak?", true, "When set to Yes, the lowest spatial frequencies will not be boosted through CTF-correction, which will lead to a reconstruction with less low-resolution contrast, but better high-resolution details>");
 
     joboptions["do_proj"] = JobOption("Also write 2D sums of central Z-slices?:", true, "When set to Yes, this option will result in the calculation of 2D sums of Z-slices from the reconstructed tomograms. These may be useful to quickly screen for bad tomograms using the relion_display program.");
@@ -6750,9 +6866,13 @@ bool RelionJob::getCommandsTomoReconstructTomogramsJob(std::string &outputname, 
         {
             command += " --ctf_intact_first_peak ";
         }
+        if (joboptions["do_skip_wiener"].getBoolean())
+        {
+            command += " --skip_fourier_wiener ";
+        }
     }
 
-        if (joboptions["do_proj"].getBoolean())
+    if (joboptions["do_proj"].getBoolean())
 	{
 		command += " --do_proj ";
         command += " --centre_proj " + joboptions["centre_proj"].getString();
@@ -6936,6 +7056,20 @@ bool RelionJob::getCommandsTomoPickTomogramsJob(std::string &outputname, std::ve
 
 	if (error_message != "") return false;
 
+    if (joboptions["in_tomoset"].getString() == "")
+    {
+        error_message = "ERROR: you need to provide an input STAR file";
+        return false;
+    }
+
+    MetaDataTable MDtest;
+    MDtest.read(joboptions["in_tomoset"].getString(), "global");
+    if (!MDtest.containsLabel(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME))
+    {
+        error_message = "ERROR: the tomogram star file does not contain the label rlnTomoReconstructedTomogram";
+        return false;
+    }
+
     if (joboptions["pick_mode"].getString() == "particles" && joboptions["in_star_file"].getString().length() > 0)
     {
         command0 = "`which relion_python_tomo_get_particle_poses`";
@@ -6952,12 +7086,6 @@ bool RelionJob::getCommandsTomoPickTomogramsJob(std::string &outputname, std::ve
     }
 
 	command="`which relion_python_tomo_pick` ";
-
-	if (joboptions["in_tomoset"].getString() == "")
-	{
-		error_message = "ERROR: you need to provide an input STAR file";
-		return false;
-	}
 
 	/*
 	if (joboptions["pick_mode"].getString() == "surfaces" || joboptions["pick_mode"].getString() == "filaments")
@@ -7055,14 +7183,15 @@ void RelionJob::initialiseTomoSubtomoJob()
 
     addTomoInputOptions(true, true, true, false);
 
-    joboptions["binning"] = JobOption("Binning factor:", 1, 1, 16, 1, "The tilt series images will be binned by this (real-valued) factor and then reconstructed in the specified box size above. Note that thereby the reconstructed region becomes larger when specifying binning factors larger than one.");
-	joboptions["box_size"] = JobOption("Box size (binned pix):", 128, 32, 512, 16, "The initial box size of the reconstruction. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
-	joboptions["crop_size"] = JobOption("Cropped box size (binned pix):", -1, -1, 512, 16, "If set to a positive value, after construction, the resulting pseudo subtomograms are cropped to this size. A smaller box size allows the (generally expensive) refinement using relion_refine to proceed more rapidly.");
+
+    joboptions["box_size_angst"] = JobOption("Box size (A):", 128, 32, 512, 16, "The final particle box size in Angstrom.");
+    joboptions["binned_size_pix"] = JobOption("Binning to box size (pixels):", 64, 16, 256, 16, "The box size above will be binned to yield the number of pixels given here. Smaller boxes will refine faster and occupy less space, but will be limited to lower Nyquist frequency.");
+    joboptions["precrop_size_angst"] = JobOption("Pre-cropping box size (A):", -1, -1, 512, 16, "If set to a positive value, then a larger box size can be used to extract 2D slices out of the micrograph, pre-multiply these with the CTF, and then crop to the box size above. A sufficiently large pre-crop box size therefore will allow more of the high-frequency signal to be captured that has been delocalised by the CTF. ");
 
     joboptions["max_dose"] = JobOption("Maximum dose (e/A^2):", -1, -1, 200, 1, "Tilt series frames with a dose higher than this maximum dose (in electrons per squared Angstroms) will not be included in the 3D pseudo-subtomogram, or in the 2D stack. For the latter, this will disc I/O operations and increase speed.");
     joboptions["min_frames"] = JobOption("Minimum nr. frames:", 1, 1, 40, 1, "Each selected pseudo-subtomogram need to be visible in at least this number of tilt series frames with doses below the maximum dose");
 
-	joboptions["do_stack2d"] = JobOption("Write output as 2D stacks?", true ,"If set to Yes, this program will write output subtomograms as 2D substacks. This is new as of relion-4.1, and the preferred way of generating subtomograms. If set to No, then relion-4.0 3D pseudo-subtomograms will be written out. Either can be used in subsequent refinements and classifications.");
+    joboptions["subtomo_format"] = JobOption("Subtomogram format:", job_subtomo_format_options, 0, "Format of the extracted subtomograms. Relion-5 type 2D stacks, relion-4 type 3D pseudo-subtomograms, or relion-3 type real-space subtomograms. Some people have reported that real-space 3D subtomograms are better for initial alignments than 2D stacks or 3D pseudo-subtomograms. You may want to use AreTomo2 reconstructions for extracting real-space subtomograms. They can be made as part of the Align tilt-series job.");
 	joboptions["do_float16"] = JobOption("Write output in float16?", true ,"If set to Yes, this program will write output images in float16 MRC format. This will save a factor of two in disk space compared to the default of writing in float32. Note that RELION and CCPEM will read float16 images, but other programs may not (yet) do so.");
 
 }
@@ -7092,14 +7221,9 @@ bool RelionJob::getCommandsTomoSubtomoJob(std::string &outputname, std::vector<s
 	outputNodes.push_back(node2);
 
 	// Job-specific stuff goes here
-
-	command += " --b " + joboptions["box_size"].getString();
-
-	int crop_size = joboptions["crop_size"].getNumber(error_message);
-	if (error_message != "") return false;
-	if (crop_size > 0.) command += " --crop " + joboptions["crop_size"].getString();
-
-	command += " --bin " + joboptions["binning"].getString();
+	command += " --box_size_A " + joboptions["box_size_angst"].getString();
+    command += " --precrop_size_A " + joboptions["precrop_size_angst"].getString();
+    command += " --binned_size_pix " + joboptions["binned_size_pix"].getString();
 
     float max_dose = joboptions["max_dose"].getNumber(error_message);
     if (error_message != "") return false;
@@ -7109,17 +7233,24 @@ bool RelionJob::getCommandsTomoSubtomoJob(std::string &outputname, std::vector<s
     if (error_message != "") return false;
     if (min_frames > 0.) command += " --min_frames " + joboptions["min_frames"].getString();
 
-	if (joboptions["do_float16"].getBoolean())
-	{
-		command += " --float16 ";
-	}
+    if (strcmp((joboptions["subtomo_format"].getString()).c_str(), job_subtomo_format_options[0].c_str()) == 0)
+    {
+        command += " --stack2d ";
+    }
+    else if (strcmp((joboptions["subtomo_format"].getString()).c_str(), job_subtomo_format_options[2].c_str()) == 0)
+    {
+        command += " --real_subtomo ";
 
-	if (joboptions["do_stack2d"].getBoolean())
-	{
-		command += " --stack2d ";
-	}
+        Node node2(outputname+"particles_for_class2d.star", LABEL_CLASS2D_PARTS);
+        outputNodes.push_back(node2);
+    }
 
-	if (is_continue)
+    if (joboptions["do_float16"].getBoolean())
+    {
+        command += " --float16 ";
+    }
+
+    if (is_continue)
 	{
 		command += " --only_do_unfinished ";
 	}

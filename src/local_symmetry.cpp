@@ -355,12 +355,14 @@ void readRelionFormatMasksAndOperators(
 		FileName fn_info,
 		std::vector<FileName>& fn_mask_list,
 		std::vector<std::vector<Matrix1D<RFLOAT> > >& ops,
+        std::vector<std::vector<RFLOAT> >& weights,
 		RFLOAT angpix,
 		bool verb)
 {
 	MetaDataTable MD;
 	FileName fn_mask;
 	std::vector<Matrix1D<RFLOAT> > dummy;
+    std::vector<RFLOAT> dummyw;
 	Matrix1D<RFLOAT> op, op_i;
 	bool is_maskname_found = false;
 	RFLOAT aa = 0., bb = 0., gg = 0., dx = 0., dy = 0., dz = 0.;
@@ -368,8 +370,10 @@ void readRelionFormatMasksAndOperators(
 	// Initialisation
 	fn_mask_list.clear();
 	ops.clear();
+    weights.clear();
 	MD.clear();
 	dummy.clear();
+    dummyw.clear();
 	op.clear();
 	op_i.clear();
 
@@ -417,7 +421,8 @@ void readRelionFormatMasksAndOperators(
 	op_i.initZeros(NR_LOCALSYM_PARAMETERS);
 	for (int id_mask = 0; id_mask < fn_mask_list.size(); id_mask++)
 	{
-		dummy.clear();
+        dummy.clear();
+        dummyw.clear();
 		if (verb)
 		{
 			std::cout << " * Mask #" << (id_mask + 1) << " = " << fn_mask_list[id_mask] << std::endl;
@@ -441,7 +446,11 @@ void readRelionFormatMasksAndOperators(
 			MD.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, dy);
 			MD.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, dz);
 
-			// Re-calculate angles so that they follow the conventions in RELION!
+            // Get weight if present
+            RFLOAT weight = 1.;
+            if (MD.containsLabel(EMDL_LOCSYM_WEIGHT)) MD.getValue(EMDL_LOCSYM_WEIGHT, weight);
+
+            // Re-calculate angles so that they follow the conventions in RELION!
 			standardiseEulerAngles(aa, bb, gg, aa, bb, gg);
 			Localsym_composeOperator(op, aa, bb, gg, dx, dy, dz);
 
@@ -460,11 +469,13 @@ void readRelionFormatMasksAndOperators(
 
 			// Push back the operator
 			dummy.push_back(op);
+            dummyw.push_back(weight);
 		}
 
 		if (dummy.size() < 1)
 			REPORT_ERROR("ERROR: Please provide at least one non-identical operator for mask file " + fn_mask_list[id_mask] + " !");
-		ops.push_back(dummy);
+        ops.push_back(dummy);
+        weights.push_back(dummyw);
 	}
 
 	// Verify mask filenames and operators (detect duplication)
@@ -1151,6 +1162,7 @@ void applyLocalSymmetry(MultidimArray<RFLOAT>& sym_map,
 		const MultidimArray<RFLOAT>& ori_map,
 		const std::vector<FileName> fn_masks,
 		const std::vector<std::vector<Matrix1D<RFLOAT> > > ops,
+        const std::vector<std::vector<RFLOAT> > weights,
 		RFLOAT radius,
 		RFLOAT cosine_width_pix)
 {
@@ -1186,6 +1198,7 @@ void applyLocalSymmetry(MultidimArray<RFLOAT>& sym_map,
 	for (int imask = 0; imask < fn_masks.size(); imask++)
 	{
 		vol1 = ori_map;
+        RFLOAT sumweight = 1.;
 
 		// Loop over all operators for this mask
 		RFLOAT nr_ops = RFLOAT(ops[imask].size());
@@ -1207,7 +1220,11 @@ void applyLocalSymmetry(MultidimArray<RFLOAT>& sym_map,
 			translate(ori_map, vol2, trans_vec, DONT_WRAP);
 			selfApplyGeometry(vol2, op_mat, IS_NOT_INV, DONT_WRAP);
 #endif
-			vol1 += vol2;
+			if (weights[imask][iop] > 0.)
+            {
+                vol1 += weights[imask][iop] * vol2;
+                sumweight += weights[imask][iop];
+            }
 		}
 
 		// Load this mask
@@ -1231,7 +1248,8 @@ void applyLocalSymmetry(MultidimArray<RFLOAT>& sym_map,
 			// This voxel is inside the mask
 			if (mask_val > (XMIPP_EQUAL_ACCURACY))
 			{
-				DIRECT_A3D_ELEM(vol1, k, i, j) *= mask_val / (nr_ops + 1.); // "mask-weighted sum" - wsum
+                //DIRECT_A3D_ELEM(vol1, k, i, j) *= mask_val / (nr_ops + 1.); // "mask-weighted sum" - wsum
+                DIRECT_A3D_ELEM(vol1, k, i, j) *= mask_val / sumweight; // "mask-weighted sum" - wsum
 			}
 			else
 			{
@@ -1329,11 +1347,12 @@ void applyLocalSymmetry(
 		MultidimArray<RFLOAT>& map,
 		const std::vector<FileName> fn_masks,
 		const std::vector<std::vector<Matrix1D<RFLOAT> > > ops,
+        const std::vector<std::vector<RFLOAT> > weights,
 		RFLOAT radius,
 		RFLOAT cosine_width_pix)
 {
 	MultidimArray<RFLOAT> vol;
-	applyLocalSymmetry(vol, map, fn_masks, ops, radius, cosine_width_pix);
+	applyLocalSymmetry(vol, map, fn_masks, ops, weights, radius, cosine_width_pix);
 	map = vol;
 }
 
@@ -2212,6 +2231,7 @@ void local_symmetry_parameters::run()
 	FileName fn_parsed, fn_tmp;
 	std::vector<FileName> fn_mask_list;
 	std::vector<std::vector<Matrix1D<RFLOAT> > > op_list;
+    std::vector<std::vector<RFLOAT> > weights;
 
 	fn_mask_list.clear();
 	op_list.clear();
@@ -2251,13 +2271,16 @@ void local_symmetry_parameters::run()
 		// Parse mask info file
 		if (fn_info_in.getExtension() == "star")
 		{
-			readRelionFormatMasksAndOperators(fn_info_in, fn_mask_list, op_list, angpix_image, do_verb);
+			readRelionFormatMasksAndOperators(fn_info_in, fn_mask_list, op_list, weights, angpix_image, do_verb);
 		}
 		else
 		{
 			fn_parsed = fn_info_in + std::string(".") + fn_info_in_parsed_ext;
 			parseDMFormatMasksAndOperators(fn_info_in, fn_parsed);
 			readDMFormatMasksAndOperators(fn_parsed, fn_mask_list, op_list, angpix_image, do_verb);
+            weights.resize(op_list.size());
+            for (int i=0; i < op_list.size(); i++)
+                weights[i].resize(op_list[i].size(), 1.);
 		}
 
 		unsym_map.clear();
@@ -2267,7 +2290,7 @@ void local_symmetry_parameters::run()
 		int box_size = ((XSIZE(unsym_map())) < (YSIZE(unsym_map()))) ? (XSIZE(unsym_map())) : (YSIZE(unsym_map()));
 		box_size = (box_size < (ZSIZE(unsym_map()))) ? box_size : (ZSIZE(unsym_map()));
 
-		applyLocalSymmetry(sym_map(), unsym_map(), fn_mask_list, op_list, (RFLOAT(box_size) * sphere_percentage) / 2., width_edge_pix);
+		applyLocalSymmetry(sym_map(), unsym_map(), fn_mask_list, op_list, weights, (RFLOAT(box_size) * sphere_percentage) / 2., width_edge_pix);
 		sym_map().setXmippOrigin();
 
 		sym_map.setSamplingRateInHeader(angpix_image, angpix_image, angpix_image);
@@ -2296,14 +2319,17 @@ void local_symmetry_parameters::run()
 		// Parse mask info file
 		if (fn_info_in.getExtension() == "star")
 		{
-			readRelionFormatMasksAndOperators(fn_info_in, fn_mask_list, op_list, angpix_image, do_verb);
+			readRelionFormatMasksAndOperators(fn_info_in, fn_mask_list, op_list, weights, angpix_image, do_verb);
 		}
 		else
 		{
 			fn_parsed = fn_info_in + std::string(".") + fn_info_in_parsed_ext;
 			parseDMFormatMasksAndOperators(fn_info_in, fn_parsed);
 			readDMFormatMasksAndOperators(fn_parsed, fn_mask_list, op_list, angpix_image, do_verb);
-		}
+            weights.resize(op_list.size());
+            for (int i=0; i < op_list.size(); i++)
+                weights[i].resize(op_list[i].size(), 1.);
+        }
 
 		map_in.clear();
 		//map_out.clear();
@@ -2408,7 +2434,7 @@ void local_symmetry_parameters::run()
 		{
 			if (fn_info_in.getExtension() == "star")
 			{
-				readRelionFormatMasksAndOperators(fn_info_in, fn_mask_list, op_list, angpix_image, true);
+				readRelionFormatMasksAndOperators(fn_info_in, fn_mask_list, op_list, weights, angpix_image, true);
 			}
 			else
 			{

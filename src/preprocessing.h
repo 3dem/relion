@@ -161,11 +161,17 @@ public:
 	// Extract helical segments
 	bool do_extract_helix;
 
+    // Extract filament segments from picked lines
+    bool do_lines;
+
 	// Outer diameter of helical tubes in Angstroms (for masks of helical segments)
 	RFLOAT helical_tube_outer_diameter;
 
-	// Extract helical segments from tube coordinates
-	bool do_extract_helical_tubes;
+	// Picking type
+    std::string picktype;
+
+    // Extract helical segments from tube coordinates
+	bool do_startend;
 
 	// Number of helical asymmetrical units
 	int helical_nr_asu;
@@ -207,6 +213,23 @@ public:
 
 	// Read coordinates from text files
 	void readCoordinates(FileName fn_coord, MetaDataTable &MD);
+
+    void addOneHelicalSegment(MetaDataTable &MD, RFLOAT xcoord, RFLOAT ycoord, int tube_id,
+                       RFLOAT psi_prior, RFLOAT helix_length, RFLOAT psi_prior_flip_ratio);
+
+    void convertHelicalLineCoordsToMetaDataTable(
+		FileName& fn_in,
+		MetaDataTable& MD_out,
+		int& total_segments,
+		int& total_tubes,
+		int nr_asu,
+		RFLOAT rise_A,
+		RFLOAT pixel_size_A,
+		RFLOAT Xdim,
+		RFLOAT Ydim,
+		RFLOAT box_size_pix,
+		bool bimodal_angular_priors = true,
+		bool cut_into_segments = true);
 
 	// Read helical coordinates from text files
 	void readHelicalCoordinates(FileName fn_mic, FileName fn_coord, MetaDataTable &MD);

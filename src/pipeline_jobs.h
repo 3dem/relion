@@ -159,6 +159,17 @@ static const std::vector<std::string> job_modelangelo_alphabet_options{
 "RNA"
 };
 
+static const std::vector<std::string> job_subtomo_format_options{
+        "2D stacks",
+        "3D pseudo-subtomos",
+        "3D subtomos"
+};
+
+static const std::vector<std::string> job_blush_version_options{
+        "v1.0",
+        "amy-v1.0"
+};
+
 // To have a line on the GUI to change the minimum number of dedicated in a job
 static bool do_allow_change_minimum_dedicated;
 

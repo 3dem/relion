@@ -144,11 +144,11 @@ void getFourierTransformsAndCtfs(long int part_id,
         // If there were no defined priors (i.e. their values were 999.), then use the "normal" angles
         // Also do this for local angular searches when not doing helical refinement (e.g. for subtomograms picked on certain geometries)
         // Note that helical refinement deals with priors in a special manner... So leave that untouched...
-        if (prior_rot > 998.99 && prior_rot < 999.01 || (!baseMLO->do_helical_refine && do_local_angular_searches) )
+        if (prior_rot > 998.99 && prior_rot < 999.01 || (!baseMLO->do_helical_refine && do_local_angular_searches && !baseMLO->keep_angular_priors_fixed ) )
             prior_rot = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
-        if (prior_tilt > 998.99 && prior_tilt < 999.01 || (!baseMLO->do_helical_refine && do_local_angular_searches) )
+        if (prior_tilt > 998.99 && prior_tilt < 999.01 || (!baseMLO->do_helical_refine && do_local_angular_searches && !baseMLO->keep_angular_priors_fixed ) )
             prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
-        if (prior_psi > 998.99 && prior_psi < 999.01 || (!baseMLO->do_helical_refine && do_local_angular_searches) )
+        if (prior_psi > 998.99 && prior_psi < 999.01 || (!baseMLO->do_helical_refine && do_local_angular_searches && !baseMLO->keep_angular_priors_fixed ) )
             prior_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PSI);
         if (prior_psi_flip_ratio > 998.99 && prior_psi_flip_ratio < 999.01)
             prior_psi_flip_ratio = 0.5;

@@ -18,7 +18,8 @@ bg_diameter         -1
 black_dust         -1 
 coords_suffix Schemes/proc/autopick/autopick.star 
 do_cut_into_segments        Yes 
-do_extract_helical_tubes        Yes 
+do_extract_helical_tubes        Yes
+do_lines                No
 do_extract_helix         No 
 do_fom_threshold        Yes 
  do_invert        Yes 

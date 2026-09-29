@@ -157,6 +157,24 @@ public:
     // Do phase shift estimation in AreTomo?
     bool do_aretomo_phaseshift;
 
+    // Do AreTomo reconstruction?
+    bool do_aretomo_reconstruct;
+
+    //Skip alignment and CTF-estimation: only reconstruct: generate .aln file from input STAR file, which must contain tiltseries alignments
+    bool do_only_aretomo_reconstruct;
+
+    // By default use Wbp in Aretomo, but can also use SART
+    bool do_aretomo_sart;
+
+    // Number of SART iterations and the number of projections per iteration
+    int aretomo_sart_iter, aretomo_sart_proj;
+
+    // AreTomo reconstruction Z-height (in unbinned pixels)
+    int aretomo_VolZ;
+
+    // Aretomo reconstruction binning
+    int aretomo_OutBin;
+
     // estimated tomogram thickness (for -AlignZ)
     RFLOAT tomogram_thickness;
 
@@ -191,7 +209,7 @@ public:
     bool checkResults(long idx_tomo);
 
     // Generate MRC stack and raw tilt file
-    void generateMRCStackAndRawTiltFile(long idx_tomo, bool is_aretomo);
+    void generateMRCStackAndRawTiltFileOrAlnFile(long idx_tomo, bool is_aretomo);
 
     // Execute IMOD for a single tomogram
     void executeIMOD(long idx_tomo, int rank = 0);

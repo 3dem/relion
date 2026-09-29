@@ -695,7 +695,8 @@ void JobWindow::initialiseManualpickWindow()
 	place("fn_in", TOGGLE_DEACTIVATE);
 
 	current_y += STEPY/2;
-	place ("do_startend");
+    place ("do_startend");
+    place ("do_lines");
 
 	current_y += STEPY/2;
 
@@ -753,7 +754,7 @@ void JobWindow::initialiseManualpickWindow()
 
 void JobWindow::initialiseAutopickWindow()
 {
-	setupTabs(6);
+	setupTabs(7);
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -767,6 +768,7 @@ void JobWindow::initialiseAutopickWindow()
 	place("do_refs", TOGGLE_DEACTIVATE);
 	place("do_log", TOGGLE_DEACTIVATE);
 	place("do_topaz", TOGGLE_DEACTIVATE);
+    place("do_amyloid", TOGGLE_DEACTIVATE);
 	place("continue_manual", TOGGLE_REACTIVATE);
 
 	tab1->end();
@@ -886,7 +888,7 @@ void JobWindow::initialiseAutopickWindow()
 
 	tab4->end();
 	tab5->begin();
-	tab5->label("autopicking");
+	tab5->label("Refs 2");
 	resetHeight();
 
 	place("threshold_autopick");
@@ -936,15 +938,51 @@ void JobWindow::initialiseAutopickWindow()
 	place("helical_nr_asu");
 	place("helical_rise");
 
-	current_y += STEPY/2;
+    group4->end();
 
-	place("do_amyloid");
+    guientries["do_pick_helical_segments"].cb_menu_i();
 
-	group4->end();
+    tab6->end();
 
-	guientries["do_pick_helical_segments"].cb_menu_i();
+    tab7->begin();
+	tab7->label("Amyloid");
+	resetHeight();
 
-	tab6->end();
+    place("do_amyloid_fom", TOGGLE_LEAVE_ACTIVE);
+
+    current_y += STEPY/2;
+
+    group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group5->end();
+
+    place("do_amyloid_tracing", TOGGLE_DEACTIVATE, group5);
+
+    group5->begin();
+    place("amyloid_threshold", TOGGLE_DEACTIVATE);
+    place("amyloid_length", TOGGLE_DEACTIVATE);
+    place("amyloid_width", TOGGLE_DEACTIVATE);
+    place("amyloid_gpu_ids", TOGGLE_DEACTIVATE);
+    place("do_amyloid_plot", TOGGLE_DEACTIVATE);
+
+    current_y += STEPY/2;
+
+    group6 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group6->end();
+
+    place("do_amyloid_carbon", TOGGLE_DEACTIVATE, group6);
+
+    group6->begin();
+    place("amyloid_carbon_threshold", TOGGLE_DEACTIVATE);
+
+    group6->end();
+    guientries["do_amyloid_carbon"].cb_menu_i();
+
+    group5->end();
+    guientries["do_amyloid_tracing"].cb_menu_i();
+
+
+
+	tab7->end();
 }
 
 void JobWindow::initialiseExtractWindow()
@@ -1050,27 +1088,12 @@ Pixels values higher than this many times the image stddev will be replaced with
 
 	group5->begin();
 
-	place("helical_tube_outer_diameter", TOGGLE_DEACTIVATE);
-
+    place("helical_tube_outer_diameter", TOGGLE_DEACTIVATE);
 	current_y += STEPY/2;
 
 	place("helical_bimodal_angular_priors", TOGGLE_DEACTIVATE);
-
-	group6 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group6->end();
-
-	current_y += STEPY/2;
-	place("do_extract_helical_tubes", TOGGLE_DEACTIVATE, group6);
-
-	group6->begin();
-
-	place("do_cut_into_segments", TOGGLE_DEACTIVATE);
 	place("helical_nr_asu", TOGGLE_DEACTIVATE);
 	place("helical_rise", TOGGLE_DEACTIVATE);
-
-	group6->end();
-
-	guientries["do_extract_helical_tubes"].cb_menu_i();
 
 	group5->end();
 
@@ -1406,7 +1429,8 @@ void JobWindow::initialiseInimodelWindow()
 	place("do_ctf_correction", TOGGLE_DEACTIVATE, group1);
 
 	group1->begin();
-	place("ctf_intact_first_peak", TOGGLE_DEACTIVATE);
+	if (is_tomo) place("ctf_intact_first_peak", TOGGLE_ALWAYS_DEACTIVATE);
+    else place("ctf_intact_first_peak", TOGGLE_DEACTIVATE);
 	group1->end();
 
 	guientries["do_ctf_correction"].cb_menu_i(); // To make default effective
@@ -1516,7 +1540,8 @@ void JobWindow::initialiseClass3DWindow()
 	place("do_ctf_correction", TOGGLE_DEACTIVATE, group1);
 	group1->begin();
 
-	place("ctf_intact_first_peak", TOGGLE_DEACTIVATE);
+    if (is_tomo) place("ctf_intact_first_peak", TOGGLE_ALWAYS_DEACTIVATE);
+    else place("ctf_intact_first_peak", TOGGLE_DEACTIVATE);
 
 	group1->end();
 
@@ -1555,7 +1580,14 @@ void JobWindow::initialiseClass3DWindow()
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	place("do_blush", TOGGLE_DEACTIVATE);
+	// Blush group
+	group9 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group9->end();
+	place("do_blush", TOGGLE_DEACTIVATE, group9);
+	group9->begin();
+	place("blush_version");
+	group9->end();
+	guientries["do_blush"].cb_menu_i(); // This is to make the default effective
 
 	tab4->end();
 
@@ -1613,21 +1645,15 @@ void JobWindow::initialiseClass3DWindow()
 	group5->begin();
 	place2("helical_tube_inner_diameter", "helical_tube_outer_diameter", "Tube diameter - inner, outer (A):", TOGGLE_DEACTIVATE);
 	place3("range_rot", "range_tilt", "range_psi", "Angular search range - rot, tilt, psi (deg):", TOGGLE_DEACTIVATE);
-	place("helical_range_distance", TOGGLE_DEACTIVATE);
+    place2("helical_range_distance", "helical_nstart", "Local averaging - range (box), N-start:", TOGGLE_DEACTIVATE);
 	place("keep_tilt_prior_fixed", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	group8 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group8->end();
-	place("do_apply_helical_symmetry", TOGGLE_DEACTIVATE, group8);
-	group8->begin();
 	place("helical_nr_asu", TOGGLE_DEACTIVATE);
 	place2("helical_twist_initial", "helical_rise_initial", "Initial twist (deg), rise (A):", TOGGLE_DEACTIVATE);
 	place("helical_z_percentage", TOGGLE_DEACTIVATE);
-	group8->end();
-	guientries["do_apply_helical_symmetry"].cb_menu_i(); // to make default effective
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -1719,7 +1745,8 @@ void JobWindow::initialiseAutorefineWindow()
 
 	group1->begin();
 
-	place("ctf_intact_first_peak", TOGGLE_DEACTIVATE);
+    if (is_tomo) place("ctf_intact_first_peak", TOGGLE_ALWAYS_DEACTIVATE);
+    else place("ctf_intact_first_peak", TOGGLE_DEACTIVATE);
 
 	group1->end();
 	guientries["do_ctf_correction"].cb_menu_i(); // To make default effective
@@ -1739,7 +1766,14 @@ void JobWindow::initialiseAutorefineWindow()
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	place("do_blush", TOGGLE_DEACTIVATE);
+    // Blush group
+    group9 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group9->end();
+    place("do_blush", TOGGLE_DEACTIVATE, group9);
+    group9->begin();
+    place("blush_version");
+    group9->end();
+    guientries["do_blush"].cb_menu_i(); // This is to make the default effective
 
 	tab4->end();
 	tab5->begin();
@@ -1774,21 +1808,15 @@ void JobWindow::initialiseAutorefineWindow()
 	group2->begin();
 	place2("helical_tube_inner_diameter", "helical_tube_outer_diameter", "Tube diameter - inner, outer (A):",TOGGLE_DEACTIVATE);
 	place3("range_rot", "range_tilt", "range_psi", "Angular search range - rot, tilt, psi (deg):", TOGGLE_DEACTIVATE);
-	place("helical_range_distance", TOGGLE_DEACTIVATE);
+    place2("helical_range_distance", "helical_nstart", "Local averaging - range (box), N-start:", TOGGLE_DEACTIVATE);
 	place("keep_tilt_prior_fixed", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group5->end();
-	place("do_apply_helical_symmetry", TOGGLE_DEACTIVATE, group5);
-	group5->begin();
 	place("helical_nr_asu", TOGGLE_DEACTIVATE);
 	place2("helical_twist_initial", "helical_rise_initial", "Initial twist (deg), rise (A):",TOGGLE_DEACTIVATE);
 	place("helical_z_percentage", TOGGLE_DEACTIVATE);
-	group5->end();
-	guientries["do_apply_helical_symmetry"].cb_menu_i(); // to make default effective
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -1855,7 +1883,14 @@ void JobWindow::initialiseMultiBodyWindow()
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	place("do_blush", TOGGLE_DEACTIVATE);
+    // Blush group
+    group9 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group9->end();
+    place("do_blush", TOGGLE_DEACTIVATE, group9);
+    group9->begin();
+    place("blush_version");
+    group9->end();
+    guientries["do_blush"].cb_menu_i(); // This is to make the default effective
 
 	tab1->end();
 	tab2->begin();
@@ -2695,6 +2730,18 @@ void JobWindow::initialiseTomoAlignTiltseriesWindow()
 
     // Add a little spacer
     current_y += STEPY/2;
+    group6 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group6->end();
+    place("do_aretomo_reconstruct", TOGGLE_DEACTIVATE, group6, false);
+    group6->begin();
+    place("do_skip_aretomo_align", TOGGLE_DEACTIVATE);
+    place("aretomo_VolZ", TOGGLE_DEACTIVATE);
+    place("aretomo_OutBin", TOGGLE_DEACTIVATE);
+    group6->end();
+    guientries["do_aretomo_reconstruct"].cb_menu_i(); // make default active
+
+    // Add a little spacer
+    current_y += STEPY/2;
     place("other_aretomo_args", TOGGLE_DEACTIVATE);
     place("gpu_ids");
     group3->end();
@@ -2757,6 +2804,7 @@ void JobWindow::initialiseTomoReconstructTomogramsWindow()
     place("do_fourier", TOGGLE_DEACTIVATE, group2, false);
 
     group2->begin();
+    place("do_skip_wiener", TOGGLE_DEACTIVATE);
     place("ctf_intact_first_peak", TOGGLE_DEACTIVATE);
     group2->end();
     guientries["do_fourier"].cb_menu_i();
@@ -2867,12 +2915,12 @@ void JobWindow::initialiseTomoSubtomoWindow()
 	tab1->end();
 
 	tab2->begin();
-	tab2->label("Reconstruct");
+	tab2->label("Extract");
 	resetHeight();
 
-    place("binning", TOGGLE_DEACTIVATE);
-	place("box_size", TOGGLE_DEACTIVATE);
-	place("crop_size", TOGGLE_DEACTIVATE);
+    place("box_size_angst", TOGGLE_DEACTIVATE);
+    place("precrop_size_angst", TOGGLE_DEACTIVATE);
+	place("binned_size_pix", TOGGLE_DEACTIVATE);
 
     current_y += STEPY /2 ;
 
@@ -2881,7 +2929,7 @@ void JobWindow::initialiseTomoSubtomoWindow()
 
     current_y += STEPY /2 ;
 
-    place("do_stack2d", TOGGLE_DEACTIVATE);
+    place("subtomo_format", TOGGLE_DEACTIVATE);
     place("do_float16", TOGGLE_DEACTIVATE);
 
 	tab2->end();

@@ -7,7 +7,7 @@
 #include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/image/buffered_image.h>
 #include <src/jaz/tomography/optimisation_set.h>
-#include <src/projector.h>
+#include <src/backprojector.h>
 
 
 
@@ -31,13 +31,16 @@ class SubtomoProgram
 			int 
 				boxSize, 
 				cropSize,
+                binnedSizePixel,
                 min_frames,
                 num_threads;
 			
 			double 
 				SNR,
 				binning,
-				taper,
+                boxSizeAngst,
+                precropSizeAngst,
+                taper,
 				env_sigma,
 				cone_slope,
 				cone_sig0,
@@ -74,6 +77,7 @@ class SubtomoProgram
 
 		void readBasicParameters(IOParser& parser);
 		virtual void readParameters(int argc, char *argv[]);
+        virtual void setBoxsizes(TomogramSet &tomogramSet, bool verb = true);
 		virtual void run();
 
 
@@ -85,10 +89,10 @@ class SubtomoProgram
 				const TomogramSet& tomogramSet,
                 bool verbose = true);
 
-        BufferedImage<float> extractSubtomogramsAndReProject(
+        BufferedImage<float> extractRealSubtomograms(
                 ParticleIndex part_id, MultidimArray<RFLOAT> &recTomo,
                 const Tomogram& tomogram, const ParticleSet &particleSet,
-                const std::vector<bool> &isVisible, RFLOAT tomogram_angpix);
+                RFLOAT tomogram_angpix, BufferedImage<float> &ctfImage, BufferedImage<float> &projImage);
 
 		void processTomograms(
 				const std::vector<int>& tomoIndices,

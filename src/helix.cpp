@@ -829,7 +829,11 @@ bool checkParametersFor3DHelicalReconstruction(
 	if (z_percentage_min > z_percentage_max)
 	{
 		if (verboseOutput)
-			std::cout << " ERROR! The range of Z percentage is invalid! To decrease the lower bound, make maximum rise smaller or box size larger. To increase the upper bound, make the particle diameter (along with the box size) larger and the outer tube diameter smaller!" << std::endl;
+        {
+            std::cout << " z_percentage_min= " << z_percentage_min << " z_percentage_max= " << z_percentage_max << std::endl;
+            std::cout << " particle_diameter_A= " << particle_diameter_A << " tube_outer_diameter_A= " << tube_outer_diameter_A << " nr_units_min= " << nr_units_min << " box_len= " << box_len <<std::endl;
+            std::cout << " ERROR! The range of Z percentage is invalid! To decrease the lower bound, make maximum rise smaller or box size larger. To increase the upper bound, make the particle diameter (along with the box size) larger and the outer tube diameter smaller!" << std::endl;
+        }
 		else
 			REPORT_ERROR("helix.cpp::chechParametersFor3DHelicalReconstruction(): The range of Z percentage is invalid! To decrease the lower bound, make maximum rise smaller or box size larger. To increase the upper bound, make the particle diameter (along with the box size) larger and the outer tube diameter smaller!");
 		return false;
@@ -837,7 +841,11 @@ bool checkParametersFor3DHelicalReconstruction(
 	if ( (z_percentage < z_percentage_min) || (z_percentage > z_percentage_max) )
 	{
 		if (verboseOutput)
-			std::cout << " ERROR! Z percentage is out of range under current settings!" << std::endl;
+        {
+            std::cout << " z_percentage_min= " << z_percentage_min << " z_percentage_max= " << z_percentage_max << std::endl;
+            std::cout << " particle_diameter_A= " << particle_diameter_A << " tube_outer_diameter_A= " << tube_outer_diameter_A << " nr_units_min= " << nr_units_min << " box_len= " << box_len <<std::endl;
+            std::cout << " ERROR! Z percentage is out of range under current settings!" << std::endl;
+        }
 		else
 			REPORT_ERROR("helix.cpp::chechParametersFor3DHelicalReconstruction(): Z percentage is out of range under current settings!");
 		return false;
@@ -1765,7 +1773,8 @@ void extractHelicalSegmentsFromTubes_Multiple(
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
 		bool bimodal_angular_priors,
-		bool cut_into_segments)
+		bool cut_into_segments,
+        RFLOAT tilt_prior)
 {
 	int total_segments, total_tubes, nr_segments, nr_tubes;
 	FileName fns_in;
@@ -1930,7 +1939,7 @@ void convertHelicalTubeCoordsToMetaDataTable(
 
     	if (!cut_into_segments)
     	{
-			MD_out.addObject();
+            MD_out.addObject();
 	    	MD_out.setValue(EMDL_IMAGE_COORD_X, ((x1 + x2) * 0.5));
 	    	MD_out.setValue(EMDL_IMAGE_COORD_Y, ((y1 + y2) * 0.5));
 	    	MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, (tube_id + 1));
@@ -2265,6 +2274,12 @@ void removeBadPsiHelicalSegmentsFromDataStar(
 	MD_out.write(fn_out);
 	std::cout << " Number of segments (input / output) = " << nr_segments_old << " / " << nr_segments_new << std::endl;
 	return;
+}
+
+RFLOAT calculateTiltPriorFromPsi(RFLOAT psi, RFLOAT tilt_angle, RFLOAT tilt_axis)
+{
+    if (fabs(tilt_angle) < 0.01) return 90.;
+    else return ACOSD(SIND(tilt_angle) * SIND(psi - tilt_axis));
 }
 
 void convertHelicalSegmentCoordsToStarFile_Multiple(
@@ -4062,6 +4077,22 @@ void flipPsiTiltForHelicalSegment(
 	new_tilt = 180. - old_tilt;
 }
 
+void getNstartHelicalTwistAndRise(RFLOAT &twist,
+                                  RFLOAT &rise,
+                                  int helical_nstart)
+{
+
+    // Shaoda's formula (which need to be inverted, as we want original N-start rise and twist back)
+    // rise_1-start = rise / N
+    // twist_1-start = (twist+360)/N if twist>0
+    // twist_1-start = (twist-360)/N if twist<0
+    rise *= helical_nstart;
+    twist *= helical_nstart;
+    while (twist > 180.) twist -= 360.;
+    while (twist < -180.) twist += 360.;
+
+}
+
 //#define DEBUG_HELICAL_UPDATE_ANGULAR_PRIORS
 void updatePriorsForOneHelicalTube(
 		std::vector<HelicalSegmentPriorInfoEntry>& list,
@@ -4072,6 +4103,7 @@ void updatePriorsForOneHelicalTube(
 		RFLOAT sigma_segment_dist,
 		std::vector<RFLOAT> helical_rise,
 		std::vector<RFLOAT> helical_twist,
+        int helical_nstart,
 		bool is_3D_data,
 		bool do_auto_refine,
         RFLOAT sigma2_rot,       // KThurber
@@ -4134,15 +4166,24 @@ void updatePriorsForOneHelicalTube(
 	nr_wrong_polarity = nr_opposite_polarity - 1;
 
 	// Change the polarity of the entire helix if psi_flip_ratio is larger than 0.5
-	if (psi_flip_ratio > 0.5)
-	{
-		for (int id = sid; id <= eid; id++)
-		{
-			flipPsiTiltForHelicalSegment(list[id].psi_prior_deg, list[id].tilt_prior_deg,
-					list[id].psi_prior_deg, list[id].tilt_prior_deg);
-			list[id].psi_flip_ratio = (1. - psi_flip_ratio);
-		}
-	}
+        if (psi_flip_ratio > 0.5)
+        {
+            for (int id = sid; id <= eid; id++)
+            {
+                flipPsiTiltForHelicalSegment(list[id].psi_prior_deg, list[id].tilt_prior_deg,
+                                             list[id].psi_prior_deg, list[id].tilt_prior_deg);
+                flipPsiTiltForHelicalSegment(list[id].psi_deg, list[id].tilt_deg,
+                                             list[id].psi_deg, list[id].tilt_deg);
+                list[id].psi_flip_ratio = (1. - psi_flip_ratio);
+            }
+        }
+        else
+        {
+            for (int id = sid; id <= eid; id++)
+            {
+                list[id].psi_flip_ratio = psi_flip_ratio;
+            }
+        }
 
 	// Calculate new distance-averaged angular priors
 	// SHWS 27042020: do two passes: one normal and one with opposite distances and find out which one is the best
@@ -4181,9 +4222,9 @@ void updatePriorsForOneHelicalTube(
 			sum_ang_vec = this_ang_vec * this_w;
 
 			// rotation angle all new KThurber
-			this_rot = list[id].rot_deg;  // KThurber
-			this_rot_vec(0) = cos(DEG2RAD(this_rot));
-			this_rot_vec(1) = sin(DEG2RAD(this_rot));
+            this_rot = list[id].rot_deg;  // KThurber
+            this_rot_vec(0) = cos(DEG2RAD(helical_nstart * this_rot));
+			this_rot_vec(1) = sin(DEG2RAD(helical_nstart * this_rot));
 			sum_rot_vec = this_rot_vec * this_w;
 			// for adjusting rot angle by shift along helix
 			center_x_helix = list[id].dx_A * cos(DEG2RAD(this_psi)) - list[id].dy_A * sin(DEG2RAD(this_psi));
@@ -4237,13 +4278,15 @@ void updatePriorsForOneHelicalTube(
 
 						// In the second pass, check the direction from large to small distances
 						RFLOAT sign = (iflip == 1) ? 1. : -1.;
-						this_rot = list[idd].rot_deg + sign*(180./pitch)*(this_pos - center_pos - this_x_helix + center_x_helix);
+                        this_rot = list[idd].rot_deg + sign*(180./pitch)*(this_pos - center_pos - this_x_helix + center_x_helix);
 					}
 					else
-						this_rot = list[idd].rot_deg;
+                    {
+                        this_rot = list[idd].rot_deg;
+                    }
 
-					this_rot_vec(0) = cos(DEG2RAD(this_rot));
-					this_rot_vec(1) = sin(DEG2RAD(this_rot));
+					this_rot_vec(0) = cos(DEG2RAD(helical_nstart * this_rot));
+					this_rot_vec(1) = sin(DEG2RAD(helical_nstart * this_rot));
 					sum_rot_vec += this_rot_vec * this_w;
 
 					this_psi = list[idd].psi_deg;
@@ -4275,12 +4318,12 @@ void updatePriorsForOneHelicalTube(
 				{
 					sum_rot_vec(0) = sum_rot_vec(0) / length_rot_vec;
 					sum_rot_vec(1) = sum_rot_vec(1) / length_rot_vec;
-					this_rot = RAD2DEG(acos(sum_rot_vec(0)));
-					if (sum_rot_vec(1) < 0.)
-						this_rot = -1. * this_rot;	// if sign negative, angle is negative
+                    this_rot = RAD2DEG(atan2(sum_rot_vec(1), sum_rot_vec(0) )) / helical_nstart;
 				}
 				else
-					this_rot = list[id].rot_deg;  // don't change prior if average fails
+                {
+                    this_rot = list[id].rot_deg;  // don't change prior if average fails
+                }
 				// KThurber end new section
 
 				if (iflip == 0)
@@ -4370,7 +4413,7 @@ void updatePriorsForHelicalReconstruction(
 		RFLOAT sigma_segment_dist,
 		std::vector<RFLOAT> helical_rise,
 		std::vector<RFLOAT> helical_twist,
-		int helical_nstart,
+        int helical_nstart,
 		bool is_3D_data,
 		bool do_auto_refine,
 		RFLOAT sigma2_rot,
@@ -4419,16 +4462,9 @@ void updatePriorsForHelicalReconstruction(
 	if (helical_nstart > 1)
 	{
 		// Assume same N-start for all classes
-		// Shaoda's formula (which need to be inverted, as we want original N-start rise and twist back)
-		// rise_1-start = rise / N
-		// twist_1-start = (twist+360)/N if twist>0
-		// twist_1-start = (twist-360)/N if twist<0
-
 		for (int iclass=0; iclass < helical_rise.size(); iclass++)
 		{
-			helical_rise[iclass] *= helical_nstart;
-			RFLOAT aux = helical_twist[iclass] * helical_nstart;
-			helical_twist[iclass] = (aux > 360.) ? aux - 360. : aux + 360.;
+			getNstartHelicalTwistAndRise(helical_twist[iclass], helical_rise[iclass], helical_nstart);
 			if (verb > 0) std::cout << " + for rotational priors go back to " << helical_nstart
 					<< "-start helical twist= " << helical_twist[iclass] << " and rise= " << helical_rise[iclass] << std::endl;
 		}
@@ -4505,7 +4541,7 @@ void updatePriorsForHelicalReconstruction(
 
 		// Real work...
 		bool reverse_direction;
-		updatePriorsForOneHelicalTube(list, sid, eid, nr_opposite_polarity, reverse_direction, sigma_segment_dist, helical_rise, helical_twist,
+		updatePriorsForOneHelicalTube(list, sid, eid, nr_opposite_polarity, reverse_direction, sigma_segment_dist, helical_rise, helical_twist,helical_nstart,
 				is_3D_data, do_auto_refine, sigma2_rot, sigma2_tilt, sigma2_psi, sigma2_offset);
 		total_opposite_polarity += nr_opposite_polarity;
 		if (reverse_direction) total_opposite_rot += 1;
@@ -4520,7 +4556,7 @@ void updatePriorsForHelicalReconstruction(
 				MD.setValue(EMDL_ORIENT_TILT_PRIOR, list[id].tilt_prior_deg, list[id].MDobjectID);
 			MD.setValue(EMDL_ORIENT_PSI_PRIOR, list[id].psi_prior_deg, list[id].MDobjectID);
 			MD.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, list[id].psi_flip_ratio, list[id].MDobjectID);
-			MD.setValue(EMDL_ORIENT_ROT_PRIOR, list[id].rot_prior_deg, list[id].MDobjectID); // KThurber
+            MD.setValue(EMDL_ORIENT_ROT_PRIOR, list[id].rot_prior_deg, list[id].MDobjectID); // KThurber
 			MD.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, list[id].dx_prior_A, list[id].MDobjectID);
 			MD.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, list[id].dy_prior_A, list[id].MDobjectID);
 			if (is_3D_data)

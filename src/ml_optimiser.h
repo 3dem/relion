@@ -505,7 +505,8 @@ public:
 
 	/** Perform reconstruction using the Blush algorithm */
 	bool do_blush;
-    	bool skip_spectral_trailing;
+	bool skip_spectral_trailing;
+    std::string blush_model;
 
 	/** Argumetns to pass to the Blush call */
 	std::string blush_args;
@@ -530,6 +531,9 @@ public:
 	 * The default is 0.999.
 	 */
 	RFLOAT adaptive_fraction;
+
+    // Keep rot, tilt psi priors fixed relative to entries in particle starfile, even when performing local angular searches?
+    bool keep_angular_priors_fixed;
 
 	// Seed for random number generator
 	int random_seed;
@@ -730,6 +734,7 @@ public:
 
 	// Local symmetry - list of operators
 	std::vector<std::vector<Matrix1D<RFLOAT> > > fn_local_symmetry_operators;
+    std::vector<std::vector<RFLOAT> > local_symmetry_weights;
 
 	//Maximum number of particles permitted to be drop, due to zero sum of weights, before exiting with an error (GPU only).
 	int failsafe_threshold;

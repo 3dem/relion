@@ -398,7 +398,7 @@ void ParticleSubtractor::saveStarFile(int myrank)
 	}
 
 #ifdef DEBUG
-	std::cout << "myrank = " << myrank << " size = " << size << " my_first = " << my_first << " my_last = " << my_last << " num_items = " << MD.numberOfObjects() << " writing to " << fn_star << std::endl;
+	std::cout << "myrank = " << myrank << " size = " << size << std::endl;
 #endif
 }
 
