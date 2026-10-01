@@ -642,7 +642,7 @@ enum EMDLabel
     EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_FILE_NAME,
     EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_HALF1_FILE_NAME,
     EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_HALF2_FILE_NAME,
-	EMDL_TOMO_DENOISED_TOMOGRAM_FILE_NAME,
+	EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_DENOISED_FILE_NAME,
     EMDL_TOMO_SIZE_X,
 	EMDL_TOMO_SIZE_Y,
 	EMDL_TOMO_SIZE_Z,
@@ -1376,7 +1376,7 @@ private:
         EMDL::addLabel(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_FILE_NAME, EMDL_STRING, "rlnTomogramProjection", "File name of a 2D projection of a reconstructed tomogram");
         EMDL::addLabel(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_HALF1_FILE_NAME, EMDL_STRING, "rlnTomogramProjectionHalf1", "File name of a 2D projection of a reconstructed tomogram from even numbered movie frames or tilt image index");
         EMDL::addLabel(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_PROJ2D_HALF2_FILE_NAME, EMDL_STRING, "rlnTomogramHProjectionalf2", "File name of a 2D projection of a reconstructed tomogram from odd numbered movie frames or tilt image index");
-        EMDL::addLabel(EMDL_TOMO_DENOISED_TOMOGRAM_FILE_NAME, EMDL_STRING, "rlnTomoDenoisedTomogram", "File name of a denoised tomogram");
+        EMDL::addLabel(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_DENOISED_FILE_NAME, EMDL_STRING, "rlnTomoReconstructedTomogramDenoised", "File name of a denoised reconstructed tomogram");
 
 		EMDL::addLabel(EMDL_TOMO_FRAME_COUNT, EMDL_INT, "rlnTomoFrameCount", "Number of tilts in a tilt series");
 		EMDL::addLabel(EMDL_TOMO_SIZE_X, EMDL_INT, "rlnTomoSizeX", "Width of a bin-1 tomogram in pixels");
