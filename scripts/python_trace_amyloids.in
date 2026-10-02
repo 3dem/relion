@@ -16,7 +16,9 @@ echo "
 # Set the Python executable path
 python_executable="@PYTHON_EXE_PATH@"
 torch_home="@TORCH_HOME_PATH@"
-relion_home="@Relion_BINARY_DIR@"
+# Look for relion_trace_amyloids.py next to this wrapper, so that it also works after
+# `make install` to a CMAKE_INSTALL_PREFIX other than the build directory.
+script_dir="$(dirname "$(readlink -f "$0")")"
 
 # Check if the python executable exists
 if [ ! -x "$python_executable" ]; then
@@ -31,9 +33,9 @@ fi
 
 # Run the Python script with forwarded arguments
 if [ -n "$torch_home" ]; then
-  TORCH_HOME="$torch_home" "$python_executable" "$relion_home"/bin/relion_trace_amyloids.py "$@"
+  TORCH_HOME="$torch_home" "$python_executable" "$script_dir"/relion_trace_amyloids.py "$@"
 else
-  "$python_executable" "$relion_home"/bin/relion_trace_amyloids.py "$@"
+  "$python_executable" "$script_dir"/relion_trace_amyloids.py "$@"
 fi
 
 # Check the return status of the python command

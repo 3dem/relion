@@ -37,6 +37,8 @@ dependencies = [
     "lru-dict",
     "superqt",
     "morphosamplers",
+    "scipy",
+    "dill",
 ]
 
 # extras

@@ -330,9 +330,15 @@ int writeMRC(long int img_select, bool isStack=false, const int mode=WRITE_OVERW
 	header->nx = Xdim;
 	header->ny = Ydim;
 	if (isStack)
-		header->nz = Ndim;
+        {
+            header->nz = Ndim;
+            header->ispg = 0;
+        }
 	else
-		header->nz = Zdim;
+	{
+            header->nz = Zdim;
+            header->ispg = 1;
+        }
 
 	// Convert T to datatype
 	DataType output_type;
