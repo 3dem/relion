@@ -562,7 +562,7 @@ def install_model(
         if not os.path.isfile(completed_check_path):
             if verbose:
                 print(f"Installing amyloid picker model ({name})...")
-                os.makedirs(dest_dir, exist_ok=True)
+            os.makedirs(dest_dir, exist_ok=True)
 
             source_url = model_list[name][0]
 
@@ -612,7 +612,7 @@ def main():
     parser.add_argument("-m", "--model_path", help="Path to PyTorch model checkpoint", default="amytracer-v2.0")
     parser.add_argument("-cm", "--carbon_model_path", help="Path to PyTorch model checkpoint for carbon detection", default="carbonpicker-v1.0")
     parser.add_argument("-a", "--abort", help="Abort if this file exists")
-    parser.add_argument("-v", "--verb", type=int, help="Verbosity")
+    parser.add_argument("-v", "--verb", type=int, default=0, help="Verbosity")
     parser.add_argument("--sample_step", type=int, default=100,
                         help="Sample a coordinate every 'sample_step' Angstroms along each path (default=50)")
     parser.add_argument("--plot", action='store_true',
