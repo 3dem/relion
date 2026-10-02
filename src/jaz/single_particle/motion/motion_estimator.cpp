@@ -271,8 +271,8 @@ void MotionEstimator::process(
 			ZIO::makeDir(newdir);
 		}
 
-		std::vector<std::vector<Image<Complex>>> movie;
-		std::vector<std::vector<Image<RFLOAT>>> movieCC;
+		ContiguousImageStack<Complex> movie;
+		ContiguousImageStack<RFLOAT> movieCC;
 		std::vector<d2Vector> positions(pc);
 		std::vector<std::vector<d2Vector>> initialTracks(pc, std::vector<d2Vector>(fc));
 		std::vector<d2Vector> globComp(fc);
@@ -386,8 +386,8 @@ void MotionEstimator::prepMicrograph(
 		const MetaDataTable &mdt, std::vector<ParFourierTransformer>& fts,
 		const std::vector<Image<RFLOAT>>& dmgWeight,
 		int ogmg,
-		std::vector<std::vector<Image<Complex>>>& movie,
-		std::vector<std::vector<Image<RFLOAT>>>& movieCC,
+		ContiguousImageStack<Complex>& movie,
+		ContiguousImageStack<RFLOAT>& movieCC,
 		std::vector<d2Vector>& positions,
 		std::vector<std::vector<d2Vector>>& initialTracks,
 		std::vector<d2Vector>& globComp)
@@ -413,7 +413,7 @@ void MotionEstimator::prepMicrograph(
 				mdt, s[ogmg], angpix[ogmg], fts,
 				positions, myInitialTracks, unregGlob, myGlobComp, 0, 0, -1); // throws exceptions*/
 	
-	movie = micrographHandler->loadMovie(mdt, s[ogmg], angpix[ogmg], fts);
+	micrographHandler->loadMovie(mdt, s[ogmg], angpix[ogmg], fts, movie);
 	micrographHandler->loadInitialTracks(mdt, angpix[ogmg], positions, myInitialTracks, unregGlob, myGlobComp);
 
 	/*const MetaDataTable &mdt, double angpix,
@@ -437,12 +437,12 @@ void MotionEstimator::prepMicrograph(
 			for (int f = 0; f < fc; f++)
 			{
 
-				MotionHelper::noiseNormalize(movie[p][f], sigma2, movie[p][f]);
+				MotionHelper::noiseNormalize(movie(p, f), sigma2, movie(p, f));
 			}
 		}
 	}
 
-	movieCC = MotionHelper::movieCC(movie, preds, dmgWeight, cc_pad, nr_omp_threads);
+	MotionHelper::movieCC(movie, preds, dmgWeight, cc_pad, nr_omp_threads, movieCC);
 
 	if (global_init || myInitialTracks.size() == 0)
 	{
@@ -523,7 +523,7 @@ void MotionEstimator::prepMicrograph(
 }
 
 std::vector<std::vector<d2Vector>> MotionEstimator::optimize(
-		const std::vector<std::vector<Image<double>>>& movieCC,
+		const ContiguousImageStack<double>& movieCC,
 		const std::vector<std::vector<gravis::d2Vector>>& inTracks,
 		double sig_vel_px, double sig_acc_px, double sig_div_px,
 		const std::vector<gravis::d2Vector>& positions,
@@ -572,6 +572,37 @@ std::vector<std::vector<d2Vector>> MotionEstimator::optimize(
 }
 
 std::vector<std::vector<d2Vector>> MotionEstimator::optimize(
+		const ContiguousImageStack<float>& movieCC,
+		const std::vector<std::vector<gravis::d2Vector>>& inTracks,
+		double sig_vel_px, double sig_acc_px, double sig_div_px,
+		const std::vector<gravis::d2Vector>& positions,
+		const std::vector<gravis::d2Vector>& globComp) const
+{
+	const int pc = movieCC.particleCount();
+	const int fc = movieCC.frameCount();
+	const int w = movieCC.xdim();
+	const int h = movieCC.ydim();
+
+	ContiguousImageStack<double> CCd;
+	CCd.resize(pc, fc, w, h);
+
+	#pragma omp parallel for num_threads(nr_omp_threads)
+	for (int p = 0; p < pc; p++)
+	{
+		for (int f = 0; f < fc; f++)
+		{
+			for (int y = 0; y < h; y++)
+			for (int x = 0; x < w; x++)
+			{
+				CCd(p, f)(y,x) = movieCC(p, f)(y,x);
+			}
+		}
+	}
+
+	return optimize(CCd, inTracks, sig_vel_px, sig_acc_px, sig_div_px, positions, globComp);
+}
+
+std::vector<std::vector<d2Vector>> MotionEstimator::optimize(
 		const std::vector<std::vector<Image<float>>>& movieCC,
 		const std::vector<std::vector<gravis::d2Vector>>& inTracks,
 		double sig_vel_px, double sig_acc_px, double sig_div_px,
@@ -583,26 +614,21 @@ std::vector<std::vector<d2Vector>> MotionEstimator::optimize(
 	const int w = movieCC[0][0].data.xdim;
 	const int h = movieCC[0][0].data.ydim;
 
-	std::vector<std::vector<Image<double>>> CCd(pc);
+	ContiguousImageStack<float> contiguous;
+	contiguous.resize(pc, fc, w, h);
 
 	#pragma omp parallel for num_threads(nr_omp_threads)
 	for (int p = 0; p < pc; p++)
+	for (int f = 0; f < fc; f++)
+	for (int y = 0; y < h; y++)
+	for (int x = 0; x < w; x++)
 	{
-		CCd[p].resize(fc);
-
-		for (int f = 0; f < fc; f++)
-		{
-			CCd[p][f] = Image<double>(w,h);
-
-			for (int y = 0; y < h; y++)
-			for (int x = 0; x < w; x++)
-			{
-				CCd[p][f](y,x) = movieCC[p][f](y,x);
-			}
-		}
+		contiguous(p, f)(y, x) = movieCC[p][f](y, x);
 	}
 
-	return optimize(CCd, inTracks, sig_vel_px, sig_acc_px, sig_div_px, positions, globComp);
+	return optimize(
+		contiguous, inTracks, sig_vel_px, sig_acc_px, sig_div_px,
+		positions, globComp);
 }
 
 std::vector<Image<RFLOAT>> MotionEstimator::computeDamageWeights(int opticsGroup)
@@ -613,7 +639,7 @@ std::vector<Image<RFLOAT>> MotionEstimator::computeDamageWeights(int opticsGroup
 }
 
 void MotionEstimator::updateFCC(
-		const std::vector<std::vector<Image<Complex>>>& movie,
+		ContiguousImageStack<Complex>& movie,
 		const std::vector<std::vector<d2Vector>>& tracks,
 		const MetaDataTable& mdt,
 		std::vector<Image<RFLOAT>>& tables,
@@ -628,11 +654,10 @@ void MotionEstimator::updateFCC(
 		int threadnum = omp_get_thread_num();
 		const int og = obsModel->getOpticsGroup(mdt, p);
 
-		std::vector<Image<Complex>> obs = movie[p];
-
 		for (int f = 0; f < fc; f++)
 		{
-			shiftImageInFourierTransform(obs[f](), obs[f](), s[og], -tracks[p][f].x, -tracks[p][f].y);
+			Image<Complex>& obs = movie(p, f);
+			shiftImageInFourierTransform(obs(), obs(), s[og], -tracks[p][f].x, -tracks[p][f].y);
 		}
 
 		Image<Complex> pred = reference->predict(
@@ -640,10 +665,13 @@ void MotionEstimator::updateFCC(
 
 		const double scale = (s_ref * angpix_ref)/(s[og] * angpix[og]);
 
-		FscHelper::updateFscTable(
-			obs, pred, scale,
-			tables[threadnum],
-			weights0[threadnum], weights1[threadnum]);
+		for (int f = 0; f < fc; f++)
+		{
+			FscHelper::updateFscTable(
+				movie(p, f), f, pred, scale,
+				tables[threadnum],
+				weights0[threadnum], weights1[threadnum]);
+		}
 	}
 }
 
