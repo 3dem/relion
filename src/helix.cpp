@@ -1828,6 +1828,7 @@ void convertHelicalTubeCoordsToMetaDataTable(
 	MetaDataTable MD_in;
 	std::vector<RFLOAT> x1_coord_list, y1_coord_list, x2_coord_list, y2_coord_list, pitch_list;
 	std::vector<int> tube_id_list;
+	std::vector<int> selection_type_list;
 
 	// Check parameters and open files
 	if ( (nr_asu < 1) || (rise_A < 0.001) || (pixel_size_A < 0.01) )
@@ -1863,13 +1864,16 @@ void convertHelicalTubeCoordsToMetaDataTable(
     // Sjors added MDin_has_id and MDin_has_pitch to allow manual calculation of different cross-over distances to be carried onto the extracted segments...
     bool MDin_has_id = MD_in.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
     bool MDin_has_pitch =  MD_in.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_PITCH);
+	bool MDin_has_selection_type = MD_in.containsLabel(EMDL_PARTICLE_SELECTION_TYPE);
     x1_coord_list.clear();
     y1_coord_list.clear();
     x2_coord_list.clear();
     y2_coord_list.clear();
     tube_id_list.clear();
     pitch_list.clear();
+	selection_type_list.clear();
     MDobj_id = 0;
+	int selection_type = 0;
     FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD_in)
     {
     	MDobj_id++;
@@ -1877,6 +1881,12 @@ void convertHelicalTubeCoordsToMetaDataTable(
     	MD_in.getValue(EMDL_IMAGE_COORD_Y, yp);
     	if (MDobj_id % 2)
     	{
+    		if (MDin_has_selection_type)
+    		{
+    			MD_in.getValue(EMDL_PARTICLE_SELECTION_TYPE, selection_type);
+    			selection_type_list.push_back(selection_type);
+    		}
+
     		x1_coord_list.push_back(xp);
     		y1_coord_list.push_back(yp);
     		if (MDin_has_id)
@@ -1917,6 +1927,8 @@ void convertHelicalTubeCoordsToMetaDataTable(
     	MD_out.addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
     if (MDin_has_pitch)
     	MD_out.addLabel(EMDL_PARTICLE_HELICAL_TUBE_PITCH);
+	if (MDin_has_selection_type)
+		MD_out.addLabel(EMDL_PARTICLE_SELECTION_TYPE);
 
 	// Calculate all coordinates for helical segments
 	nr_segments = 0;
@@ -1937,6 +1949,10 @@ void convertHelicalTubeCoordsToMetaDataTable(
 		dx = step_pix * cos(psi_rad);
 		dy = step_pix * sin(psi_rad);
 
+    	int current_selection_type = 0;
+    	if (MDin_has_selection_type)
+    		current_selection_type = selection_type_list[tube_id];
+
     	if (!cut_into_segments)
     	{
             MD_out.addObject();
@@ -1952,6 +1968,8 @@ void convertHelicalTubeCoordsToMetaDataTable(
 				MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, id);
 			if (MDin_has_pitch)
 				MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_PITCH, pitch);
+    		if (MDin_has_selection_type)
+    			MD_out.setValue(EMDL_PARTICLE_SELECTION_TYPE, current_selection_type);
 
 	        nr_segments++;
     		continue;
@@ -1997,6 +2015,8 @@ void convertHelicalTubeCoordsToMetaDataTable(
     				MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, id);
     			if (MDin_has_pitch)
     				MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_PITCH, pitch);
+    			if (MDin_has_selection_type)
+    				MD_out.setValue(EMDL_PARTICLE_SELECTION_TYPE, current_selection_type);
    			nr_segments++;
     		}
     	}

@@ -759,7 +759,7 @@ def main():
                 df = pd.DataFrame({
                     'rlnCoordinateX': sampled_points[:, 0],
                     'rlnCoordinateY': sampled_points[:, 1],
-                    'rlnParticleSelectionType':  sampled_points[:, 2]
+                    'rlnHelicalLineId':  sampled_points[:, 2]
                 })
                 starfile.write(df, outfile, overwrite=True)
             else:

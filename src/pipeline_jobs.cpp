@@ -2555,6 +2555,7 @@ Pixels values higher than this many times the image stddev will be replaced with
 	joboptions["rescale"] = JobOption("Re-scaled size (pixels): ", 128, 64, 512, 8, "The re-scaled value needs to be an even number");
 	joboptions["do_fom_threshold"] = JobOption("Use autopick FOM threshold?", false, "If set to Yes, only particles with rlnAutopickFigureOfMerit values below the threshold below will be extracted.");
 	joboptions["minimum_pick_fom"] = JobOption("Minimum autopick FOM: ", 0, -5, 10, 0.1, "The minimum value for the rlnAutopickFigureOfMerit for particles to be extracted.");
+	joboptions["selection_type"] = JobOption("Selected particles: ", job_extract_selection_type_options, 0, "Extract particles only of this selection type. Default: extract all particles regardless of selection type.");
 
 	joboptions["do_extract_helix"] = JobOption("Extract helical segments?", false, "Set to Yes if you want to extract helical segments. RELION (.star), EMAN2 (.box) and XIMDISP (.coords) formats of tube or segment coordinates are supported.");
 	joboptions["helical_tube_outer_diameter"] = JobOption("Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
@@ -2671,6 +2672,12 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	if (joboptions["do_fom_threshold"].getBoolean())
 	{
 		command += " --minimum_pick_fom " + joboptions["minimum_pick_fom"].getString();
+	}
+
+	std::string selection_type = joboptions["selection_type"].getString();
+	if (selection_type != "All particles")
+	{
+		command += " --selection_type " + std::string(1, selection_type[0]);
 	}
 
 	if (joboptions["do_float16"].getBoolean())
