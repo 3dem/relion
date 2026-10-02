@@ -364,6 +364,15 @@ private:
 
 		a->free = true;
 
+		// Clear any deferred-free state: alloc() may hand this record out again as an exact fit,
+		// and a stale freeWhenReady/readyEvent would make _freeReadyAllocs() free it under its new owner.
+		if (a->readyEvent != 0)
+		{
+			DEBUG_HANDLE_ERROR(cudaEventDestroy(a->readyEvent));
+			a->readyEvent = 0;
+		}
+		a->freeWhenReady = false;
+
 		if (cache)
 		{
 			//Previous neighbor is free, concatenate
