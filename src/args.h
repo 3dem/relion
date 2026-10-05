@@ -218,4 +218,14 @@ public:
  */
 void untangleDeviceIDs(std::string &tangled, std::vector < std::vector < std::string > > &untangled);
 
+bool hasExplicitDeviceIDs(const std::string &gpu_ids);
+
+/*
+ * Returns the device IDs for an MPI rank. If fewer rank-specific GPU ID groups
+ * are provided than MPI ranks, the groups are reused cyclically.
+ */
+const std::vector<std::string>& getDeviceIDsForRank(
+	const std::vector < std::vector < std::string > > &allThreadIDs,
+	int rank);
+
 #endif
