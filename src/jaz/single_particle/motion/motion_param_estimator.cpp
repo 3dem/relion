@@ -522,8 +522,8 @@ void MotionParamEstimator::prepAlignment()
         std::cout << "        micrograph " << (g+1) << " / " << gc << ": "
             << pc << " particles [" << pctot << " total]" << std::endl;
 
-        std::vector<std::vector<Image<Complex>>> movie;
-        std::vector<std::vector<Image<RFLOAT>>> movieCC;
+        ContiguousImageStack<Complex> movie;
+        ContiguousImageStack<RFLOAT> movieCC;
 
         try
         {
@@ -548,17 +548,21 @@ void MotionParamEstimator::prepAlignment()
         {
 			for (int f = 0; f < fc; f++)
             {
-				if (maxRange > 0)
+                if (maxRange > 0)
                 {
-                    movieCC[p][f] = FilterHelper::cropCorner2D(movieCC[p][f], maxRangeP, maxRangeP);
+                    Image<RFLOAT> cropped = FilterHelper::cropCorner2D(
+                        movieCC(p, f), maxRangeP, maxRangeP);
+                    alignmentSet.copyCC(g, p, f, cropped);
                 }
-
-                alignmentSet.copyCC(g, p, f, movieCC[p][f]);
+                else
+                {
+                    alignmentSet.copyCC(g, p, f, movieCC(p, f));
+                }
 
                 Image<Complex> pred = reference->predict(
                     mdts[g], p, *obsModel, ReferenceMap::Opposite);
 
-                alignmentSet.accelerate(movie[p][f], alignmentSet.obs[g][p][f]);
+                alignmentSet.accelerate(movie(p, f), alignmentSet.obs[g][p][f]);
                 alignmentSet.accelerate(pred, alignmentSet.pred[g][p]);
             }
         }
@@ -572,4 +576,3 @@ void MotionParamEstimator::prepAlignment()
 
     std::cout << "   done\n";
 }
-

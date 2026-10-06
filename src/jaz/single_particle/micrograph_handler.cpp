@@ -351,9 +351,10 @@ void MicrographHandler::validatePixelSize(RFLOAT angpix) const
 	}
 }
 
-std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
+void MicrographHandler::loadMovie(
 		const MetaDataTable &mdt, int s,
 		double angpix, std::vector<ParFourierTransformer>& fts,
+		ContiguousImageStack<Complex>& movie,
 		const std::vector<std::vector<gravis::d2Vector>>* offsets_in,
 		std::vector<std::vector<gravis::d2Vector>>* offsets_out,
 		double data_angpix,
@@ -430,8 +431,6 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 				DIRECT_MULTIDIM_ELEM(defectMask, n) = true;
 	}
 	
-	BufferedImage<float> muGraph;
-	
 	RawImage<RFLOAT> gainRef_new(lastGainRef);
 	RawImage<bool> defectMask_new(defectMask);
 	
@@ -448,7 +447,19 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 
 	const int frame0 = returnSingleFrame? single_frame_relative_index : firstFrame;
 	const int fc = returnSingleFrame? 1 : lastFrame - firstFrame + 1;
-				
+
+	std::vector<Image<RFLOAT>> extractionAuxReal;
+	std::vector<Image<Complex>> extractionAuxFourier;
+
+	auto extractFrame = [&](const RawImage<float>& frame, long int f)
+	{
+		SpaExtraction::extractMovieFrameFS(
+			mdt, frame, f, fc, s,
+			angpix, coords_angpix, movie_angpix, data_angpix,
+			offsets_in, offsets_out, movie, fts,
+			extractionAuxReal, extractionAuxFourier);
+	};
+
 	if (isEER)			
 	{
 		if (eer_upsampling < 0)
@@ -461,47 +472,39 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 			eer_grouping = micrograph.getEERGrouping();
 		}
 
-		muGraph = MovieLoader::readEER<float>(
+		MovieLoader::readEERFrames<float>(
 			movieFn, gainRefToUse, defectMaskToUse,
 			frame0, fc,
 			eer_upsampling, eer_grouping,
-			nr_omp_threads);
+			nr_omp_threads, extractFrame);
 	}
 	else
 	{
-		muGraph = MovieLoader::readDense<float>(
+		MovieLoader::readDenseFrames<float>(
 			movieFn, gainRefToUse, defectMaskToUse,
 			frame0, fc,
 			hotCutoff,
-			nr_omp_threads);
+			nr_omp_threads, extractFrame);
 	}
 	
-	std::vector<std::vector<Image<Complex>>> movie = SpaExtraction::extractMovieStackFS(
-			mdt, muGraph, s,
-			angpix, coords_angpix, movie_angpix, data_angpix,
-			offsets_in, offsets_out, 
-			nr_omp_threads);
-	
-	const int pc = movie.size();
+	const int pc = movie.particleCount();
 
 	if (!returnSingleFrame)
 	{
 		#pragma omp parallel for num_threads(nr_omp_threads)
 		for (int p = 0; p < pc; p++)
 		{
-			RFLOAT scale2 = StackHelper::computePower(movie[p], false);
+			RFLOAT scale2 = StackHelper::computePower(movie.getParticleRef(p), false);
 			
 			for (int f = 0; f < fc; f++)
 			{
 				// NOTE: sqrt(fc) is a legacy scaling factor.
 				// It probably shouldn't be there.
 				//                   --JZ
-				RawImage<Complex>(movie[p][f]) /= s * sqrt(scale2 / fc); 
+				RawImage<Complex>(movie(p, f)) /= s * sqrt(scale2 / fc);
 			}
 		}
 	}
-
-	return movie;
 }
 
 void MicrographHandler::loadInitialTracks(

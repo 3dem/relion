@@ -32,6 +32,7 @@
 #include <src/jaz/gravis/t3Vector.h>
 #include <src/jaz/single_particle/obs_model.h>
 #include <src/jaz/single_particle/parallel_ft.h>
+#include <src/jaz/image/contiguous_image_stack.h>
 #include <vector>
 
 
@@ -39,11 +40,12 @@ class MotionHelper
 {
     public:
 
-        static std::vector<std::vector<Image<RFLOAT>>> movieCC(
-                const std::vector<std::vector<Image<Complex>>>& movie,
+        static void movieCC(
+                const ContiguousImageStack<Complex>& movie,
                 const std::vector<Image<Complex>>& preds,
                 const std::vector<Image<RFLOAT>>& damageWeights,
-                double pad, int threads);
+                double pad, int threads,
+                ContiguousImageStack<RFLOAT>& out);
 
         // deprecated: use the one above!
         /*static std::vector<std::vector<Image<RFLOAT>>> movieCC(
@@ -60,13 +62,13 @@ class MotionHelper
                 const std::vector<std::vector<Image<RFLOAT>>>& movieCC, double cc_pad);*/
 
         static std::vector<Image<RFLOAT>> addCCs(
-                const std::vector<std::vector<Image<RFLOAT>>>& movieCC);
+                const ContiguousImageStack<RFLOAT>& movieCC);
 
         static std::vector<gravis::d2Vector> getGlobalTrack(
                 const std::vector<Image<RFLOAT>>& movieCcSum, double cc_pad);
 
         static std::vector<gravis::d2Vector> getGlobalOffsets(
-                const std::vector<std::vector<Image<RFLOAT>>>& movieCC,
+                const ContiguousImageStack<RFLOAT>& movieCC,
                 const std::vector<std::vector<gravis::d2Vector>>& initialTracks, 
 				double cc_pad, double sigma, int wMax, int hMax, int threads);
 

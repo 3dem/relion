@@ -28,6 +28,7 @@
 #include <src/jaz/single_particle/volume.h>
 #include <src/jaz/gravis/t2Matrix.h>
 #include <src/jaz/single_particle/parallel_ft.h>
+#include <src/jaz/image/contiguous_image_stack.h>
 #include <vector>
 
 class Projector;
@@ -78,6 +79,9 @@ class StackHelper
 		
 		static std::vector<double> powerSpectrum(
 					const std::vector<std::vector<Image<Complex>>>& stack);
+
+		static std::vector<double> powerSpectrum(
+					const ContiguousImageStack<Complex>& stack);
 		
 		static std::vector<double> varSpectrum(
 					const std::vector<std::vector<Image<Complex>>>& stack);

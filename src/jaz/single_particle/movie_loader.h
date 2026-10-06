@@ -20,6 +20,17 @@ class MovieLoader
 				RFLOAT hot,
 				int num_threads);
 
+		template <typename T, typename FrameConsumer>
+		static void readDenseFrames(
+				std::string movieFn,
+				const RawImage<RFLOAT>* gainRef,
+				const RawImage<bool>* defectivePixels,
+				int frame0,
+				int numFrames,
+				RFLOAT hot,
+				int num_threads,
+				FrameConsumer&& consumeFrame);
+
 		template <typename T>
 		static BufferedImage<T> readEER(
 				std::string movieFn,
@@ -30,6 +41,18 @@ class MovieLoader
 				int eer_upsampling,
 				int eer_grouping,
 				int num_threads);
+
+		template <typename T, typename FrameConsumer>
+		static void readEERFrames(
+				std::string movieFn,
+				const RawImage<RFLOAT>* gainRef,
+				const RawImage<bool>* defectivePixels,
+				int frame0,
+				int numFrames,
+				int eer_upsampling,
+				int eer_grouping,
+				int num_threads,
+				FrameConsumer&& consumeFrame);
 
 		template <typename T>
 		static void fixDefects(
@@ -47,6 +70,34 @@ BufferedImage<T> MovieLoader::readDense(
 			int numFrames,
 			RFLOAT hot,
 			int num_threads)
+{
+	BufferedImage<T> out;
+
+	readDenseFrames<T>(
+		movieFn, gainRef, defectivePixels, frame0, numFrames, hot, num_threads,
+		[&out, numFrames](const RawImage<T>& frame, long int f)
+		{
+			if (f == 0)
+			{
+				out.resize(frame.xdim, frame.ydim, numFrames);
+			}
+
+			out.getSliceRef(f).copyFrom(frame);
+		});
+
+	return out;
+}
+
+template <typename T, typename FrameConsumer>
+void MovieLoader::readDenseFrames(
+			std::string movieFn,
+			const RawImage<RFLOAT>* gainRef,
+			const RawImage<bool>* defectivePixels,
+			int frame0,
+			int numFrames,
+			RFLOAT hot,
+			int num_threads,
+			FrameConsumer&& consumeFrame)
 {
 	const bool isCompressedMRC = CompressedMRCReader::isCompressedMRC(movieFn);
 
@@ -96,8 +147,6 @@ BufferedImage<T> MovieLoader::readDense(
 	}
 
 
-	BufferedImage<T> out(w0, h0, fc);
-
 	for (long f = 0; f < fc; f++)
 	{
 		Image<float> muGraphFrame_xmipp;
@@ -125,10 +174,8 @@ BufferedImage<T> MovieLoader::readDense(
 			fixDefects(muGraphFrame, defectivePixels, num_threads, false);
 		}
 
-		out.getSliceRef(f).copyFrom(muGraphFrame);
+		consumeFrame(muGraphFrame, f);
 	}
-
-	return out;
 }
 
 template <typename T>
@@ -201,6 +248,72 @@ BufferedImage<T> MovieLoader::readEER(
 	}
 
 	return out;
+}
+
+template <typename T, typename FrameConsumer>
+void MovieLoader::readEERFrames(
+		std::string movieFn,
+		const RawImage<RFLOAT>* gainRef,
+		const RawImage<bool>* defectivePixels,
+		int frame0,
+		int numFrames,
+		int eer_upsampling,
+		int eer_grouping,
+		int num_threads,
+		FrameConsumer&& consumeFrame)
+{
+	EERRenderer renderer;
+	renderer.read(movieFn, eer_upsampling);
+
+	const long int w0 = renderer.getWidth();
+	const long int h0 = renderer.getHeight();
+	const long int pixCt = w0 * h0;
+	const int fc = numFrames;
+	const std::string tag = "MovieLoader::readEERFrames: ";
+
+	const bool useGain = gainRef != 0;
+	if (useGain && (w0 != gainRef->xdim || h0 != gainRef->ydim))
+	{
+		REPORT_ERROR_STR(tag << "incompatible gain reference - size (x = " << gainRef->xdim
+				<< ", y = " << gainRef->ydim << ") is different from " << movieFn
+				<< " (x = " << w0 << ", y = " << h0 << ")");
+	}
+
+	const bool do_fixDefect = defectivePixels != 0;
+	if (do_fixDefect && (w0 != defectivePixels->xdim || h0 != defectivePixels->ydim))
+	{
+		REPORT_ERROR_STR(tag << "incompatible defect mask - size (x = " << defectivePixels->xdim
+				<< ", y = " << defectivePixels->ydim << ") is different from " << movieFn
+				<< " (x = " << w0 << ", y = " << h0 << ")");
+	}
+
+	for (int f = 0; f < fc; f++)
+	{
+		MultidimArray<float> muGraphFrame_xmipp;
+		// this takes 1-indexed frame numbers
+		renderer.renderFrames(
+				(frame0 + f) * eer_grouping + 1,
+				(frame0 + f + 1) * eer_grouping,
+				muGraphFrame_xmipp);
+
+		RawImage<T> muGraphFrame(muGraphFrame_xmipp);
+
+		#pragma omp parallel for num_threads(num_threads)
+		for (long int i = 0; i < pixCt; i++)
+		{
+			const RFLOAT val = muGraphFrame[i];
+			const RFLOAT gain = useGain? (*gainRef)[i] : 1.0;
+
+			muGraphFrame[i] = -gain * val;
+		}
+
+		if (do_fixDefect)
+		{
+			fixDefects(muGraphFrame, defectivePixels, num_threads, true);
+		}
+
+		consumeFrame(muGraphFrame, f);
+	}
 }
 
 template <typename T>
