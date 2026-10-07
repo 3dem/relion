@@ -337,7 +337,8 @@ int writeMRC(long int img_select, bool isStack=false, const int mode=WRITE_OVERW
 	else
 	{
             header->nz = Zdim;
-            header->ispg = 1;
+            // MRC2014: ISPG=0 for a single 2D image (or image stack), 1 for a single 3D volume
+            header->ispg = (Zdim > 1) ? 1 : 0;
         }
 
 	// Convert T to datatype
