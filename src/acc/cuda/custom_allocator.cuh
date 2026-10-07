@@ -364,6 +364,14 @@ private:
 
 		a->free = true;
 
+		// In cached mode, this Alloc stays in chain and gets reused; stale flags would
+		// cause _freeReadyAllocs() to incorrectly free the reused allocation.a->freeWhenReady = false;
+		if (a->readyEvent != 0)
+		{
+			DEBUG_HANDLE_ERROR(cudaEventDestroy(a->readyEvent));
+			a->readyEvent = 0;
+		}
+
 		if (cache)
 		{
 			//Previous neighbor is free, concatenate
@@ -500,7 +508,7 @@ public:
 
 		if (cache)
 		{
-			size = alignmentSize*ceilf( (float)size / (float)alignmentSize) ; //To prevent miss-aligned memory
+			size = ((size + alignmentSize - 1) / alignmentSize) * alignmentSize; //To prevent miss-aligned memory (integer arithmetic: float rounding returned undersized allocations above 16 MB)
 
 			Alloc *curAlloc = _getFirstSuitedFree(size);
 
