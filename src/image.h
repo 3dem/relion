@@ -1781,7 +1781,7 @@ void rewindow(Image<RFLOAT> &I, int mysize);
 #define RAINBOWSCALE 4
 #define CYANBLACKYELLOWSCALE 5
 
-void getImageContrast(MultidimArray<RFLOAT> &image, RFLOAT &minval, RFLOAT &maxval, RFLOAT &sigma_contrast);
+void getImageContrast(MultidimArray<RFLOAT> &image, RFLOAT &minval, RFLOAT &maxval, RFLOAT &sigma_contrast, bool skip_redo_minmax=false);
 
 inline void greyToRGB(const int color_scheme, const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue)
 {

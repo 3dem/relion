@@ -19,6 +19,8 @@
  ***************************************************************************/
 
 #include "src/displayer.h"
+#include <FL/Fl_Value_Slider.H>
+#include <FL/Fl_Choice.H>
 //#define DEBUG
 //
 #ifdef HAVE_PNG
@@ -38,10 +40,517 @@ const Fl_Menu_Item color_choices[] =
 };
 const int NUM_COLORS = 6;
 
+namespace
+{
+class SliceViewerWindow : public Fl_Double_Window
+{
+protected:
+    MultidimArray<RFLOAT> image;
+    DisplayBox *display_box;
+    Fl_Value_Slider *slice_slider;
+    Fl_Value_Slider *black_slider;
+    Fl_Value_Slider *white_slider;
+    Fl_Box *slice_value_box;
+    Fl_Box *black_value_box;
+    Fl_Box *white_value_box;
+    MetaDataTable metadata;
+    RFLOAT minval;
+    RFLOAT maxval;
+    RFLOAT image_minval;
+    RFLOAT image_maxval;
+    RFLOAT scale;
+
+    static void cb_slice(Fl_Widget *, void *data)
+    {
+        static_cast<SliceViewerWindow *>(data)->showCurrentSlice();
+    }
+
+    static void cb_contrast(Fl_Widget *widget, void *data)
+    {
+        static_cast<SliceViewerWindow *>(data)->changeContrast(widget);
+    }
+
+    virtual int numberOfSlices() const
+    {
+        return ZSIZE(image);
+    }
+
+    virtual void extractCurrentSlice(MultidimArray<RFLOAT> &slice) const
+    {
+        image.getSlice(ROUND(slice_slider->value()), slice);
+    }
+
+    virtual void formatSliceValue(char *buffer, size_t buffer_size) const
+    {
+        snprintf(buffer, buffer_size, "%d", ROUND(slice_slider->value()));
+    }
+
+    void updateSliderValueBoxes()
+    {
+        char buffer[64];
+
+        formatSliceValue(buffer, sizeof(buffer));
+        slice_value_box->copy_label(buffer);
+
+        snprintf(buffer, sizeof(buffer), "%.6g", (double)black_slider->value());
+        black_value_box->copy_label(buffer);
+
+        snprintf(buffer, sizeof(buffer), "%.6g", (double)white_slider->value());
+        white_value_box->copy_label(buffer);
+    }
+
+    void configureSliceSlider(int initial_slice)
+    {
+        const int count = numberOfSlices();
+        slice_slider->bounds(0, count - 1);
+        slice_slider->value(XMIPP_MAX(0, XMIPP_MIN(count - 1, initial_slice)));
+    }
+
+    void changeContrast(Fl_Widget *changed_widget)
+    {
+        RFLOAT new_minval = black_slider->value();
+        RFLOAT new_maxval = white_slider->value();
+
+        const RFLOAT minimum_step = XMIPP_MAX(
+            (image_maxval - image_minval) / 1000000.,
+            (RFLOAT)XMIPP_EQUAL_ACCURACY);
+
+        if (new_minval >= new_maxval)
+        {
+            if (changed_widget == black_slider)
+            {
+                new_minval = new_maxval - minimum_step;
+                black_slider->value(new_minval);
+            }
+            else
+            {
+                new_maxval = new_minval + minimum_step;
+                white_slider->value(new_maxval);
+            }
+        }
+
+        minval = new_minval;
+        maxval = new_maxval;
+        showCurrentSlice();
+    }
+
+    virtual void showCurrentSlice()
+    {
+        updateSliderValueBoxes();
+
+        MultidimArray<RFLOAT> slice;
+        extractCurrentSlice(slice);
+
+        if (display_box->img_data != NULL)
+        {
+            delete [] display_box->img_data;
+            display_box->img_data = NULL;
+        }
+
+        display_box->setData(slice, metadata.getObject(),
+                             ROUND(slice_slider->value()),
+                             minval, maxval, scale, true);
+        display_box->redraw();
+    }
+
+    SliceViewerWindow(MultidimArray<RFLOAT> &input_image,
+                      RFLOAT _minval, RFLOAT _maxval,
+                      RFLOAT _sigma_contrast, RFLOAT _scale,
+                      int canvas_width, int canvas_height,
+                      const char *title,
+                      const char *slice_label_text)
+        : Fl_Double_Window(XMIPP_MAX(320, canvas_width), canvas_height + 115, title),
+          image(input_image), display_box(NULL), slice_slider(NULL),
+          black_slider(NULL), white_slider(NULL), slice_value_box(NULL),
+          black_value_box(NULL), white_value_box(NULL), minval(_minval),
+          maxval(_maxval), image_minval(0.), image_maxval(0.), scale(_scale)
+    {
+        getImageContrast(image, minval, maxval, _sigma_contrast, true);
+        image.computeDoubleMinMax(image_minval, image_maxval);
+
+        const int controls_y = canvas_height + 8;
+        const int slider_x = 55;
+        const int slider_width = w() - 80;
+
+        begin();
+        display_box = new DisplayBox(0, 0, w(), canvas_height, "");
+
+        if (slice_label_text != NULL)
+        {
+            Fl_Box *slice_label = new Fl_Box(5, controls_y, 45, 25, slice_label_text);
+            slice_label->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+        }
+
+        slice_slider = new Fl_Value_Slider(slider_x + 15, controls_y,
+                                           slider_width, 25);
+        slice_slider->type(FL_HOR_NICE_SLIDER);
+        slice_slider->step(1);
+        slice_slider->precision(0);
+        slice_slider->callback(cb_slice, this);
+        slice_slider->when(FL_WHEN_CHANGED | FL_WHEN_RELEASE);
+
+        slice_value_box = new Fl_Box(slider_x, controls_y, 50, 25);
+        slice_value_box->box(FL_DOWN_BOX);
+        slice_value_box->color(GUI_INPUT_COLOR);
+        slice_value_box->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_CLIP);
+
+        Fl_Box *black_label = new Fl_Box(5, controls_y + 35, 45, 25, "Black:");
+        black_label->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+
+        black_slider = new Fl_Value_Slider(slider_x + 15, controls_y + 35,
+                                           slider_width, 25);
+        black_slider->type(FL_HOR_NICE_SLIDER);
+        black_slider->bounds(image_minval, image_maxval);
+        black_slider->precision(2);
+        black_slider->value(minval);
+        black_slider->callback(cb_contrast, this);
+        black_slider->when(FL_WHEN_CHANGED | FL_WHEN_RELEASE);
+
+        black_value_box = new Fl_Box(slider_x, controls_y + 35, 50, 25);
+        black_value_box->box(FL_DOWN_BOX);
+        black_value_box->color(GUI_INPUT_COLOR);
+        black_value_box->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_CLIP);
+
+        Fl_Box *white_label = new Fl_Box(5, controls_y + 70, 45, 25, "White:");
+        white_label->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+
+        white_slider = new Fl_Value_Slider(slider_x + 15, controls_y + 70,
+                                           slider_width, 25);
+        white_slider->type(FL_HOR_NICE_SLIDER);
+        white_slider->bounds(image_minval, image_maxval);
+        white_slider->precision(2);
+        white_slider->value(maxval);
+        white_slider->callback(cb_contrast, this);
+        white_slider->when(FL_WHEN_CHANGED | FL_WHEN_RELEASE);
+
+        white_value_box = new Fl_Box(slider_x, controls_y + 70, 50, 25);
+        white_value_box->box(FL_DOWN_BOX);
+        white_value_box->color(GUI_INPUT_COLOR);
+        white_value_box->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_CLIP);
+
+        minval = black_slider->value();
+        maxval = white_slider->value();
+        end();
+
+        metadata.addObject();
+        resizable(display_box);
+    }
+};
+
+class volumeSliceViewerWindow : public SliceViewerWindow
+{
+private:
+    enum SliceAxis
+    {
+        AXIS_X = 0,
+        AXIS_Y = 1,
+        AXIS_Z = 2
+    };
+
+    Fl_Choice *axis_choice;
+
+    static int canvasWidth(MultidimArray<RFLOAT> &volume, RFLOAT scale)
+    {
+        return CEIL(XMIPP_MAX(XSIZE(volume), YSIZE(volume)) * scale);
+    }
+
+    static int canvasHeight(MultidimArray<RFLOAT> &volume, RFLOAT scale)
+    {
+        return CEIL(XMIPP_MAX(YSIZE(volume), ZSIZE(volume)) * scale);
+    }
+
+    static void cb_axis(Fl_Widget *, void *data)
+    {
+        static_cast<volumeSliceViewerWindow *>(data)->changeAxis();
+    }
+
+    int numberOfSlices() const override
+    {
+        switch (axis_choice->value())
+        {
+        case AXIS_X: return XSIZE(image);
+        case AXIS_Y: return YSIZE(image);
+        default:     return ZSIZE(image);
+        }
+    }
+
+    void extractCurrentSlice(MultidimArray<RFLOAT> &slice) const override
+    {
+        const int index = ROUND(slice_slider->value());
+
+        switch (axis_choice->value())
+        {
+        case AXIS_X: image.getSlice(index, slice, 'X'); break;
+        case AXIS_Y: image.getSlice(index, slice, 'Y'); break;
+        default:     image.getSlice(index, slice);      break;
+        }
+    }
+
+    void changeAxis()
+    {
+        configureSliceSlider(numberOfSlices() / 2);
+        showCurrentSlice();
+    }
+
+public:
+    volumeSliceViewerWindow(MultidimArray<RFLOAT> &volume,
+                            RFLOAT minval, RFLOAT maxval,
+                            RFLOAT sigma_contrast, RFLOAT scale,
+                            const char *title)
+        : SliceViewerWindow(volume, minval, maxval, sigma_contrast, scale,
+                            canvasWidth(volume, scale), canvasHeight(volume, scale),
+                            title, NULL),
+          axis_choice(NULL)
+    {
+        const int controls_y = canvasHeight(volume, scale) + 8;
+        begin();
+        axis_choice = new Fl_Choice(5, controls_y, 50, 25);
+        axis_choice->add("X|Y|Z");
+        axis_choice->value(AXIS_Z);
+        axis_choice->callback(cb_axis, this);
+        end();
+
+        configureSliceSlider(ZSIZE(image) / 2);
+        showCurrentSlice();
+    }
+};
+
+class tiltseriesSlideViewerWindow : public SliceViewerWindow
+{
+private:
+    std::vector<bool> slice_selected;
+    std::vector<RFLOAT> nominal_tilt_angles;
+    MetaDataTable input_metadata;
+    ObservationModel *observation_model;
+    bool do_allow_save;
+    FileName fn_selected_slices;
+
+    static int canvasWidth(MultidimArray<RFLOAT> &tilt_series, RFLOAT scale)
+    {
+        return CEIL(XSIZE(tilt_series) * scale);
+    }
+
+    static int canvasHeight(MultidimArray<RFLOAT> &tilt_series, RFLOAT scale)
+    {
+        return CEIL(YSIZE(tilt_series) * scale);
+    }
+
+    void formatSliceValue(char *buffer, size_t buffer_size) const override
+    {
+        const int index = ROUND(slice_slider->value());
+        snprintf(buffer, buffer_size, "%.2f", (double)nominal_tilt_angles[index]);
+    }
+
+    void showCurrentSlice() override
+    {
+        SliceViewerWindow::showCurrentSlice();
+
+        const int index = ROUND(slice_slider->value());
+        // DisplayBox draws a coloured border when selected is non-zero.
+        // Use inverse logic here: a red border marks a deselected tilt image.
+        display_box->selected = slice_selected[index] ? NOTSELECTED : 1;
+        display_box->redraw();
+    }
+
+    void toggleCurrentSlice()
+    {
+        const int index = ROUND(slice_slider->value());
+        slice_selected[index] = !slice_selected[index];
+        showCurrentSlice();
+    }
+
+    void saveSelectedSlices()
+    {
+        if (!do_allow_save)
+            return;
+
+        FileName fn_out = fn_selected_slices;
+        if (fn_out == "")
+        {
+            char *chosen = fl_file_chooser("Save selected tilt images", "*.star", "selected_tilt_images.star");
+            if (chosen == NULL)
+                return;
+            fn_out = FileName(chosen);
+        }
+
+        MetaDataTable output_metadata;
+        output_metadata.setName(input_metadata.getName());
+        for (long int index = 0; index < input_metadata.numberOfObjects(); index++)
+        {
+            if (slice_selected[index])
+                output_metadata.addObject(input_metadata.getObject(index));
+        }
+
+        if (output_metadata.numberOfObjects() == 0)
+        {
+            fl_message("No tilt images are selected.");
+            return;
+        }
+
+        if (observation_model != NULL &&
+            observation_model->opticsMdt.numberOfObjects() > 0)
+        {
+            std::string table_name = input_metadata.getName();
+            if (table_name == "")
+                table_name = "tilt_series";
+            observation_model->save(output_metadata, fn_out, table_name);
+        }
+        else
+        {
+            output_metadata.write(fn_out);
+        }
+
+        std::cout << "Saved " << fn_out << " with " << output_metadata.numberOfObjects() << " selected tilt images." << std::endl;
+    }
+
+protected:
+    int handle(int event) override
+    {
+        // Space is a keyboard alternative to left-clicking the displayed image.
+        // Handle both events so this also works when one of the sliders has focus.
+        if (event == FL_KEYDOWN || event == FL_SHORTCUT)
+        {
+            const int key = Fl::event_key();
+
+            if (key == ' ')
+            {
+                toggleCurrentSlice();
+                return 1;
+            }
+
+            if (do_allow_save && (key == 's' || key == 'S'))
+            {
+                saveSelectedSlices();
+                hide();
+                return 1;
+            }
+            if (key == 'q' || key == 'Q')
+            {
+                hide();
+                return 1;
+            }
+
+        }
+
+        if (event == FL_PUSH && Fl::event_button() == FL_LEFT_MOUSE)
+        {
+            const int mouse_x = Fl::event_x();
+            const int mouse_y = Fl::event_y();
+            if (mouse_x >= display_box->x() &&
+                mouse_x < display_box->x() + display_box->w() &&
+                mouse_y >= display_box->y() &&
+                mouse_y < display_box->y() + display_box->h())
+            {
+                toggleCurrentSlice();
+                return 1;
+            }
+        }
+        else if (event == FL_PUSH && Fl::event_button() == FL_RIGHT_MOUSE)
+        {
+            Fl_Menu_Item menu[] = {
+                { "&Save selected and Quit" },
+                { "&Quit" },
+                { 0 }
+            };
+
+            if (!do_allow_save)
+                menu[0].deactivate();
+
+            const Fl_Menu_Item *item = menu->popup(Fl::event_x(), Fl::event_y(), 0, 0, 0);
+            if (item == NULL)
+                return 0;
+
+            if (item == &menu[0])
+            {
+                saveSelectedSlices();
+                hide();
+            }
+            else if (item == &menu[1])
+                hide();
+
+            return 1;
+        }
+
+        return SliceViewerWindow::handle(event);
+    }
+
+public:
+    tiltseriesSlideViewerWindow(MultidimArray<RFLOAT> &tilt_series,
+                                MetaDataTable &tilt_metadata,
+                                ObservationModel *_observation_model,
+                                RFLOAT minval, RFLOAT maxval,
+                                RFLOAT sigma_contrast, RFLOAT scale,
+                                bool _do_allow_save,
+                                FileName _fn_selected_slices,
+                                const char *title)
+        : SliceViewerWindow(tilt_series, minval, maxval,
+                            sigma_contrast, scale,
+                            canvasWidth(tilt_series, scale),
+                            canvasHeight(tilt_series, scale),
+                            title, "Tilt:"),
+          slice_selected(ZSIZE(tilt_series), true),
+          nominal_tilt_angles(ZSIZE(tilt_series), 0.),
+          input_metadata(tilt_metadata),
+          observation_model(_observation_model),
+          do_allow_save(_do_allow_save),
+          fn_selected_slices(_fn_selected_slices)
+    {
+        if (input_metadata.numberOfObjects() != ZSIZE(image))
+            REPORT_ERROR("Tilt-series metadata and image stack have different numbers of slices");
+
+        const EMDLabel tilt_label =
+            input_metadata.containsLabel(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE)
+            ? EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE
+            : EMDL_TOMO_YTILT;
+
+        if (!input_metadata.containsLabel(tilt_label))
+            REPORT_ERROR("Tilt-series metadata does not contain nominal tilt-stage angles");
+
+        for (long int index = 0; index < input_metadata.numberOfObjects(); index++)
+            input_metadata.getValue(tilt_label, nominal_tilt_angles[index], index);
+
+        configureSliceSlider(ZSIZE(image) / 2);
+        showCurrentSlice();
+    }
+};
+
+int displayVolumeWithSliceSlider(MultidimArray<RFLOAT> &volume,
+                                 RFLOAT minval, RFLOAT maxval,
+                                 RFLOAT sigma_contrast, RFLOAT scale,
+                                 const char *title)
+{
+    volumeSliceViewerWindow win(volume, minval, maxval,
+                                sigma_contrast, scale, title);
+    win.show();
+    return Fl::run();
+}
+
+int displayTiltSeriesWithSliceSlider(MultidimArray<RFLOAT> &tilt_series,
+                                     MetaDataTable &tilt_metadata,
+                                     ObservationModel *observation_model,
+                                     RFLOAT minval, RFLOAT maxval,
+                                     RFLOAT sigma_contrast, RFLOAT scale,
+                                     bool do_allow_save,
+                                     FileName fn_selected_slices,
+                                     const char *title)
+{
+    tiltseriesSlideViewerWindow win(tilt_series, tilt_metadata, observation_model,
+                                    minval, maxval, sigma_contrast, scale,
+                                    do_allow_save, fn_selected_slices, title);
+    win.show();
+    return Fl::run();
+}
+} // namespace
+
 /************************************************************************/
 void DisplayBox::draw()
 {
     if (!img_data) return;
+
+    // Clear pixels left behind when the newly displayed slice is smaller
+    // than the previous slice orientation.
+    fl_color(FL_BLACK);
+    fl_rectf(x(), y(), w(), h());
 
 	short xpos = x() + xoff;
 	short ypos = y() + yoff;
@@ -212,7 +721,11 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 			{
 				for (dx = xsize_data, xerr = xsize_data, old_ptr = img.data + sy * line_d; dx > 0; dx --, n++)
 				{
-					img_data[n] = (char)FLOOR((*old_ptr - minval) / step);
+					//img_data[n] = (char)FLOOR((*old_ptr - minval) / step);
+                    RFLOAT scaled_val = 255. * (*old_ptr - minval) / (maxval - minval);
+                    scaled_val = XMIPP_MAX((RFLOAT)0.,
+                                           XMIPP_MIN((RFLOAT)255., scaled_val));
+                    img_data[n] = static_cast<unsigned char>(FLOOR(scaled_val));
 					old_ptr += xstep;
 					xerr    -= xmod;
 					if (xerr <= 0)
@@ -237,8 +750,10 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 			{
 				for (dx = xsize_data, xerr = xsize_data, old_ptr = img.data + sy * line_d; dx > 0; dx --, n++)
 				{
-					unsigned char val = FLOOR((*old_ptr - minval) / step);
-					greyToRGB(colour_scheme, val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
+                    RFLOAT scaled_val = 255. * (*old_ptr - minval) / (maxval - minval);
+                    scaled_val = XMIPP_MAX((RFLOAT)0., XMIPP_MIN((RFLOAT)255., scaled_val));
+                    unsigned char val = static_cast<unsigned char>(FLOOR(scaled_val));
+                    greyToRGB(colour_scheme, val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
 					old_ptr += xstep;
 					xerr    -= xmod;
 					if (xerr <= 0)
@@ -264,15 +779,21 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 		{
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(img, n, old_ptr)
 			{
-				img_data[n] = FLOOR((*old_ptr - minval) / step);
-			}
+                RFLOAT scaled_val = 255. * (*old_ptr - minval) / (maxval - minval);
+                scaled_val = XMIPP_MAX((RFLOAT)0.,
+                                       XMIPP_MIN((RFLOAT)255., scaled_val));
+                img_data[n] = static_cast<unsigned char>(FLOOR(scaled_val));
+
+            }
 		}
 		else
 		{
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(img, n, old_ptr)
 			{
-				unsigned char val = FLOOR((*old_ptr - minval) / step);
-				greyToRGB(colour_scheme, val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
+				RFLOAT scaled_val = 255. * (*old_ptr - minval) / (maxval - minval);
+                scaled_val = XMIPP_MAX((RFLOAT)0., XMIPP_MIN((RFLOAT)255., scaled_val));
+                unsigned char val = static_cast<unsigned char>(FLOOR(scaled_val));
+                greyToRGB(colour_scheme, val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
 			}
 		}
 	}
@@ -3155,6 +3676,8 @@ void Displayer::read(int argc, char **argv)
 	else colour_scheme = GREYSCALE;
 	do_colourbar = parser.checkOption("--colour_bar", "Show colourbar image?");
 	do_ignore_optics = parser.checkOption("--ignore_optics", "Ignore information about optics groups in input STAR file?");
+    do_tiled_volumes = !parser.checkOption("--slider3d", "Display 3D volumes with a slider for subsequent slices (instead of the default multi-slice viewer)");
+    nr_threads = textToInteger(parser.getOption("--j", "Number of (openMP) threads", "1"));
 
 	int disp_section  = parser.addSection("Multiviewer options");
 	ncol = textToInteger(parser.getOption("--col", "Number of columns", "5"));
@@ -3532,34 +4055,130 @@ void Displayer::run()
 			if (obsModel.opticsMdt.numberOfObjects() == 0) MDin.read(fn_in);
 		}
 
-		// Check that label to display is present in the table
-		if (!MDin.containsLabel(display_label))
-			REPORT_ERROR("Cannot find metadata label in input STAR file");
+        // Check whether this is a tomography tilt series by seeing whether the star file contain the rlnTomoNominalStageTiltAngle label
+        if (MDin.containsLabel(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE) || MDin.containsLabel(EMDL_TOMO_YTILT))
+        {
 
-		// Store class number in metadata table
-		if (do_class && !MDin.containsLabel(EMDL_PARTICLE_CLASS))
-		{
-			int iclass = 0;
-			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
-			{
-				iclass++; // start counting at 1
-				MDin.setValue(EMDL_PARTICLE_CLASS, iclass);
-			}
-		}
+            bool has_mics = MDin.containsLabel(EMDL_MICROGRAPH_NAME);
+            bool has_odd_even_mics = MDin.containsLabel(EMDL_MICROGRAPH_EVEN) && MDin.containsLabel(EMDL_MICROGRAPH_ODD);
+            bool is_aligned = MDin.containsLabel(EMDL_TOMO_ZROT) && MDin.containsLabel(EMDL_TOMO_XSHIFT_ANGST) && MDin.containsLabel(EMDL_TOMO_YSHIFT_ANGST);
+            if (!has_mics && !has_odd_even_mics) REPORT_ERROR("ERROR: can't find rlnMicrographName or rlnMicrographNameEven&Odd");
 
-		if (sort_label != EMDL_UNDEFINED || random_sort)
-		{
-			MDin.sort(sort_label, reverse_sort, true, random_sort); // true means only store sorted_idx!
-			// When sorting: never read in the whole stacks!
-			do_read_whole_stacks = false;
-		}
+            // Read the images from the tilt series from low to high tilt stage angle and apply alignments if present
+            if (MDin.containsLabel(EMDL_TOMO_YTILT)) MDin.newSort(EMDL_TOMO_YTILT);
+            else MDin.newSort(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE);
+            Image<RFLOAT> imgtmp, img3d;
+            FileName fn_tmp;
+            // Set size of volume
+
+            if (display_label == EMDL_CTF_IMAGE) MDin.getValue(EMDL_CTF_IMAGE, fn_tmp, 0);
+            else if (has_mics) MDin.getValue(EMDL_MICROGRAPH_NAME, fn_tmp, 0);
+            else MDin.getValue(EMDL_MICROGRAPH_EVEN, fn_tmp, 0);
+            imgtmp.read(fn_tmp, false);
+            long int n_slices = MDin.numberOfObjects();
+            img3d().resize(n_slices, YSIZE(imgtmp()), XSIZE(imgtmp()));
+            if (angpix < 0.)
+            {
+                angpix = imgtmp.samplingRateX();
+                if (verb > 0) std::cout << "Getting pixel size from tilt series image header: " << angpix << std::endl;
+            }
+
+            if (verb > 0) std::cout << "Reading in all images for " << fn_in.afterLastOf("/") << "..." << std::endl;
+            if (verb > 0) init_progress_bar(n_slices);
+
+#pragma omp parallel for num_threads(nr_threads)
+            for(long int n= 0; n < n_slices; n++)
+            {
+
+                Image<RFLOAT> img2d, img2dt;
+                FileName fn_img;
+                if (display_label == EMDL_CTF_IMAGE)
+                {
+                    MDin.getValue(EMDL_CTF_IMAGE, fn_img, n);
+                    img2d.read(fn_img);
+                    img3d().setSlice(n, img2d());
+                }
+                else
+                {
+
+                    if (has_mics)
+                    {
+                        MDin.getValue(EMDL_MICROGRAPH_NAME, fn_img, n);
+                        img2d.read(fn_img);
+                    }
+                    else
+                    {
+                        MDin.getValue(EMDL_MICROGRAPH_EVEN, fn_img, n);
+                        img2d.read(fn_img);
+                        MDin.getValue(EMDL_MICROGRAPH_ODD, fn_img, n);
+                        img2dt.read(fn_img);
+                        img2d() += img2dt();
+                    }
+
+                    if (is_aligned)
+                    {
+                        RFLOAT zrot, xoff_angst, yoff_angst, tilt_axis, xoff, yoff;
+                        MDin.getValue(EMDL_TOMO_ZROT, zrot, n);
+                        MDin.getValue(EMDL_TOMO_XSHIFT_ANGST, xoff_angst, n);
+                        MDin.getValue(EMDL_TOMO_YSHIFT_ANGST, yoff_angst, n);
+                        tilt_axis = zrot;
+                        xoff = xoff_angst / angpix;
+                        yoff = yoff_angst / angpix;
+                        Matrix2D<RFLOAT> A;
+                        rotation2DMatrix(tilt_axis, A);
+                        MAT_ELEM(A, 0, 2) = xoff;
+                        MAT_ELEM(A, 1, 2) = yoff;
+                        selfApplyGeometry(img2d(), A, IS_INV, DONT_WRAP);
+                    }
+                    if (lowpass > 0.)
+                        lowPassFilterMap(img2d(), lowpass, angpix);
+
+                    // set the 2D slice in the 3D image
+                    img3d().setSlice(n, img2d());
+                }
+                if (verb > 0) progress_bar(n);
+            }
+
+            if (verb > 0) progress_bar(n_slices);
+
+            displayTiltSeriesWithSliceSlider(img3d(), MDin, &obsModel,
+                                             minval, maxval, sigma_contrast, scale,
+                                             do_allow_save, fn_selected_imgs,
+                                             fn_in.c_str());
+
+        }
+        else
+        {
+
+            // Check that label to display is present in the table
+            if (!MDin.containsLabel(display_label))
+                REPORT_ERROR("Cannot find metadata label in input STAR file");
+
+            // Store class number in metadata table
+            if (do_class && !MDin.containsLabel(EMDL_PARTICLE_CLASS))
+            {
+                int iclass = 0;
+                FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
+                {
+                    iclass++; // start counting at 1
+                    MDin.setValue(EMDL_PARTICLE_CLASS, iclass);
+                }
+            }
+
+            if (sort_label != EMDL_UNDEFINED || random_sort)
+            {
+                MDin.sort(sort_label, reverse_sort, true, random_sort); // true means only store sorted_idx!
+                // When sorting: never read in the whole stacks!
+                do_read_whole_stacks = false;
+            }
 
 
-		basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
-		win.fillCanvas(MULTIVIEWER, MDin, &obsModel, display_label, text_label, do_read_whole_stacks, do_apply_orient, minval, maxval, sigma_contrast, scale, ori_scale, ncol,
-				max_nr_images,  lowpass, highpass, do_class, &MDdata, nr_regroups, do_recenter, fn_in.contains("_data.star"), &MDgroups,
-				do_allow_save, fn_selected_imgs, fn_selected_parts, max_nr_parts_per_class);
-	}
+            basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
+            win.fillCanvas(MULTIVIEWER, MDin, &obsModel, display_label, text_label, do_read_whole_stacks, do_apply_orient, minval, maxval, sigma_contrast, scale, ori_scale, ncol,
+                           max_nr_images,  lowpass, highpass, do_class, &MDdata, nr_regroups, do_recenter, fn_in.contains("_data.star"), &MDgroups,
+                           do_allow_save, fn_selected_imgs, fn_selected_parts, max_nr_parts_per_class);
+        }
+    }
 	else
 	{
 		// Attempt to read a single-file image
@@ -3583,33 +4202,44 @@ void Displayer::run()
 		}
 		else if (ZSIZE(img()) > 1)
 		{
+            if (do_tiled_volumes)
+            {
+                // Read volume slices from .mrc as if it were a .mrcs stack and then use normal slice viewer
+                // This will not work for Spider volumes...
+                if (fn_in.getFileFormat() != "mrc")
+                    REPORT_ERROR("Displayer::run() ERROR: only MRC maps are allowed...");
 
-			// Read volume slices from .mrc as if it were a .mrcs stack and then use normal slice viewer
-			// This will not work for Spider volumes...
-			if (fn_in.getFileFormat() != "mrc")
-				REPORT_ERROR("Displayer::run() ERROR: only MRC maps are allowed...");
+                // Use a single minval and maxval for all slice
+                if (minval == maxval)
+                {
+                    Image<RFLOAT> It;
+                    It.read(fn_in);
+                    It().computeDoubleMinMax(minval, maxval);
+                }
 
-			// Use a single minval and maxval for all slice
-			if (minval == maxval)
-			{
-				Image<RFLOAT> It;
-				It.read(fn_in);
-				It().computeDoubleMinMax(minval, maxval);
-			}
+                // Trick MD with :mrcs extension....
+                for (int n = 0; n < ZSIZE(img()); n++)
+                {
+                    FileName fn_tmp;
+                    fn_tmp.compose(n+1,fn_in);
+                    fn_tmp += ":mrcs";
+                    MDin.addObject();
+                    MDin.setValue(EMDL_IMAGE_NAME, fn_tmp);
+                    MDin.setValue(EMDL_IMAGE_OPTICS_GROUP, 1);
+                }
 
-			// Trick MD with :mrcs extension....
-			for (int n = 0; n < ZSIZE(img()); n++)
-			{
-				FileName fn_tmp;
-				fn_tmp.compose(n+1,fn_in);
-				fn_tmp += ":mrcs";
-				MDin.addObject();
-				MDin.setValue(EMDL_IMAGE_NAME, fn_tmp);
-				MDin.setValue(EMDL_IMAGE_OPTICS_GROUP, 1);
-			}
+                basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
+                win.fillCanvas(MULTIVIEWER, MDin, &obsModel, EMDL_IMAGE_NAME, text_label, true, false, minval, maxval, sigma_contrast, scale, ori_scale, ncol, max_nr_images, lowpass, highpass);
 
-			basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
-			win.fillCanvas(MULTIVIEWER, MDin, &obsModel, EMDL_IMAGE_NAME, text_label, true, false, minval, maxval, sigma_contrast, scale, ori_scale, ncol, max_nr_images, lowpass, highpass);
+            }
+            else
+            {
+                // Read the complete volume once. The slider viewer extracts and
+                // displays one Z slice at a time.
+                img.read(fn_in);
+                displayVolumeWithSliceSlider(img(), minval, maxval,
+                                             sigma_contrast, scale, fn_in.c_str());
+            }
 		}
 		else
 		{

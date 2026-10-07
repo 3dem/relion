@@ -59,7 +59,7 @@ void exponentiate_weights_fine(
 		}
 	}
 }
-void RNDnormalDitributionComplexWithPowerModulation2D(ACCCOMPLEX* Image, size_t xdim, XFLOAT *spectra)
+void RNDnormalDitributionComplexWithPowerModulation2D(ACCCOMPLEX* Image, size_t xdim, XFLOAT *spectra, RandomStream &rng)
 {
 	size_t x,y,size;
 	size = xdim*((xdim-1)*2);
@@ -74,8 +74,8 @@ void RNDnormalDitributionComplexWithPowerModulation2D(ACCCOMPLEX* Image, size_t 
 
 		if(ires<xdim)
 		{
-			Image[i].x = rnd_gaus(0., spectra[ires]);
-			Image[i].y = rnd_gaus(0., spectra[ires]);
+			Image[i].x = rng.gaus(0., spectra[ires]);
+			Image[i].y = rng.gaus(0., spectra[ires]);
 		}
 		else
 		{
@@ -85,7 +85,7 @@ void RNDnormalDitributionComplexWithPowerModulation2D(ACCCOMPLEX* Image, size_t 
     }
 }
 
-void RNDnormalDitributionComplexWithPowerModulation3D(ACCCOMPLEX* Image, size_t xdim, size_t ydim, XFLOAT *spectra)
+void RNDnormalDitributionComplexWithPowerModulation3D(ACCCOMPLEX* Image, size_t xdim, size_t ydim, XFLOAT *spectra, RandomStream &rng)
 {
 	int x,y,z,xydim(xdim*ydim),size;
 	size = xdim*((xdim-1)*2);				//assuming square input images (particles)
@@ -104,8 +104,8 @@ void RNDnormalDitributionComplexWithPowerModulation3D(ACCCOMPLEX* Image, size_t 
 
 		if(ires<xdim)
 		{
-			Image[i].x = rnd_gaus(0., spectra[ires]);
-			Image[i].y = rnd_gaus(0., spectra[ires]);
+			Image[i].x = rng.gaus(0., spectra[ires]);
+			Image[i].y = rng.gaus(0., spectra[ires]);
 		}
 		else
 		{

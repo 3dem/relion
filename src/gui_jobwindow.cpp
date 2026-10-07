@@ -425,10 +425,10 @@ void JobWindow::initialise(int my_job_type, bool _is_tomo)
 		myjob.initialise(my_job_type);
 		initialiseTomoImportWindow();
 	}
-    else if (my_job_type == PROC_TOMO_EXCLUDE_TILT_IMAGES)
+    else if (my_job_type == PROC_TOMO_SELECT_TILTSERIES)
     {
         myjob.initialise(my_job_type);
-        initialiseTomoExcludeTiltImagesWindow();
+        initialiseTomoSelectTiltSeriesWindow();
     }
     else if (my_job_type == PROC_TOMO_RECONSTRUCT_TOMOGRAM)
     {
@@ -3142,19 +3142,41 @@ void JobWindow::initialiseTomoReconParWindow()
 
 }
 
-void JobWindow::initialiseTomoExcludeTiltImagesWindow()
+void JobWindow::initialiseTomoSelectTiltSeriesWindow()
 {
-    setupTabs(1);
+	setupTabs(2);
 
-    tab1->begin();
-    tab1->label("I/O");
-    resetHeight();
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
 
-    place("in_tiltseries", TOGGLE_DEACTIVATE);
+	place("in_tiltseries", TOGGLE_DEACTIVATE);
 
-    // Add a little spacer
-    current_y += STEPY/2;
+	tab1->end();
 
-    place("cache_size", TOGGLE_DEACTIVATE);
-    tab1->end();
+
+	tab2->begin();
+	tab2->label("Display");
+	resetHeight();
+
+	place("scale");
+	place("sigma_contrast");
+    place("lowpass");
+
+	current_y += STEPY / 2;
+
+	place("ctf_scale");
+	place("ctf_sigma_contrast");
+
+    current_y += STEPY / 2;
+
+    place("tomogram_scale");
+    place("tomogram_sigma_contrast");
+    place("tomogram_lowpass");
+
+    tab2->end();
+
+	// This is an interactive GUI program and should always run locally.
+	guientries["do_queue"].deactivate_option = TOGGLE_ALWAYS_DEACTIVATE;
+	myjob.joboptions["do_queue"].setString("No");
 }

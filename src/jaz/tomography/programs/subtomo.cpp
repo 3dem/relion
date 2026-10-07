@@ -467,7 +467,10 @@ void SubtomoProgram::writeParticleSet(
 	for (int og = 0; og < copy.numberOfOpticsGroups(); og++)
 	{
 
-        bool is_premultiplied = (do_stack2d) ? do_ctf : false;
+        bool is_premultiplied = true; // default for pseudo-subtomo
+        if (do_stack2d) is_premultiplied = do_ctf;
+        if (do_real_subtomo) is_premultiplied = false;
+        
 		copy.optTable.setValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, is_premultiplied, og);
 		int datadim = (do_stack2d) ? 2 : 3;
         copy.optTable.setValue(EMDL_IMAGE_DIMENSIONALITY, datadim, og);

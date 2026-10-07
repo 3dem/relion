@@ -568,11 +568,14 @@ void FlexAnalyser::make3DModelsAlongPrincipalComponents(std::vector< std::vector
 
 		long int binwidth = ROUND((double)project.size() / (double)nr_maps_per_component);
 
-		std::cout << " Calculating 3D models for principal component " << k+1 << " ... " << std::endl;
+		std::cout << " - Calculating 3D models for principal component " << k+1 << " ... " << std::endl;
 
 		for (int ibin = 0; ibin < nr_maps_per_component; ibin++)
 		{
-			long int istart = ibin * binwidth;
+
+            std::cout << "   - Bin: " << ibin+1 << " ... " << std::endl;
+
+            long int istart = ibin * binwidth;
 			long int istop = (ibin+1) * binwidth - 1;
 			if (ibin == nr_maps_per_component - 1)
 				istop = project.size() - 1;
@@ -611,8 +614,8 @@ void FlexAnalyser::make3DModelsAlongPrincipalComponents(std::vector< std::vector
 				YY(body_offset_3d)  = orients[ibody * 6 + 4] / norm_pca[ibody*4+3];
 				ZZ(body_offset_3d)  = orients[ibody * 6 + 5] / norm_pca[ibody*4+3];
 				//std::cerr << " norm_pca[ibody*4+0]= " << norm_pca[ibody*4+0] << " norm_pca[ibody*4+1]= " << norm_pca[ibody*4+1] << " norm_pca[ibody*4+2]= " << norm_pca[ibody*4+2] << " norm_pca[ibody*4+3]= " << norm_pca[ibody*4+3] << std::endl;
-				//std::cerr << " body_rot= " << body_rot << " body_tilt= " << body_tilt << " body_psi= " << body_psi << std::endl;
-				//std::cerr << " XX(body_offset_3d)= " << XX(body_offset_3d) << " YY(body_offset_3d)= " << YY(body_offset_3d) << " ZZ(body_offset_3d)= " << ZZ(body_offset_3d) << std::endl;
+                std::cout << "    + body= " << ibody+1 << " X-offset= " << XX(body_offset_3d) << " Y-offset= " << YY(body_offset_3d) << " Z-offset= " << ZZ(body_offset_3d) << std::endl;
+				std::cout << "    + body= " << ibody+1 << " relative rot= " << body_rot << " tilt= " << body_tilt << " psi= " << body_psi << std::endl;
 
 				Matrix2D<RFLOAT> Aresi,  Abody;
 				// Aresi is the residual orientation for this ibody
@@ -627,13 +630,22 @@ void FlexAnalyser::make3DModelsAlongPrincipalComponents(std::vector< std::vector
 				MAT_ELEM(Abody, 2, 3) = ZZ(body_offset_3d);
 				MAT_ELEM(Abody, 3, 3) = 1.;
 
-				Mbody.resize(model.Iref[ibody]);
+
+                Mbody.resize(model.Iref[ibody]);
 				Mmask.resize(model.masks_bodies[ibody]);
 				applyGeometry(model.Iref[ibody], Mbody, Abody, IS_NOT_INV, DONT_WRAP);
 				applyGeometry(model.masks_bodies[ibody], Mmask, Abody, IS_NOT_INV, DONT_WRAP);
 
 				img() += Mbody * Mmask;
 				sumw += Mmask;
+
+                // Just for comvenience in output
+                RFLOAT rot, tilt, psi;
+                RFLOAT xx,yy,zz;
+                Abody.resize(3,3);
+                Euler_matrix2angles(Abody, rot, tilt, psi);
+                std::cout << "    + body= " << ibody+1 << " absolute rot= " << rot << " tilt= " << tilt << " psi= " << psi << std::endl;
+
 			}
 
 			// Divide the img by sumw to deal with overlapping bodies: just take average

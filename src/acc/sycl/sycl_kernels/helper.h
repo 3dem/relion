@@ -12,6 +12,8 @@
 #include "src/acc/acc_projector.h"
 #include "src/acc/acc_projectorkernel_impl.h"
 
+class RandomStream;
+
 namespace syclKernels
 {
 
@@ -173,8 +175,8 @@ void exponentiate_weights_fine(
 		unsigned long *d_job_num,
 		long int job_num);
 
-void RNDnormalDitributionComplexWithPowerModulation2D(ACCCOMPLEX *Image, size_t xdim, XFLOAT *spectra);
-void RNDnormalDitributionComplexWithPowerModulation3D(ACCCOMPLEX *Image, size_t xdim, size_t ydim, XFLOAT *spectra);
+void RNDnormalDitributionComplexWithPowerModulation2D(ACCCOMPLEX *Image, size_t xdim, XFLOAT *spectra, RandomStream &rng);
+void RNDnormalDitributionComplexWithPowerModulation3D(ACCCOMPLEX *Image, size_t xdim, size_t ydim, XFLOAT *spectra, RandomStream &rng);
 
 void softMaskBackgroundValue(	int      block_dim,
                                 int      block_size,

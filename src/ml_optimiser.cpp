@@ -2605,9 +2605,7 @@ void MlOptimiser::initialiseWorkLoad()
     // Note, this function is overloaded in ml_optimiser_mpi (where random_seed is only set by the leader and then send to all followers!)
 
     // Randomise the order of the particles
-    if (random_seed == -1) random_seed = time(NULL);
-    // Also randomize random-number-generator for perturbations on the angles
-    init_random_generator(random_seed);
+    if (random_seed == -1) random_seed = random_device_seed();
 
     if (do_split_random_halves && debug_split_random_half > 0)
     {
@@ -2733,24 +2731,25 @@ void MlOptimiser::initialiseReferences()
             {
                 if (mymodel.pdf_class[i] > 0. || !do_som)
                 {
+                    RandomStream rng(random_seed, RANDOM_BLOBS, i);
                     MultidimArray<RFLOAT> blobs_pos(mymodel.Iref[i]), blobs_neg(mymodel.Iref[i]);
                     if (mymodel.ref_dim == 2)
                     {
                         SomGraph::make_blobs_2d(
                                 blobs_pos, mymodel.Iref[i], 40,
-                                diameter, is_helical_segment);
+                                diameter, is_helical_segment, rng);
                         SomGraph::make_blobs_2d(
                                 blobs_neg, mymodel.Iref[i], 40,
-                                diameter, is_helical_segment);
+                                diameter, is_helical_segment, rng);
                     }
                     else
                     {
                         SomGraph::make_blobs_3d(
                                 blobs_pos, mymodel.Iref[i], 40,
-                                diameter, is_helical_segment);
+                                diameter, is_helical_segment, rng);
                         SomGraph::make_blobs_3d(
                                 blobs_neg, mymodel.Iref[i], 40,
-                                diameter, is_helical_segment);
+                                diameter, is_helical_segment, rng);
                     }
                     //Maintain standard deviation
                     RFLOAT std = SomGraph::std(mymodel.Iref[i]);
@@ -3007,11 +3006,11 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
                 MultidimArray<Complex > Fimg;
 
                 // Make sure MPI and sequential behave exactly the same
-                init_random_generator(random_seed + part_id);
+                RandomStream rng(random_seed, RANDOM_ANGLES, part_id);
                 // Randomize the initial orientations for initial reference generation at this step....
                 // TODO: this is not an even angular distribution....
                 RFLOAT rot, tilt, psi;
-                rot  = (mymodel.ref_dim == 2) ? 0. : rnd_unif() * 360.;
+                rot  = (mymodel.ref_dim == 2) ? 0. : rng.unif() * 360.;
                 if (is_helical_segment)
                 {
                     tilt = (mymodel.ref_dim == 2) ? 0. : tilt_prior;
@@ -3019,8 +3018,8 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
                 }
                 else
                 {
-                    tilt = (mymodel.ref_dim == 2) ? 0. : rnd_unif() * 180.;
-                    psi  = rnd_unif() * 360.;
+                    tilt = (mymodel.ref_dim == 2) ? 0. : rng.unif() * 180.;
+                    psi  = rng.unif() * 360.;
                 }
                 // SHWS 25Aug2022: make sure all classes have particles in them, their order has been randomised already
                 int iclass  = part_id_sorted % mymodel.nr_classes;
@@ -4006,12 +4005,9 @@ void MlOptimiser::expectationSetup()
     std::cerr << "Entering expectationSetup" << std::endl;
 #endif
 
-    // Re-initialise the random seed, because with a noisy_mask, inside the previous iteration different timings of different MPI nodes may have given rise to different number of calls to ran1
-    // Use the iteration number so that each iteration has a different random seed
-    init_random_generator(random_seed + iter);
-
     // Reset the random perturbation for this sampling
-    sampling.resetRandomlyPerturbedSampling();
+    RandomStream rng(random_seed, RANDOM_SAMPLING, iter);
+    sampling.resetRandomlyPerturbedSampling(rng);
 
     // Initialise Projectors and fill vector with power_spectra for all classes
     MultidimArray<RFLOAT> *my_fourier_mask = (XSIZE(helical_fourier_mask) > 0) ? &helical_fourier_mask : NULL;
@@ -4038,8 +4034,9 @@ void MlOptimiser::expectationSetupCheckMemory(int myverb)
         }
         else
         {
-            int randir = (int)(rnd_unif() * sampling.NrDirections() );
-            int ranpsi = (int)(rnd_unif() * sampling.NrPsiSamplings() );
+            RandomStream rng(random_seed, RANDOM_MEMORY, 0);
+            int randir = rng.next() % sampling.NrDirections();
+            int ranpsi = rng.next() % sampling.NrPsiSamplings();
             sampling.getDirection(randir, ran_rot, ran_tilt);
             sampling.getPsiAngle(ranpsi, ran_psi);
         }
@@ -4166,16 +4163,14 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
         exp_random_class_some_particles.clear();
         if (!do_som) {
             for (long int part_id = my_first_part_id; part_id <= my_last_part_id; part_id++) {
-                                init_random_generator(random_seed + part_id);
-                                int random_class = rand() % mymodel.nr_classes;
+                int random_class = RandomStream(random_seed, RANDOM_CLASS, part_id).next() % mymodel.nr_classes;
                 exp_random_class_some_particles.push_back(random_class);
             }
         }
         else {
             std::vector<unsigned> nodes = mymodel.som.get_all_nodes();
             for (long int part_id = my_first_part_id; part_id <= my_last_part_id; part_id++) {
-                                init_random_generator(random_seed + part_id);
-                int random_node = rand() % nodes.size();
+                int random_node = RandomStream(random_seed, RANDOM_CLASS, part_id).next() % nodes.size();
                 exp_random_class_some_particles.push_back(nodes[random_node]);
             }
         }
@@ -6317,7 +6312,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
             // Different MPI-distributed subsets may otherwise have different instances of the random noise below,
             // because work is on an on-demand basis and therefore variable with the timing of distinct nodes...
             // Have the seed based on the part_id, so that each particle has a different instant of the noise
-            init_random_generator(random_seed + part_id); // This only serves for exact reproducibility tests with 1.3-code...
+            RandomStream noise(random_seed, RANDOM_NOISE, part_id);
 
             // Create noisy image for outside the mask
             MultidimArray<Complex > Fnoise;
@@ -6343,8 +6338,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(
                 if (ires >= 0 && ires < XSIZE(remapped_sigma2_noise))
                 {
                     RFLOAT sigma = sqrt(sigma2_fudge * DIRECT_A1D_ELEM(remapped_sigma2_noise, ires));
-                    DIRECT_A3D_ELEM(Fnoise, k, i, j).real = rnd_gaus(0., sigma);
-                    DIRECT_A3D_ELEM(Fnoise, k, i, j).imag = rnd_gaus(0., sigma);
+                    DIRECT_A3D_ELEM(Fnoise, k, i, j).real = noise.gaus(0., sigma);
+                    DIRECT_A3D_ELEM(Fnoise, k, i, j).imag = noise.gaus(0., sigma);
                 }
                 else
                 {
@@ -9516,8 +9511,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
                     if ( (imode == 0 && ang_error > 30.) || (imode == 1 && sh_error > 10.) )
                         break;
 
-                    // part_id to keep exactly the same as in relion-3.0....
-                    init_random_generator(random_seed + part_id);
+                    RandomStream rng(random_seed, RANDOM_ACCURACY, part_id);
 
                     MultidimArray<Complex > F1, F2;
                     Matrix2D<RFLOAT> A1, A2;
@@ -9561,7 +9555,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
                             if (mymodel.ref_dim == 3)
                             {
                                 // Randomly change rot, tilt or psi
-                                RFLOAT ran = rnd_unif();
+                                RFLOAT ran = rng.unif();
                                 if (ran < 0.3333)
                                     rot2 = rot1 + ang_error;
                                 else if (ran < 0.6667)
@@ -9577,7 +9571,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
                         else
                         {
                             // Randomly change xoff or yoff
-                            RFLOAT ran = rnd_unif();
+                            RFLOAT ran = rng.unif();
                             if (mymodel.data_dim == 3 || mydata.is_tomo)
                             {
                                 if (ran < 0.3333)

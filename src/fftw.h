@@ -381,7 +381,7 @@ public:
 };
 
 // Randomize phases beyond the given F-space shell (index) of R-space input image
-void randomizePhasesBeyond(MultidimArray<RFLOAT> &I, int index);
+void randomizePhasesBeyond(MultidimArray<RFLOAT> &I, int index, RandomStream *rng = NULL);
 
 // // Randomize phases beyond the given F-space shell (index) of F-space input image
 // void randomizePhasesBeyond(MultidimArray<Complex> &v, int index);

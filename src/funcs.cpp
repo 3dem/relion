@@ -54,6 +54,10 @@
 #include <complex>
 #include <fstream>
 #include <typeinfo>
+#include <climits>
+#include <random>
+#include <Random123/philox.h>
+#include <Random123/uniform.hpp>
 
 void fitStraightLine(const std::vector<fit_point2D> &points, RFLOAT &slope, RFLOAT &intercept, RFLOAT &corr_coeff)
 {
@@ -580,6 +584,11 @@ void randomize_random_generator()
 	srand(static_cast <unsigned> (time(NULL)) );
 }
 
+int random_device_seed()
+{
+	return std::random_device()() % INT_MAX + 1;
+}
+
 float rnd_unif(float a, float b)
 {
 
@@ -622,6 +631,37 @@ float rnd_gaus(float mu, float sigma)
 
   return (mu + sigma * (float) X1);
 
+}
+
+RandomStream::RandomStream(unsigned long seed, RandomUse use, unsigned long stream) :
+	key{(unsigned int)seed, (unsigned int)(seed >> 32)},
+	counter{0, (unsigned int)use, (unsigned int)stream, (unsigned int)(stream >> 32)},
+	used(4)
+{}
+
+unsigned int RandomStream::next()
+{
+	if (used == 4)
+	{
+		r123::Philox4x32::ctr_type c = {{counter[0]++, counter[1], counter[2], counter[3]}};
+		r123::Philox4x32::key_type k = {{key[0], key[1]}};
+		r123::Philox4x32::ctr_type r = r123::Philox4x32()(c, k);
+		std::copy(r.begin(), r.end(), block);
+		used = 0;
+	}
+	return block[used++];
+}
+
+float RandomStream::unif(float a, float b)
+{
+	return a + (b - a) * r123::u01<float>(next());
+}
+
+float RandomStream::gaus(float mu, float sigma)
+{
+	// Box-Muller; u01 never returns 0
+	float r = sqrt(-2.f * log(r123::u01<float>(next())));
+	return mu + sigma * r * cos(2.f * PI * r123::u01<float>(next()));
 }
 
 float rnd_student_t(RFLOAT nu, float mu, float sigma)

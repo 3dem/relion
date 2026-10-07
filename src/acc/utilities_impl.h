@@ -230,7 +230,8 @@ namespace AccUtilities
 template <class MlClass>
 void makeNoiseImage(XFLOAT sigmaFudgeFactor,
 		MultidimArray<RFLOAT > &sigmaNoiseSpectra,
-		long int seed,
+		int random_seed,
+		long int part_id,
 		MlClass *accMLO,
 		AccPtr<XFLOAT> &RandomImage,
 		bool is3D)
@@ -238,7 +239,7 @@ void makeNoiseImage(XFLOAT sigmaFudgeFactor,
     // Different MPI-distributed subsets may otherwise have different instances of the random noise below,
     // because work is on an on-demand basis and therefore variable with the timing of distinct nodes...
     // Have the seed based on the part_id, so that each particle has a different instant of the noise
-    init_random_generator(seed);
+    RandomStream rng(random_seed, RANDOM_NOISE, part_id);
 
     // Make a holder for the spectral profile and copy to the GPU
     // AccDataTypes::Image<XFLOAT> NoiseSpectra(sigmaNoiseSpectra, ptrFactory);
@@ -260,7 +261,7 @@ void makeNoiseImage(XFLOAT sigmaFudgeFactor,
 
     // Initialize randomization by particle ID, like on the CPU-side
     cuda_kernel_initRND<<<RND_BLOCK_NUM,RND_BLOCK_SIZE>>>(
-                                     seed,
+                                     random_seed + part_id,
                                     ~RandomStates);
     LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
@@ -304,7 +305,7 @@ void makeNoiseImage(XFLOAT sigmaFudgeFactor,
 
     // Initialize randomization by particle ID, like on the CPU-side
     hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_initRND), RND_BLOCK_NUM, RND_BLOCK_SIZE, 0, 0,
-                                     seed,
+                                     random_seed + part_id,
                                     ~RandomStates);
     LAUNCH_PRIVATE_ERROR(hipGetLastError(),accMLO->errorStatus);
 
@@ -339,9 +340,9 @@ void makeNoiseImage(XFLOAT sigmaFudgeFactor,
 #elif _SYCL_ENABLED
 	// Create noise image with the correct spectral profile
 	if(is3D)
-		syclKernels::RNDnormalDitributionComplexWithPowerModulation3D(accMLO->transformer1.fouriers(), accMLO->transformer1.xFSize, accMLO->transformer1.yFSize, ~NoiseSpectra);
+		syclKernels::RNDnormalDitributionComplexWithPowerModulation3D(accMLO->transformer1.fouriers(), accMLO->transformer1.xFSize, accMLO->transformer1.yFSize, ~NoiseSpectra, rng);
 	else
-		syclKernels::RNDnormalDitributionComplexWithPowerModulation2D(accMLO->transformer1.fouriers(), accMLO->transformer1.xFSize, ~NoiseSpectra);
+		syclKernels::RNDnormalDitributionComplexWithPowerModulation2D(accMLO->transformer1.fouriers(), accMLO->transformer1.xFSize, ~NoiseSpectra, rng);
 
 	// Transform to real-space, to get something which look like
 	// the particle image without actual signal (a particle)
@@ -355,9 +356,9 @@ void makeNoiseImage(XFLOAT sigmaFudgeFactor,
 
     // Create noise image with the correct spectral profile
     if(is3D)
-    	CpuKernels::RNDnormalDitributionComplexWithPowerModulation3D(accMLO->transformer1.fouriers(), accMLO->transformer1.xFSize, accMLO->transformer1.yFSize, ~NoiseSpectra);
+    	CpuKernels::RNDnormalDitributionComplexWithPowerModulation3D(accMLO->transformer1.fouriers(), accMLO->transformer1.xFSize, accMLO->transformer1.yFSize, ~NoiseSpectra, rng);
     else
-    	CpuKernels::RNDnormalDitributionComplexWithPowerModulation2D(accMLO->transformer1.fouriers(), accMLO->transformer1.xFSize, ~NoiseSpectra);
+    	CpuKernels::RNDnormalDitributionComplexWithPowerModulation2D(accMLO->transformer1.fouriers(), accMLO->transformer1.xFSize, ~NoiseSpectra, rng);
 
     // Transform to real-space, to get something which look like
 	// the particle image without actual signal (a particle)

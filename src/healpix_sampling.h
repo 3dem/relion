@@ -172,7 +172,7 @@ public:
 			std::vector <Matrix2D<RFLOAT> > & L_repository);
 
     // Reset the random perturbation
-    void resetRandomlyPerturbedSampling();
+    void resetRandomlyPerturbedSampling(RandomStream &rng);
 
     // Read in all information from the command line to build the sampling object
     // Jun19,2015 - Shaoda, is that available???
