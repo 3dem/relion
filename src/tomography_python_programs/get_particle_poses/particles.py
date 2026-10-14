@@ -134,18 +134,29 @@ def create_annotations_from_previous_star_file(
         pixel_size = float(
             tomo_data.loc[tomo_name, 'rlnTomoTiltSeriesPixelSize'])
 
-        new_coords = tomo_df.apply(
-            lambda df_row: rlnOrigin_to_rlnCoordinate_row(df_row, pixel_size),
-            axis=1
-        )
+        if all(
+            c in tomo_df.columns
+            for c in [
+                'rlnCoordinateX',
+                'rlnCoordinateY',
+                'rlnCoordinateZ',]
+        ):
+            new_coords = tomo_df[
+                ['rlnCoordinateX', 'rlnCoordinateY', 'rlnCoordinateZ']
+            ].copy()
+        else:
+            new_coords = tomo_df.apply(
+                lambda df_row: rlnOrigin_to_rlnCoordinate_row(df_row, pixel_size),
+                axis=1
+            )
 
-        new_coords = (new_coords + shift) / tomo_bin
-        new_coords.insert(loc=0, column='rlnTomoName', value=tomo_name)
-        new_coords.rename(columns={
-            'rlnCenteredCoordinateXAngst': 'rlnCoordinateX',
-            'rlnCenteredCoordinateYAngst': 'rlnCoordinateY',
-            'rlnCenteredCoordinateZAngst': 'rlnCoordinateZ'
-        }, inplace=True)
+            new_coords = (new_coords + shift) / tomo_bin
+            new_coords.insert(loc=0, column='rlnTomoName', value=tomo_name)
+            new_coords.rename(columns={
+                'rlnCenteredCoordinateXAngst': 'rlnCoordinateX',
+                'rlnCenteredCoordinateYAngst': 'rlnCoordinateY',
+                'rlnCenteredCoordinateZAngst': 'rlnCoordinateZ'
+            }, inplace=True)
 
         starfile.write(new_coords, anno_file)
         console.log(f'  Wrote {anno_file_name}')
