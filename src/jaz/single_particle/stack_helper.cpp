@@ -503,6 +503,46 @@ std::vector<double> StackHelper::powerSpectrum(const std::vector<std::vector<Ima
 	return out;
 }
 
+std::vector<double> StackHelper::powerSpectrum(const ContiguousImageStack<Complex>& stack)
+{
+	const int ic = stack.particleCount();
+	const int fc = stack.frameCount();
+	const int w = stack.xdim();
+	const int h = stack.ydim();
+
+	std::vector<double> out(w, 0.0), wgh(w, 0.0);
+
+	for (int i = 0; i < ic; i++)
+	for (int f = 0; f < fc; f++)
+	{
+		for (int y = 0; y < h; y++)
+		for (int x = 0; x < w; x++)
+		{
+			const Complex z = stack(i, f)(y, x);
+
+			const double yy = y < w? y : y - h;
+			const double xx = x;
+
+			const int r = (int) sqrt(xx * xx + yy * yy);
+
+			if (r >= w) continue;
+
+			out[r] += z.norm();
+			wgh[r] += 1.0;
+		}
+	}
+
+	for (int x = 0; x < w; x++)
+	{
+		if (wgh[x] > 0.0)
+		{
+			out[x] /= wgh[x];
+		}
+	}
+
+	return out;
+}
+
 std::vector<double> StackHelper::varSpectrum(const std::vector<std::vector<Image<Complex>>> &stack)
 {
 	const int ic = stack.size();

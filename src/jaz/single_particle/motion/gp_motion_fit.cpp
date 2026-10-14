@@ -28,7 +28,7 @@
 using namespace gravis;
 
 GpMotionFit::GpMotionFit(
-		const std::vector<std::vector<Image<double>>>& correlation,
+		const ContiguousImageStack<double>& correlation,
 		double cc_pad,
 		double sig_vel_px, double sig_div_px, double sig_acc_px,
 		int maxDims,
@@ -37,8 +37,8 @@ GpMotionFit::GpMotionFit(
 		int threads, bool expKer)
 	:
 	  expKer(expKer),
-	  pc(correlation.size()),
-	  fc(correlation[0].size()),
+	  pc(correlation.particleCount()),
+	  fc(correlation.frameCount()),
 	  threads(threads),
 	  cc_pad(cc_pad),
 	  sig_vel_px(sig_vel_px),
@@ -103,7 +103,7 @@ double GpMotionFit::f(const std::vector<double> &x) const
 		for (int f = 0; f < fc; f++)
 		{
 			e_t[pad*t] -= Interpolation::cubicXY(
-						correlation[p][f],
+						correlation(p, f),
 						cc_pad * (pos[p][f].x + perFrameOffsets[f].x),
 						cc_pad * (pos[p][f].y + perFrameOffsets[f].y),
 						0, 0, true);
@@ -176,7 +176,7 @@ double GpMotionFit::f(const std::vector<double> &x, void* tempStorage) const
 
 		for (int f = 0; f < fc; f++)
 		{
-			const double epf = Interpolation::cubicXY(correlation[p][f],
+			const double epf = Interpolation::cubicXY(correlation(p, f),
 													  cc_pad * (ts->pos[p][f].x + perFrameOffsets[f].x),
 													  cc_pad * (ts->pos[p][f].y + perFrameOffsets[f].y),
 													  0, 0, true);
@@ -246,7 +246,7 @@ void GpMotionFit::grad(const std::vector<double> &x,
 		for (int f = 0; f < fc; f++)
 		{
 			d2Vector vr = Interpolation::cubicXYgrad(
-						correlation[p][f],
+						correlation(p, f),
 						cc_pad * (pos[p][f].x + perFrameOffsets[f].x),
 						cc_pad * (pos[p][f].y + perFrameOffsets[f].y),
 						0, 0, true);
@@ -352,7 +352,7 @@ void GpMotionFit::grad(const std::vector<double> &x,
 		for (int f = 0; f < fc; f++)
 		{
 			d2Vector vr = Interpolation::cubicXYgrad(
-						correlation[p][f],
+						correlation(p, f),
 						cc_pad * (ts->pos[p][f].x + perFrameOffsets[f].x),
 						cc_pad * (ts->pos[p][f].y + perFrameOffsets[f].y),
 						0, 0, true);

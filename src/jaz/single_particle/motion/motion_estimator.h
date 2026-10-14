@@ -23,6 +23,7 @@
 
 #include <src/image.h>
 #include <src/jaz/gravis/t2Vector.h>
+#include <src/jaz/image/contiguous_image_stack.h>
 #include <vector>
 
 class IOParser;
@@ -58,21 +59,29 @@ class MotionEstimator
 			const std::vector<Image<RFLOAT>>& dmgWeight,
 			int ogmg,
             // out:
-            std::vector<std::vector<Image<Complex>>>& movie,
-            std::vector<std::vector<Image<RFLOAT>>>& movieCC,
+            ContiguousImageStack<Complex>& movie,
+            ContiguousImageStack<RFLOAT>& movieCC,
             std::vector<gravis::d2Vector>& positions,
             std::vector<std::vector<gravis::d2Vector>>& initialTracks,
             std::vector<gravis::d2Vector>& globComp);
 
         // perform the actual optimization (also used by MotionParamEstimator)
         std::vector<std::vector<gravis::d2Vector>> optimize(
-            const std::vector<std::vector<Image<double>>>& movieCC,
+            const ContiguousImageStack<double>& movieCC,
             const std::vector<std::vector<gravis::d2Vector>>& inTracks,
             double sig_vel_px, double sig_acc_px, double sig_div_px,
             const std::vector<gravis::d2Vector>& positions,
             const std::vector<gravis::d2Vector>& globComp) const;
 
         // syntactic sugar for float-valued CCs
+        std::vector<std::vector<gravis::d2Vector>> optimize(
+            const ContiguousImageStack<float>& movieCC,
+            const std::vector<std::vector<gravis::d2Vector>>& inTracks,
+            double sig_vel_px, double sig_acc_px, double sig_div_px,
+            const std::vector<gravis::d2Vector>& positions,
+            const std::vector<gravis::d2Vector>& globComp) const;
+
+        // Compatibility path for the persistent parameter-estimation AlignmentSet.
         std::vector<std::vector<gravis::d2Vector>> optimize(
             const std::vector<std::vector<Image<float>>>& movieCC,
             const std::vector<std::vector<gravis::d2Vector>>& inTracks,
@@ -138,7 +147,7 @@ class MotionEstimator
 
 
         void updateFCC(
-            const std::vector<std::vector<Image<Complex>>>& movie,
+            ContiguousImageStack<Complex>& movie,
             const std::vector<std::vector<gravis::d2Vector>>& tracks,
             const MetaDataTable& mdt,
             std::vector<Image<RFLOAT>>& tables,

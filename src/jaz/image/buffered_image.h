@@ -1,6 +1,8 @@
 #ifndef JAZ_VECTOR_IMAGE_H
 #define JAZ_VECTOR_IMAGE_H
 
+#include <utility>
+
 #include "raw_image.h"
 
 
@@ -15,6 +17,7 @@ class BufferedImage : public RawImage<T>
 		BufferedImage();
 		BufferedImage(size_t xdim, size_t ydim = 1, size_t zdim = 1);
 		BufferedImage(const BufferedImage& vi);
+		BufferedImage(BufferedImage&& vi) noexcept;
 		BufferedImage(const RawImage<T>& vi);
 		BufferedImage(const Image<T>& vi);
 		BufferedImage(std::string filename);
@@ -37,6 +40,7 @@ class BufferedImage : public RawImage<T>
 		RawImage<T> getRef();
 		
 		BufferedImage& operator = (const BufferedImage& other);
+		BufferedImage& operator = (BufferedImage&& other) noexcept;
 };
 
 
@@ -72,6 +76,27 @@ BufferedImage<T>& BufferedImage<T>::operator = (const BufferedImage<T>& other)
 }
 
 template <class T>
+BufferedImage<T>& BufferedImage<T>::operator = (BufferedImage<T>&& other) noexcept
+{
+	if (this != &other)
+	{
+		this->xdim = other.xdim;
+		this->ydim = other.ydim;
+		this->zdim = other.zdim;
+		dataVec = std::move(other.dataVec);
+		this->data = dataVec.data();
+
+		other.xdim = 0;
+		other.ydim = 0;
+		other.zdim = 0;
+		other.dataVec.clear();
+		other.data = 0;
+	}
+
+	return *this;
+}
+
+template <class T>
 BufferedImage<T>::BufferedImage()
 	: RawImage<T>()
 {}
@@ -90,6 +115,20 @@ BufferedImage<T>::BufferedImage(const BufferedImage<T>& vi)
 	  dataVec(vi.dataVec)
 {
 	RawImage<T>::data = &(dataVec[0]);
+}
+
+template <class T>
+BufferedImage<T>::BufferedImage(BufferedImage<T>&& vi) noexcept
+	:   RawImage<T>(vi.xdim, vi.ydim, vi.zdim, 0),
+	  dataVec(std::move(vi.dataVec))
+{
+	RawImage<T>::data = dataVec.data();
+
+	vi.xdim = 0;
+	vi.ydim = 0;
+	vi.zdim = 0;
+	vi.dataVec.clear();
+	vi.data = 0;
 }
 
 template <class T>
