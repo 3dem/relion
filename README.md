@@ -1,4 +1,4 @@
-RELION 5.0.1
+RELION 5.1.1
 ============
 
 RELION (for REgularised LIkelihood OptimisatioN) is a stand-alone computer
@@ -12,7 +12,7 @@ Comprehensive documentation of RELION and tutorials are stored [here](https://re
 
 ## Installation
 
-See our [installation instructions](https://relion.readthedocs.io/en/release-5.0/Installation.html).
+See our [installation instructions](https://relion.readthedocs.io/en/release-5.1/Installation.html).
 
 You will have to set up a Python environment to use Python modules (e.g. Blush, ModelAngelo and DynaMight).
 Thus, please read the above instructions carefully even if you are familiar with earlier versions.
