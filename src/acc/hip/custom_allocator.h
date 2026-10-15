@@ -511,7 +511,7 @@ public:
 
 		if (cache)
 		{
-			size = alignmentSize*ceilf( (float)size / (float)alignmentSize) ; //To prevent miss-aligned memory
+			size = ((size + alignmentSize - 1) / alignmentSize) * alignmentSize; //To prevent miss-aligned memory (integer arithmetic: float rounding returned undersized allocations above 16 MB)
 
 			Alloc *curAlloc = _getFirstSuitedFree(size);
 
