@@ -155,7 +155,7 @@ class TiltSeriesBrowserWidget(QWidget):
             self.viewer.layers['tilt-series'].data = tilt_series.data
         else:
             self.viewer.add_image(
-                data=tilt_series.data, name='tilt-series', interpolation='bicubic'
+                data=tilt_series.data, name='tilt-series', interpolation2d='cubic'
             )
         self.viewer.status = _status_from_lazy_tilt_series(tilt_series)
         if tilt_series.n_images_loaded == 1:
