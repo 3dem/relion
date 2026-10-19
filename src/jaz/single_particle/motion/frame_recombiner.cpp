@@ -317,6 +317,7 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 		
 		BufferedImage<Complex> sumStack(sh_out[ogmg], s_out[ogmg], pc);
 		sumStack.fill(Complex(0,0));
+		ContiguousImageStack<Complex> fullFrame;
 
 		// This is an ugly code duplication.
 		// Frame-by-frame reading (the normal route) is more memory efficient but
@@ -325,8 +326,8 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 		// CompressedMRCReader (and probably EERRenderer).
 		if (readAtOnce)
 		{
-			std::vector<std::vector<Image<Complex>>> fullFrame = micrographHandler->loadMovie(
-						mdtOut, s_out[ogmg], angpix_out[ogmg], fts,
+			micrographHandler->loadMovie(
+						mdtOut, s_out[ogmg], angpix_out[ogmg], fts, fullFrame,
 						&priorShift, &shift, data_angpix[ogmg]);
 
 			for (int f = 0; f < fc; f++)
@@ -334,7 +335,7 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 				#pragma omp parallel for num_threads(nr_omp_threads)
 				for (int p = 0; p < pc; p++)
 				{
-					RawImage<Complex> obs(fullFrame[p][f]);
+					RawImage<Complex> obs(fullFrame(p, f));
 
 					Translation::shiftInFourierSpace2D(obs, -shift[p][f].x, -shift[p][f].y);
 
@@ -357,14 +358,14 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 					priorShift_f[p] = {priorShift[p][f]};
 				}
 
-				std::vector<std::vector<Image<Complex>>> fullFrame = micrographHandler->loadMovie(
-							mdtOut, s_out[ogmg], angpix_out[ogmg], fts,
+				micrographHandler->loadMovie(
+							mdtOut, s_out[ogmg], angpix_out[ogmg], fts, fullFrame,
 							&priorShift_f, &shift, data_angpix[ogmg], f);
 
 				#pragma omp parallel for num_threads(nr_omp_threads)
 				for (int p = 0; p < pc; p++)
 				{
-					RawImage<Complex> obs(fullFrame[p][0]);
+					RawImage<Complex> obs(fullFrame(p, 0));
 
 					Translation::shiftInFourierSpace2D(obs, -shift[p][0].x, -shift[p][0].y);
 
