@@ -54,10 +54,10 @@ void AutoPickerMpi::deviceInitialise()
 	untangleDeviceIDs(gpu_ids, allThreadIDs);
 
 	// Sequential initialisation of GPUs on all ranks
-	if (!std::isdigit(*gpu_ids.begin()))
+	if (!hasExplicitDeviceIDs(gpu_ids))
 		device_id = node->rank%devCount;
 	else
-		device_id = textToInteger((allThreadIDs[node->rank][0]).c_str());
+		device_id = textToInteger(getDeviceIDsForRank(allThreadIDs, node->rank)[0].c_str());
 
 	for (int follower = 0; follower < node->size; follower++)
 	{
