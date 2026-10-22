@@ -366,6 +366,15 @@ private:
 
 		a->free = true;
 
+		// Clear any deferred-free state: alloc() may hand this record out again as an exact fit,
+		// and a stale freeWhenReady/readyEvent would make _freeReadyAllocs() free it under its new owner.
+		if (a->readyEvent != 0)
+		{
+			DEBUG_HANDLE_ERROR(hipEventDestroy(a->readyEvent));
+			a->readyEvent = 0;
+		}
+		a->freeWhenReady = false;
+
 		if (cache)
 		{
 			//Previous neighbor is free, concatenate
@@ -502,7 +511,7 @@ public:
 
 		if (cache)
 		{
-			size = alignmentSize*ceilf( (float)size / (float)alignmentSize) ; //To prevent miss-aligned memory
+			size = ((size + alignmentSize - 1) / alignmentSize) * alignmentSize; //To prevent miss-aligned memory (integer arithmetic: float rounding returned undersized allocations above 16 MB)
 
 			Alloc *curAlloc = _getFirstSuitedFree(size);
 
