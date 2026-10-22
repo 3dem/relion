@@ -153,10 +153,10 @@ FileName TiltSeriesSelectorGuiWindow::getTomogramFilename(int index) const
 
     // Prefer a denoised tomogram when both columns are present.
     if (tomogram_set.globalTable.containsLabel(
-            EMDL_TOMO_DENOISED_TOMOGRAM_FILE_NAME))
+            EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_DENOISED_FILE_NAME))
     {
         tomogram_set.globalTable.getValueSafely(
-                EMDL_TOMO_DENOISED_TOMOGRAM_FILE_NAME,
+                 EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_DENOISED_FILE_NAME,
                 filename, index);
         if (filename != "")
             return filename;
