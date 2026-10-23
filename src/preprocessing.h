@@ -215,7 +215,7 @@ public:
 	void readCoordinates(FileName fn_coord, MetaDataTable &MD);
 
     void addOneHelicalSegment(MetaDataTable &MD, RFLOAT xcoord, RFLOAT ycoord, int tube_id,
-                       RFLOAT psi_prior, RFLOAT helix_length, RFLOAT psi_prior_flip_ratio);
+                       RFLOAT psi_prior, RFLOAT helix_length, RFLOAT psi_prior_flip_ratio, int selection_type);
 
     void convertHelicalLineCoordsToMetaDataTable(
 		FileName& fn_in,

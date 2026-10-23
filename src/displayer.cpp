@@ -636,6 +636,7 @@ int basisViewerWindow::fillPickerViewerCanvas(MultidimArray<RFLOAT> image, Multi
 											  RFLOAT _minimum_pick_fom, RFLOAT _min_fom, RFLOAT _max_fom)
 {
 	current_selection_type = 2; // Green
+	current_line_id = 1;
 
 	// Scroll bars
 	Fl_Scroll scroll(0, 0, w(), h());
@@ -2080,6 +2081,8 @@ void pickerViewerCanvas::draw()
 	long int icoord = 0;
     int my_prev_type = 0;
 	int xcoori_start, ycoori_start;
+	int current_line_id;
+	int prev_line_id = 0;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDcoords)
 	{
 		icoord++;
@@ -2096,6 +2099,9 @@ void pickerViewerCanvas::draw()
 			MDcoords.getValue(EMDL_PARTICLE_AUTOPICK_FOM, fom);
 			if (fom < minimum_pick_fom) continue;
 		}
+
+		if (MDcoords.containsLabel(EMDL_PARTICLE_HELICAL_LINE_ID))
+			MDcoords.getValue(EMDL_PARTICLE_HELICAL_LINE_ID, current_line_id);
 
         if (color_label != EMDL_UNDEFINED)
 		{
@@ -2160,7 +2166,7 @@ void pickerViewerCanvas::draw()
 
         if (do_lines)
         {
-            if (mytype == my_prev_type)
+            if (current_line_id == prev_line_id)
             {
                 fl_line(xcoori_start, ycoori_start, xcoori, ycoori);
             }
@@ -2184,7 +2190,8 @@ void pickerViewerCanvas::draw()
                 }
             }
         }
-        my_prev_type = mytype;
+        //my_prev_type = mytype;
+		prev_line_id = current_line_id;
     }
 }
 
@@ -2196,7 +2203,7 @@ int pickerViewerCanvas::handle(int ev)
 	const int key = Fl::event_key();
     if (do_lines && has_dragged && ev == FL_RELEASE)
     {
-        current_selection_type++;
+        current_line_id++;
     }
     has_dragged = false;
 
@@ -2251,9 +2258,12 @@ int pickerViewerCanvas::handle(int ev)
 			MDcoords.setValue(EMDL_IMAGE_COORD_X, xcoor);
 			MDcoords.setValue(EMDL_IMAGE_COORD_Y, ycoor);
 			// No autopicking, but still always fill in the parameters for autopicking with dummy values (to prevent problems in joining autopicked and manually picked coordinates)
-			MDcoords.setValue(EMDL_PARTICLE_SELECTION_TYPE, iaux);
+			MDcoords.setValue(EMDL_PARTICLE_SELECTION_TYPE, current_selection_type);
 			MDcoords.setValue(EMDL_ORIENT_PSI, aux);
 			MDcoords.setValue(EMDL_PARTICLE_AUTOPICK_FOM, zero);
+
+			if (do_lines)
+				MDcoords.setValue(EMDL_PARTICLE_HELICAL_LINE_ID, current_line_id);
 
 			redraw();
             return 1;
@@ -2275,13 +2285,13 @@ int pickerViewerCanvas::handle(int ev)
 					if (do_lines)
                     {
                         int delval;
-                        MDcoords.getValue(EMDL_PARTICLE_SELECTION_TYPE, delval);
+                        MDcoords.getValue(EMDL_PARTICLE_HELICAL_LINE_ID, delval);
                         MetaDataTable MDout;
                         MDout.setName(MDcoords.getName());
                         FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDcoords)
                         {
                             int val;
-                            MDcoords.getValue(EMDL_PARTICLE_SELECTION_TYPE, val);
+                            MDcoords.getValue(EMDL_PARTICLE_HELICAL_LINE_ID, val);
 
                             if (val != delval) MDout.addObject(MDcoords.getObject(current_object));
                         }
@@ -2450,10 +2460,10 @@ void pickerViewerCanvas::loadCoordinates(bool ask_filename)
         FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDcoords)
         {
             int ifil;
-            MDcoords.getValue(EMDL_PARTICLE_SELECTION_TYPE, ifil);
+            MDcoords.getValue(EMDL_PARTICLE_HELICAL_LINE_ID, ifil);
             if (ifil > ifil_max) ifil_max=ifil;
         }
-        current_selection_type = ifil_max+1;
+        current_line_id = ifil_max+1;
     }
 
 	if (fn_color != "")

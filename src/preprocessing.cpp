@@ -661,7 +661,7 @@ void Preprocessing::readCoordinates(FileName fn_coord, MetaDataTable &MD)
 }
 
 void Preprocessing::addOneHelicalSegment(MetaDataTable &MD, RFLOAT xcoord, RFLOAT ycoord, int tube_id,
-                                  RFLOAT psi_prior, RFLOAT helix_length, RFLOAT psi_prior_flip_ratio)
+                                  RFLOAT psi_prior, RFLOAT helix_length, RFLOAT psi_prior_flip_ratio, int selection_type)
 {
     MD.addObject();
     MD.setValue(EMDL_IMAGE_COORD_X, xcoord);
@@ -671,7 +671,8 @@ void Preprocessing::addOneHelicalSegment(MetaDataTable &MD, RFLOAT xcoord, RFLOA
     MD.setValue(EMDL_ORIENT_PSI_PRIOR, psi_prior);
     MD.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM, helix_length);
     MD.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_prior_flip_ratio);
-
+	if (selection_type > 0)
+		MD.setValue(EMDL_PARTICLE_SELECTION_TYPE, selection_type);
 }
 
 void Preprocessing::convertHelicalLineCoordsToMetaDataTable(
@@ -695,8 +696,8 @@ void Preprocessing::convertHelicalLineCoordsToMetaDataTable(
         return;
 
     if ( (!MD_in.containsLabel(EMDL_IMAGE_COORD_X)) || (!MD_in.containsLabel(EMDL_IMAGE_COORD_Y)) ||
-            (!MD_in.containsLabel(EMDL_PARTICLE_SELECTION_TYPE)) )
-        REPORT_ERROR("Preprocessing::convertHelicalLineCoordsToMetaDataTable: Input STAR file does not contain X, Y coordinates or particle selection type! Error(s) in " + fn_in);
+            (!MD_in.containsLabel(EMDL_PARTICLE_HELICAL_LINE_ID)) )
+        REPORT_ERROR("Preprocessing::convertHelicalLineCoordsToMetaDataTable: Input STAR file does not contain X, Y coordinates or helical line ID! Error(s) in " + fn_in);
 
     MD_out.clear();
     MD_out.addLabel(EMDL_IMAGE_COORD_X);
@@ -706,6 +707,10 @@ void Preprocessing::convertHelicalLineCoordsToMetaDataTable(
     MD_out.addLabel(EMDL_ORIENT_PSI_PRIOR);
     MD_out.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM);
     MD_out.addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
+
+	if (MD_in.containsLabel(EMDL_PARTICLE_SELECTION_TYPE))
+		MD_out.addLabel(EMDL_PARTICLE_SELECTION_TYPE);
+
     RFLOAT psi_prior_flip_ratio = (bimodal_angular_priors) ? BIMODAL_PSI_PRIOR_FLIP_RATIO : UNIMODAL_PSI_PRIOR_FLIP_RATIO;
 
     int filament_id=0;
@@ -715,15 +720,19 @@ void Preprocessing::convertHelicalLineCoordsToMetaDataTable(
     RFLOAT step_pix = step_A / pixel_size_A;
 
     total_tubes = total_segments = 0;
-    int my_type=0, my_prev_type= 0;
+    int current_line_id=0, prev_line_id= 0;
+	int selection_type = 0;
     bool is_first = false;
     RFLOAT my_xcoord, my_ycoord, prev_xcoord, prev_ycoord;
     FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD_in)
     {
         MD_in.getValue(EMDL_IMAGE_COORD_X, my_xcoord);
         MD_in.getValue(EMDL_IMAGE_COORD_Y, my_ycoord);
-        MD_in.getValue(EMDL_PARTICLE_SELECTION_TYPE, my_type);
-        if (my_type != my_prev_type)
+        MD_in.getValue(EMDL_PARTICLE_HELICAL_LINE_ID, current_line_id);
+    	if (MD_in.containsLabel(EMDL_PARTICLE_SELECTION_TYPE))
+    		MD_in.getValue(EMDL_PARTICLE_SELECTION_TYPE, selection_type);
+
+        if (current_line_id != prev_line_id)
         {
             if (is_first)
             {
@@ -740,7 +749,7 @@ void Preprocessing::convertHelicalLineCoordsToMetaDataTable(
             total_segments++;
             //std::cerr << "is_first= "<<is_first << " x,y= " << my_xcoord << " , " << my_ycoord<< " id= " << filament_id<< " l= "<<filament_length<< std::endl;
             addOneHelicalSegment(MD_out, my_xcoord, my_ycoord,
-                                 filament_id, 0., filament_length, psi_prior_flip_ratio); // this is wrong tilt prior for tilted data!!! (we might never use this anyway...)
+                                 filament_id, 0., filament_length, psi_prior_flip_ratio, selection_type); // this is wrong tilt prior for tilted data!!! (we might never use this anyway...)
         }
         else
         {
@@ -759,7 +768,7 @@ void Preprocessing::convertHelicalLineCoordsToMetaDataTable(
                 if (is_first) MD_out.setValue(EMDL_ORIENT_PSI_PRIOR, psi_prior, MD_out.numberOfObjects()-1);
                 //std::cerr << "added="<<added << " newx,y= " << new_x << " , " << new_y<< " psi= " << psi_prior << " id= " << filament_id<< " l= "<<filament_length<< std::endl;
                 addOneHelicalSegment(MD_out, new_x, new_y,filament_id,
-                                     psi_prior, filament_length, psi_prior_flip_ratio);
+                                     psi_prior, filament_length, psi_prior_flip_ratio, selection_type);
             }
             remaining_step = added - dist;
             is_first = false;
@@ -767,7 +776,7 @@ void Preprocessing::convertHelicalLineCoordsToMetaDataTable(
 
         prev_xcoord = my_xcoord;
         prev_ycoord = my_ycoord;
-        my_prev_type = my_type;
+        prev_line_id = current_line_id;
     }
 
 }
