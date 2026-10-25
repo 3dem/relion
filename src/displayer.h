@@ -145,7 +145,7 @@ public:
 	               RFLOAT _scale, RFLOAT _ori_scale, int _ncol, long int max_nr_images = -1, RFLOAT lowpass = -1.0 , RFLOAT highpass = -1.0,
 	               bool do_class = false, MetaDataTable *MDdata = NULL,
 	               int _nr_regroup = -1, bool do_recenter = false, bool _is_data = false, MetaDataTable *MDgroups = NULL,
-	               bool do_allow_save = false, FileName fn_selected_imgs="", FileName fn_selected_parts="", int max_nr_parts_per_class = -1);
+	               bool do_allow_save = false, FileName fn_selected_imgs="", FileName fn_selected_parts="", int max_nr_parts_per_class = -1, bool _show_fourier_amplitudes = false, bool _show_fourier_phase_angles = false);
 	int fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale);
 	int fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale, RFLOAT _coord_scale,
 	                           int _particle_radius, bool do_startend = false, FileName _fn_coords = "",
@@ -168,6 +168,11 @@ public:
 	int ysize_box;
 	int xoff;
 	int yoff;
+	// Show Fourier amplitudes?
+	bool show_fourier_amplitudes;
+
+	// Show Fourier phase angles?
+	bool show_fourier_phase_angles;
 
 	// To get positions in scrolled canvas...
 	Fl_Scroll *scroll;
@@ -277,6 +282,8 @@ private:
 	void makeStarFileSelectedParticles(int save_selected, MetaDataTable &MDpart);
 	void saveSelectedParticles(int save_selected);
 	void showSelectedParticles(int save_selected);
+	void showSelectedFourierAmplitudes(int save_selected);
+	void showSelectedFourierPhaseAngles(int save_selected);
 	void saveTrainingSet();
 	void saveSelected(int save_selected);
 	void saveBackupSelection();
