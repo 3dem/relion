@@ -1566,7 +1566,7 @@ private:
 			err = writeSPIDER(select_img, isStack, mode, datatype);
 		else if (ext_name.contains("mrcs"))
 			writeMRC(select_img, true, mode, datatype);
-		else if (ext_name.contains("mrc"))
+		else if (ext_name.contains("mrc") || ext_name.contains("map"))
 			writeMRC(select_img, false, mode, datatype);
 		else if (ext_name.contains("img") || ext_name.contains("hed"))
 			writeIMAGIC(select_img, mode);
