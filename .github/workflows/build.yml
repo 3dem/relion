@@ -18,26 +18,19 @@ jobs:
         run: mkdir build && cd build && cmake -DALTCPU=${{ matrix.altcpu }} -DCUDA=OFF -DFETCH_WEIGHTS=OFF -DPYTHON_EXE_PATH=/usr/bin/python3 -DTORCH_HOME_PATH=/tmp .. && make
 
   build_on_aarch64:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04-arm
     strategy:
       matrix:
         altcpu: [ON, OFF]
     steps:
       - uses: actions/checkout@v7
+      - name: Install aarch64 dependencies
+        run: |
+          sudo apt-get update -q -y
+          sudo apt-get install -q -y cmake git build-essential mpi-default-bin mpi-default-dev libfftw3-dev libtiff-dev libpng-dev libtbb-dev libfltk1.3-dev python3
       - name: Build RELION for Linux aarch64
-        uses: uraimo/run-on-arch-action@v3.1.0
-        with:
-          arch: aarch64
-          distro: ubuntu20.04
-          githubToken: ${{ github.token }}
-          dockerRunArgs: |
-            --volume "${PWD}:/relion" 
-          install: |
-            apt-get update -q -y
-            apt-get install -q -y cmake git build-essential mpi-default-bin mpi-default-dev libfftw3-dev libtiff-dev libpng-dev libtbb-dev libfltk1.3-dev python3
-          run: |
-            cd /relion
-            mkdir build
-            cd build
-            cmake -DALTCPU=${{ matrix.altcpu }} -DCUDA=OFF -DFETCH_WEIGHTS=OFF -DPYTHON_EXE_PATH=/usr/bin/python3 -DTORCH_HOME_PATH=/tmp ..
-            make
+        run: |
+          mkdir build
+          cd build
+          cmake -DALTCPU=${{ matrix.altcpu }} -DCUDA=OFF -DFETCH_WEIGHTS=OFF -DPYTHON_EXE_PATH=/usr/bin/python3 -DTORCH_HOME_PATH=/tmp ..
+          cmake --build . --parallel 2
