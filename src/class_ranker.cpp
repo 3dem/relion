@@ -418,6 +418,7 @@ void ClassRanker::read(int argc, char **argv, int rank)
 	nr_subimages = textToInteger(parser.getOption("--nr_subimages", "Number of subimage to extract (randonly)", "25"));
 	subimage_boxsize = textToInteger(parser.getOption("--subimage_boxsize", "Boxsize (in pixels) for subimages", "24"));
 	only_do_subimages = parser.checkOption("--only_do_subimages", "Dont do anything else than extracting subimages");
+	nr_3d_projections = textToInteger(parser.getOption("--3d_nr_projections", "Number of uniformly distributed projections per 3D class", "192"));
 
 	int expert_section = parser.addSection("Expert options");
 	radius_ratio = textToFloat(parser.getOption("--radius_ratio", "Ratio of inner radius of the interested ring area in proportion to the current circular mask radius", "0.95"));
@@ -432,6 +433,8 @@ void ClassRanker::read(int argc, char **argv, int rank)
 	// Check for errors in the command-line option
 	if (radius > 0 && radius < 1)
 		REPORT_ERROR("Incorrect value(s) for inner_radius / outer_radius. Try inner_radius_ratio / outer_radius_ratio.");
+	if (nr_3d_projections < 1)
+		REPORT_ERROR("The number of 3D class projections must be positive.");
 	if (parser.checkForErrors())
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 
@@ -452,6 +455,7 @@ void ClassRanker::initialise()
 {
 
 	if (verb > 0) std::cout << " Initialising... " << std::endl;
+	have_average_ctf = false;
 
 	// Make sure output rootname ends with a "/" and make directory
 	if (fn_out[fn_out.length()-1] != '/') fn_out += "/";
@@ -490,6 +494,14 @@ void ClassRanker::initialise()
 		//Sjors 06022020: go back to just reading MD_optimiser for speed
 		mymodel.read(fn_model, nr_optics_groups);
 		if (debug>0) std::cerr << "Done with reading model.star ..." << std::endl;
+		do_3d_class_ranking = (mymodel.ref_dim == 3);
+		if (do_3d_class_ranking && mymodel.nr_bodies > 1)
+			REPORT_ERROR("ClassRanker 3D scoring is intended for 3D classification, not multi-body refinement.");
+		if (do_3d_class_ranking && mymodel.data_dim != 2)
+			REPORT_ERROR("ClassRanker 3D scoring currently requires 2D particle data.");
+		if (verb > 0 && do_3d_class_ranking)
+			std::cout << " Detected 3D classification; scoring " << nr_3d_projections
+			          << " projections per class and averaging their predictions." << std::endl;
 
 		//myopt.read(fn_optimiser); // true means skip_groups_and_pdf_direction from mlmodel; only read 1000 particles...
 		//if (debug>0) std::cerr << "Done with reading optimiser ..." << std::endl;
@@ -515,18 +527,24 @@ void ClassRanker::initialise()
 				if (mymodel.pdf_class[iclass] > 0)
 				{
 
-					if (mymodel.acc_rot[iclass] > 99. || mymodel.acc_rot[iclass] > 99.)
+					if (mymodel.acc_rot[iclass] > 99. || mymodel.acc_trans[iclass] > 99.)
 					{
 						haveAllAccuracies = false;
 						break;
 					}
 				}
 			}
-			if (!haveAllAccuracies)
-			{
-				// Set FTs of the references
-				mymodel.setFourierTransformMaps(false);
-			}
+		}
+
+		// 3D classes always need Projectors for generating 2D views. Use the full
+		// original box so that projected images retain the model pixel size.
+		if (do_3d_class_ranking || (!do_skip_angular_errors && !haveAllAccuracies))
+		{
+			int saved_current_size = mymodel.current_size;
+			if (do_3d_class_ranking)
+				mymodel.current_size = mymodel.ori_size;
+			mymodel.setFourierTransformMaps(false);
+			mymodel.current_size = saved_current_size;
 		}
 
 		if (!only_do_subimages && (intact_ctf_first_peak || do_ranking || (!do_skip_angular_errors && !haveAllAccuracies)) )
@@ -565,12 +583,20 @@ void ClassRanker::initialise()
 			// some people may have used a too small , or even zero amplitude contrast, lets forbid that...
 			//q0 = XMIPP_MAX(q0, 0.07);
 			CTF avgctf;
-			avgctf.setValuesByGroup(&mydata.obsModel, 0, def_u, def_v, 0.);
+			avgctf.setValuesByGroup(&mydata.obsModel, 0, def_avg, def_avg, 0.);
 
-			// Loop over all classes in myopt.mymodel.Iref
-			for (int iref =0; iref < mymodel.Iref.size(); iref++)
+			if (do_3d_class_ranking)
 			{
-				correctCtfUntilFirstPeak(mymodel.Iref[iref], avgctf);
+				// The correction is intrinsically 2D, so apply it after each 3D
+				// class has been projected rather than to the volume itself.
+				average_ctf = avgctf;
+				have_average_ctf = true;
+			}
+			else
+			{
+				// Loop over all 2D class averages.
+				for (int iref =0; iref < mymodel.Iref.size(); iref++)
+					correctCtfUntilFirstPeak(mymodel.Iref[iref], avgctf);
 			}
 		}
 
@@ -1440,10 +1466,12 @@ void ClassRanker::saveMasks(Image<RFLOAT> &img, MultidimArray<RFLOAT> &lpf, Mult
 	}
 
 	FileName fp_out, fs_out, flpf_out, fimg_out;
-	fimg_out = fn_out+filtered_mask_folder+"/class"+integerToString(cf.class_index)+"_original.mrc";
-	flpf_out = fn_out+filtered_mask_folder+"/class"+integerToString(cf.class_index)+"_lowpassfiltered.mrc";
-	fp_out = fn_out+filtered_mask_folder+"/class"+integerToString(cf.class_index)+"_p_mask.mrc";
-	fs_out = fn_out+filtered_mask_folder+"/class"+integerToString(cf.class_index)+"_s_mask.mrc";
+	std::string projection_suffix = (cf.projection_index >= 0)
+			? "_projection" + integerToString(cf.projection_index + 1) : "";
+	fimg_out = fn_out+filtered_mask_folder+"/class"+integerToString(cf.class_index)+projection_suffix+"_original.mrc";
+	flpf_out = fn_out+filtered_mask_folder+"/class"+integerToString(cf.class_index)+projection_suffix+"_lowpassfiltered.mrc";
+	fp_out = fn_out+filtered_mask_folder+"/class"+integerToString(cf.class_index)+projection_suffix+"_p_mask.mrc";
+	fs_out = fn_out+filtered_mask_folder+"/class"+integerToString(cf.class_index)+projection_suffix+"_s_mask.mrc";
 
 	img.write(fimg_out);
 	lpf_out.write(flpf_out);
@@ -1488,7 +1516,9 @@ void ClassRanker::maskCircumference(MultidimArray<int> p_mask, RFLOAT &protein_C
 		mktree("mask_C");
 
 		FileName fc_out;
-		fc_out = "./mask_C/class_"+integerToString(cf.class_index)+"_mask_c.mrc";
+		std::string projection_suffix = (cf.projection_index >= 0)
+				? "_projection" + integerToString(cf.projection_index + 1) : "";
+		fc_out = "./mask_C/class_"+integerToString(cf.class_index)+projection_suffix+"_mask_c.mrc";
 		c_out.write(fc_out);
 	}
 }
@@ -1544,242 +1574,279 @@ void ClassRanker::localNormalisation(std::vector<classFeatures> &cf_all)
 }
 
 /** ======================================================== Collecting All Features ========================================================= */
-// Get features for non-empty classes
+
+void ClassRanker::get3DProjectionDirections(std::vector<RFLOAT> &rots, std::vector<RFLOAT> &tilts)
+{
+	rots.resize(nr_3d_projections);
+	tilts.resize(nr_3d_projections);
+
+	// Fibonacci-lattice directions are deterministic and approximately uniform on
+	// the complete sphere. The half-step in z avoids placing samples exactly at
+	// the poles, where the rot angle is degenerate.
+	const RFLOAT golden_angle = PI * (3. - sqrt(5.));
+	for (int idir = 0; idir < nr_3d_projections; idir++)
+	{
+		RFLOAT z = 1. - 2. * ((RFLOAT)idir + 0.5) / (RFLOAT)nr_3d_projections;
+		RFLOAT phi = fmod((RFLOAT)idir * golden_angle, 2. * PI);
+		rots[idir] = phi * 180. / PI;
+		if (rots[idir] > 180.) rots[idir] -= 360.;
+		tilts[idir] = acos(z) * 180. / PI;
+	}
+}
+
+MultidimArray<RFLOAT> ClassRanker::project3DClass(int iclass, RFLOAT rot, RFLOAT tilt)
+{
+	if (mymodel.ref_dim != 3)
+		REPORT_ERROR("BUG: project3DClass called for a non-3D model.");
+
+	Matrix2D<RFLOAT> A;
+	Euler_angles2matrix(rot, tilt, 0., A, false);
+
+	MultidimArray<Complex> Fprojection;
+	Fprojection.initZeros(mymodel.ori_size, mymodel.ori_size / 2 + 1);
+	mymodel.PPref[iclass].get2DFourierTransform(Fprojection, A);
+
+	MultidimArray<RFLOAT> projection;
+	projection.initZeros(mymodel.ori_size, mymodel.ori_size);
+	FourierTransformer transformer;
+	transformer.inverseFourierTransform(Fprojection, projection);
+	CenterFFT(projection, false);
+	projection.setXmippOrigin();
+	return projection;
+}
+
+void ClassRanker::calculateImageFeatures(MultidimArray<RFLOAT> input_image, classFeatures &features_this_class)
+{
+	Image<RFLOAT> img;
+	img() = input_image;
+
+	// Re-scale the image to the pixel size on which the handcrafted features
+	// were trained.
+	int newsize = ROUND(XSIZE(img()) * (mymodel.pixel_size / uniform_angpix));
+	newsize -= newsize % 2;
+	resizeMap(img(), newsize);
+	img().setXmippOrigin();
+
+	circular_mask_radius = particle_diameter / (uniform_angpix * 2.);
+	circular_mask_radius = std::min(RFLOAT(XSIZE(img()) / 2.), circular_mask_radius);
+	if (radius_ratio > 0 && radius <= 0) radius = radius_ratio * circular_mask_radius;
+	if (radius > 0)
+		features_this_class.ring_moments = calculateMoments(img(), radius, circular_mask_radius);
+	if (debug > 0) std::cerr << " done with ring moments" << std::endl;
+
+	MultidimArray<RFLOAT> lpf;
+	lpf = img();
+	lowPassFilterMap(lpf, lowpass, uniform_angpix);
+	lpf.computeStats(features_this_class.lowpass_filtered_img_avg, features_this_class.lowpass_filtered_img_stddev,
+			features_this_class.lowpass_filtered_img_minval, features_this_class.lowpass_filtered_img_maxval);
+
+	MultidimArray<int> p_mask, s_mask;
+	long protein_area = 0, solvent_area = 0;
+	makeSolventMasks(features_this_class, img(), lpf, p_mask, s_mask,
+			features_this_class.scattered_signal, protein_area, solvent_area);
+	if (protein_area > 1) features_this_class.protein_area = 1;
+	if (solvent_area > 0.08 * 3.14 * circular_mask_radius * circular_mask_radius)
+		features_this_class.solvent_area = 1;
+	if (do_save_masks) saveMasks(img, lpf, p_mask, s_mask, features_this_class);
+
+	RFLOAT protein_C = 0.;
+	if (features_this_class.protein_area > 0.5)
+	{
+		maskCircumference(p_mask, protein_C, features_this_class, do_save_mask_c);
+		features_this_class.CAR = protein_C / (2 * sqrt(3.14 * protein_area));
+	}
+
+	features_this_class.solvent_entropy = img().entropy(&s_mask);
+	features_this_class.protein_entropy = img().entropy(&p_mask);
+	features_this_class.total_entropy = img().entropy();
+
+	features_this_class.protein_moments = calculateMoments(img(), 0., circular_mask_radius, &p_mask);
+	features_this_class.solvent_moments = calculateMoments(img(), 0., circular_mask_radius, &s_mask);
+	features_this_class.relative_signal_intensity = features_this_class.protein_moments.sum
+			- features_this_class.solvent_moments.mean * protein_area;
+
+	long int edge_pix = 0, edge_white = 0;
+	FOR_ALL_ELEMENTS_IN_ARRAY2D(p_mask)
+	{
+		if (round(sqrt(RFLOAT(i * i + j * j))) == round(circular_mask_radius))
+		{
+			edge_pix++;
+			if (A2D_ELEM(p_mask, i, j) == 1) edge_white++;
+		}
+	}
+	features_this_class.edge_signal = (edge_pix > 0) ? RFLOAT(edge_white) / RFLOAT(edge_pix) : 0.;
+	if (debug > 0) std::cerr << " done with edge signal" << std::endl;
+
+	if (do_granularity_features)
+	{
+		calculatePvsLBP(img(), p_mask, s_mask, features_this_class);
+		if (debug > 0) std::cerr << " done with lbp" << std::endl;
+
+		if (debug > 0) std::cerr << "Haralick features for protein area:" << std::endl;
+		features_this_class.haralick_p = haralick_extractor.getHaralickFeatures(img(), &p_mask, debug > 0);
+		if (debug > 0) std::cerr << "Haralick features for solvent area:" << std::endl;
+		features_this_class.haralick_s = haralick_extractor.getHaralickFeatures(img(), &s_mask, debug > 0);
+		features_this_class.zernike_moments = zernike_extractor.getZernikeMoments(img(), 7, circular_mask_radius, debug > 0);
+		features_this_class.granulo = calculateGranulo(img());
+	}
+
+	// The CNN input is generated from the original-pixel-size image. The mask is
+	// currently not consumed by getSubimages, but is passed for API compatibility.
+	features_this_class.subimages = getSubimages(input_image, subimage_boxsize, nr_subimages, &p_mask);
+	if (debug > 0) std::cerr << " done with getSubimages" << std::endl;
+}
+
 // SHWS 16092020: temporary for development of subimage-CNN
 void ClassRanker::onlyGetSubimages()
 {
-
 	features_all_classes.clear();
-	features_all_classes.reserve(mymodel.nr_classes);
+	features_all_classes.reserve((end_class - start_class) * (do_3d_class_ranking ? nr_3d_projections : 1));
+
+	std::vector<RFLOAT> projection_rots, projection_tilts;
+	if (do_3d_class_ranking)
+		get3DProjectionDirections(projection_rots, projection_tilts);
 
 	for (int iclass = start_class; iclass < end_class; iclass++)
 	{
-		classFeatures features_this_class;
-		MultidimArray<int> p_mask;
-		features_this_class.class_distribution = mymodel.pdf_class[iclass];
-		features_this_class.particle_nr = features_this_class.class_distribution * total_nr_particles;
-		features_this_class.estimated_resolution = mymodel.estimated_resolution[iclass];
-		features_this_class.accuracy_rotation = mymodel.acc_rot[iclass];
-		features_this_class.accuracy_translation = mymodel.acc_trans[iclass];
-		if (features_this_class.particle_nr > 10)
+		classFeatures base_features;
+		base_features.class_distribution = mymodel.pdf_class[iclass];
+		base_features.particle_nr = base_features.class_distribution * total_nr_particles;
+		base_features.estimated_resolution = mymodel.estimated_resolution[iclass];
+		base_features.accuracy_rotation = mymodel.acc_rot[iclass];
+		base_features.accuracy_translation = mymodel.acc_trans[iclass];
+		if (base_features.particle_nr <= 10) continue;
+
+		base_features.name = mymodel.ref_names[iclass];
+		base_features.class_index = iclass + 1;
+		int nr_views = do_3d_class_ranking ? nr_3d_projections : 1;
+		for (int iview = 0; iview < nr_views; iview++)
 		{
-			features_this_class.name = mymodel.ref_names[iclass];
-			features_this_class.class_index = getClassIndex(features_this_class.name);
-			features_this_class.subimages = getSubimages(mymodel.Iref[iclass], subimage_boxsize, nr_subimages, &p_mask);
+			classFeatures features_this_class = base_features;
+			MultidimArray<RFLOAT> class_image;
+			if (do_3d_class_ranking)
+			{
+				features_this_class.projection_index = iview;
+				features_this_class.projection_rot = projection_rots[iview];
+				features_this_class.projection_tilt = projection_tilts[iview];
+				class_image = project3DClass(iclass, projection_rots[iview], projection_tilts[iview]);
+				if (have_average_ctf) correctCtfUntilFirstPeak(class_image, average_ctf);
+			}
+			else
+			{
+				class_image = mymodel.Iref[iclass];
+			}
+
+			MultidimArray<int> p_mask;
+			features_this_class.subimages = getSubimages(class_image, subimage_boxsize, nr_subimages, &p_mask);
 
 			FileName fn_stack;
-            fn_stack.compose(fn_out + "subimages_class", features_this_class.class_index, "mrcs");
-            Image<RFLOAT> img;
-            img()=features_this_class.subimages;
-            img.write(fn_stack, -1, true);
-
-            // Push back the features of this class in the vector for all classes
-    		features_all_classes.push_back(features_this_class);
+			fn_stack.compose(fn_out + "subimages_class", features_this_class.class_index, "mrcs");
+			if (features_this_class.projection_index >= 0)
+				fn_stack = fn_stack.insertBeforeExtension("_projection" + integerToString(features_this_class.projection_index + 1));
+			Image<RFLOAT> img;
+			img() = features_this_class.subimages;
+			img.write(fn_stack, -1, true);
+			features_all_classes.push_back(features_this_class);
 		}
 	}
 }
 
-// Get features for non-empty classes
+// Get features for non-empty classes. For a 3D classification, each entry in
+// features_all_classes is one projected view; performRanking averages the CNN
+// predictions over all entries with the same class_index.
 void ClassRanker::getFeatures()
 {
-
 	minRes = 999.0;
 	features_all_classes.clear();
-	features_all_classes.reserve(mymodel.nr_classes);
+	features_all_classes.reserve((end_class - start_class) * (do_3d_class_ranking ? nr_3d_projections : 1));
 
 	if (verb > 0)
 	{
-		std::cout << " Calculating features for each class ..." << std::endl;
-		init_progress_bar(end_class-start_class);
+		std::cout << " Calculating features for each "
+		          << (do_3d_class_ranking ? "3D-class projection" : "class") << " ..." << std::endl;
+		init_progress_bar(end_class - start_class);
 	}
+
+	std::vector<RFLOAT> projection_rots, projection_tilts;
+	if (do_3d_class_ranking)
+		get3DProjectionDirections(projection_rots, projection_tilts);
 
 	int ith_nonzero_class = 0;
 	for (int iclass = start_class; iclass < end_class; iclass++)
 	{
-		if (debug > 0) std::cerr << " dealing with class: " << iclass+1 << std::endl;
-		classFeatures features_this_class;
-
-		// Get class distribution and particle number in the class and exclude classes with less than 10 particles (so that particle-number
-// weighted resolution is sensible)
-		features_this_class.class_distribution = mymodel.pdf_class[iclass];
-		features_this_class.particle_nr = features_this_class.class_distribution * total_nr_particles;
-		if (features_this_class.particle_nr > 10)
+		if (debug > 0) std::cerr << " dealing with class: " << iclass + 1 << std::endl;
+		classFeatures base_features;
+		base_features.class_distribution = mymodel.pdf_class[iclass];
+		base_features.particle_nr = base_features.class_distribution * total_nr_particles;
+		if (base_features.particle_nr > 10)
 		{
-			features_this_class.name = mymodel.ref_names[iclass];
-			features_this_class.class_index = getClassIndex(features_this_class.name);
-			Image<RFLOAT> img;
-			img() = mymodel.Iref[iclass];
+			base_features.name = mymodel.ref_names[iclass];
+			// 3D maps are standalone MRC files rather than indexed stack entries,
+			// so derive the class number from the model-table row in both modes.
+			base_features.class_index = iclass + 1;
 
-			// Get selection label (if training data)
 			if (MD_select.numberOfObjects() > 0)
-			{
-				MD_select.getValue(EMDL_SELECTED, features_this_class.is_selected, iclass);
-			}
+				MD_select.getValue(EMDL_SELECTED, base_features.is_selected, iclass);
 			else
-			{
-				features_this_class.is_selected = 1;
-			}
+				base_features.is_selected = 1;
 
-			// Get estimated resolution (regardless of whether it is already in model_classes table or not)
 			if (mymodel.estimated_resolution[iclass] > 0.)
-			{
-				features_this_class.estimated_resolution = mymodel.estimated_resolution[iclass];
-			}
+				base_features.estimated_resolution = mymodel.estimated_resolution[iclass];
 			else
-			{
-				// TODO: this still relies on mlmodel!!!
-				features_this_class.estimated_resolution = findResolution(features_this_class);
-			}
+				base_features.estimated_resolution = findResolution(base_features);
 
-			// Calculate particle number-weighted resolution
-			features_this_class.weighted_resolution = (1. / (features_this_class.estimated_resolution*features_this_class.estimated_resolution)) / log(features_this_class.particle_nr);
-
-			// Calculate image size weighted resolution
-			features_this_class.relative_resolution = features_this_class.estimated_resolution / (mymodel.ori_size * mymodel.pixel_size);
-
-			// Find job-wise best resolution among selected (red) classes in preparation for class score calculation called in the write_output function
-			if (features_this_class.is_selected == 1 && features_this_class.estimated_resolution < minRes)
-			{
-				minRes = features_this_class.estimated_resolution;
-			}
+			base_features.weighted_resolution = (1. / (base_features.estimated_resolution * base_features.estimated_resolution))
+					/ log(base_features.particle_nr);
+			base_features.relative_resolution = base_features.estimated_resolution / (mymodel.ori_size * mymodel.pixel_size);
+			if (base_features.is_selected == 1 && base_features.estimated_resolution < minRes)
+				minRes = base_features.estimated_resolution;
 
 			if (do_skip_angular_errors)
 			{
-				features_this_class.accuracy_rotation = (preread_features_all_classes[ith_nonzero_class]).accuracy_rotation;
-				features_this_class.accuracy_translation = (preread_features_all_classes[ith_nonzero_class]).accuracy_translation;
+				base_features.accuracy_rotation = preread_features_all_classes[ith_nonzero_class].accuracy_rotation;
+				base_features.accuracy_translation = preread_features_all_classes[ith_nonzero_class].accuracy_translation;
 			}
 			else
 			{
-				// Calculate class accuracy rotation and translation from model.star if present
-				features_this_class.accuracy_rotation = mymodel.acc_rot[iclass];
-				features_this_class.accuracy_translation = mymodel.acc_trans[iclass];
-				if (debug>0) std::cerr << " mymodel.acc_rot[iclass]= " << mymodel.acc_rot[iclass] << " mymodel.acc_trans[iclass]= " << mymodel.acc_trans[iclass] << std::endl;
-				if (features_this_class.accuracy_rotation > 99. || features_this_class.accuracy_translation > 99.)
+				base_features.accuracy_rotation = mymodel.acc_rot[iclass];
+				base_features.accuracy_translation = mymodel.acc_trans[iclass];
+				if (base_features.accuracy_rotation > 99. || base_features.accuracy_translation > 99.)
+					calculateExpectedAngularErrors(iclass, base_features);
+			}
+
+			if (do_3d_class_ranking)
+			{
+				for (int iproj = 0; iproj < nr_3d_projections; iproj++)
 				{
-					calculateExpectedAngularErrors(iclass, features_this_class);
-				}
-				if (debug > 0) std::cerr << " done with angular errors" << std::endl;
-			}
-
-			// Now that we are going to calculate image-based features,
-			// re-scale the image to have uniform pixel size of 4 angstrom
-			int newsize = ROUND(XSIZE(img()) * (mymodel.pixel_size / uniform_angpix));
-			newsize -= newsize%2; //make even in case it is not already
-			resizeMap(img(), newsize);
-			img().setXmippOrigin();
-
-			// Determining radius to use
-			circular_mask_radius = particle_diameter / (uniform_angpix * 2.);
-			circular_mask_radius = std::min(RFLOAT(XSIZE(img())/2.) , circular_mask_radius);
-			if (radius_ratio > 0 && radius <= 0) radius = radius_ratio * circular_mask_radius;
-			// Calculate moments in ring area
-			if (radius > 0)
-			{
-				features_this_class.ring_moments = calculateMoments(img(), radius, circular_mask_radius);
-//				features_this_class.inner_circle_moments = calculateMoments(img(), 0, radius); // no longer written out
-			}
-			if (debug > 0) std::cerr << " done with ring moments" << std::endl;
-
-			// Store the mean, stddev, minval and maxval of the lowpassed image as features
-			MultidimArray<RFLOAT> lpf;
-			lpf = img();
-			lowPassFilterMap(lpf, lowpass, uniform_angpix);
-			lpf.computeStats(features_this_class.lowpass_filtered_img_avg, features_this_class.lowpass_filtered_img_stddev,
-					features_this_class.lowpass_filtered_img_minval, features_this_class.lowpass_filtered_img_maxval);
-
-		 	// Make filtered masks
-//			MultidimArray<RFLOAT> lpf;
-			MultidimArray<int> p_mask, s_mask;
-			long protein_area=0, solvent_area=0;
-			makeSolventMasks(features_this_class, img(), lpf, p_mask, s_mask, features_this_class.scattered_signal, protein_area, solvent_area);
-			// Protein and solvent area
-			if (protein_area > 1) features_this_class.protein_area = 1;
-			if (solvent_area > 0.08*3.14*circular_mask_radius*circular_mask_radius) features_this_class.solvent_area = 1;
-			if (do_save_masks) saveMasks(img, lpf, p_mask, s_mask, features_this_class);
-
-			// Circumference to area ratio
-			RFLOAT protein_C = 0.;
-			if (features_this_class.protein_area > 0.5)
-			{
-				maskCircumference(p_mask, protein_C, features_this_class, do_save_mask_c);
-				features_this_class.CAR = protein_C / (2*sqrt(3.14*protein_area));
-				// Debug
-//				std::cerr << "Class " << features_this_class.class_index << ": protein area: " << protein_area << " mask circumference: " << protein_C << std::endl;
-			}
-			// Store entropy features on overall, protein and solvent region
-			features_this_class.solvent_entropy = img().entropy(&s_mask);
-			features_this_class.protein_entropy = img().entropy(&p_mask);
-			features_this_class.total_entropy = img().entropy();
-
-			// Moments for the protein and solvent area
-			features_this_class.protein_moments = calculateMoments(img(), 0., circular_mask_radius, &p_mask);
-			features_this_class.solvent_moments = calculateMoments(img(), 0., circular_mask_radius, &s_mask);
-
-			// Signal intensity in the protein area relative to the solvent area
-			features_this_class.relative_signal_intensity = features_this_class.protein_moments.sum - features_this_class.solvent_moments.mean*protein_area;
-
-			// Fraction of white pixels in the protein mask on the edge
-			long int edge_pix = 0, edge_white = 0;
-			FOR_ALL_ELEMENTS_IN_ARRAY2D(p_mask)
-			{
-				if (round(sqrt(RFLOAT(i * i + j * j))) == round(circular_mask_radius))
-				{
-					edge_pix++;
-					if (A2D_ELEM(p_mask, i, j) == 1) edge_white++;
+					classFeatures projection_features = base_features;
+					projection_features.projection_index = iproj;
+					projection_features.projection_rot = projection_rots[iproj];
+					projection_features.projection_tilt = projection_tilts[iproj];
+					MultidimArray<RFLOAT> projection = project3DClass(iclass, projection_rots[iproj], projection_tilts[iproj]);
+					if (have_average_ctf) correctCtfUntilFirstPeak(projection, average_ctf);
+					calculateImageFeatures(projection, projection_features);
+					features_all_classes.push_back(projection_features);
 				}
 			}
-			features_this_class.edge_signal = RFLOAT(edge_white) / RFLOAT(edge_pix);
-			if (debug > 0) std::cerr << " done with edge signal" << std::endl;
-
-			if (do_granularity_features)
+			else
 			{
-				// Calculate whole image LBP and protein and solvent area LBP
-				calculatePvsLBP(img(), p_mask, s_mask, features_this_class);
-				if (debug > 0) std::cerr << " done with lbp" << std::endl;
-
-				// Calculate Haralick features
-				if (debug>0) std::cerr << "Haralick features for protein area:" << std::endl;
-				features_this_class.haralick_p = haralick_extractor.getHaralickFeatures(img(), &p_mask, debug>0);
-				if (debug>0) std::cerr << "Haralick features for solvent area:" << std::endl;
-				features_this_class.haralick_s = haralick_extractor.getHaralickFeatures(img(), &s_mask, debug>0);
-				if (debug > 0) std::cerr << " done with haralick" << std::endl;
-
-				// Calculate Zernike moments
-				features_this_class.zernike_moments = zernike_extractor.getZernikeMoments(img(), 7, circular_mask_radius, debug>0);
-				if (debug> 0 ) std::cerr << " done with Zernike moments" << std::endl;
-
-				// Calculate granulo feature
-				features_this_class.granulo = calculateGranulo(img());
+				classFeatures features_this_class = base_features;
+				calculateImageFeatures(mymodel.Iref[iclass], features_this_class);
+				features_all_classes.push_back(features_this_class);
 			}
-//			std::cout << "protein_area: " << features_this_class.protein_area << std::endl;
-//			std::cout << "solvent_area: " << features_this_class.solvent_area << std::endl;
-
-			// SHWS 15072020: new try small subimages with fixed boxsize at uniform_angpix for image-based CNN
-			Image<RFLOAT> Itt;
-			features_this_class.subimages = getSubimages(mymodel.Iref[iclass], subimage_boxsize, nr_subimages, &p_mask);
-			if (debug> 0 ) std::cerr << " done with getSubimages" << std::endl;
-
-			// Push back the features of this class in the vector for all classes
-			features_all_classes.push_back(features_this_class);
 
 			ith_nonzero_class++;
+		}
 
-			if (verb > 0)
-				progress_bar(iclass-start_class+1);
+		if (verb > 0) progress_bar(iclass - start_class + 1);
+	}
 
-		} // end if non-zero class
+	if (!features_all_classes.empty())
+		ClassRanker::localNormalisation(features_all_classes);
 
-	} // end iterating all classes
-
-	// Apply local normalisation for protein_sum, solvent_sum, and relative_signal_intensity
-	ClassRanker::localNormalisation(features_all_classes);
-
-	// If training, auto-labelled class score will be calculated and written out in writeFeatures()
-
-	if (verb > 0)
-		progress_bar(end_class-start_class);
-
+	if (verb > 0) progress_bar(end_class - start_class);
 }
+
 
 // TODO: Liyi: make a read
 void ClassRanker::readFeatures()
@@ -1928,70 +1995,81 @@ void ClassRanker::performRanking()
 {
 	if (mydata.numberOfParticles() == 0)
 	{
-		// Read in particles if we haven't done this already
-		mydata.read(fn_data, "", "", true, true); // true true means: ignore particle_name and group name!
-		if (debug>0) std::cerr << "Done with reading data.star ..." << std::endl;
+		mydata.read(fn_data, "", "", true, true); // ignore particle_name and group name
+		if (debug > 0) std::cerr << "Done with reading data.star ..." << std::endl;
 	}
+
+	if (features_all_classes.empty())
+		REPORT_ERROR("ClassRanker found no non-empty classes to score.");
 
 	if (verb > 0)
 	{
-		std::cout << " Deploying torch model for each class ..." << std::endl;
+		std::cout << " Deploying torch model for each "
+		          << (do_3d_class_ranking ? "3D-class projection" : "class") << " ..." << std::endl;
 	}
 
-	// Initialise all scores to -999 (including empty classes!)
-	std::vector<RFLOAT> predicted_scores(mymodel.nr_classes, -999.);
-
-	// to preserve original particle order in the data.star file
+	// Preserve original particle order in the data.star file.
 	if (do_select)
 	{
-		// Store original image order
 		long int nr_parts = mydata.MDimg.numberOfObjects();
 		for (long int j = 0; j < nr_parts; j++)
-		{
 			mydata.MDimg.setValue(EMDL_SORTED_IDX, j, j);
-		}
 	}
-
-	MetaDataTable MDselected_particles, MDselected_classavgs;
-
-	RFLOAT highscore = 0.0;
-	std::vector<int> selected_classes;
-	std::vector<float> scores;
-	float max_score = -999.;
-//	for (int i = 0; i < features_all_classes.size(); i++)
-//	{
-//		std::vector<float> image_vector, feature_vector;
-//
-//		MultidimArray<RFLOAT> myimg;
-//		features_all_classes[i].subimages.getSlice(0, myimg);
-//		image_vector.resize(NZYXSIZE(myimg));
-//		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(myimg)
-//		{
-//			image_vector[n] = DIRECT_MULTIDIM_ELEM(myimg, n);
-//		}
-//		feature_vector = features_all_classes[i].toNormalizedVector();
-//		scores[i] = (RFLOAT) deployTorchModel(fn_pytorch_model, feature_vector, image_vector);
-//		if (scores[i] > max_score) max_score = scores[i];
-//	}
 
 	std::vector<float> image_vector(features_all_classes.size() * IMGSIZE * IMGSIZE);
 	std::vector<float> feature_vector(features_all_classes.size() * NR_FEAT);
 	for (int i = 0; i < features_all_classes.size(); i++)
 	{
+		if (features_all_classes[i].granulo.size() < 6)
+			REPORT_ERROR("ClassRanker scoring requires granularity features; use --do_granularity_features.");
 		std::vector<float> f = features_all_classes[i].toNormalizedVector();
+		if (f.size() != NR_FEAT)
+			REPORT_ERROR("BUG: unexpected ClassRanker feature-vector size.");
 		for (int j = 0; j < NR_FEAT; j++)
-			feature_vector[i*NR_FEAT + j] = f[j];
+			feature_vector[i * NR_FEAT + j] = f[j];
 
 		MultidimArray<RFLOAT> img;
 		features_all_classes[i].subimages.getSlice(0, img);
-		image_vector.resize(NZYXSIZE(img));
+		if (NZYXSIZE(img) != IMGSIZE * IMGSIZE)
+			REPORT_ERROR("BUG: unexpected ClassRanker CNN image size.");
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img)
-		{
 			image_vector[i * IMGSIZE * IMGSIZE + n] = DIRECT_MULTIDIM_ELEM(img, n);
-		}
 	}
 
-	deployTorchModel(feature_vector, image_vector, scores);
+	std::vector<float> projection_scores;
+	deployTorchModel(feature_vector, image_vector, projection_scores);
+	if (projection_scores.size() != features_all_classes.size())
+		REPORT_ERROR("ClassRanker received an unexpected number of CNN predictions.");
+
+	// In 2D there is one feature row per class. In 3D there are multiple rows per
+	// class, one for every projection. Average all projection predictions here so
+	// all downstream selection and STAR output remain class-wise.
+	std::vector<RFLOAT> predicted_scores(mymodel.nr_classes, -999.);
+	std::vector<RFLOAT> score_sums(mymodel.nr_classes, 0.);
+	std::vector<int> score_counts(mymodel.nr_classes, 0);
+	std::vector<int> representative_feature(mymodel.nr_classes, -1);
+	for (int i = 0; i < features_all_classes.size(); i++)
+	{
+		int iclass = features_all_classes[i].class_index - 1;
+		if (iclass < 0 || iclass >= mymodel.nr_classes)
+			REPORT_ERROR("BUG: ClassRanker class index lies outside the model.");
+		score_sums[iclass] += projection_scores[i];
+		score_counts[iclass]++;
+		if (representative_feature[iclass] < 0)
+			representative_feature[iclass] = i;
+	}
+
+	std::vector<int> ranked_classes;
+	RFLOAT max_score = -999.;
+	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+	{
+		if (score_counts[iclass] > 0)
+		{
+			predicted_scores[iclass] = score_sums[iclass] / (RFLOAT)score_counts[iclass];
+			ranked_classes.push_back(iclass);
+			max_score = std::max(max_score, predicted_scores[iclass]);
+		}
+	}
 
 	RFLOAT my_min = select_min_score;
 	RFLOAT my_max = select_max_score;
@@ -2001,107 +2079,69 @@ void ClassRanker::performRanking()
 		my_max = select_max_score * max_score;
 	}
 
-
-	MetaDataTable MDbackup;
+	MetaDataTable MDselected_particles, MDselected_classavgs, MDbackup;
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 	{
 		MDbackup.addObject();
 		MDbackup.setValue(EMDL_SELECTED, 0);
 	}
 
+	std::vector<int> selected_classes;
+	std::vector<bool> class_is_selected(mymodel.nr_classes, false);
 	long int nr_sel_parts = 0;
 	long int nr_sel_classavgs = 0;
-	for (int i = 0; i < features_all_classes.size(); i++)
+
+	auto selectClass = [&](int iclass)
 	{
-		if (do_select && scores[i] >= my_min && scores[i] <= my_max)
+		if (class_is_selected[iclass]) return;
+		int ifeature = representative_feature[iclass];
+		if (ifeature < 0) return;
+		classFeatures &cf = features_all_classes[ifeature];
+
+		class_is_selected[iclass] = true;
+		nr_sel_classavgs++;
+		nr_sel_parts += cf.particle_nr;
+		selected_classes.push_back(iclass + 1);
+
+		MDselected_classavgs.addObject();
+		MDselected_classavgs.setValue(EMDL_MLMODEL_REF_IMAGE, cf.name);
+		MDselected_classavgs.setValue(EMDL_CLASS_PREDICTED_SCORE, predicted_scores[iclass]);
+		MDselected_classavgs.setValue(EMDL_MLMODEL_PDF_CLASS, cf.class_distribution);
+		MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_ROT, cf.accuracy_rotation);
+		MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, cf.accuracy_translation);
+		MDselected_classavgs.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, cf.estimated_resolution);
+		MDbackup.setValue(EMDL_SELECTED, 1, iclass);
+	};
+
+	if (do_select)
+	{
+		for (int iclass : ranked_classes)
 		{
-			nr_sel_classavgs++;
-			nr_sel_parts+= features_all_classes[i].particle_nr;
-
-			selected_classes.push_back(features_all_classes[i].class_index);
-
-			MDselected_classavgs.addObject();
-			MDselected_classavgs.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[i].name);
-			MDselected_classavgs.setValue(EMDL_CLASS_PREDICTED_SCORE, scores[i]);
-			MDselected_classavgs.setValue(EMDL_MLMODEL_PDF_CLASS, features_all_classes[i].class_distribution);
-			MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_ROT, features_all_classes[i].accuracy_rotation);
-			MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, features_all_classes[i].accuracy_translation);
-			MDselected_classavgs.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, features_all_classes[i].estimated_resolution);
-
-			MDbackup.setValue(EMDL_SELECTED, 1, features_all_classes[i].class_index - 1 );
+			if (predicted_scores[iclass] >= my_min && predicted_scores[iclass] <= my_max)
+				selectClass(iclass);
 		}
 
-		// Set myscore in the vector that now runs over ALL classes (including empty ones)
-		int iclass = features_all_classes[i].class_index - 1; // class counting in STAR files starts at 1!
-		predicted_scores.at(iclass) = scores[i];
+		bool need_more_particles = (select_min_parts >= 0 && nr_sel_parts < select_min_parts);
+		bool need_more_classes = (select_min_classes >= 0 && nr_sel_classavgs < select_min_classes);
+		if (need_more_particles || need_more_classes)
+		{
+			std::vector<std::pair<RFLOAT, int> > sorted_classes;
+			for (int iclass : ranked_classes)
+				sorted_classes.push_back(std::make_pair(predicted_scores[iclass], iclass));
+			std::sort(sorted_classes.begin(), sorted_classes.end());
+
+			for (int idx = (int)sorted_classes.size() - 1; idx >= 0; idx--)
+			{
+				int iclass = sorted_classes[idx].second;
+				if (!class_is_selected[iclass]) selectClass(iclass);
+				need_more_particles = (select_min_parts >= 0 && nr_sel_parts < select_min_parts);
+				need_more_classes = (select_min_classes >= 0 && nr_sel_classavgs < select_min_classes);
+				if (!need_more_particles && !need_more_classes) break;
+			}
+		}
 	}
 
-	// Select a minimum number of particles or classes
-	if (do_select && (nr_sel_parts < select_min_parts || nr_sel_classavgs < select_min_classes) )
-	{
-		std::vector<std::pair<float, int> > vp;
-
-	    for (int i = 0; i < scores.size(); i++)
-	    {
-	        vp.push_back(std::make_pair(scores[i], i));
-	    }
-	    std::sort(vp.begin(), vp.end());
-
-	    // Go from best classes down to worst
-	    for (int idx = scores.size() - 1; idx >=0 ; idx--)
-	    {
-	    	int i = vp[idx].second;
-    		float myscore = scores[i];
-    		// only consider classes that we haven't considered yet
-    		if (!(scores[i] >= my_min && scores[i] <= my_max))
-    		{
-    			if (nr_sel_parts < select_min_parts)
-				{
-
-    				nr_sel_classavgs++;
-    				nr_sel_parts+= features_all_classes[i].particle_nr;
-
-    				selected_classes.push_back(features_all_classes[i].class_index);
-
-    				MDselected_classavgs.addObject();
-    				MDselected_classavgs.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[i].name);
-    				MDselected_classavgs.setValue(EMDL_CLASS_PREDICTED_SCORE, scores[i]);
-    				MDselected_classavgs.setValue(EMDL_MLMODEL_PDF_CLASS, features_all_classes[i].class_distribution);
-    				MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_ROT, features_all_classes[i].accuracy_rotation);
-    				MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, features_all_classes[i].accuracy_translation);
-    				MDselected_classavgs.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, features_all_classes[i].estimated_resolution);
-
-    				MDbackup.setValue(EMDL_SELECTED, 1, features_all_classes[i].class_index - 1 );
-
-					if (nr_sel_parts >= select_min_parts) break;
-				}
-				else if (nr_sel_classavgs < select_min_classes)
-				{
-
-					nr_sel_classavgs++;
-					nr_sel_parts+= features_all_classes[i].particle_nr;
-
-					selected_classes.push_back(features_all_classes[i].class_index);
-
-					MDselected_classavgs.addObject();
-					MDselected_classavgs.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[i].name);
-					MDselected_classavgs.setValue(EMDL_CLASS_PREDICTED_SCORE, scores[i]);
-					MDselected_classavgs.setValue(EMDL_MLMODEL_PDF_CLASS, features_all_classes[i].class_distribution);
-					MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_ROT, features_all_classes[i].accuracy_rotation);
-					MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, features_all_classes[i].accuracy_translation);
-					MDselected_classavgs.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, features_all_classes[i].estimated_resolution);
-
-					MDbackup.setValue(EMDL_SELECTED, 1, features_all_classes[i].class_index - 1 );
-
-					if (nr_sel_classavgs >= select_min_classes) break;
-				}
-    		}
-	    }
-
-	}
-
-
-	// Write optimiser.star and model.star in the output directory.
+	// Write optimiser.star and the class-wise score table.
 	FileName fn_opt_out, fn_model_out, fn_data_out;
 	fn_opt_out = fn_out + fn_root + "_optimiser.star";
 	fn_model_out = fn_out + fn_root + "_model.star";
@@ -2123,7 +2163,7 @@ void ClassRanker::performRanking()
 		MDclass.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, mymodel.acc_trans[iclass]);
 		MDclass.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, mymodel.estimated_resolution[iclass]);
 		MDclass.setValue(EMDL_MLMODEL_FOURIER_COVERAGE_TOTAL_REF, mymodel.total_fourier_coverage[iclass]);
-		if (mymodel.ref_dim==2)
+		if (mymodel.ref_dim == 2)
 		{
 			MDclass.setValue(EMDL_MLMODEL_PRIOR_OFFX_CLASS, XX(mymodel.prior_offset_class[iclass]));
 			MDclass.setValue(EMDL_MLMODEL_PRIOR_OFFY_CLASS, YY(mymodel.prior_offset_class[iclass]));
@@ -2132,40 +2172,31 @@ void ClassRanker::performRanking()
 	MDclass.setName("model_classes");
 	MDclass.write(fn_model_out);
 	if (verb > 0)
-	{
 		std::cout << " Written model with all predicted scores to: " << fn_opt_out << std::endl;
-	}
 
 	if (do_select)
 	{
-
-		// Select all particles in the data.star that have classes inside the selected_classes vector
-		nr_sel_parts = 0;
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(mydata.MDimg)
 		{
 			int classnr;
 			mydata.MDimg.getValue(EMDL_PARTICLE_CLASS, classnr);
 			if (std::find(selected_classes.begin(), selected_classes.end(), classnr) != selected_classes.end())
-			{
 				MDselected_particles.addObject(mydata.MDimg.getObject());
-				nr_sel_parts++;
-			}
 		}
-		// Maintain the original image ordering and obsModel in mydata too
+
 		MDselected_particles.sort(EMDL_SORTED_IDX);
 		mydata.MDimg = MDselected_particles;
-        mydata.MDimg.setName("particles");
-		mydata.write(fn_out+fn_sel_parts);
-
-		// Also write out class_averages.star with the selected classes
-		MDselected_classavgs.write(fn_out+fn_sel_classavgs);
+		mydata.MDimg.setName("particles");
+		mydata.write(fn_out + fn_sel_parts);
+		MDselected_classavgs.write(fn_out + fn_sel_classavgs);
 
 		if (verb > 0)
 		{
-			std::cout << " Written " << nr_sel_parts << " selected particles to: " << fn_out << fn_sel_parts << std::endl;
-			std::cout << " Written " << nr_sel_classavgs << " selected classes to: " << fn_out << fn_sel_classavgs << std::endl;
+			std::cout << " Written " << mydata.MDimg.numberOfObjects() << " selected particles to: "
+			          << fn_out << fn_sel_parts << std::endl;
+			std::cout << " Written " << nr_sel_classavgs << " selected classes to: "
+			          << fn_out << fn_sel_classavgs << std::endl;
 		}
-
 	}
 }
 
@@ -2187,6 +2218,16 @@ void ClassRanker::writeFeatures()
 
             MD_class_features.addObject();
             MD_class_features.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[i].name);
+
+			if (features_all_classes[i].projection_index >= 0)
+			{
+				MD_class_features.setValue(EMDL_ORIENT_ROT, features_all_classes[i].projection_rot);
+				MD_class_features.setValue(EMDL_ORIENT_TILT, features_all_classes[i].projection_tilt);
+				MD_class_features.setValue(EMDL_ORIENT_PSI, 0.);
+				MD_normalized_class_features.setValue(EMDL_ORIENT_ROT, features_all_classes[i].projection_rot);
+				MD_normalized_class_features.setValue(EMDL_ORIENT_TILT, features_all_classes[i].projection_tilt);
+				MD_normalized_class_features.setValue(EMDL_ORIENT_PSI, 0.);
+			}
 
             // First calculate class scores if this is for training purpose (as the calculation depends on minRes, which can only be obtained at the end of the loop of getFeatures())
             if (!do_ranking)
@@ -2269,6 +2310,8 @@ void ClassRanker::writeFeatures()
             {
                 FileName fn_stack;
                 fn_stack.compose(fn_out + "subimages_class", features_all_classes[i].class_index, "mrcs");
+				if (features_all_classes[i].projection_index >= 0)
+					fn_stack = fn_stack.insertBeforeExtension("_projection" + integerToString(features_all_classes[i].projection_index + 1));
                 Image<RFLOAT> img;
                 img()=features_all_classes[i].subimages;
                 img.write(fn_stack, -1, true);

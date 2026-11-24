@@ -348,6 +348,11 @@ void init_random_generator(int seed = -1);
  */
 void randomize_random_generator();
 
+/** A seed from std::random_device in [1, INT_MAX], never -1 (unset) or 0 (no
+ *  randomisation of the particle order), which the optimiser treats specially.
+ */
+int random_device_seed();
+
 /** Produce a uniform random number between a and b
  *
  * @code
@@ -374,6 +379,27 @@ float rnd_gaus(float mu = 0., float sigma = 1.);
  * @endcode
  */
 float rnd_student_t(RFLOAT nu, float mu = 0., float sigma = 1.);
+
+// What the random numbers are for; each use has its own streams
+enum RandomUse { RANDOM_CLASS, RANDOM_NOISE, RANDOM_ANGLES, RANDOM_ACCURACY,
+                 RANDOM_SAMPLING, RANDOM_MEMORY, RANDOM_HALVES, RANDOM_PHASES,
+                 RANDOM_BLOBS };
+
+/** Random numbers that depend only on the seed, the use and the stream (e.g. a
+ *  particle), not on which thread draws them. Philox4x32 from Random123.
+ */
+class RandomStream
+{
+public:
+	RandomStream(unsigned long seed, RandomUse use, unsigned long stream);
+	unsigned int next();
+	float unif(float a = 0., float b = 1.);
+	float gaus(float mu = 0., float sigma = 1.);
+
+private:
+	unsigned int key[2], counter[4], block[4];
+	int used;
+};
 
 /** Gaussian area from -x0 to x0
  *

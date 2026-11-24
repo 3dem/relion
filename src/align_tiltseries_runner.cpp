@@ -785,6 +785,9 @@ bool AlignTiltseriesRunner::readAreTomoResults(long idx_tomo, std::string &error
     FileName fn_ctf = fn_dir + tomoname + "_ctf.txt";
     FileName fn_log = fn_dir + tomoname + ".log";
 
+    // In case of MPI, the tomogramTable may not yet have been sorted on the tilt angle. Do it again now
+    tomogramSet.tomogramTables[idx_tomo].newSort(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE);
+
     int fc = tomogramSet.tomogramTables[idx_tomo].numberOfObjects();
     RFLOAT angpix = tomogramSet.getTiltSeriesPixelSize(idx_tomo);
 
@@ -860,8 +863,13 @@ bool AlignTiltseriesRunner::readAreTomoResults(long idx_tomo, std::string &error
 
     if (rot.size() != fc - dark_frames.size())
     {
-        error_message = " ERROR_: unexpected number of data rows in parameter file: " + fn_aln + " : " +
+        error_message = " ERROR: unexpected number of data rows in parameter file: " + fn_aln + " : " +
                 integerToString(rot.size()) + " (expected: " + integerToString(fc) + " - " + integerToString(dark_frames.size()) + " dark frames )";
+        return false;
+    }
+    if (fc = dark_frames.size())
+    {
+        error_message = " ERROR: all frames are dark; inspect AreTomo2 logs for: " + fn_log;
         return false;
     }
 

@@ -385,15 +385,6 @@ public:
 
 	}
 
-	// Generate random number on a normal distribution, with std=1 and mean=0
-	template<typename T>
-	static T random_normal()
-	{
-		T v1 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
-		T v2 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
-		return cos(2 * 3.14 * v2) * sqrt(-2. * log(v1));
-	}
-
 	template<typename T>
 	static T mean(MultidimArray<T> &array)
 	{
@@ -420,7 +411,7 @@ public:
 	}
 
 	template<typename T>
-	static void make_blobs_2d(MultidimArray<T> &box, MultidimArray<T> &amp_box, unsigned nr_blobs, T diameter, bool helical)
+	static void make_blobs_2d(MultidimArray<T> &box, MultidimArray<T> &amp_box, unsigned nr_blobs, T diameter, bool helical, RandomStream &rng)
 	{
 		std::vector<T> blobs_x(nr_blobs), blobs_y(nr_blobs), blobs_amp(nr_blobs, 0);
 		box.resize(amp_box);
@@ -430,10 +421,10 @@ public:
 		{
 			// Generate random coordinates
 			if (helical)
-				blobs_x[i] = (T) (rand() % box.xdim);
+				blobs_x[i] = (T) (rng.next() % box.xdim);
 			else
-				blobs_x[i] = random_normal<T>() * diameter / 7. + box.xdim / 2.;
-			blobs_y[i] = random_normal<T>() * diameter / 7. + box.ydim / 2.;
+				blobs_x[i] = rng.gaus() * diameter / 7. + box.xdim / 2.;
+			blobs_y[i] = rng.gaus() * diameter / 7. + box.ydim / 2.;
 
 			if (blobs_y[i] < amp_box.ydim && blobs_x[i] < amp_box.xdim)
 				blobs_amp[i] = fabs(amp_box.data[(long) blobs_y[i] * amp_box.xdim + (long) blobs_x[i]]);
@@ -454,7 +445,7 @@ public:
 	}
 
 	template<typename T>
-	static void make_blobs_3d(MultidimArray<T> &box, MultidimArray<T> &amp_box, unsigned nr_blobs, T diameter, bool helical)
+	static void make_blobs_3d(MultidimArray<T> &box, MultidimArray<T> &amp_box, unsigned nr_blobs, T diameter, bool helical, RandomStream &rng)
 	{
 		std::vector<T> blobs_x(nr_blobs), blobs_y(nr_blobs), blobs_z(nr_blobs), blobs_amp(nr_blobs);
 		box.resize(amp_box);
@@ -463,13 +454,13 @@ public:
 		for (int i = 0; i < nr_blobs; i ++)
 		{
 			// Generate random coordinates
-			blobs_x[i] = random_normal<T>() * diameter / 6. + box.xdim / 2.;
-			blobs_y[i] = random_normal<T>() * diameter / 6. + box.ydim / 2.;
+			blobs_x[i] = rng.gaus() * diameter / 6. + box.xdim / 2.;
+			blobs_y[i] = rng.gaus() * diameter / 6. + box.ydim / 2.;
 
 			if (helical)
-				blobs_z[i] = ((T) rand() / (T) RAND_MAX) * box.zdim;
+				blobs_z[i] = rng.unif() * box.zdim;
 			else
-				blobs_z[i] = random_normal<T>() * diameter / 6. + box.zdim / 2.;
+				blobs_z[i] = rng.gaus() * diameter / 6. + box.zdim / 2.;
 
 			if (blobs_z[i] < amp_box.zdim && blobs_y[i] < amp_box.ydim && blobs_x[i] < amp_box.xdim)
 				blobs_amp[i] = fabs(amp_box.data[

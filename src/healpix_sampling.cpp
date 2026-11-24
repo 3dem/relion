@@ -124,9 +124,6 @@ void HealpixSampling::initialise(
 	// Store the non-oversampled projection directions
 	setOrientations(-1, -1.);
 
-	// Random perturbation and filling of the directions, psi_angles and translations vectors
-	resetRandomlyPerturbedSampling();
-
 	// SHWS 27feb2020: Set original sampling rates to allow 2D/3D classifications using coarser ones in earlier iterations
 	healpix_order_ori = healpix_order;
 	psi_step_ori = psi_step;
@@ -164,12 +161,12 @@ void HealpixSampling::initialiseSymMats(FileName fn_sym_, int & pgGroup_,
 
 }
 
-void HealpixSampling::resetRandomlyPerturbedSampling()
+void HealpixSampling::resetRandomlyPerturbedSampling(RandomStream &rng)
 {
 
 	// Actual instance of random perturbation
 	// Add to the random perturbation from the last iteration, so it keeps changing strongly...
-	random_perturbation += rnd_unif(0.5*perturbation_factor, perturbation_factor);
+	random_perturbation += rng.unif(0.5*perturbation_factor, perturbation_factor);
 	random_perturbation = realWRAP(random_perturbation, -perturbation_factor, perturbation_factor);
 
 }

@@ -805,13 +805,13 @@ void MlOptimiserMpi::initialiseWorkLoad()
 	{
 #ifdef USE_MPI_COLLECTIVE
 		if (node->isLeader())
-			random_seed = time(NULL);
+			random_seed = random_device_seed();
 
 		node->relion_MPI_Bcast(&random_seed, 1, MPI_INT, 0, MPI_COMM_WORLD);
 #else
 		if (node->isLeader())
 		{
-			random_seed = time(NULL);
+			random_seed = random_device_seed();
 		        for (int follower = 1; follower < node->size; follower++)
 	        		node->relion_MPI_Send(&random_seed, 1, MPI_INT, follower, MPITAG_RANDOMSEED, MPI_COMM_WORLD);
 		}
@@ -822,9 +822,6 @@ void MlOptimiserMpi::initialiseWorkLoad()
 		}
 #endif
 	}
-
-	// Also randomize random-number-generator for perturbations on the angles
-	init_random_generator(random_seed);
 
 	// Split the data into two random halves
 	if (do_split_random_halves)
@@ -3354,8 +3351,9 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 				{
 					std::cout.width(35); std::cout << std::left << "  + randomize phases beyond: "; std::cout << XSIZE(Iunreg1())* mymodel.pixel_size / randomize_at << " Angstroms" << std::endl;
 				}
-				randomizePhasesBeyond(Iunreg1(), randomize_at);
-				randomizePhasesBeyond(Iunreg2(), randomize_at);
+				RandomStream rng(random_seed, RANDOM_PHASES, iter);
+				randomizePhasesBeyond(Iunreg1(), randomize_at, &rng);
+				randomizePhasesBeyond(Iunreg2(), randomize_at, &rng);
 				// Mask randomized phases maps and calculated fsc_random_masked
 				Iunreg1() *= Imask();
 				Iunreg2() *= Imask();
